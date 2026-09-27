@@ -76,6 +76,7 @@
       <!-- State: Form -->
       <div v-else class="bg-card border border-border rounded-xl p-6 md:p-8">
         <!-- Step 1: Basic Info -->
+        <p v-if="hasCountryRestrictions && !availableCountryOptions.length" role="alert">{{ t('kyc.country_policy_unavailable') }}</p>
         <form v-if="currentStep === 1" @submit.prevent="nextStep" class="space-y-6">
           <div class="space-y-4">
             <div>
@@ -246,7 +247,7 @@
             <button
                 @click="handleSubmit"
                 class="px-8 py-3 bg-primary text-primary-foreground font-bold rounded hover:bg-primary/90 transition-all box-glow flex items-center gap-2"
-                :disabled="submitting || !form.documentType || (requiresHandheldImage && !form.handheldImage)"
+                :disabled="submitting || !availableCountryOptions.length || !form.documentType || (requiresHandheldImage && !form.handheldImage)"
             >
               <Icon v-if="submitting" icon="mdi:loading" class="animate-spin" />
               {{ submitting ? t('kyc.submitting') : t('kyc.submit') }}
@@ -319,16 +320,19 @@ const isEnterpriseType = computed(() => form.value.submissionType === 'enterpris
 
 const configuredCountries = computed(() => {
     const rules = kycConfig.value?.country_document_types?.map((rule) => rule.country).filter(Boolean) ?? []
+    const allowed = uniqueValues(kycConfig.value?.allowed_countries ?? [])
     if (rules.length > 0) {
-        return uniqueValues(rules)
+        return uniqueValues(rules).filter((country) => !allowed.length || allowed.some((value) => value.toLowerCase() === country.toLowerCase()))
     }
-    return uniqueValues(kycConfig.value?.allowed_countries ?? [])
+    return allowed
 })
+const hasCountryRestrictions = computed(() => Boolean(kycConfig.value?.allowed_countries?.length || kycConfig.value?.country_document_types?.length))
 
 const availableCountryOptions = computed<KycCountrySelectOption[]>(() => {
     const source = countryOptions.value.length > 0 ? countryOptions.value : fallbackCountryOptions
     const configured = configuredCountries.value
     if (configured.length === 0) {
+        if (hasCountryRestrictions.value) return []
         return source.map((country) => ({ ...country, value: country.name }))
     }
     return configured.map((value) => {
@@ -423,7 +427,7 @@ function documentTypeLabel(value: string) {
 }
 
 function nextStep() {
-    if (!form.value.realName || !form.value.country || !form.value.documentType || !form.value.idCard) {
+    if (!form.value.realName || !availableCountryOptions.value.some((option) => option.value === form.value.country) || !form.value.documentType || !form.value.idCard) {
         toast.error(t('kyc.fill_basic'))
         return
     }
@@ -488,6 +492,10 @@ function getErrorMessage(error: unknown) {
 }
 
 async function handleSubmit() {
+    if (!availableCountryOptions.value.some((option) => option.value === form.value.country)) {
+        toast.error(t('kyc.country_policy_unavailable'))
+        return
+    }
     if (!form.value.frontImage || !form.value.backImage) {
         toast.error(t('kyc.upload_both'))
         return

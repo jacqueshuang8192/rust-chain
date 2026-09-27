@@ -2,6 +2,7 @@ import { adminFieldLabel } from './adminPresentation';
 import { safeSingleLineText } from './sensitiveText';
 
 const knownMessages: Record<string, string> = {
+  'allowed_countries must have matching country_document_types': '允许国家与证件规则不一致，请为每个允许国家配置对应证件类型',
   unauthorized: '登录状态已失效，请重新登录',
   forbidden: '当前账号没有此操作权限',
   'not found': '记录不存在或已被移除',

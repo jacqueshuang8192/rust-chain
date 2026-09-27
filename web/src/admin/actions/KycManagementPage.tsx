@@ -5,6 +5,7 @@ import type { ColumnProps } from '@douyinfe/semi-ui/lib/es/table';
 import { useEffect, useMemo, useState } from 'react';
 
 import { apiRequest } from '../../api/client';
+import { listActiveAdminCountries } from '../../api/adminCountries';
 import { AdminRequestActionBoundary } from '../access';
 import { PageHeader } from '../../layouts/PageHeader';
 import { WorkflowPageActions } from '../components/WorkflowPageActions';
@@ -14,6 +15,7 @@ import { AdminSelect, AdminTextArea, AdminTextInput, type SemiSelectOption } fro
 import { StatusTag } from '../../shared/StatusTag';
 import { TimestampText } from '../../shared/TimestampText';
 import { containedTableStyle } from '../../shared/tableLayout';
+import { kycCountryPolicyError } from './kycCountryPolicy';
 
 const { Text, Title } = Typography;
 
@@ -31,10 +33,6 @@ type AdminCountryOption = {
   country_name: string;
   registration_enabled?: boolean;
   status?: string;
-};
-
-type AdminCountriesResponse = {
-  countries?: AdminCountryOption[];
 };
 
 type KycConfig = {
@@ -272,6 +270,7 @@ function KycWorkspacePage({ workspace }: { workspace: KycWorkspace }) {
   const [submissions, setSubmissions] = useState<KycSubmissionSummary[]>([]);
   const [submissionTotal, setSubmissionTotal] = useState(0);
   const handheldDocumentTypeRuleCount = countHandheldDocumentTypeRules(configForm.countryDocumentTypes);
+  const countryPolicyError = kycCountryPolicyError(configForm.enabled, uniqueItems(splitCsv(configForm.allowedCountries)), configForm.countryDocumentTypes);
 
   const configSummary = useMemo(
     () => [
@@ -296,11 +295,11 @@ function KycWorkspacePage({ workspace }: { workspace: KycWorkspace }) {
       if (workspace === 'settings') {
         const [nextConfig, countriesResponse] = await Promise.all([
           apiRequest<KycConfig>('/admin/api/v1/kyc/config'),
-          apiRequest<AdminCountriesResponse>('/admin/api/v1/countries?status=active&limit=200')
+          listActiveAdminCountries()
         ]);
         setConfig(nextConfig);
         setConfigForm(configToForm(nextConfig));
-        setCountryOptions(adminCountrySelectOptions(countriesResponse.countries ?? []));
+        setCountryOptions(adminCountrySelectOptions(countriesResponse));
       } else {
         const submissionResponse = await apiRequest<KycSubmissionsResponse>(
           `/admin/api/v1/kyc/submissions?status=${nextStatus}&limit=100`
@@ -616,12 +615,14 @@ function KycWorkspacePage({ workspace }: { workspace: KycWorkspace }) {
                 <span>最后更新：<TimestampText value={config?.updated_at ?? null} /></span>
               </div>
               <AdminRequestActionBoundary endpoint="/admin/api/v1/kyc/config" method="PATCH">
+                {countryPolicyError ? <Text type="danger" role="alert">{countryPolicyError}</Text> : null}
                 <ConfirmAction
                   actionText="保存配置"
-                  disabled={normalizeRequiredDocuments(configForm.requiredDocuments).length === 0}
+                  disabled={Boolean(countryPolicyError) || normalizeRequiredDocuments(configForm.requiredDocuments).length === 0}
                   title="确认保存 KYC 配置"
                   onConfirm={(reason) =>
                     submitAction('保存 KYC 配置', async () => {
+                      if (countryPolicyError) throw new Error(countryPolicyError);
                       const saved = await apiRequest<KycConfig>('/admin/api/v1/kyc/config', {
                         method: 'PATCH',
                         body: JSON.stringify({

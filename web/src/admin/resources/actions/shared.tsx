@@ -3,6 +3,7 @@ import { SideSheet, Toast } from '@douyinfe/semi-ui';
 import { type ReactNode, useState } from 'react';
 
 import { listAdminResource } from '../../../api/adminResources';
+import { listActiveAdminCountries } from '../../../api/adminCountries';
 import { apiRequest } from '../../../api/client';
 import type { ApiRecord } from '../../../api/types';
 import type { ResourceDetailLoader } from '../useResourceDetail';
@@ -30,6 +31,7 @@ export type AdminNewsCountryOption = {
   countryCode: string;
   countryName: string;
   defaultLocale: string;
+  supportedLocales?: string[];
 };
 
 export type RowActionHelpers = {
@@ -235,11 +237,11 @@ export function useMarketPairOptions(enabled = true) {
 
 export function useAdminCountryOptions(enabled = true) {
   const query = useSharedAdminOptionQuery<AdminNewsCountryOption[]>({
-    cacheKey: 'countries:active:500',
+    cacheKey: 'countries:active:complete',
     empty: [],
     enabled,
     load: async (signal) => {
-      const { rows } = await listAdminResource('/admin/api/v1/countries', 'countries', { status: 'active', limit: 500 }, { signal });
+      const rows = await listActiveAdminCountries(signal);
       return rows.map(adminNewsCountryFromRecord).filter((country): country is AdminNewsCountryOption => country !== null);
     }
   });
@@ -355,8 +357,17 @@ function adminNewsCountryFromRecord(record: ApiRecord): AdminNewsCountryOption |
   return {
     countryCode,
     countryName: countryName || countryCode,
-    defaultLocale
+    defaultLocale,
+    supportedLocales: Array.isArray(record.supported_locales)
+      ? record.supported_locales.filter((value): value is string => typeof value === 'string' && Boolean(value.trim()))
+      : [defaultLocale]
   };
+}
+
+export function contentLocaleOptions(countries: AdminNewsCountryOption[], countryCode: string, currentLocale: string): SemiSelectOption[] {
+  const country = countries.find((item) => item.countryCode === countryCode.trim().toUpperCase());
+  const locales = [currentLocale, ...(country?.supportedLocales ?? []), country?.defaultLocale ?? ''];
+  return [...new Set(locales.map((value) => value.trim()).filter(Boolean))].map((value) => ({ value, label: value }));
 }
 
 export function earnCountrySelectOptions(countries: AdminNewsCountryOption[]): SemiSelectOption[] {

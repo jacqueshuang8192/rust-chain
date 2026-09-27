@@ -134,7 +134,7 @@ describe('KycManagementPage', () => {
           target_kyc_level: 2
         });
       }
-      if (path === '/admin/api/v1/countries?status=active&limit=200' && !init?.method) {
+      if (path === '/admin/api/v1/countries?status=active&limit=100&offset=0' && !init?.method) {
         return Promise.resolve({
           countries: [
             { country_code: 'CN', country_name: '中国', remark: '中国', registration_enabled: true, status: 'active' },
@@ -199,7 +199,7 @@ describe('KycManagementPage', () => {
       if (path === '/admin/api/v1/kyc/config') {
         return Promise.resolve(kycConfig);
       }
-      if (path === '/admin/api/v1/countries?status=active&limit=200') {
+      if (path === '/admin/api/v1/countries?status=active&limit=100&offset=0') {
         return Promise.resolve({ countries: [] });
       }
       if (String(path).startsWith('/admin/api/v1/kyc/submissions?')) {
@@ -244,6 +244,26 @@ describe('KycManagementPage', () => {
     expect(apiRequestMock.mock.calls.filter(([path]) => String(path).startsWith('/admin/api/v1/kyc/submissions?status=pending'))).toHaveLength(2);
   });
 
+  it('offers countries beyond the first 100 rows in the KYC rule selector', async () => {
+    const base = apiRequestMock.getMockImplementation()!;
+    apiRequestMock.mockImplementation((path, init) => {
+      if (String(path).startsWith('/admin/api/v1/countries?')) {
+        const offset = new URL(String(path), 'http://local').searchParams.get('offset');
+        const countries = offset === '0' ? Array.from({ length: 100 }, (_, index) => ({
+          country_code: `X${String.fromCharCode(65 + Math.floor(index / 26))}${String.fromCharCode(65 + index % 26)}`, country_name: `Country ${index}`
+        })) : [{ country_code: 'ZZ', country_name: 'Tail Country' }];
+        return Promise.resolve({ countries, total: 101 });
+      }
+      return base(path, init);
+    });
+    const user = userEvent.setup();
+    renderKycPage(<KycSettingsPage />);
+    await screen.findByRole('combobox', { name: '规则国家 1' });
+    await selectSemiOptionByAccessibleName(user, '规则国家 1', 'Tail Country (ZZ)');
+    expect(screen.getByRole('combobox', { name: '规则国家 1' })).toHaveTextContent('Tail Country');
+    expect(apiRequestMock.mock.calls.some(([path]) => String(path).includes('offset=100'))).toBe(true);
+  });
+
   it('saves KYC config with Semi controls and operation reason', async () => {
     const user = userEvent.setup();
 
@@ -261,6 +281,8 @@ describe('KycManagementPage', () => {
     expect(screen.getByText('身份证件反面')).toBeInTheDocument();
     expect(screen.getByText('本人手持证件照：1 个证件类型')).toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: '身份证件正面' })).not.toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Japan');
+    expect(screen.getByRole('button', { name: '保存配置' })).toBeDisabled();
     semiSelectByLabel('配置状态');
     await selectSemiOption(user, '配置状态', '禁用');
     await user.clear(screen.getByLabelText('目标 KYC 等级'));

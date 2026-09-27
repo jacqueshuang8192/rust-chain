@@ -73,8 +73,10 @@ const maxDocumentSize = computed(() => kyc.value?.config.maxDocumentSizeBytes ||
 const maxDocumentSizeMb = computed(() => Math.max(1, Math.round(maxDocumentSize.value / 1024 / 1024)))
 const configuredCountries = computed(() => {
   const rules = kyc.value?.config.countryDocumentTypes.map((rule) => rule.country).filter(Boolean) || []
-  return rules.length ? uniqueValues(rules) : uniqueValues(kyc.value?.config.allowedCountries || [])
+  const allowed = uniqueValues(kyc.value?.config.allowedCountries || [])
+  return rules.length ? uniqueValues(rules).filter((country) => !allowed.length || allowed.some((value) => value.toLowerCase() === country.toLowerCase())) : allowed
 })
+const hasCountryRestrictions = computed(() => Boolean(kyc.value?.config.allowedCountries.length || kyc.value?.config.countryDocumentTypes.length))
 const regionNameResolvers = computed<Intl.DisplayNames[]>(() => uniqueValues([
   locale.value,
   'en',
@@ -89,6 +91,7 @@ const regionNameResolvers = computed<Intl.DisplayNames[]>(() => uniqueValues([
 const countryOptions = computed<KycCountryOption[]>(() => {
   const configured = configuredCountries.value
   if (!configured.length) {
+    if (hasCountryRestrictions.value) return []
     return countries.value.map((country) => kycCountryOption(country.name || country.code, country))
   }
   return configured.map((value) => {
@@ -317,7 +320,7 @@ function fileToDataUrl(file: File): Promise<string> {
 async function submit(): Promise<void> {
   error.value = ''
   success.value = ''
-  if (!form.value.realName.trim() || !form.value.country || !form.value.idNumber.trim()) {
+  if (!form.value.realName.trim() || !countryOptions.value.some((option) => option.value === form.value.country) || !form.value.idNumber.trim()) {
     error.value = t('kyc.requiredFields')
     return
   }
@@ -394,6 +397,7 @@ onBeforeUnmount(clearDocumentPreviews)
         <p v-if="error" class="pencil-message pencil-message--error kyc-feedback" role="alert">{{ error }}</p>
         <p v-else-if="success" class="pencil-message pencil-message--success kyc-feedback" role="status">{{ success }}</p>
         <p v-if="countryDirectoryError" class="kyc-note kyc-country-directory-warning" role="status">{{ countryDirectoryError }}</p>
+        <p v-if="!loading && hasCountryRestrictions && !countryOptions.length" class="pencil-message pencil-message--error" role="alert">{{ t('kyc.countryPolicyUnavailable') }}</p>
         <p v-if="loading" class="kyc-loading" role="status">{{ t('kyc.loading') }}</p>
         <template v-else-if="kyc">
           <section class="kyc-status" :class="latest ? `kyc-status--${latest.status}` : ''" role="status">
@@ -489,7 +493,7 @@ onBeforeUnmount(clearDocumentPreviews)
             </section>
 
             <p class="kyc-note">{{ t('kyc.fileHint', { size: maxDocumentSizeMb }) }}</p>
-            <button class="pencil-primary kyc-submit" type="submit" :disabled="submitting">
+            <button class="pencil-primary kyc-submit" type="submit" :disabled="submitting || !countryOptions.length">
               {{ submitting ? t('common.submitting') : t('kyc.submit') }}
             </button>
           </form>

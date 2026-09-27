@@ -18,6 +18,7 @@ import {
   type RowActionHelpers,
   activeStatusOptions,
   createModalProps,
+  contentLocaleOptions,
   earnCountrySelectOptions,
   emptyRichTextValue,
   includeCurrentCountrySelectOption,
@@ -97,12 +98,12 @@ const initialEarnProduct: EarnProductValues = {
   liabilityCapacity: '',
   smallLogoUrl: '',
   status: 'active',
-  introductions: [{ locale: 'zh-CN', country: 'CN', title: '', content: emptyRichTextValue }]
+  introductions: [{ locale: '', country: 'CN', title: '', content: emptyRichTextValue }]
 };
 
 const initialEarnCategory: EarnCategoryValues = {
   code: '',
-  names: [{ locale: 'zh-CN', country: 'CN', title: '' }],
+  names: [{ locale: '', country: 'CN', title: '' }],
   sortOrder: '0',
   status: 'active'
 };
@@ -227,7 +228,7 @@ function applyEarnIntroductionCountry(values: EarnProductValues, index: number, 
   const current = values.introductions[index];
   return updateEarnIntroduction(values, index, {
     country: country?.countryCode ?? normalizedCountryCode,
-    locale: country?.defaultLocale ?? current?.locale ?? ''
+    locale: current?.locale || country?.defaultLocale || ''
   });
 }
 
@@ -238,11 +239,11 @@ function syncEarnProductCountryLocales(values: EarnProductValues, countries: Adm
     if (!country) {
       return item;
     }
-    if (item.locale === country.defaultLocale && item.country === country.countryCode) {
+    if (item.locale && item.country === country.countryCode) {
       return item;
     }
     changed = true;
-    return { ...item, country: country.countryCode, locale: country.defaultLocale };
+    return { ...item, country: country.countryCode, locale: item.locale || country.defaultLocale };
   });
   return changed ? { ...values, introductions } : values;
 }
@@ -253,7 +254,7 @@ function applyEarnCategoryNameCountry(values: EarnCategoryValues, index: number,
   const current = values.names[index];
   return updateEarnCategoryName(values, index, {
     country: country?.countryCode ?? normalizedCountryCode,
-    locale: country?.defaultLocale ?? current?.locale ?? ''
+    locale: current?.locale || country?.defaultLocale || ''
   });
 }
 
@@ -264,11 +265,11 @@ function syncEarnCategoryCountryLocales(values: EarnCategoryValues, countries: A
     if (!country) {
       return item;
     }
-    if (item.locale === country.defaultLocale && item.country === country.countryCode) {
+    if (item.locale && item.country === country.countryCode) {
       return item;
     }
     changed = true;
-    return { ...item, country: country.countryCode, locale: country.defaultLocale };
+    return { ...item, country: country.countryCode, locale: item.locale || country.defaultLocale };
   });
   return changed ? { ...values, names } : values;
 }
@@ -474,7 +475,7 @@ function EarnCategoryForm({
                     </label>
                     <label>栏目名称<AdminTextInput ariaLabel="栏目名称" value={item.title} onChange={(title) => onChange(updateEarnCategoryName(values, index, { title }))} /></label>
                   </div>
-                  <Text type="tertiary">默认语言：{item.locale || '--'}</Text>
+                  <label>内容语言<AdminSelect ariaLabel="内容语言" value={item.locale} optionList={contentLocaleOptions(countries, item.country, item.locale)} onChange={(locale) => onChange(updateEarnCategoryName(values, index, { locale }))} /></label>
                 </Space>
               </Card>
             );
@@ -732,7 +733,7 @@ function EarnProductForm({
                     </label>
                     <label>介绍标题<AdminTextInput ariaLabel="介绍标题" value={item.title} onChange={(title) => onChange(updateEarnIntroduction(values, index, { title }))} /></label>
                   </div>
-                  <Text type="tertiary">默认语言：{item.locale || '--'}</Text>
+                  <label>内容语言<AdminSelect ariaLabel="内容语言" value={item.locale} optionList={contentLocaleOptions(countries, item.country, item.locale)} onChange={(locale) => onChange(updateEarnIntroduction(values, index, { locale }))} /></label>
                   <QuillRichTextEditor value={item.content} onChange={(content) => onChange(updateEarnIntroduction(values, index, { content }))} />
                 </Space>
               </Card>

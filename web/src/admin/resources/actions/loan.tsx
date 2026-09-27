@@ -14,6 +14,7 @@ import {
   type RowActionHelpers,
   activeStatusOptions,
   createModalProps,
+  contentLocaleOptions,
   earnCountrySelectOptions,
   includeCurrentCountrySelectOption,
   includeCurrentOption,
@@ -78,7 +79,7 @@ const initialLoanProduct: LoanProductValues = {
   minAmount: '',
   minKycLevel: '0',
   name: '',
-  names: [{ locale: 'zh-CN', country: 'CN', title: '' }],
+  names: [{ locale: '', country: 'CN', title: '' }],
   status: 'active',
   termDays: ''
 };
@@ -117,7 +118,7 @@ function applyLoanProductNameCountry(values: LoanProductValues, index: number, c
   const current = values.names[index];
   return updateLoanProductName(values, index, {
     country: country?.countryCode ?? normalizedCountryCode,
-    locale: country?.defaultLocale ?? current?.locale ?? ''
+    locale: current?.locale || country?.defaultLocale || ''
   });
 }
 
@@ -128,11 +129,11 @@ function syncLoanProductCountryLocales(values: LoanProductValues, countries: Adm
     if (!country) {
       return item;
     }
-    if (item.locale === country.defaultLocale && item.country === country.countryCode) {
+    if (item.locale && item.country === country.countryCode) {
       return item;
     }
     changed = true;
-    return { ...item, country: country.countryCode, locale: country.defaultLocale };
+    return { ...item, country: country.countryCode, locale: item.locale || country.defaultLocale };
   });
   return changed ? { ...values, name: names[0]?.title ?? values.name, names } : values;
 }
@@ -375,7 +376,7 @@ function LoanProductForm({
                     </label>
                     <label>产品名称<AdminTextInput ariaLabel="产品名称" value={item.title} onChange={(title) => onChange(updateLoanProductName(values, index, { title }))} /></label>
                   </div>
-                  <Text type="tertiary">默认语言：{item.locale || '--'}</Text>
+                  <label>内容语言<AdminSelect ariaLabel="内容语言" value={item.locale} optionList={contentLocaleOptions(countries, item.country, item.locale)} onChange={(locale) => onChange(updateLoanProductName(values, index, { locale }))} /></label>
                 </Space>
               </Card>
             );

@@ -104,7 +104,7 @@ describe('loan product revision actions', () => {
       }
       if (endpoint === '/admin/api/v1/countries') {
         return {
-          rows: [{ country_code: 'CN', country_name: '中国', default_locale: 'zh-CN' }],
+          rows: [{ country_code: 'CN', country_name: '中国', default_locale: 'en', supported_locales: ['zh', 'en'] }],
           raw: {}
         };
       }
@@ -135,7 +135,7 @@ describe('loan product revision actions', () => {
     expect(helpers.reload).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps the list revision in the complete edit payload', async () => {
+  it('keeps the revision and original translation despite changed country default', async () => {
     const user = userEvent.setup();
     const helpers = rowHelpers();
     renderWithQueryClient(<LoanProductRowActions helpers={helpers} record={productRecord} />);
@@ -158,12 +158,35 @@ describe('loan product revision actions', () => {
       expect.objectContaining({
         asset_id: 11,
         name: '30日信用贷',
+        name_json: productRecord.name_json,
         reason: '调整产品配置',
         revision: 7,
         status: 'active'
       })
     );
     expect(helpers.reload).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves two language entries for the same country through save', async () => {
+    const user = userEvent.setup();
+    const nameJson = { version: 1, default_locale: 'zh-CN', items: [
+      { locale: 'zh-CN', country: 'CN', title: '中文名称' },
+      { locale: 'en', country: 'CN', title: 'English name' }
+    ] };
+    renderWithQueryClient(<LoanProductRowActions helpers={rowHelpers()} record={{ ...productRecord, name_json: nameJson }} />);
+    await user.click(screen.getByRole('button', { name: '修改' }));
+    const languageControls = () => screen.getAllByText('内容语言').map((label) =>
+      label.closest('label')?.querySelector('.semi-select')
+    );
+    await waitFor(() => expect(languageControls()).toHaveLength(2));
+    expect(languageControls()[0]).toHaveTextContent('zh-CN');
+    expect(languageControls()[1]).toHaveTextContent('en');
+    await user.click(screen.getByRole('button', { name: '提交修改' }));
+    fireEvent.change(await screen.findByLabelText('操作原因'), { target: { value: '保留已有翻译' } });
+    await user.click(screen.getByRole('button', { name: '确认' }));
+    await waitFor(() => expect(apiRequestMock).toHaveBeenCalledWith('/admin/api/v1/loan/products/71', expect.objectContaining({ method: 'PATCH' })));
+    const request = apiRequestMock.mock.calls.find(([path, init]) => path === '/admin/api/v1/loan/products/71' && init?.method === 'PATCH')?.[1];
+    expect(JSON.parse(String(request?.body)).name_json).toEqual(nameJson);
   });
 
   it('refreshes the list and shows a Chinese recovery instruction on HTTP 409', async () => {

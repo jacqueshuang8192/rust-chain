@@ -4193,6 +4193,8 @@ describe('resourceConfigs create actions', () => {
       await selectSemiOption(user, editDialog, '提前赎回扣费基准', '按收益比例扣除');
       fireEvent.change(within(editDialog).getByLabelText('提前赎回扣费率'), { target: { value: '0.03' } });
       await selectSemiOption(user, editDialog, '国家', 'United States (US / en-US)');
+      expect(semiSelectByLabel(editDialog, '内容语言')).toHaveTextContent('zh-CN');
+      await selectSemiOption(user, editDialog, '内容语言', 'en-US');
       fireEvent.change(within(editDialog).getByLabelText('介绍标题'), { target: { value: 'USDT Earn Updated' } });
       await user.click(within(editDialog).getByRole('button', { name: '提交修改' }));
       fireEvent.change(await screen.findByLabelText('操作原因'), { target: { value: 'update earn product' } });

@@ -1408,6 +1408,7 @@ export default {
     residencePermit: '居住证',
     loadFailed: '认证资料加载失败。',
     countryLoadFailed: '国家名称目录暂时不可用，仍可选择认证配置中的原始值。',
+    countryPolicyUnavailable: '当前认证配置没有可用国家，请联系客服处理。',
     fileTooLarge: '单个认证文件不能超过 {size}MB。',
     imageOnly: '请上传图片格式的认证文件。',
     fileReadFailed: '认证文件读取失败。',

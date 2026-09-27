@@ -101,6 +101,7 @@ pub(crate) struct ValidatedKycSubmission {
 /// 手持照不通过这里配置，而是由按国家的证件类型规则决定。
 /// 允许国家清单去重后可以为空，空表示不限制国家。
 /// 按国家的证件类型规则交由专门函数校验国家唯一性与手持类型的包含关系。
+/// 启用且两类限制都非空时，每个允许国家必须有证件规则；停用仍允许保存以便关闭旧冲突配置。
 /// 纯函数，任何一步失败都直接返回校验错误，不产生持久化或审计副作用。
 pub(crate) fn validate_kyc_config(
     input: KycConfigValidationInput,
@@ -132,16 +133,28 @@ pub(crate) fn validate_kyc_config(
         }
     }
 
+    let allowed_countries =
+        normalize_unique_values(&input.allowed_countries, "allowed_countries", 128)?;
+    let country_document_types = validate_country_document_types(&input.country_document_types)?;
+    if input.enabled
+        && !country_document_types.is_empty()
+        && allowed_countries.iter().any(|country| {
+            !country_document_types
+                .iter()
+                .any(|rule| rule.country.eq_ignore_ascii_case(country))
+        })
+    {
+        return Err(AppError::Validation(
+            "allowed_countries must have matching country_document_types".to_owned(),
+        ));
+    }
+
     Ok(ValidatedKycConfig {
         enabled: input.enabled,
         target_kyc_level: input.target_kyc_level,
         required_documents,
-        allowed_countries: normalize_unique_values(
-            &input.allowed_countries,
-            "allowed_countries",
-            128,
-        )?,
-        country_document_types: validate_country_document_types(&input.country_document_types)?,
+        allowed_countries,
+        country_document_types,
         max_document_size_bytes: input.max_document_size_bytes,
     })
 }
@@ -510,3 +523,7 @@ pub(crate) fn validate_review_status(value: &str) -> AppResult<String> {
     }
     Ok(status)
 }
+
+#[cfg(test)]
+#[path = "../../../tests/unit_src/src_modules_kyc_domain_tests.rs"]
+mod tests;

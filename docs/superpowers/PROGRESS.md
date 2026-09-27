@@ -9092,3 +9092,24 @@
 - 修改文件：`src/`、`tests/`、`migrations/0129*` 至 `migrations/0141*`、`mobile/src/`、`mobile/tests/`、`pc/src/`、`pc/tests/`、`web/src/`、相关 `.trellis/spec/`、九个本轮 `.trellis/tasks/09-18-*` / `09-19-*` 任务及本进度记录；具体文件以本次提交清单为准。
 - 验证结果：提交前重新执行 `git diff --check`、`cargo fmt --all -- --check`、源码完整性扫描及扫描器16项单测，全部通过；完整业务测试沿用08:08最终验收记录，本次未重启数据库或重复全量测试。`git fetch origin` 成功，远端无新增提交，本地已有6个待推送提交；测试证据为本地mock，未发现其中包含真实登录凭据。
 - 后续事项：执行普通提交及推送并核对远端提交哈希，不强制推送。推送main会触发既有镜像工作流；本地核验不等于CI构建或线上部署成功，0141迁移顺序、MySQL8.4演练及既有发布边界仍须遵守。
+
+## 2026-09-26 23:22 - 后台多国家配置跨端复核
+
+- 完成内容：确认产品编辑重写语言身份、KYC 允许国家与证件规则冲突、后台国家选项被 100 条上限截断、手机丢弃国家语言配置、未消费产品多语言及公告未带地区筛选六项问题；区分国家标识治理、地区支付、多语种扩展及配置上线预览等能力建议，排除注册仅前端限制和新闻保存删除所有翻译的误报。仅审查，未修改业务代码或实际配置。
+- 修改文件：`.trellis/tasks/09-26-multi-country-config-review/{prd.md,task.json,implement.jsonl,check.jsonl,research/review.md,research/behavior-probes.mjs}`、`docs/superpowers/PROGRESS.md`。
+- 验证结果：真实源码 AST 抽取后隔离行为探针 5/5，Mobile 国家搜索/语言/富文本定向测试 15/15，Web KYC/贷款表单测试 12/12；报告 34 处显式源码路径和行号有效，任务上下文校验与 git diff --check 通过。探针断言为现状复现，不是修复完成；未跑数据库集成、浏览器、原生设备、生产接口、真实资金或完整发布门禁。
+- 后续事项：先修内容语言身份、KYC 冲突和国家选项完整性，再补手机语言/产品文案/公告地区消费，之后设计区域配置中心与地区支付规则。保留全部既有未提交工作；本轮未提交、推送或部署。
+
+## 2026-09-27 07:50 - 多国家配置第一批一致性修复
+
+- 完成内容：贷款/理财/分类保留已有内容语言并支持显式选择；KYC 前后端拦截允许国家与证件规则冲突，Mobile/PC 按有效交集展示且空交集不回退全部国家；后台共享有界国家分页，不再仅取前 100 个。保留旧国家身份、空限制及停用语义，未改首条默认内容逻辑。
+- 修改文件：`web/src/api/adminCountries*`、`web/src/admin/resources/actions/{shared,loan,earn}.tsx`及回归、`web/src/admin/actions/{KycManagementPage*,kycCountryPolicy*}`、错误映射；`src/modules/kyc/domain.rs`及独立单测；Mobile/PC KYC 页面与语言提示、`mobile/tests/kyc-country-policy.test.ts`；Admin响应规范与任务 `09-27-multi-country-config-priority`。完整清单见任务 `research/delivery.md`。
+- 验证结果：Web全量984/984、lint/类型构建、生产策略15/15、覆盖率门禁23/23；Mobile/PC类型与KYC定向18/18；Rust全库507/507、架构11/11、fmt/diff/任务上下文通过。本地mock验证旧语言保留、显式选择、101国续页与KYC冲突禁用/修正启用，KYC 1728/390/320px无页面横向溢出，桌面/390截图已查看。包体失败raw2611227/gzip770472，未抬阈值；全局文档门禁因既有Convert route_offset缺中文doc失败，未改无关函数。
+- 后续事项：修复包体与文档发布门禁，补真实API、指针/控制台验收；F4–F6手机语言、产品翻译消费、公告地区筛选留后续。浏览器下拉切视口及Script error边界见交付报告，不声称完整视觉/发布验收。TaskSpace4与本任务5198已关闭，无迁移、真实资金、提交、推送或部署，保留原有未提交工作。
+
+## 2026-09-27 08:30 - 多国家配置修复提交推送准备
+
+- 完成内容：按用户“提交推送”授权，仅整理多国家配置第一批修复及其审查、规范、测试和验收记录；行情、代理充值、历史分页及缓存仍保留本地，不纳入本次提交。共用语言文件与进度记录按改动片段暂存，避免夹带其他任务。
+- 修改文件：本次范围见 `09-27-multi-country-config-priority/research/delivery.md`；另包含前置 `09-26-multi-country-config-review` 审查记录。本条只补提交追踪，不新增业务改动。
+- 验证结果：`git fetch origin` 成功，提交前 HEAD 与 origin/main 相同；暂存独立快照Web类型构建、定向103/103，Mobile/PC类型与KYC18/18，Rust KYC4/4及fmt通过，暂存diff检查通过。独立包体gzip750656仍超预算656字节，未抬阈值；与07:50含其他任务的工作区结果区分记录。全局文档门禁本次未重跑，远端最终哈希在推送后核验。
+- 后续事项：普通提交并推送main，禁止强推；推送触发既有镜像CI，不等同CI成功或线上部署完成。完整发布验收仍开放，本轮不归档任务、不执行生产操作。

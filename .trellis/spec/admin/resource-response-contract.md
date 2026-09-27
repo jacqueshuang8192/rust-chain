@@ -221,3 +221,80 @@ await helpers.loadDetail(async (signal) => ({
 - Regression coverage must include fractional JSON monetary numbers, >2^53
   decimal strings, 1e-18, 19 fractional digits, storage overflow, huge zero
   exponents, invalid integer lexical forms, currency grouping and page scope.
+
+## Country Configuration Consistency
+
+### 1. Scope / Trigger
+
+Country option loaders, loan/earn translated content editors, and KYC country
+configuration consumed by Admin, Mobile and PC. No migration of legacy country
+names to codes is implied by this contract.
+
+### 2. Signatures
+
+- `listActiveAdminCountries(signal?: AbortSignal): Promise<AdminCountryRecord[]>`
+- `GET /admin/api/v1/countries?status=active&limit=100&offset=<loaded>`
+- `PATCH /admin/api/v1/kyc/config` and domain `validate_kyc_config(...)`
+- `kycCountryPolicyError(enabled, allowed, rules): string`
+- `contentLocaleOptions(countries, countryCode, currentLocale)`
+
+### 3. Contracts
+
+- Load country pages sequentially, advancing by the actual number of rows.
+  Resolve only a complete directory, with at most 100 requests / 10,000 rows.
+  Share product/news directory queries under `countries:active:complete`.
+- Preserve each existing translation's `locale` when opening editors, receiving
+  country metadata, or switching countries. Only an empty locale inherits the
+  country's default. Changing content language requires explicit selection;
+  neither changing country nor language translates or rewrites the text.
+  Include the existing locale in the choices even when no longer supported by
+  the current country. This does not change first-item `default_locale` behavior.
+- Enabled KYC with nonempty document rules requires a matching rule for every
+  allowed country. Compare trimmed identities ignoring ASCII case on the
+  backend; `CN` and `China` remain distinct. Extra rules are permitted.
+- Empty allowlists mean no allowlist restriction; empty rule lists retain the
+  existing default document policy. Disabled KYC may retain an old cross-list
+  conflict so administrators can turn it off; individual rule validation stays.
+- Mobile/PC use the intersection when both restrictions exist. An empty
+  intersection must not fall back to the unrestricted directory. Prevent
+  submission when the chosen country is absent from current effective options.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+|---|---|
+| Later directory request fails or aborts | Reject the read; do not resolve partial options |
+| Duplicate/malformed identity, changed total, missing page or limit exceeded | Throw `ContractError` and request reload |
+| Short page with a larger declared total | Continue from the actual loaded offset |
+| Legacy response omits total | Finish on a page shorter than 100 rows |
+| Enabled KYC allowlist has countries absent from nonempty rules | Reject with `allowed_countries must have matching country_document_types` |
+| Admin rule has no country or document type | Explain the incomplete rule and disable save |
+| Legacy client policy has an empty intersection | Show unavailable-country message; disable submission |
+
+### 5. Good / Base / Bad Cases
+
+- Good: editing Chinese text remains `zh-CN` after the country's default becomes
+  `en`; the user can explicitly choose a new locale.
+- Base: a 205-country directory resolves after offsets 0, 100, and 200.
+- Bad: allowed countries are `[CN, US]`, rules contain only `CN`, and KYC is
+  enabled. Admin must not save this configuration; legacy clients offer only CN.
+
+### 6. Tests Required
+
+- API tests: >100 rows, short pages, duplicate identities, changed total, failed
+  later pages, missing pages, excessive totals and an ignored abort response.
+- Real Admin component tests: preserve old translations and two locales in one
+  country through save; explicit locale selection; select country 101 in KYC.
+- Rust domain tests: incomplete/disjoint restrictions, empty-list semantics,
+  preserved identities, extra rules, and disabling old conflicts.
+- Mobile/PC effective option tests: intersection, no unrestricted fallback, and
+  existing empty-restriction behavior.
+
+### 7. Wrong vs Correct
+
+Wrong: `locale = country.defaultLocale` whenever the directory resolves, or
+`effective.length ? effective : allCountries` for conflicting KYC restrictions.
+
+Correct: `locale = current.locale || country.defaultLocale`, and preserve an
+empty effective list when restrictions exist. Do not infer country equivalence
+from localized labels.

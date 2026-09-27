@@ -1408,6 +1408,7 @@ export default {
     residencePermit: 'Residence permit',
     loadFailed: 'Unable to load verification details.',
     countryLoadFailed: 'Country names are temporarily unavailable. Configured verification values remain selectable.',
+    countryPolicyUnavailable: 'No countries are currently available for verification. Please contact support.',
     fileTooLarge: 'Each verification file must be {size} MB or smaller.',
     imageOnly: 'Upload verification documents as images.',
     fileReadFailed: 'Unable to read the verification file.',
