@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/admin/index.md", "reason": "Run administrator regression and build gates"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Verify SQL query filtering and backend architecture"}
+{"file": ".trellis/tasks/09-28-admin-active-trading/research/delivery.md", "reason": "Record completed quality gates and bundle limitation"}

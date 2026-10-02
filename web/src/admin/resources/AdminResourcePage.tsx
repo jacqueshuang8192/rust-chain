@@ -65,6 +65,7 @@ type AdminResourcePageProps<T extends ApiRecord> = {
   endpoint: string;
   filters?: FilterField[];
   initialFilters?: FilterValues;
+  fixedFilters?: FilterValues;
   responseKey: string;
   rowActions?: (
     record: T,
@@ -219,6 +220,7 @@ export function AdminResourcePage<T extends ApiRecord>({
   endpoint,
   filters,
   initialFilters,
+  fixedFilters,
   responseKey,
   rowActions,
   serverPaged = false,
@@ -272,9 +274,10 @@ export function AdminResourcePage<T extends ApiRecord>({
     () => ({
       ...filterValues,
       ...toolbarFilterValues,
+      ...fixedFilters,
       ...(serverPaged ? { limit: pageSize, offset: (page - 1) * pageSize } : {})
     }),
-    [filterValues, page, pageSize, serverPaged, toolbarFilterValues]
+    [filterValues, fixedFilters, page, pageSize, serverPaged, toolbarFilterValues]
   );
   const rowContract = useMemo(() => buildAdminResourceRowContract(columns), [columns]);
   const requestContext = useMemo(

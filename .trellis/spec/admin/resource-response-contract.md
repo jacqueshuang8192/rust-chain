@@ -124,6 +124,22 @@ const rowContract = buildAdminResourceRowContract(columns);
 The presentation fallback can run while genuine response fields retain strict
 validation.
 
+## Active Trading Views
+
+- Existing seconds-order and margin-position routes default to active scopes;
+  all-record tabs preserve historical access, detail actions and read permissions.
+- `fixedFilters` are merged after editable filters. Reset cannot remove them;
+  scope switches remount the resource page to reset pagination and request ownership.
+- Active seconds use `status=opened`. Countdown is derived from `expires_at`
+  milliseconds; expiry says awaiting settlement and never guesses a terminal state.
+- Active margin uses `status=opened&filled_only=true`. The backend applies
+  `entry_price IS NOT NULL` to both rows and count. Omitted/false preserves the
+  old list, including unfilled orders; those rows display as pending, not held.
+- Nullable/omitted entry price remains a derived display field. Monetary values
+  stay decimal strings. No per-row market polling or invented live PnL.
+- Tests cover fixed-filter reset/refresh, scope pagination, timer cleanup,
+  pending labels and real-database row/count filtering.
+
 ## Resource Request Ownership and Batch Safety
 
 ### 1. Scope / Trigger

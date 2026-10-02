@@ -9113,3 +9113,31 @@
 - 修改文件：本次范围见 `09-27-multi-country-config-priority/research/delivery.md`；另包含前置 `09-26-multi-country-config-review` 审查记录。本条只补提交追踪，不新增业务改动。
 - 验证结果：`git fetch origin` 成功，提交前 HEAD 与 origin/main 相同；暂存独立快照Web类型构建、定向103/103，Mobile/PC类型与KYC18/18，Rust KYC4/4及fmt通过，暂存diff检查通过。独立包体gzip750656仍超预算656字节，未抬阈值；与07:50含其他任务的工作区结果区分记录。全局文档门禁本次未重跑，远端最终哈希在推送后核验。
 - 后续事项：普通提交并推送main，禁止强推；推送触发既有镜像CI，不等同CI成功或线上部署完成。完整发布验收仍开放，本轮不归档任务、不执行生产操作。
+
+## 2026-09-28 02:36 - 管理员进行中秒合约与当前杠杆持仓
+
+- 完成内容：接续已有同名任务与初步实现，秒合约默认进行中并提供倒计时/全部订单，杠杆默认当前持仓并保留全部仓位；新增只读 filled_only 参数在行与COUNT同步排除未成交委托，全部记录区分待成交/持仓中/已平仓。保留原权限、刷新、筛选和明细，固定筛选不可被重置清除，切换范围归零分页；状态与倒计时前置。
+- 修改文件：`web/src/admin/resources/{TradingResourcePage.tsx,TradingResourcePage.css,TradingResourcePage.test.tsx,AdminResourcePage.tsx,resourceConfigs.tsx}`、`web/src/admin/routes{.tsx,.test.tsx}`、`web/src/shared/SecondsOrderCountdown{.tsx,.test.tsx}`、`web/src/agent/UserPortfolioPage.tsx`；`src/modules/margin/{presentation.rs,application/queries.rs,infrastructure/position_queries.rs}`、`tests/margin_routes.rs`；资源响应规范与任务 `09-28-admin-active-trading`。包含接续已有未提交文件，未覆盖其他功能改动。
+- 验证结果：初轮前端定向110/110；隔离MySQL9.3端口13318的后台杠杆路由12/12真实执行，含当前/全部/false/历史、分页total及无写入；Rust全库507/507、架构11/11与全目标全特性check通过。浏览器本地mock确认秒合约倒计时、只读权限、持仓/待成交/平仓区分及1728/390px无页面横向溢出，截图已查看。Web全量首轮991/992，唯一失败为本任务重置后断言旧DOM，已修正待复跑；并非产品运行失败。
+- 后续事项：继续最终前端定向/全量与生产构建预算、Clippy/fmt，补最终验收记录并关闭专用测试数据库。未提交、推送、部署、操作线上资金或变更数据库结构。
+
+## 2026-09-28 02:39 - 管理员进行中交易视图最终验证
+
+- 完成内容：完成秒合约进行中/全部订单、杠杆当前持仓/全部仓位视图和后端已成交过滤，倒计时与状态优先展示、可访问标签面板、固定筛选重置与刷新、分页切换及待成交标识回归全部通过。任务功能清单完成，发布预算门禁保持开放。
+- 修改文件：本任务前条所列代码/测试、`.trellis/spec/admin/resource-response-contract.md`、`.trellis/tasks/09-28-admin-active-trading/{prd.md,implement.jsonl,check.jsonl,research/delivery.md,research/browser-mock.js}`、`docs/superpowers/PROGRESS.md`。
+- 验证结果：最终Web全量105文件992/992、定向6/6、typecheck/lint/build、生产策略15/15、覆盖率门禁23/23通过；Rust507/507、架构11/11、全目标check、严格Clippy、fmt通过（Clippy过程有增量缓存文件删除警告，退出0）。隔离MySQL9.3后台杠杆12/12；本地mock桌面1728及窄屏390/320无页面横向溢出，最终桌面状态/倒计时首屏可见并检查截图；任务上下文及diff检查通过。包体仍失败raw2614909>2600000，未提高阈值。
+- 后续事项：专用MySQL13318已按私有socket关闭且PID文件移除，Ego TaskSpace6已关闭，原Vite5198保留。上线前仍需解决既有包体超限；浏览器为本地mock、实库为MySQL9.3，不等同生产/MySQL8.4端到端验收。未提交、推送、部署或操作真实资金，保留全部其他未提交工作。
+
+## 2026-10-02 - 管理员交易视图任务继续收口
+
+- 完成内容：继续管理员进行中秒合约与当前杠杆持仓任务；复跑前端类型检查、Lint、交易视图与倒计时定向回归，补齐任务验证记录并将任务状态标记为完成。功能范围保持只读，不新增资金逻辑、数据库迁移或无关改动。
+- 修改文件：`.trellis/tasks/09-28-admin-active-trading/{prd.md,task.json,implement.jsonl,check.jsonl,research/delivery.md}`、`docs/superpowers/PROGRESS.md`
+- 验证结果：`npm --prefix web run typecheck` 通过；`npm --prefix web run lint` 通过；交易视图/倒计时 2 文件 6/6 通过；`python3 .trellis/scripts/task.py validate .trellis/tasks/09-28-admin-active-trading` 通过；`git diff --check` 通过。已有 bundle budget 超限仍保持为发布阻塞，未抬高预算。
+- 后续事项：按当前流程仅提交本管理员交易视图相关改动，避免夹带其他未提交任务；提交前仍需完成选择性暂存和最终提交说明。
+
+## 2026-10-02 - 管理员交易视图选择性暂存
+
+- 完成内容：完成本任务与其他未提交功能的边界核对，仅暂存管理员秒合约/杠杆持仓视图、倒计时、已成交过滤、回归测试和任务文档；用户历史分页、代理充值、新币行情及其他改动继续保留未暂存。
+- 修改文件：本条仅更新 `.trellis/tasks/09-28-admin-active-trading/task.json` 与 `docs/superpowers/PROGRESS.md` 的任务收口记录；业务代码暂存范围以 staged diff 为准。
+- 验证结果：选择性暂存后 staged diff 仍通过边界检查，待执行 `git diff --cached --check` 和提交前状态核对。
+- 后续事项：提交本任务专用 commit；不推送其他未完成任务改动。

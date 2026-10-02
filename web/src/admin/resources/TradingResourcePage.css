@@ -1,0 +1,9 @@
+.admin-trading-tabs > .semi-tabs-bar {
+  padding: 0 32px;
+}
+
+@media (max-width: 840px) {
+  .admin-trading-tabs > .semi-tabs-bar {
+    padding: 0 16px;
+  }
+}

@@ -140,8 +140,8 @@ pub(crate) async fn list_admin_margin_position_history(
         query.email,
         query.pair_id,
         status.as_deref(),
-        route_limit(query.limit),
-        route_offset(query.offset),
+        query.filled_only.unwrap_or(false),
+        (route_limit(query.limit), route_offset(query.offset)),
     )
     .await?;
     Ok(AdminMarginPositionsResponse { positions, total })

@@ -65,6 +65,7 @@ const WithdrawalRowActions = lazy(async () => ({ default: (await import('./actio
 const PredictionMarketRowActions = lazy(async () => ({ default: (await import('../actions/PredictionMarketRowActions')).PredictionMarketRowActions }));
 
 export type ResourceConfig = {
+  fixedFilters?: FilterValues;
   actions?: React.ComponentProps<typeof AdminResourcePage<ApiRecord>>['actions'];
   batchActions?: React.ComponentProps<typeof AdminResourcePage<ApiRecord>>['batchActions'];
   columns: Array<AdminResourceColumn<ApiRecord>>;

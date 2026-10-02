@@ -47,6 +47,8 @@ pub(crate) struct AdminListPositionsQuery {
     pub(crate) email: Option<String>,
     pub(crate) pair_id: Option<u64>,
     pub(crate) status: Option<String>,
+    /// 为 true 时只返回已成交仓位；省略或 false 保留待成交委托。
+    pub(crate) filled_only: Option<bool>,
     pub(crate) limit: Option<u32>,
     pub(crate) offset: Option<u32>,
 }

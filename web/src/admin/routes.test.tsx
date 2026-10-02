@@ -32,6 +32,8 @@ async function lazyComponentName(path: string) {
 
 describe('adminRoutes', () => {
   it.each([
+    ['seconds-contract/orders', 'secondsOrders'],
+    ['margin/positions', 'marginPositions'],
     ['news', 'news'],
     ['system/countries', 'countries'],
     ['new-coins/subscriptions', 'newCoinSubscriptions'],

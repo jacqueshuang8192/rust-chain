@@ -3906,6 +3906,129 @@ async fn admin_margin_positions_filter_history_and_return_interest_fields()
 }
 
 #[tokio::test]
+async fn admin_margin_active_positions_exclude_unfilled_orders_and_count_consistently()
+-> Result<(), Box<dyn Error>> {
+    let Some(pool) = mysql_pool().await else {
+        return Ok(());
+    };
+    let settings = test_settings();
+    let admin_id = create_admin(&pool).await;
+    let mut tx = pool.begin().await?;
+    let user_id = create_user(&mut tx).await;
+    let (base, base_symbol) = create_asset(&mut tx, "AB").await;
+    let (quote, quote_symbol) = create_asset(&mut tx, "AQ").await;
+    let pair = create_pair(
+        &mut tx,
+        base,
+        quote,
+        &format!("{base_symbol}-{quote_symbol}"),
+    )
+    .await;
+    let product = seed_margin_product(&mut tx, pair, quote).await;
+    let mut filled_ids = Vec::new();
+    for (status, entry_price) in [
+        ("opened", Some("100")),
+        ("opened", Some("101")),
+        ("opened", None),
+        ("closed", Some("99")),
+    ] {
+        let id = sqlx::query(
+            r#"INSERT INTO margin_positions
+               (user_id, product_id, pair_id, margin_asset, direction, order_type,
+                margin_amount, leverage, notional_amount, borrowed_amount, entry_price,
+                limit_price, status, idempotency_key)
+               VALUES (?, ?, ?, ?, 'long', 'limit', 10, 10, 100, 90, ?, 100, ?, ?)"#,
+        )
+        .bind(user_id)
+        .bind(product)
+        .bind(pair)
+        .bind(quote)
+        .bind(entry_price.map(decimal))
+        .bind(status)
+        .bind(format!("active-margin-{}", Uuid::now_v7().simple()))
+        .execute(&mut *tx)
+        .await?
+        .last_insert_id();
+        if status == "opened" && entry_price.is_some() {
+            filled_ids.push(id);
+        }
+    }
+    tx.commit().await?;
+    filled_ids.reverse();
+    let token = issue_token(
+        &settings,
+        format!("admin:{admin_id}"),
+        TokenScope::Admin,
+        900,
+    )?;
+    let app = admin_routes().with_state(AppState::new(settings).with_mysql(pool.clone()));
+    for (filter, total, count, expected_id) in [
+        (
+            "&status=opened&filled_only=true&limit=1",
+            2,
+            1,
+            Some(filled_ids[0]),
+        ),
+        (
+            "&status=opened&filled_only=true&limit=1&offset=1",
+            2,
+            1,
+            Some(filled_ids[1]),
+        ),
+        (
+            "&status=opened&filled_only=true&limit=1&offset=2",
+            2,
+            0,
+            None,
+        ),
+        ("&status=opened", 3, 3, None),
+        ("&status=opened&filled_only=false", 3, 3, None),
+        ("", 4, 4, None),
+        ("&status=closed&filled_only=true", 1, 1, None),
+    ] {
+        let response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!(
+                        "/margin/positions?user_id={user_id}&pair_id={pair}{filter}"
+                    ))
+                    .header("authorization", format!("Bearer {token}"))
+                    .body(Body::empty())?,
+            )
+            .await?;
+        assert_eq!(response.status(), StatusCode::OK, "{filter}");
+        let payload = body_json(response).await?;
+        assert_eq!(payload["total"], total, "{filter}");
+        assert_eq!(
+            payload["positions"].as_array().unwrap().len(),
+            count,
+            "{filter}"
+        );
+        if let Some(id) = expected_id {
+            assert_eq!(payload["positions"][0]["id"], id);
+            assert!(payload["positions"][0]["entry_price"].is_string());
+        }
+    }
+    let invalid = app
+        .oneshot(
+            Request::builder()
+                .uri("/margin/positions?filled_only=invalid")
+                .header("authorization", format!("Bearer {token}"))
+                .body(Body::empty())?,
+        )
+        .await?;
+    assert_eq!(invalid.status(), StatusCode::BAD_REQUEST);
+    let unchanged: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM margin_positions WHERE user_id = ?")
+            .bind(user_id)
+            .fetch_one(&pool)
+            .await?;
+    assert_eq!(unchanged, 4);
+    Ok(())
+}
+
+#[tokio::test]
 async fn admin_margin_interest_summary_requires_admin_scope_and_mysql() -> Result<(), Box<dyn Error>>
 {
     let settings = test_settings();

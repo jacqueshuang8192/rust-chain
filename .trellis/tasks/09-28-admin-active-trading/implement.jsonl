@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/admin/resource-response-contract.md", "reason": "Keep fixed query status and strict API-derived field boundaries"}
+{"file": ".trellis/spec/backend/margin-trading-actions.md", "reason": "Distinguish unfilled orders from risk-bearing positions"}
+{"file": ".trellis/tasks/09-28-admin-active-trading/research/delivery.md", "reason": "Record final continuation verification and release boundary"}

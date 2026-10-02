@@ -28,6 +28,7 @@ import { DataTable } from '../shared/DataTable';
 import { AdminSelect } from '../shared/SemiFormControls';
 import { StatusTag } from '../shared/StatusTag';
 import { TimestampText } from '../shared/TimestampText';
+import { SecondsOrderCountdown } from '../shared/SecondsOrderCountdown';
 import './UserPortfolioPage.css';
 
 const { Text } = Typography;
@@ -178,45 +179,6 @@ const spotColumns: Array<ColumnProps<AgentUserSpotOrder>> = [
   { dataIndex: 'created_at', key: 'created_at', title: '委托时间', render: (value) => <TimestampText value={value} /> },
   { dataIndex: 'updated_at', key: 'updated_at', title: '更新时间', render: (value) => <TimestampText value={value} /> }
 ];
-
-function SecondsOrderCountdown({ expiresAt, orderId }: { expiresAt: number; orderId: number }) {
-  const [remaining, setRemaining] = useState(() => Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000)));
-
-  useEffect(() => {
-    let interval: number | undefined;
-    // 始终按截止时间重算，后台节流或休眠后不累积逐秒递减误差。
-    const sync = () => {
-      const next = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
-      setRemaining(next);
-      if (next === 0 && interval !== undefined) {
-        window.clearInterval(interval);
-        interval = undefined;
-      }
-    };
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') sync();
-    };
-    sync();
-    if (expiresAt > Date.now()) interval = window.setInterval(sync, 1000);
-    window.addEventListener('focus', sync);
-    document.addEventListener('visibilitychange', onVisible);
-    return () => {
-      window.clearInterval(interval);
-      window.removeEventListener('focus', sync);
-      document.removeEventListener('visibilitychange', onVisible);
-    };
-  }, [expiresAt]);
-
-  const hours = Math.floor(remaining / 3600);
-  const minutes = String(Math.floor((remaining % 3600) / 60)).padStart(2, '0');
-  const seconds = String(remaining % 60).padStart(2, '0');
-  const countdown = `${hours > 0 ? `${String(hours).padStart(2, '0')}:` : ''}${minutes}:${seconds}`;
-  return (
-    <span aria-label={`订单 ${orderId} 倒计时`} className="agent-order-countdown" role="timer">
-      {remaining > 0 ? countdown : '待结算'}
-    </span>
-  );
-}
 
 const secondsColumns: Array<ColumnProps<AgentUserSecondsContractOrder>> = [
   { dataIndex: 'id', key: 'id', title: '订单ID', width: 100 },

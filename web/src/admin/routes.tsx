@@ -16,7 +16,11 @@ function resourceRoute(path: string, resourceKey: ResourceConfigKey): RouteObjec
     handle: { resourceKey, permission },
     lazy: async () => {
       const { ResourcePage, resourceConfigs } = await import('./resources/resourceConfigs');
-      const Page = path.startsWith('new-coins/') ? (await import('./new-coins/NewCoinResourcePage')).NewCoinResourcePage : ResourcePage;
+      const Page = path.startsWith('new-coins/')
+        ? (await import('./new-coins/NewCoinResourcePage')).NewCoinResourcePage
+        : resourceKey === 'secondsOrders' || resourceKey === 'marginPositions'
+          ? (await import('./resources/TradingResourcePage')).TradingResourcePage
+          : ResourcePage;
       return {
         Component: function AdminResourceRoute() {
           return (
