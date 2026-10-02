@@ -10,6 +10,11 @@ import { displayDetailValue } from './DetailDrawer';
 import { StatusTag } from './StatusTag';
 
 describe('Admin Chinese presentation coverage', () => {
+  it('labels agent recharge ledger change and reference types without changing the source', () => {
+    expect(adminEnumLabel('change_type', 'agent_recharge')).toBe('代理充值');
+    expect(adminEnumLabel('ref_type', 'agent_recharge')).toBe('代理充值');
+    expect(displayDetailValue('agent_recharge', 'ref_type')).toBe('代理充值');
+  });
   it('does not apply shared display translations to raw CSV enum or JSON values', () => {
     const csv = toCsv([{ key: 'scenario', title: '场景' }, { key: 'generator', title: '生成模型', type: 'json' }], [{ scenario: 'trend_up', generator: { seed_mode: 'fixed', seed: 'active' } }]);
     expect(csv).toContain('trend_up');

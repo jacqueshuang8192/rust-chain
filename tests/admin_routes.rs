@@ -34,6 +34,8 @@ use std::{
 use tower::ServiceExt;
 use uuid::Uuid;
 
+#[path = "admin_routes/new_coin_market.rs"]
+mod new_coin_market;
 #[path = "admin_routes/numeric_safety.rs"]
 mod numeric_safety;
 

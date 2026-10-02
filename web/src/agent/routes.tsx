@@ -27,6 +27,8 @@ export const agentRoutes: RouteObject[] = [
   agentRoute('support', 'AgentSupportPage'),
   agentRoute('users', 'AgentUsersPage'),
   agentRoute('users/:userId/portfolio', 'AgentUserPortfolioPage'),
+  { path: 'users/:userId/recharge', handle: { page: 'AgentRechargePage' }, lazy: async () => ({ Component: (await import('./RechargePage')).AgentRechargePage }) },
+  { path: 'recharges', handle: { page: 'AgentRechargePage' }, lazy: async () => ({ Component: (await import('./RechargePage')).AgentRechargePage }) },
   agentRoute('invite-codes', 'AgentInviteCodesPage'),
   agentRoute('commissions', 'AgentCommissionsPage'),
   agentRoute('convert-stats', 'AgentConvertStatsPage'),

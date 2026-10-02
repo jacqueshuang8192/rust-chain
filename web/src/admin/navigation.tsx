@@ -41,6 +41,7 @@ export const adminNavItems: AdminNavItem[] = [
       { path: '/admin/users/kyc/reviews', label: 'KYC 审核队列' },
       { path: '/admin/users/kyc/settings', label: 'KYC 规则配置' },
       { path: '/admin/agents', label: '代理管理' },
+      { path: '/admin/agent-recharges', label: '代理充值审核' },
       { path: '/admin/agent-commissions', label: '代理佣金' },
       { path: '/admin/agent-commission-rules', label: '佣金规则' }
     ]
@@ -128,7 +129,7 @@ export const adminNavItems: AdminNavItem[] = [
     icon: <IconLineChartStroked aria-hidden="true" />,
     children: [
       { path: '/admin/margin/products', label: '杠杆产品' },
-      { path: '/admin/margin/positions', label: '杠杆仓位' },
+      { path: '/admin/margin/positions', label: '杠杆持仓' },
       { path: '/admin/margin/liquidations', label: '强平记录' },
       { path: '/admin/margin/interest', label: '利息汇总' }
     ]

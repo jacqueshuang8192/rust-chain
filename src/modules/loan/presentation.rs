@@ -59,6 +59,7 @@ pub(crate) struct AdminLoanOrdersQuery {
 pub(crate) struct UserLoanOrdersQuery {
     /// 期望条数，缺省 50，夹紧到 1..=200。
     pub(crate) limit: Option<u32>,
+    pub(crate) offset: Option<u32>,
     /// 订单状态筛选，空白等价于不过滤，不校验枚举合法性。
     pub(crate) status: Option<String>,
 }
@@ -270,6 +271,7 @@ pub(crate) struct AdminLoanProductsResponse {
 #[derive(Debug, Serialize)]
 pub(crate) struct LoanOrdersResponse {
     pub(crate) orders: Vec<LoanOrderResponse>,
+    pub(crate) has_more: bool,
 }
 
 /// 后台订单列表响应，total 同样跟随当前筛选。

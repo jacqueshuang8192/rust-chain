@@ -251,6 +251,7 @@ export function AgentUsersPage() {
         fixed: 'right',
         key: 'actions',
         render: (_value, record) => (
+          <Space>
           <Button
             onClick={() => navigate(`/agent/users/${record.user_id}/portfolio`, { state: { email: record.email ?? null } })}
             size="small"
@@ -258,6 +259,8 @@ export function AgentUsersPage() {
           >
             资产与订单
           </Button>
+          <Button size="small" onClick={() => navigate(`/agent/users/${record.user_id}/recharge`)}>充值申请</Button>
+          </Space>
         ),
         title: '操作',
         width: 288

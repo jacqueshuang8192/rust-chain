@@ -72,7 +72,7 @@ pub(crate) async fn get_user_quick_recharge_config(
 /// 读取当前用户的充值订单列表，用户编号由令牌 subject 解析，查询条件中强制带上该编号，绝不跨用户返回。
 /// 状态筛选在查询前按本地状态机校验，只接受 `created`、`pending`、`paid`、`failed`、`expired` 五种取值，
 /// 非法状态返回参数错误而不是当成空结果，避免前端拼错状态时误以为没有订单。
-/// 空白状态串会被裁剪为不筛选。条数经 `route_limit` 归一，本接口不支持偏移分页。
+/// 空白状态串会被裁剪为不筛选。条数和偏移经 `route_limit`/`route_offset` 归一。
 /// 返回的是订单视图，不含商户密钥、回调原文与钱包流水。
 pub(crate) async fn list_user_quick_recharge_orders(
     pool: Option<Pool<MySql>>,
@@ -87,11 +87,13 @@ pub(crate) async fn list_user_quick_recharge_orders(
         user_id,
         status,
         limit: route_limit(query.limit),
+        offset: route_offset(query.offset),
     };
     let orders =
         infrastructure::list_user_orders(&quick_recharge_mysql_pool(pool)?, filter).await?;
     Ok(QuickRechargeOrdersResponse {
-        orders: quick_recharge_order_responses(orders),
+        orders: quick_recharge_order_responses(orders.0),
+        has_more: orders.1,
     })
 }
 

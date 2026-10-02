@@ -134,7 +134,8 @@ pub(crate) async fn list_user_margin_positions(
     user_id: u64,
     status: Option<&str>,
     limit: u32,
-) -> AppResult<Vec<MarginPositionResponse>> {
+    offset: u32,
+) -> AppResult<(Vec<MarginPositionResponse>, bool)> {
     let mut builder = QueryBuilder::<MySql>::new(
         r#"SELECT positions.id, positions.user_id, positions.product_id, positions.pair_id,
                   positions.margin_asset, positions.wallet_scope, positions.margin_mode,
@@ -152,12 +153,17 @@ pub(crate) async fn list_user_margin_positions(
         builder.push_bind(status);
     }
     builder.push(" ORDER BY positions.id DESC LIMIT ");
-    builder.push_bind(limit as i64);
-    builder
+    builder.push_bind((limit + 1) as i64);
+    builder.push(" OFFSET ");
+    builder.push_bind(offset.min(100_000) as i64);
+    let mut rows = builder
         .build_query_as::<MarginPositionResponse>()
         .fetch_all(pool)
         .await
-        .map_err(AppError::from)
+        .map_err(AppError::from)?;
+    let has_more = rows.len() > limit as usize;
+    rows.truncate(limit as usize);
+    Ok((rows, has_more))
 }
 
 /// 读取用户可用的杠杆资产目录与 available、frozen、locked 三桶余额，并补上资产符号与图标。

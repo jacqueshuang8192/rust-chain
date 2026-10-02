@@ -16,6 +16,9 @@ use std::{error::Error, str::FromStr};
 use tower::ServiceExt;
 use uuid::Uuid;
 
+#[path = "agent_routes/recharges.rs"]
+mod recharges;
+
 #[derive(Debug, Clone, Copy)]
 struct AgentFixture {
     agent_user_id: u64,

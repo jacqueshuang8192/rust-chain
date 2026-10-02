@@ -24,6 +24,11 @@ Optional fields retain `serde(default)`; PATCH fields distinguish absence,
 explicit null and an actual decimal. Response types and JSON serialization
 are not changed by request guards.
 
+New string-only financial APIs use `deserialize_decimal_text`, which rejects
+JSON number literals before calling the same bounded parser. Agent recharge
+uses this adapter: a browser must never send a rounded Number disguised as
+trusted exact input. Existing numeric-compatible DTOs retain their contracts.
+
 ## Representation and Bounds
 
 | Role | Representation | Boundary |

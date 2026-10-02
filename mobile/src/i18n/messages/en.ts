@@ -1058,6 +1058,7 @@ export default {
     typeWithdrawalRelease: 'Withdrawal released',
     typeWithdrawalConfirm: 'Withdrawal confirmed',
     typeAdminRecharge: 'Manual credit',
+    typeAgentRecharge: 'Agent manual credit',
     typeQuickRecharge: 'Quick buy',
     typeSpotFreeze: 'Spot order hold',
     typeSpotUnfreeze: 'Spot order release',

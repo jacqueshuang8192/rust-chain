@@ -5,6 +5,8 @@
 //! 另一类是代理自助后台的子树只读查询。所有子树查询都以服务端解析出的物化路径为边界，
 //! 前缀匹配统一带斜杠分隔符防止同名前缀越权；带 in_tx 后缀的函数复用调用方事务，既不提交也不回滚。
 
+pub(crate) mod recharges;
+
 use crate::{
     error::{AppError, AppResult},
     modules::{

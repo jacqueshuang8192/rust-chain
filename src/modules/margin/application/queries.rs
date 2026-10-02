@@ -47,13 +47,17 @@ pub(crate) async fn list_user_margin_positions(
     user_id: u64,
     status: Option<String>,
     limit: u32,
+    offset: u32,
 ) -> AppResult<MarginPositionsResponse> {
     let status = optional_string(status)
         .map(|status| normalized_position_status(&status))
         .transpose()?;
-    let positions =
-        list_user_margin_positions_rows(pool, user_id, status.as_deref(), limit).await?;
-    Ok(MarginPositionsResponse { positions })
+    let (positions, has_more) =
+        list_user_margin_positions_rows(pool, user_id, status.as_deref(), limit, offset).await?;
+    Ok(MarginPositionsResponse {
+        positions,
+        has_more,
+    })
 }
 
 /// 汇总用户保证金钱包、已开仓仓位与全仓账户快照；该读模型不重算或写入资金。
@@ -84,7 +88,8 @@ pub(crate) async fn list_user_margin_wallets(
         wallet.transfer_risk_maintenance_margin = capacity.maintenance_margin;
         wallet.transfer_risk_observed_at = capacity.observed_at;
     }
-    let positions = list_user_margin_positions_rows(pool, user_id, Some("opened"), limit).await?;
+    let (positions, _) =
+        list_user_margin_positions_rows(pool, user_id, Some("opened"), limit, 0).await?;
     let cross_accounts = list_user_cross_margin_accounts(pool, user_id).await?;
     Ok(MarginWalletsResponse {
         wallets,

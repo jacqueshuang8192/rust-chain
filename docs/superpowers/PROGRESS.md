@@ -9093,6 +9093,60 @@
 - 验证结果：提交前重新执行 `git diff --check`、`cargo fmt --all -- --check`、源码完整性扫描及扫描器16项单测，全部通过；完整业务测试沿用08:08最终验收记录，本次未重启数据库或重复全量测试。`git fetch origin` 成功，远端无新增提交，本地已有6个待推送提交；测试证据为本地mock，未发现其中包含真实登录凭据。
 - 后续事项：执行普通提交及推送并核对远端提交哈希，不强制推送。推送main会触发既有镜像工作流；本地核验不等于CI构建或线上部署成功，0141迁移顺序、MySQL8.4演练及既有发布边界仍须遵守。
 
+## 2026-09-19 08:24 - 新币行情简化流程方案
+
+- 完成内容：核对新币项目中心、上市后购买、默认生成、跟随及手工策略入口，提出项目内“行情”页签与关联交易对、选择模式、简化参数、预览确认四步流程；记录草稿与发布分离、实际生效状态、行情暂停与交易独立、精度和来源标识等边界，等待用户确认范围。
+- 修改文件：`.trellis/tasks/09-19-new-coin-market-workflow/{task.json,prd.md}`、`docs/superpowers/PROGRESS.md`；无业务代码或数据库变更。
+- 验证结果：通过代码索引和源码只读核对现有行为，方案文档检查通过；本轮未运行业务测试或浏览器，未实施方案。外部设计资料检索无可用正文，不据此宣称行业结论。
+- 后续事项：确认先简化行情配置还是扩展至新币创建/上市全流程；确认前不启用行情、不新增业务接口、不提交或推送方案文件。
+
+## 2026-09-19 09:16 - 新币行情草稿与调度公平性实库验证
+
+- 完成内容：新增独立项目行情草稿及显式发布，复用默认生成事务、双资源权限、版本冲突和发布回执；暂停后重放不恢复行情。手工/默认候选改按最近尝试时间轮转，不再让失败或固定低ID项持续占满名额。
+- 修改文件：`migrations/0142_new_coin_market_drafts.sql`、`0143_market_generation_scheduling.sql`，Admin四层`new_coin_market.rs`及默认行情事务、权限与注册入口，`src/workers/synthetic_market*`、`market/infrastructure/default_runtime/state.rs`，对应实库测试、OpenAPI与后端规范。
+- 验证结果：隔离MySQL9.3下新币行情综合回归1/1、调度公平性1/1实际执行通过；涵盖18位精度、双权限、草稿无行情副作用、最终审计失败回滚、并发只发布一次、暂停后重放、错误资产/外部行情拒绝。Web首轮全量98文件909/909通过；新增3项交互测试及最终联合门禁待复跑。
+- 后续事项：继续浏览器桌面/窄屏、旧默认行情接口与严格质量门禁；MySQL8.4部署迁移演练仍需发布环境执行。未启用实际交易对、改历史数据、提交或推送。
+
+## 2026-09-19 09:47 - 新币行情向导与引擎复核交付记录
+
+- 完成内容：项目内四步行情向导、独立草稿/显式发布、精确金额、冲突与未知结果恢复、读取时运行状态及暂停入口；补窄屏侧栏与导航滚动，保存Admin执行规范和引擎P1/P2复核清单。M01-M03勾选完成，M04因包体门禁保持未完成。
+- 修改文件：`web/src/admin/new-coins/{NewCoinProjectPage,NewCoinMarketSetup,useNewCoinMarket,marketSetupModel}*`及测试/夹具、`DefaultMarketForm.tsx`、`AdminLayout.tsx/.test.tsx`、`styles.css`、`.trellis/spec/admin/ui-system.md`、任务PRD/元数据及`research/{delivery,engine-review}.md`；后端清单见前条。
+- 验证结果：最终Web98文件913/913，typecheck/lint/production-policy15/coverage23/build通过；Rust502/502、架构/文档/数值/OpenAPI/生成器定向57项、全目标check/严格Clippy/fmt通过。旧默认行情实库17/17，新流程与调度各1/1。1728/390/320px本地mock无页面横向溢出，320px预览/模拟发布保留18位小数；最终`git diff --check`与任务上下文校验通过。`npm --prefix web run budget`失败：gzip758364 > 750000，超8364字节，未提高阈值。浏览器任务已关闭，专用MySQL13316经socket正常关闭；本任务预览5198返回HTTP200并保留，未操作原5178。
+- 后续事项：先解决包体预算再标记全验收通过，不提交/部署未通过版本。引擎后续为准备阶段按项错误隔离、轮次容量/延迟度量、统一监控告警，详见复核报告。上线前需MySQL8.4迁移0142/0143演练与旧worker排空；本轮未验证真实行情到资金订单全链路或压力容量，未启用真实行情、提交或推送。
+
+## 2026-09-22 15:28 - 代理充值审核与逐代理免审授权
+
+- 完成内容：新增代理下级人工充值申请，默认待管理员审核；独立权限按代理授权/撤销免审，不继承、不自动执行旧申请。接通申请历史、管理员队列与单条终态核对，精确金额、原请求恢复、并发幂等、钱包/流水/平衡分录/审计原子提交；手机和PC账单识别代理人工充值。复核修复祖先锁全表扫描，改为校验三级规范路径后按主键顺序逐行共享锁。
+- 修改文件：`migrations/0144_agent_wallet_recharges.sql`、`src/modules/agent/{application,infrastructure,presentation,routes}/recharges.rs`及注册、管理员路由/权限/幂等巡检、`src/numeric.rs`、钱包分类、OpenAPI、`tests/agent_routes/recharges.rs`；`web/src/{agent,admin,api,recharges}`相关入口/恢复/测试；Mobile/PC账单类型与标签；完整清单将保存在本任务交付报告。
+- 验证结果：隔离MySQL9.3下新充值实库17/17，含真实等待期间无关代理授权不阻塞；Web完整101文件965/965、定向84/84、类型/lint/生产策略15/覆盖率23/构建通过。Rust全库及最终门禁继续；代理窄屏菜单修正后需复跑。浏览器本地mock已确认大额原文仅提交一次，但截图接口超时，尚不宣称视觉验收通过。
+- 后续事项：继续窄屏与管理员真实组件mock操作、最终后端/前端回归、包体预算记录、规范和任务验收。沿用人工加币进入用户现货可用余额、不扣代理钱包；未提交、推送、部署或操作真实资金，MySQL8.4迁移演练尚未执行。
+
+## 2026-09-22 15:49 - 代理充值功能验证与发布边界收口
+
+- 完成内容：完成申请/审核/免审授权及撤销闭环，补他人审核终态查询、未知响应和原请求标识丢失的安全恢复，禁止新建重复充值；补代理窄屏菜单。账单归类与巡检识别正常充值及金额/申请状态不匹配引用；同步八项OpenAPI、后端与前端执行规范、发布清单，A01–A03完成，A04发布验收保持未完成。
+- 修改文件：前条功能文件；补 `web/src/layouts/AgentLayout.{tsx,css,test.tsx}`、`web/src/{agent/RechargePage,admin/recharges/RechargeReviewPage,api/recharges}*`、`tests/{agent_routes/recharges.rs,unit_src/src_modules_wallet_infrastructure_tests.rs}`；规范 `.trellis/spec/{backend/{agent-hierarchy,numeric-safety,financial-journals},admin/ui-system}.md`；任务 `09-22-agent-recharge-approval/{prd.md,task.json,research/{backend-tests,delivery}.md,research/browser-mock.js}`。
+- 验证结果：最终Web101文件969/969、类型/lint/构建、生产策略15/15与覆盖率23/23通过。Rust全库503/503、数值1/1、实库代理路由41/41（含18个新增充值场景）、OpenAPI12/12、架构11/11、文档1/1、资金分类1/1、全目标全特性严格Clippy/fmt/diff、源码扫描及其16项测试通过；Mobile19/19、PC2/2与各自类型检查通过。本地真实组件mock完成大额申请/批准、1e-18免审直充、授权撤销与手机菜单；1728/390/320px弹窗/抽屉DOM测量均无页面横向溢出。截图接口持续超时，部分窄屏指针操作须键盘完成，且浏览器有无应用栈的Script error，不声称完整视觉/指针/控制台验收通过。
+- 后续事项：包体预算仍失败：JS raw2608723>2600000，gzip769563>750000，比前任务已超限gzip758364增加11199；未调高阈值。上线前补包体和浏览器验收、MySQL8.4迁移0144演练及权限配置，保留旧代理创建/改派与充值交叉锁序压力测试边界。测试MySQL13316已通过专用socket关闭、PID移除，两个本任务浏览器空间关闭；本地预览5198返回HTTP200并保留，原5178未动。未提交、推送、部署或实际充值，未运行自动提交归档钩子。
+## 2026-09-26 00:00 - 手机端业务完整性缺口审查
+
+- 完成内容：审查手机端导航、通知、提现与资产、交易/杠杆、秒合约、闪兑、理财、贷款、预测、安全和客服相关页面及接口；确认业务通知分类目前只展示公告、提现地址登记/冷静期缺少手机前置入口、多个资金与订单历史接口只有固定单页、登录设备/会话管理未接入，并补充未知资金结果恢复与风险提醒聚合建议。区分了已确认的客户端缺口、后端已有但未接入、条件性策略缺口和可选增强，未把已完成的金额精度治理重复列为未完成。
+- 修改文件：`.trellis/tasks/09-26-mobile-business-gap-review/research/mobile-gap-review.md`、`.trellis/tasks/09-26-mobile-business-gap-review/prd.md`、`docs/superpowers/PROGRESS.md`
+- 验证结果：通过 `rg`、源码定向阅读和带行号核对完成代码证据；执行 `git diff --check` 与 `.trellis/scripts/task.py validate`，未修改业务代码，未进行真实手机、原生签名包、生产接口或真实资金验证。
+- 后续事项：按报告顺序实施通知中心、提现地址登记/冷静期、统一游标分页、未知结果恢复、设备会话管理和风险事项聚合；实施前需分别补后端接口契约、数据库迁移和真实状态机测试。
+
+## 2026-09-26 10:01 - 项目剩余优化点证据化复核
+
+- 完成内容：基于当前工作区完成六项优先复核：PC闪兑所见报价/未知结果重试/金额尾数、K线1m成功后聚合失败被次轮跳过、代理充值与旧创建改派祖先锁反序、后台包体超限及主CI缺build/budget接线、行情健康无时间窗历史聚合、实时行情重复历史读取与串行触发。明确新增发现与历史仍开放事项，不重复否定既有精度、账务及公平调度修复；未修改业务代码。
+- 修改文件：`.trellis/tasks/09-25-project-optimization-review/{prd.md,task.json,research/optimization-review.md,research/kline-recovery-model.py}`、`docs/superpowers/PROGRESS.md`；复用既有闪兑重放与锁序模型，未修改产品与其他任务内容。
+- 验证结果：当前PC真实handleSwap提取+内存接口重放观察到两个新quote及1.000000000000000001→1；既有PC闪兑合同5/5。Rust恢复/退避定向17/17（首次Cargo路径缺失，修正PATH后通过）；代理锁模型3组、恢复失败/正常模型2组通过，均非实库复现。后台当前build退出0，budget退出1：raw2608723>2600000、gzip769563>750000；未提高阈值。报告27处源码路径/行号、task.py validate与git diff --check通过；未跑数据库、浏览器、压力或完整全端门禁。
+- 后续事项：先修稳定报价身份与DecimalText，再补高周期恢复故障注入和MySQL8.4交叉锁序回归；解决实际包体并接入CI后推进监控读模型与行情运行时度量。恢复与死锁发现保留静态/模型证据边界，性能收益待实测；未提交、推送、部署或操作真实资金。
+## 2026-09-26 00:00 - 手机端历史记录分页完善
+
+- 完成内容：为提现、现货订单、杠杆仓位、闪兑、理财、贷款、预测和快捷充值的用户历史接口补充有界 `limit + offset + has_more` 分页；服务端按稳定时间/主键顺序取多一条判断是否还有下一页，手机端新增页适配器、请求边界校验、去重、会话切换保护、追加失败重试和安全页数上限。提现记录页已接入加载更多和追加重试；其他已有页面通过兼容读取函数自动连续读取全部历史，避免仍停留在首屏。
+- 修改文件：`src/modules/{wallet,spot,margin,convert,earn,loan,prediction,quick_recharge}/**` 相关分页查询与响应、`mobile/src/{api/{wallet,trading,swap,earn,loan,prediction}.ts,core/historyPagination.ts,views/WithdrawalRecordsView.vue}`、`mobile/tests/{history-pagination.test.ts,wallet-secondary-views.test.ts,pencil-wallet-flow-parity.test.ts}`、`.trellis/tasks/09-26-mobile-history-pagination/research/delivery.md`
+- 验证结果：`cargo check --all-targets --all-features`、`cargo test --lib --quiet` 503/503、`cargo fmt --all -- --check`、`npm --prefix mobile run type-check`、`npm --prefix mobile run type-check:tests`、手机分页/钱包回归 16/16、`git diff --check` 全部通过。未进行线上、原生设备或真实资金验证。
+- 后续事项：如需进一步优化加载体验，可将闪兑、理财、贷款、预测和快捷充值页面从兼容“连续读取”升级为各自的可见加载更多控件；当前功能已保证历史记录不再因固定单页上限而丢失。
+
 ## 2026-09-26 23:22 - 后台多国家配置跨端复核
 
 - 完成内容：确认产品编辑重写语言身份、KYC 允许国家与证件规则冲突、后台国家选项被 100 条上限截断、手机丢弃国家语言配置、未消费产品多语言及公告未带地区筛选六项问题；区分国家标识治理、地区支付、多语种扩展及配置上线预览等能力建议，排除注册仅前端限制和新闻保存删除所有翻译的误报。仅审查，未修改业务代码或实际配置。

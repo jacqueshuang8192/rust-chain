@@ -270,7 +270,8 @@ pub(crate) async fn list_convert_orders(
     user_id: u64,
     status: Option<String>,
     limit: u32,
-) -> AppResult<Vec<ConvertOrderResponse>> {
+    offset: u32,
+) -> AppResult<(Vec<ConvertOrderResponse>, bool)> {
     let mut builder = QueryBuilder::<MySql>::new(
         r#"SELECT id, quote_id, convert_pair_id, from_asset AS from_asset_id,
                   to_asset AS to_asset_id, from_amount, to_amount, rate,
@@ -286,14 +287,18 @@ pub(crate) async fn list_convert_orders(
     }
 
     builder.push(" ORDER BY id DESC LIMIT ");
-    builder.push_bind(limit as i64);
+    builder.push_bind((limit + 1) as i64);
+    builder.push(" OFFSET ");
+    builder.push_bind(offset as i64);
 
-    let orders = builder
+    let mut orders = builder
         .build_query_as::<ConvertOrderResponse>()
         .fetch_all(pool)
         .await?;
 
-    Ok(orders)
+    let has_more = orders.len() > limit as usize;
+    orders.truncate(limit as usize);
+    Ok((orders, has_more))
 }
 
 /// 为一次报价请求定位唯一可用的闪兑规则，同时接受配置中正向与反向两种资产排列。

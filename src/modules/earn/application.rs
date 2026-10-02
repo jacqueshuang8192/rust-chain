@@ -48,7 +48,7 @@ use serde_json::json;
 use sqlx::{MySql, Pool};
 
 /// 按产品编号倒序列出可申购的理财产品，状态过滤硬编码为 active，下架产品对用户不可见。
-/// 数量默认 50、夹紧到 1..=100，不支持偏移翻页，产品较多时只能看到编号最大的一批。
+/// 数量默认 50、夹紧到 1..=100；产品目录仍取最近一批，用户订阅列表另走 offset 分页。
 /// 返回的费率是产品当前配置，仅供展示；真正参与结算的是申购时复制进订阅的快照。
 /// 不读取调用者的订阅记录或钱包余额，因此无法据此判断用户是否有足够余额申购。
 pub(crate) async fn list_active_earn_products(
@@ -104,7 +104,13 @@ pub(crate) async fn list_earn_subscriptions(
 ) -> AppResult<EarnSubscriptionsResponse> {
     let user_id = user_id_from_subject(subject)?;
     let pool = earn_mysql_pool(pool)?;
-    infrastructure::list_user_subscriptions(&pool, user_id, route_limit(query.limit)).await
+    infrastructure::list_user_subscriptions(
+        &pool,
+        user_id,
+        route_limit(query.limit),
+        route_offset(query.offset),
+    )
+    .await
 }
 
 /// 归一邮箱与状态两项文本筛选后查询后台订阅分页与总数，用户编号为数值无需归一。

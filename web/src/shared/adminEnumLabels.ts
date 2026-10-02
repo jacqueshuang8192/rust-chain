@@ -56,6 +56,7 @@ export const ADMIN_FIELD_VALUE_LABELS: Record<string, Record<string, string>> = 
     manual: '人工记录',
     deposit_record: '充值记录',
     admin_recharge: '后台充值',
+    agent_recharge: '代理充值',
     quick_recharge: '快速充值',
     convert_order: '闪兑订单',
     spot_order: '现货委托',
@@ -74,6 +75,7 @@ export const ADMIN_FIELD_VALUE_LABELS: Record<string, Record<string, string>> = 
   change_type: {
     deposit: '充值',
     admin_recharge: '后台充值',
+    agent_recharge: '代理充值',
     quick_recharge: '快速充值',
     convert_settlement: '闪兑结算',
     spot_freeze: '现货委托冻结',

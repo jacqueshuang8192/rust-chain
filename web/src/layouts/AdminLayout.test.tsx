@@ -60,6 +60,18 @@ describe('AdminLayout', () => {
 
   afterEach(() => {
     authStore.clearSession();
+    Object.defineProperty(window, 'innerWidth', { value: 1024, writable: true, configurable: true });
+  });
+
+  it('starts compact on narrow project screens and keeps explicit expansion available', () => {
+    Object.defineProperty(window, 'innerWidth', { value: 390, writable: true, configurable: true });
+    const { container } = renderAdminLayout('/admin/new-coins/projects/7');
+    const sider = screen.getByLabelText('后台侧边栏');
+    expect(sider).toHaveClass('admin-layout-sider-collapsed');
+    fireEvent.click(container.querySelector('.semi-navigation-footer button')!);
+    expect(sider).not.toHaveClass('admin-layout-sider-collapsed');
+    fireEvent(window, new Event('resize'));
+    expect(sider).toHaveClass('admin-layout-sider-collapsed');
   });
 
   it('renders the Chinese admin navigation labels', () => {
@@ -82,7 +94,7 @@ describe('AdminLayout', () => {
       { group: '行情市场', children: ['交易对配置', '行情策略', '行情订阅'] },
       { group: '闪兑管理', children: ['闪兑交易对', '闪兑订单'] },
       { group: '秒合约', children: ['秒合约产品', '秒合约订单'] },
-      { group: '杠杆交易', children: ['杠杆产品', '杠杆仓位', '强平记录', '利息汇总'] },
+      { group: '杠杆交易', children: ['杠杆产品', '杠杆持仓', '强平记录', '利息汇总'] },
       { group: '理财管理', children: ['理财分类', '理财产品', '理财申购'] },
       { group: '内容运营', children: ['新闻中心'] },
       { group: '风控中心', children: ['风控规则', '风控事件'] },

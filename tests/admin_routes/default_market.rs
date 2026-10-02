@@ -67,7 +67,13 @@ impl Fixture {
             ))
             .await
             .unwrap();
-        (response.status(), body_json(response).await.unwrap())
+        let status = response.status();
+        let bytes = axum::body::to_bytes(response.into_body(), 1_048_576)
+            .await
+            .unwrap();
+        let body = serde_json::from_slice(&bytes)
+            .unwrap_or_else(|_| Value::String(String::from_utf8_lossy(&bytes).into_owned()));
+        (status, body)
     }
     async fn counts(&self) -> (i64, i64, i64) {
         sqlx::query_as("SELECT (SELECT COUNT(*) FROM market_default_generators WHERE pair_id=?),(SELECT COUNT(*) FROM market_default_generator_versions WHERE pair_id=?),(SELECT COUNT(*) FROM admin_audit_logs WHERE admin_id=? AND target_type='default_market')")
@@ -232,15 +238,18 @@ async fn default_market_initial_precision_limits_and_no_bootstrap_are_rejected_w
     let Some(f) = Fixture::new().await? else {
         return Ok(());
     };
-    for price in [
-        Value::Null,
-        json!("0"),
-        json!("-1"),
-        json!("1.23456"),
-        json!("100000000000000000000"),
+    for (price, expected_status) in [
+        (Value::Null, StatusCode::BAD_REQUEST),
+        (json!("0"), StatusCode::BAD_REQUEST),
+        (json!("-1"), StatusCode::BAD_REQUEST),
+        (json!("1.23456"), StatusCode::BAD_REQUEST),
+        (
+            json!("100000000000000000000"),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
     ] {
         let (status, body) = f.call("PATCH", "", config(0, true, price)).await;
-        assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+        assert_eq!(status, expected_status, "{body}");
         assert_eq!(f.counts().await, (0, 0, 0));
     }
     for params in [

@@ -41,6 +41,7 @@ pub(crate) struct SpotOrdersQuery {
     pub(crate) pair_id: Option<String>,
     pub(crate) status: Option<String>,
     pub(crate) limit: Option<u32>,
+    pub(crate) offset: Option<u32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -121,6 +122,7 @@ pub(crate) struct SpotOrderResponse {
 #[derive(Debug, Serialize)]
 pub(crate) struct SpotOrdersResponse {
     pub(crate) orders: Vec<SpotOrderResponse>,
+    pub(crate) has_more: bool,
 }
 
 #[derive(Debug, Serialize)]

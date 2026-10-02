@@ -84,7 +84,7 @@ pub fn admin_routes() -> Router<AppState> {
 }
 
 /// 返回面向终端用户的可申请借贷产品，固定只包含 status 为 active 的配置。
-/// 无需登录，`limit` 缺省 50 并被夹紧到 1..=200，不支持偏移翻页。
+/// 无需登录，产品 `limit` 缺省 50 并被夹紧到 1..=200；用户订单列表支持 offset 分页。
 /// 只读产品配置，不读取调用者的 KYC 等级、既有订单或钱包余额。
 async fn list_active_products(
     State(state): State<AppState>,

@@ -122,6 +122,7 @@ body {
 }
 
 .admin-layout-nav .semi-navigation-header {
+  flex-shrink: 0;
   height: 76px;
   margin: 0;
   padding: 16px 18px;
@@ -150,11 +151,20 @@ body {
 }
 
 .admin-layout-nav .semi-navigation-list-wrapper {
-  height: calc(100% - 132px);
+  flex: 1;
+  min-height: 0;
+  height: auto;
   padding: 12px 8px 18px;
   overflow-y: auto;
   scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
   scrollbar-width: thin;
+}
+
+.admin-layout-nav .semi-navigation-header-list-outer {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
 .admin-layout-nav .semi-navigation-list-wrapper::-webkit-scrollbar {
@@ -226,6 +236,7 @@ body {
 }
 
 .admin-layout-nav .semi-navigation-footer {
+  flex-shrink: 0;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   background: transparent;
 }

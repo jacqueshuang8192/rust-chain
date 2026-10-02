@@ -18,8 +18,9 @@ pub(crate) struct QuickRechargeUserOrderFilter {
     pub(crate) user_id: u64,
     /// 可选的订单状态筛选，已按本地状态机校验过取值合法性。
     pub(crate) status: Option<String>,
-    /// 单次返回条数上限，已归一化；用户侧不支持偏移分页。
+    /// 单次返回条数上限，已归一化。
     pub(crate) limit: u32,
+    pub(crate) offset: u32,
 }
 
 /// 后台订单查询条件，五个筛选维度全部可选，同时给出时按 AND 叠加。

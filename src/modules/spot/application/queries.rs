@@ -33,7 +33,7 @@ pub(crate) async fn list_user_spot_orders(
     user_id: u64,
     query: SpotOrdersQuery,
 ) -> AppResult<SpotOrdersResponse> {
-    let orders = list_spot_orders(
+    let (orders, has_more) = list_spot_orders(
         pool,
         SpotOrderListFilter {
             user_id: Some(user_id),
@@ -42,11 +42,11 @@ pub(crate) async fn list_user_spot_orders(
             email: None,
             include_internal: true,
             limit: route_limit(query.limit),
-            offset: 0,
+            offset: route_offset(query.offset),
         },
     )
     .await?;
-    Ok(SpotOrdersResponse { orders })
+    Ok(SpotOrdersResponse { orders, has_more })
 }
 
 /// 按管理员筛选条件查询现货订单及总数；调用方必须先完成管理员鉴权，内部订单仅在显式请求时返回。

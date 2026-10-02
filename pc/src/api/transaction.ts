@@ -4,6 +4,7 @@ import { backendApiUrl, normalizeWalletLedgerPage } from './backendAdapters'
 export const WALLET_LEDGER_TRANSACTION_TYPES = [
     'deposit',
     'admin_recharge',
+    'agent_recharge',
     'quick_recharge',
     'convert_settlement',
     'spot_freeze',

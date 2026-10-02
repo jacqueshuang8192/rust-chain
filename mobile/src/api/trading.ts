@@ -22,6 +22,7 @@ import {
   referenceRequestRegistry,
   type ReferenceRequestOptions,
 } from './requestCache'
+import { fetchAllHistoryPages, mapHistoryPage, validateHistoryPageRequest, type HistoryPage } from '@/core/historyPagination'
 
 const spotOrderIdempotencyKeys = new RetryStableIdempotencyKeys('mobile-spot')
 
@@ -324,16 +325,34 @@ export async function fetchSpotOrders(
   limit = 30,
   signal?: AbortSignal,
 ): Promise<SpotOrder[]> {
-  const pair = symbol ? splitSymbol(symbol) : undefined
-  const response = await client.get<{ orders?: Array<Record<string, unknown>> }>(requestUrl('/spot/orders'), {
+  return (await fetchSpotOrdersPage({ symbol, status, limit, offset: 0, signal })).items
+}
+
+export async function fetchSpotOrdersPage(input: {
+  symbol?: string
+  status?: string
+  limit?: number
+  offset?: number
+  signal?: AbortSignal
+} = {}): Promise<HistoryPage<SpotOrder>> {
+  const limit = input.limit ?? 30
+  const offset = input.offset ?? 0
+  validateHistoryPageRequest(limit, offset)
+  const pair = input.symbol ? splitSymbol(input.symbol) : undefined
+  const response = await client.get<{ orders?: Array<Record<string, unknown>>; has_more?: boolean }>(requestUrl('/spot/orders'), {
     params: {
       pair_id: pair ? `${pair.base}-${pair.quote}` : undefined,
-      status,
+      status: input.status,
       limit,
+      offset,
     },
-    signal,
+    signal: input.signal,
   })
-  return (response.data.orders || []).map(mapSpotOrder)
+  return mapHistoryPage(
+    { items: response.data.orders || [], has_more: response.data.has_more },
+    { limit, offset },
+    mapSpotOrder,
+  )
 }
 
 function mapSpotOrder(order: Record<string, unknown>): SpotOrder {
@@ -373,14 +392,20 @@ export async function cancelSpotOrder(orderId: string): Promise<void> {
 
 export async function fetchOpenSpotOrders(limit = 30, signal?: AbortSignal): Promise<SpotOrder[]> {
   const pages = await Promise.all(['pending', 'open', 'partially_filled'].map(
-    (status) => fetchSpotOrders(undefined, status, limit, signal),
+    (status) => fetchAllHistoryPages(
+      (request) => fetchSpotOrdersPage({ status, ...request, signal }),
+      { pageSize: limit, identity: (item) => item.id },
+    ),
   ))
   return uniqueSpotOrders(pages.flat())
 }
 
 export async function fetchSpotOrderHistory(limit = 30, signal?: AbortSignal): Promise<SpotOrder[]> {
   const pages = await Promise.all(['filled', 'cancelled', 'rejected'].map(
-    (status) => fetchSpotOrders(undefined, status, limit, signal),
+    (status) => fetchAllHistoryPages(
+      (request) => fetchSpotOrdersPage({ status, ...request, signal }),
+      { pageSize: limit, identity: (item) => item.id },
+    ),
   ))
   return uniqueSpotOrders(pages.flat())
 }
@@ -505,11 +530,30 @@ export async function fetchMarginPositions(
   limit = 30,
   signal?: AbortSignal,
 ): Promise<MarginPosition[]> {
-  const response = await client.get<{ positions?: Array<Record<string, unknown>> }>(requestUrl('/margin/positions'), {
-    params: { status, limit },
-    signal,
-  })
-  return (response.data.positions || []).map(mapMarginPosition)
+  return fetchAllHistoryPages(
+    (request) => fetchMarginPositionsPage({ status, ...request, signal }),
+    { pageSize: limit, identity: (item) => item.id },
+  )
+}
+
+export async function fetchMarginPositionsPage(input: {
+  status?: string
+  limit?: number
+  offset?: number
+  signal?: AbortSignal
+} = {}): Promise<HistoryPage<MarginPosition>> {
+  const limit = input.limit ?? 30
+  const offset = input.offset ?? 0
+  validateHistoryPageRequest(limit, offset)
+  const response = await client.get<{ positions?: Array<Record<string, unknown>>; has_more?: boolean }>(
+    requestUrl('/margin/positions'),
+    { params: { status: input.status, limit, offset }, signal: input.signal },
+  )
+  return mapHistoryPage(
+    { items: response.data.positions || [], has_more: response.data.has_more },
+    { limit, offset },
+    mapMarginPosition,
+  )
 }
 
 export async function fetchMarginPosition(

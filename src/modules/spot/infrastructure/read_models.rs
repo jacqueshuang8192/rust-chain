@@ -419,18 +419,25 @@ impl MySqlSpotRepository {
 pub(crate) async fn list_spot_orders(
     pool: &Pool<MySql>,
     filter: SpotOrderListFilter,
-) -> AppResult<Vec<SpotOrderResponse>> {
+) -> AppResult<(Vec<SpotOrderResponse>, bool)> {
     let mut builder = base_spot_orders_query(filter.include_internal);
     push_spot_order_list_filters(&mut builder, &filter);
     builder.push(SPOT_ORDER_ORDER_BY);
     builder.push(" LIMIT ");
-    builder.push_bind(i64::from(filter.limit));
+    builder.push_bind(i64::from(filter.limit + 1));
+    builder.push(" OFFSET ");
+    builder.push_bind(i64::from(filter.offset));
 
-    let rows = builder
+    let mut rows = builder
         .build_query_as::<SpotOrderQueryRow>()
         .fetch_all(pool)
         .await?;
-    Ok(rows.into_iter().map(SpotOrderResponse::from).collect())
+    let has_more = rows.len() > filter.limit as usize;
+    rows.truncate(filter.limit as usize);
+    Ok((
+        rows.into_iter().map(SpotOrderResponse::from).collect(),
+        has_more,
+    ))
 }
 
 /// 后台订单列表：行查询与 COUNT 共用同一组谓词，总数才会跟随当前筛选。

@@ -1,0 +1,30 @@
+.recharge-form {
+  display: grid;
+  gap: 16px;
+  max-width: 680px;
+  margin: 16px 0 24px;
+}
+.recharge-form label, .recharge-filters label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.recharge-form p, .recharge-form dd {
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+.recharge-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin: 16px 0;
+}
+.recharge-filters > label { width: 180px; max-width: 100%; }
+.recharge-history { min-width: 0; }
+.recharge-history .semi-table-pagination { flex-wrap: wrap; gap: 8px; }
+.recharge-form .semi-select { width: 100%; }
+@media (max-width: 600px) {
+  .recharge-history .semi-table-pagination > * { margin-left: 0; }
+  .recharge-filters > label { width: 100%; }
+}

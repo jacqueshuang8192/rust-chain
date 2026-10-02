@@ -14,6 +14,7 @@ import { ADMIN_OPTION_QUERY_KEY } from '../sharedOptionQuery';
 import { loadProjectCenter, projectQueryKey, stages } from './projectModel';
 import { NewCoinProjectSettings } from './NewCoinProjectSettings';
 import { NewCoinGrant } from './NewCoinGrant';
+import { NewCoinMarketSetup } from './NewCoinMarketSetup';
 
 function RecordLink({ path, endpoint: explicitEndpoint, children }: { path:string; endpoint?: string; children:React.ReactNode }) {
   const endpoint=explicitEndpoint ?? path.split('?')[0].replace('/admin/','/admin/api/v1/');
@@ -25,6 +26,7 @@ export function NewCoinProjectPage() {
   const { projectId = '' }=useParams();
   const queryClient=useQueryClient();
   const [dirty,setDirty]=useState(false);
+  const [activeTab,setActiveTab]=useState('overview');
   const [error,setError]=useState('');
   const [revision,setRevision]=useState(0);
   const query=useQuery({queryKey:projectQueryKey(projectId),queryFn:({signal})=>loadProjectCenter(projectId,signal),enabled:/^[1-9]\d*$/.test(projectId),retry:false,refetchOnWindowFocus:false});
@@ -60,7 +62,7 @@ export function NewCoinProjectPage() {
         </AdminRequestActionBoundary> : null}
       </Space>
     </Card>
-    <Tabs keepDOM lazyRender tabPaneMotion={false} style={{marginTop:24}}>
+    <Tabs keepDOM lazyRender activeKey={activeTab} onChange={key=>{if(!dirty)setActiveTab(key);}} tabPaneMotion={false} style={{marginTop:24}}>
       <TabPane itemKey="overview" tab="项目概览">
         <Card bordered={false}><Space vertical align="start" spacing={16}>
           <Typography.Text>发行总量：<AmountText value={p.total_supply}/> · 发行价：<AmountText value={p.issue_price}/></Typography.Text>
@@ -73,6 +75,9 @@ export function NewCoinProjectPage() {
       </TabPane>
       <TabPane itemKey="settings" tab={canWrite?'项目配置':'配置详情'}>
         <NewCoinProjectSettings key={`${p.id}:${revision}`} data={data} onSaved={reload} onDirty={setDirty}/>
+      </TabPane>
+      <TabPane itemKey="market" tab="行情">
+        <NewCoinMarketSetup key={`${p.id}:${revision}`} project={p} onDirty={setDirty}/>
       </TabPane>
       <TabPane itemKey="records" tab="关联记录">
         <Card bordered={false}><Space vertical align="start" spacing={16}>

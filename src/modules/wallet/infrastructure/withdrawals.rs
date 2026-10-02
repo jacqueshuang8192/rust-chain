@@ -678,24 +678,31 @@ pub(crate) async fn reserve_withdrawal_request(
 
 /// 按用户和状态读取提现请求快照，限制单次返回数量且不锁定资金。
 /// 用户与状态均为可选条件，两者缺省时返回全量最新申请，因此调用方必须自行限定用户以免越权读取。
-/// 返回条数被钳制在一到二百之间，排序固定按申请编号倒序，该入口只取单页且不返回总数。
+/// 返回条数被钳制在一到二百之间，排序固定按申请编号倒序，使用 offset 取单页并返回 has_more。
 /// 返回的金额与预留额字段仅为申请当时的快照，不作为新的扣款依据，也不反映钱包三桶的当前值。
 pub(crate) async fn list_wallet_withdrawals(
     pool: &Pool<MySql>,
     user_id: Option<u64>,
     status: Option<&str>,
     limit: u32,
-) -> AppResult<Vec<WalletWithdrawalResponse>> {
+    offset: u32,
+) -> AppResult<(Vec<WalletWithdrawalResponse>, bool)> {
     let mut builder = QueryBuilder::<MySql>::new(wallet_withdrawal_select_sql());
     push_wallet_withdrawal_filters(&mut builder, user_id, status);
     builder.push(WALLET_WITHDRAWAL_ORDER_BY);
+    let page_limit = limit.clamp(1, 200);
     builder.push(" LIMIT ");
-    builder.push_bind(limit.clamp(1, 200) as i64);
-    builder
+    builder.push_bind((page_limit + 1) as i64);
+    builder.push(" OFFSET ");
+    builder.push_bind(offset.min(100_000) as i64);
+    let mut rows = builder
         .build_query_as::<WalletWithdrawalResponse>()
         .fetch_all(pool)
         .await
-        .map_err(AppError::from)
+        .map_err(AppError::from)?;
+    let has_more = rows.len() > page_limit as usize;
+    rows.truncate(page_limit as usize);
+    Ok((rows, has_more))
 }
 
 /// 后台提现列表：行查询与 COUNT 共用同一组谓词，总数才会跟随当前筛选。

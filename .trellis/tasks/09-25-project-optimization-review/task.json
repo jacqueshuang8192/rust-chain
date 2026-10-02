@@ -1,0 +1,30 @@
+{
+  "id": "project-optimization-review",
+  "name": "project-optimization-review",
+  "title": "Review remaining project optimization opportunities",
+  "description": "Evidence-backed review of current worktree; product fixes remain follow-up work.",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "rust-chain",
+  "assignee": "rust-chain",
+  "createdAt": "2026-09-25",
+  "completedAt": "2026-09-26",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    ".trellis/tasks/09-25-project-optimization-review/research/optimization-review.md",
+    ".trellis/tasks/09-25-project-optimization-review/research/kline-recovery-model.py",
+    "docs/superpowers/PROGRESS.md"
+  ],
+  "notes": "Review only; six prioritized findings. Rust 17/17 and PC 5/5 focused checks passed; Admin build passed but bundle budget remains failed. No database, browser, production, commit or deployment operations.",
+  "meta": {}
+}

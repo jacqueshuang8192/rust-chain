@@ -16,6 +16,7 @@ mod financial_retries;
 mod market;
 mod market_feed;
 mod new_coin;
+mod new_coin_market;
 mod new_coin_reconciliation;
 mod news;
 mod risk_security;
@@ -24,6 +25,7 @@ mod users;
 mod wallet_assets;
 
 pub(crate) use self::financial_retries::*;
+pub(crate) use self::new_coin_market::*;
 pub(crate) use self::{
     access_control::*, agents::*, config_center::*, config_changes::*, convert::*, countries::*,
     dashboard_audit::*, default_market::*, deposit_networks::*, market::*, new_coin::*,

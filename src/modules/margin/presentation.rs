@@ -20,6 +20,7 @@ pub(crate) struct ListQuery {
 pub(crate) struct ListPositionsQuery {
     pub(crate) status: Option<String>,
     pub(crate) limit: Option<u32>,
+    pub(crate) offset: Option<u32>,
 }
 
 /// 管理后台产品列表查询参数。
@@ -262,6 +263,7 @@ pub(crate) struct MarginTradingCapabilitiesResponse {
 #[derive(Debug, Serialize)]
 pub(crate) struct MarginPositionsResponse {
     pub(crate) positions: Vec<MarginPositionResponse>,
+    pub(crate) has_more: bool,
 }
 
 #[derive(Debug, Serialize)]

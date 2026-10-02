@@ -1,12 +1,16 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { LoaderCircle, RefreshCw } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import AssetMark from '@/components/AssetMark.vue'
 import LoginRequiredState from '@/components/LoginRequiredState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { apiErrorMessage } from '@/api/client'
-import { fetchWithdrawalRecords, type WithdrawalRecord } from '@/api/wallet'
+import { fetchWithdrawalRecordsPage, type WithdrawalRecord } from '@/api/wallet'
+import {
+  createHistoryPaginationController,
+  type HistoryPaginationState,
+} from '@/core/historyPagination'
 import { formatAmount, formatDateTime, shortAddress } from '@/core/format'
 import { useSessionStore } from '@/stores/session'
 
@@ -19,6 +23,27 @@ const records = ref<WithdrawalRecord[]>([])
 const activeFilter = ref<RecordFilter>('all')
 const loading = ref(false)
 const error = ref('')
+const loadingMore = ref(false)
+const appendError = ref('')
+const hasMore = ref(false)
+
+const pagination = createHistoryPaginationController<WithdrawalRecord>({
+  sessionKey: () => `${session.token}:${activeFilter.value}`,
+  pageSize: 50,
+  fetchPage: ({ limit, offset }) => fetchWithdrawalRecordsPage({
+    limit,
+    offset,
+  }),
+  identity: (record) => String(record.id),
+  onChange: (state: HistoryPaginationState<WithdrawalRecord>) => {
+    records.value = state.items
+    loading.value = state.loading
+    loadingMore.value = state.loadingMore
+    hasMore.value = state.hasMore
+    error.value = state.initialError ? apiErrorMessage(state.initialError, t('withdrawRecords.loadFailed')) : ''
+    appendError.value = state.appendError ? apiErrorMessage(state.appendError, t('withdrawRecords.loadFailed')) : ''
+  },
+})
 
 const sortedRecords = computed(() => [...records.value].sort((left, right) => right.createdAt - left.createdAt))
 const filteredRecords = computed(() => {
@@ -63,19 +88,23 @@ function filterLabel(filter: RecordFilter): string {
 }
 
 async function load(): Promise<void> {
-  if (!session.isAuthenticated) return
-  loading.value = true
-  error.value = ''
-  try {
-    records.value = await fetchWithdrawalRecords()
-  } catch (reason) {
-    error.value = apiErrorMessage(reason, t('withdrawRecords.loadFailed'))
-  } finally {
-    loading.value = false
-  }
+  await pagination.loadInitial()
 }
 
-onMounted(() => { void load() })
+async function loadMore(): Promise<void> {
+  await pagination.loadMore()
+}
+
+async function retryLoadMore(): Promise<void> {
+  await pagination.retryLoadMore()
+}
+
+watch(() => [session.token, activeFilter.value] as const, ([token]) => {
+  pagination.reset()
+  if (token) void load()
+}, { immediate: true })
+
+onBeforeUnmount(() => { pagination.stop() })
 </script>
 
 <template>
@@ -138,6 +167,23 @@ onMounted(() => { void load() })
           </article>
         </div>
         <p v-else class="empty-state">{{ t('withdrawRecords.empty') }}</p>
+        <div v-if="appendError" class="records-append-error" role="alert">
+          <span>{{ appendError }}</span>
+          <button type="button" :disabled="loadingMore" @click="retryLoadMore">
+            {{ loadingMore ? t('common.loading') : t('common.retry') }}
+          </button>
+        </div>
+        <button
+          v-if="hasMore && !appendError"
+          class="records-load-more"
+          type="button"
+          :disabled="loadingMore"
+          :aria-busy="loadingMore"
+          @click="loadMore"
+        >
+          <LoaderCircle v-if="loadingMore" :size="17" class="spin" aria-hidden="true" />
+          <span>{{ loadingMore ? t('common.loading') : t('common.loadMore') }}</span>
+        </button>
       </template>
     </div>
   </main>

@@ -20,6 +20,7 @@ use sqlx::types::Json as SqlxJson;
 pub(crate) struct ListQuery {
     /// 期望条数，缺省 50，越界夹紧到 1..=100。
     pub(crate) limit: Option<u32>,
+    pub(crate) offset: Option<u32>,
 }
 
 /// 后台产品列表的查询串，不提供状态筛选，因此上下架产品一并返回。
@@ -300,6 +301,7 @@ pub(crate) struct AdminEarnProductsResponse {
 #[derive(Debug, Serialize)]
 pub(crate) struct EarnSubscriptionsResponse {
     pub(crate) subscriptions: Vec<EarnSubscriptionResponse>,
+    pub(crate) has_more: bool,
 }
 
 /// 后台订阅列表响应，total 跟随用户、邮箱、状态三项筛选。

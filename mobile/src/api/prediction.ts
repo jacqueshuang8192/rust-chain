@@ -7,6 +7,7 @@ import {
 import { requiredId, requiredSafeInteger, normalizeTimestamp } from '@/core/numeric'
 import { i18n } from '@/i18n'
 import { normalizeDecimalText, requiredDecimalText, type DecimalText } from '@/core/decimal'
+import { fetchAllHistoryPages, mapHistoryPage, validateHistoryPageRequest, type HistoryPage } from '@/core/historyPagination'
 
 export type PredictionOutcome = 'yes' | 'no'
 
@@ -120,10 +121,29 @@ export async function confirmPredictionQuote(quoteId: string): Promise<Predictio
   return mapPredictionOrder(response.data.order)
 }
 
+export async function fetchPredictionOrdersPage(input: {
+  limit?: number
+  offset?: number
+} = {}): Promise<HistoryPage<PredictionOrder>> {
+  const limit = input.limit ?? 50
+  const offset = input.offset ?? 0
+  validateHistoryPageRequest(limit, offset)
+  const response = await client.get<{ orders?: Array<Record<string, unknown>>; has_more?: boolean }>(
+    requestUrl('/prediction/orders'),
+    { params: { limit, offset } },
+  )
+  return mapHistoryPage(
+    { items: response.data.orders || [], has_more: response.data.has_more },
+    { limit, offset },
+    mapPredictionOrder,
+  )
+}
+
 export async function fetchPredictionOrders(limit = 50): Promise<PredictionOrder[]> {
-  requiredSafeInteger(limit, 'limit', 1)
-  const response = await client.get<{ orders?: Array<Record<string, unknown>> }>(requestUrl('/prediction/orders'), { params: { limit } })
-  return (response.data.orders || []).map(mapPredictionOrder)
+  return fetchAllHistoryPages(
+    (request) => fetchPredictionOrdersPage(request),
+    { pageSize: limit, identity: (item) => String(item.id) },
+  )
 }
 
 function mapPredictionOrder(order: Record<string, unknown>): PredictionOrder {

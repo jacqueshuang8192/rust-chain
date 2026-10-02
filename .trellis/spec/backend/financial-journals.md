@@ -45,6 +45,12 @@ solvency. Historical coverage remains partial; no synthetic opening backfill.
   prepaid platform liquidity account counts as platform inventory. Upstream
   market providers are not financial counterparties. Current zero-fee fills
   stay zero-fee; nonzero fees require a real charged-asset settlement contract.
+- Agent manual recharge writes no legs while pending or rejected. Authorized
+  direct credit and approved credit atomically book `agent_recharge_clearing`
+  +amount and `user_wallet_liability` -amount under `agent_recharge:{id}`.
+  This clearing balance does not prove outside funds arrived; no agent wallet
+  is debited. Both replay and audit/journal failure follow the
+  [agent hierarchy contract](./agent-hierarchy.md).
 
 ## 4. Error Matrix
 

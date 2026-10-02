@@ -89,6 +89,14 @@ where
     decimal_value(serde_json::Value::deserialize(deserializer)?).map_err(D::Error::custom)
 }
 
+/// 新资金命令的严格文本入口；拒绝JSON数字，同时复用有界无损解析，不改变既有兼容入口。
+pub fn deserialize_decimal_text<'de, D>(deserializer: D) -> Result<BigDecimal, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    parse_decimal_input(&String::deserialize(deserializer)?).map_err(D::Error::custom)
+}
+
 /// 可空十进制请求入口；缺省由字段的 serde(default) 处理，null 保持 None。
 pub fn deserialize_optional_decimal<'de, D>(deserializer: D) -> Result<Option<BigDecimal>, D::Error>
 where

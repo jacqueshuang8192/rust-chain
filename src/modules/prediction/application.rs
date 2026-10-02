@@ -349,7 +349,7 @@ fn prediction_asset_config_audit_json(row: &repository::PredictionAssetConfigRow
 /// 纳入待确认是为了让上游已关闭但尚未派奖的市场仍能被查到，用户可据此确认自己的持仓去向。
 /// 已 settled 或 refunded 的市场从列表消失，历史成绩需通过订单列表查看。
 /// 排序先按最近同步时间倒序再补主键，使刚更新的市场靠前且相同时间戳下顺序稳定。
-/// 只按条数截断不支持偏移，因此本列表不提供深翻页。
+/// 用户资产配置列表仍只按条数截断；用户订单列表另有独立 offset 分页。
 /// 这是无需登录的公共端点，不含任何用户维度过滤。
 pub(crate) async fn list_user_markets(
     State(state): State<AppState>,
@@ -546,7 +546,7 @@ pub(crate) async fn create_order(
 /// 可选按订单状态与市场编号进一步筛选，空串状态视为未传；
 /// 不限制结算状态，因此已派奖和已退款的历史订单同样可查。
 /// 排序先按创建时间倒序再补主键，保证同一毫秒内创建的多笔订单顺序稳定。
-/// 只按条数截断不支持偏移，也不返回总数，因此本列表面向最近记录而非完整对账。
+/// 用户订单按状态、市场和用户主体过滤，使用 offset 分页但不返回总数。
 /// 纯读端点，不会因查询而推进任何订单状态。
 pub(crate) async fn list_user_orders(
     UserAuth(claims): UserAuth,
@@ -565,17 +565,25 @@ pub(crate) async fn list_user_orders(
         builder.push(" AND orders.market_id = ");
         builder.push_bind(market_id);
     }
+    let limit = service::route_limit(query.limit);
     builder.push(" ORDER BY orders.created_at DESC, orders.id DESC LIMIT ");
-    builder.push_bind(service::route_limit(query.limit) as i64);
-    let rows = builder
+    builder.push_bind((limit + 1) as i64);
+    builder.push(" OFFSET ");
+    builder.push_bind(service::route_offset(query.offset) as i64);
+    let mut rows = builder
         .build_query_as::<repository::PredictionOrderRow>()
         .fetch_all(&infrastructure::mysql_pool(&state)?)
         .await?;
+    let has_more = rows.len() > limit as usize;
+    rows.truncate(limit as usize);
     let orders = rows
         .into_iter()
         .map(presentation::PredictionOrderResponse::from)
         .collect();
-    Ok(Json(presentation::PredictionOrdersResponse { orders }))
+    Ok(Json(presentation::PredictionOrdersResponse {
+        orders,
+        has_more,
+    }))
 }
 
 /// 按订单状态、市场编号与用户邮箱筛选全平台预测订单，并返回与筛选一致的总数。

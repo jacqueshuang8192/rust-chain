@@ -25,6 +25,7 @@ pub(crate) struct ConvertOrdersQuery {
     pub(crate) status: Option<String>,
     /// 期望返回条数，缺省 50，夹紧到 1..=100。
     pub(crate) limit: Option<u32>,
+    pub(crate) offset: Option<u32>,
 }
 
 /// 创建报价的请求体。汇率不可由客户端指定，只能提交方向与源金额。
@@ -111,6 +112,7 @@ pub(crate) struct ConvertOrderResponse {
 #[derive(Debug, Serialize)]
 pub(crate) struct ConvertOrdersResponse {
     pub(crate) orders: Vec<ConvertOrderResponse>,
+    pub(crate) has_more: bool,
 }
 
 /// 新建报价的响应，字段与落库快照逐一对应，客户端应原样展示不再自行换算。

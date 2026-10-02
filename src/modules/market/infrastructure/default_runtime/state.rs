@@ -38,7 +38,7 @@ pub(crate) struct PairGenerationRun {
 }
 
 /// 扫描已显式启用默认配置且没有当前人工排期的内部交易对；无策略记录也可命中。
-/// 人工排期运行故障不被误当成没有排期，整个交易对暂停优先；按旧检查点优先避免固定 ID 饥饿。
+/// 人工排期运行故障不被误当成没有排期，整个交易对暂停优先；按最久未尝试优先，失败项不能永久霸占名额。
 pub(crate) async fn load_default_pairs(
     pool: &Pool<MySql>,
     now: DateTime<Utc>,
@@ -49,13 +49,24 @@ pub(crate) async fn load_default_pairs(
                   configs.version, configs.initial_price, configs.config_json, configs.seed
            FROM trading_pairs pairs
            INNER JOIN market_default_generators configs ON configs.pair_id = pairs.id
-           LEFT JOIN market_pair_generation_runs runtime ON runtime.pair_id = pairs.id
+           LEFT JOIN market_generation_attempts attempts ON attempts.pair_id = pairs.id
            WHERE pairs.status = 'active' AND pairs.market_type IN ('strategy', 'internal')
              AND configs.enabled = TRUE AND configs.all_market_paused = FALSE
              AND NOT EXISTS (SELECT 1 FROM market_strategies strategies WHERE strategies.pair_id = pairs.id
                  AND strategies.status = 'active' AND strategies.start_time <= ? AND strategies.end_time > ?)
-           ORDER BY runtime.last_tick_at, pairs.id LIMIT ?"#,
+           ORDER BY attempts.last_attempt_at, pairs.id LIMIT ?"#,
     ).bind(now.naive_utc()).bind(now.naive_utc()).bind(limit.clamp(1,100)).fetch_all(pool).await?)
+}
+
+/// 在尝试互斥或解析参数之前记录调度时间；成功、失败和被占用项都会轮转，不伪造价格检查点。
+/// 该记录不授予租约或写入权限，与资金和行情归档无关；多实例同时尝试只合并为最新数据库时间。
+pub(crate) async fn record_pair_generation_attempt(
+    pool: &Pool<MySql>,
+    pair_id: u64,
+) -> AppResult<()> {
+    sqlx::query("INSERT INTO market_generation_attempts (pair_id,last_attempt_at) VALUES (?,UTC_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE last_attempt_at=GREATEST(last_attempt_at,VALUES(last_attempt_at))")
+        .bind(pair_id).execute(pool).await?;
+    Ok(())
 }
 
 /// 在已取得共同锁后重读单个默认配置，避免扫描至抢锁之间后台保存新版本导致新分钟使用旧参数。

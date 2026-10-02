@@ -17,7 +17,7 @@ export type AdminAccess = {
   is_super_admin: boolean;
 };
 
-export type AdminMutationAction = 'operate' | 'review' | 'settle' | 'write';
+export type AdminMutationAction = 'authorize' | 'operate' | 'review' | 'settle' | 'write';
 export type AdminPermissionAction = 'read' | AdminMutationAction;
 export type AdminHttpMethod = 'DELETE' | 'GET' | 'HEAD' | 'OPTIONS' | 'PATCH' | 'POST' | 'PUT';
 
@@ -71,6 +71,7 @@ const frontendPathResources: Array<[string, string]> = [
   ['/admin/users/kyc', 'users.kyc'],
   ['/admin/users', 'users'],
   ['/admin/agents', 'agents'],
+  ['/admin/agent-recharges', 'agents.recharges'],
   ['/admin/agent-commissions', 'agents.commissions'],
   ['/admin/agent-commission-rules', 'agents.commission_rules'],
   ['/admin/assets', 'wallet.assets'],
@@ -144,6 +145,7 @@ const apiPathResources: Array<[string, string]> = [
   ['/kyc', 'users.kyc'],
   ['/users', 'users'],
   ['/agents', 'agents'],
+  ['/agent-recharges', 'agents.recharges'],
   ['/agent-commissions', 'agents.commissions'],
   ['/agent-commission-rules', 'agents.commission_rules'],
   ['/assets', 'wallet.assets'],
@@ -218,6 +220,7 @@ export function adminActionForRequest(endpoint: string, method: AdminHttpMethod)
   const path = endpoint.replace(/^\/admin\/api\/v1/, '').split('?')[0];
   if (path.startsWith('/auth/') || path === '/auth' || path === '/access/me') return null;
   if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return 'read';
+  if (method === 'PATCH' && /^\/agents\/[1-9]\d*\/recharge-policy$/.test(path)) return 'authorize';
   if (method === 'POST' && isCommissionReversal(path)) return 'settle';
   if (method === 'POST') {
     const kind = financialReconciliationPathKind(path);
@@ -249,6 +252,20 @@ export function adminActionForRequest(endpoint: string, method: AdminHttpMethod)
 
 export function adminPermissionForRequest(endpoint: string, method: AdminHttpMethod): string | null {
   const path = endpoint.replace(/^\/admin\/api\/v1/, '').split('?')[0];
+  if (path.startsWith('/agent-recharges') || (path.startsWith('/agents/') && path.includes('/recharge-policy'))) {
+    const read = ['GET', 'HEAD', 'OPTIONS'].includes(method);
+    if (read && path === '/agent-recharges') return 'agents.recharges.read';
+    const detail = /^\/agent-recharges\/([1-9]\d*)$/.exec(path);
+    if (read && detail && BigInt(detail[1]) <= BigInt(Number.MAX_SAFE_INTEGER)) return 'agents.recharges.read';
+    const review = /^\/agent-recharges\/([1-9]\d*)\/review$/.exec(path);
+    const policy = /^\/agents\/([1-9]\d*)\/recharge-policy$/.exec(path);
+    if (review && BigInt(review[1]) <= BigInt(Number.MAX_SAFE_INTEGER) && method === 'POST') return 'agents.recharges.review';
+    if (policy && BigInt(policy[1]) <= BigInt(Number.MAX_SAFE_INTEGER)) {
+      if (read) return 'agents.read';
+      if (method === 'PATCH') return 'agents.recharges.authorize';
+    }
+    return `admin.unmapped.${read ? 'read' : 'write'}`;
+  }
   if (path.startsWith('/seconds-contracts/') && (path.includes('/refund-policy') || path.includes('/principal-refund'))) {
     const read = ['GET', 'HEAD', 'OPTIONS'].includes(method);
     const match = /^\/seconds-contracts\/(products|orders)\/([1-9]\d*)\/(refund-policy|principal-refund)$/.exec(path);

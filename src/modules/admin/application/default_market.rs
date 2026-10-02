@@ -59,13 +59,31 @@ pub(crate) async fn save_admin_default_market(
     pair_id: u64,
     request: SaveDefaultMarketRequest,
 ) -> AppResult<DefaultMarketResponse> {
-    let reason = required_admin_audit_reason(request.reason)?;
+    let reason = required_admin_audit_reason(request.reason.clone())?;
     let pool = admin_mysql_pool(pool)?;
     let mut guard = acquire_generation_lock(&pool, pair_id).await?;
     let mut tx = pool.begin().await?;
-    let pair = lock_admin_trading_pair_in_tx(&mut tx, pair_id).await?;
+    guard.ensure_owned().await?;
+    let response =
+        save_default_market_configuration_in_tx(&mut tx, admin_id, pair_id, request, reason)
+            .await?;
+    guard.ensure_owned().await?;
+    tx.commit().await?;
+    Ok(response)
+}
+
+/// 复用默认配置的校验、不可变版本和审计写入；调用方必须持有交易对命名锁并在提交前复核所有权。
+/// 不提交事务，使项目草稿发布凭证与实际生成器版本能原子落库；不更改交易对状态或全部暂停标志。
+pub(super) async fn save_default_market_configuration_in_tx(
+    tx: &mut Transaction<'_, MySql>,
+    admin_id: u64,
+    pair_id: u64,
+    request: SaveDefaultMarketRequest,
+    reason: String,
+) -> AppResult<DefaultMarketResponse> {
+    let pair = lock_admin_trading_pair_in_tx(tx, pair_id).await?;
     ensure_supported_pair(&pair)?;
-    let saved = load_default_market_in_tx(&mut tx, pair_id).await?;
+    let saved = load_default_market_in_tx(tx, pair_id).await?;
     let version = next_default_market_version(
         saved.as_ref().map_or(0, |v| v.version),
         request.expected_version,
@@ -74,9 +92,9 @@ pub(crate) async fn save_admin_default_market(
         pair_precision(pair.price_precision)?,
         pair_precision(pair.qty_precision)?,
     )?;
-    validate_default_market_reference(&mut tx, pair_id, &request.config, true).await?;
+    validate_default_market_reference(tx, pair_id, &request.config, true).await?;
     validate_default_market_initial_price(request.initial_price.as_ref(), pair.price_precision)?;
-    let runtime = load_default_market_runtime_in_tx(&mut tx, pair_id).await?;
+    let runtime = load_default_market_runtime_in_tx(tx, pair_id).await?;
     if request.enabled {
         if pair.status != "active" {
             return Err(AppError::Validation(
@@ -84,7 +102,7 @@ pub(crate) async fn save_admin_default_market(
             ));
         }
         let start_price =
-            resolve_start_price(&mut tx, &pair, &runtime, request.initial_price.as_ref()).await?;
+            resolve_start_price(tx, &pair, &runtime, request.initial_price.as_ref()).await?;
         if request
             .config
             .price_min
@@ -114,26 +132,14 @@ pub(crate) async fn save_admin_default_market(
             .map_or_else(|| default_market_seed(pair_id), |v| v.seed.clone()),
         updated_at: Utc::now(),
     };
-    guard.ensure_owned().await?;
-    save_default_market_in_tx(&mut tx, &record, admin_id).await?;
+    save_default_market_in_tx(tx, &record, admin_id).await?;
     if !record.enabled && runtime.active_source == "default" {
-        invalidate_default_market_runtime_in_tx(&mut tx, pair_id).await?;
+        invalidate_default_market_runtime_in_tx(tx, pair_id).await?;
     }
-    audit_default_market(
-        &mut tx,
-        admin_id,
-        &record,
-        before,
-        reason,
-        "default_market.save",
-    )
-    .await?;
-    let saved = load_default_market_in_tx(&mut tx, pair_id).await?;
-    let runtime = load_default_market_runtime_in_tx(&mut tx, pair_id).await?;
-    let response = default_market_response(&mut tx, pair, saved, runtime).await?;
-    guard.ensure_owned().await?;
-    tx.commit().await?;
-    Ok(response)
+    audit_default_market(tx, admin_id, &record, before, reason, "default_market.save").await?;
+    let saved = load_default_market_in_tx(tx, pair_id).await?;
+    let runtime = load_default_market_runtime_in_tx(tx, pair_id).await?;
+    default_market_response(tx, pair, saved, runtime).await
 }
 
 /// 全部暂停独立于策略状态和交易对上架；可在尚无默认配置时直接急停，恢复仅清除总开关而不隐式启用。
@@ -429,7 +435,8 @@ fn pair_precision(value: i32) -> AppResult<u32> {
         .ok_or_else(|| AppError::Validation("交易对价格和数量精度必须在 0～18 之间".to_owned()))
 }
 
-async fn validate_default_market_reference(
+/// 保存草稿和发布共用参考身份校验；发布时共享锁定引用，禁止跟随自身、停用或非外部交易对。
+pub(super) async fn validate_default_market_reference(
     tx: &mut Transaction<'_, MySql>,
     pair_id: u64,
     config: &DefaultMarketParameters,

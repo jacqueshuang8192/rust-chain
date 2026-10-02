@@ -83,7 +83,7 @@ pub fn admin_routes() -> Router<AppState> {
 /// 返回可申购的理财产品，状态过滤在应用层硬编码为 active，已下架产品对用户不可见。
 /// 需要登录但不区分用户，claims 只用于准入，返回内容对所有已登录用户一致。
 /// 响应含 APR、期限、额度区间和四项费率的当前配置，以及分类的多语言名称。
-/// 只读且不支持偏移翻页，limit 缺省 50 并夹紧到 1..=100。
+/// 只读；产品目录的 limit 缺省 50 并夹紧到 1..=100，订阅列表支持 offset 分页。
 async fn list_active_products(
     UserAuth(_claims): UserAuth,
     State(state): State<AppState>,

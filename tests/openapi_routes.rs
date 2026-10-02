@@ -69,12 +69,178 @@ async fn request_json(uri: &str) -> Value {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::OK);
-    let body = to_bytes(response.into_body(), 256 * 1024).await.unwrap();
+    // The aggregated API document spans multiple domains; this is not a bundle budget.
+    let body = to_bytes(response.into_body(), 1024 * 1024).await.unwrap();
     serde_json::from_slice(&body).unwrap()
 }
 
 async fn openapi_json() -> Value {
     request_json("/openapi.json").await
+}
+
+#[tokio::test]
+async fn openapi_documents_agent_recharges_money_nulls_permissions_and_aliases() {
+    for alias in ["/openapi.json", "/api/openapi.json"] {
+        let document = request_json(alias).await;
+        for (path, method, permission) in [
+            ("/agent/api/v1/recharges/options", "get", ""),
+            ("/agent/api/v1/users/{user_id}/recharge", "post", ""),
+            ("/agent/api/v1/recharges", "get", ""),
+            (
+                "/admin/api/v1/agent-recharges",
+                "get",
+                "agents.recharges.read",
+            ),
+            (
+                "/admin/api/v1/agent-recharges/{id}",
+                "get",
+                "agents.recharges.read",
+            ),
+            (
+                "/admin/api/v1/agent-recharges/{id}/review",
+                "post",
+                "agents.recharges.review",
+            ),
+            (
+                "/admin/api/v1/agents/{id}/recharge-policy",
+                "get",
+                "agents.read",
+            ),
+            (
+                "/admin/api/v1/agents/{id}/recharge-policy",
+                "patch",
+                "agents.recharges.authorize",
+            ),
+        ] {
+            assert!(
+                operation_has_bearer_security(&document, path, method),
+                "{method} {path}"
+            );
+            assert!(
+                document["paths"][path][method]
+                    .to_string()
+                    .contains(permission)
+            );
+        }
+        let schemas = &document["components"]["schemas"];
+        assert_eq!(
+            document["paths"]["/admin/api/v1/agent-recharges/{id}"]["get"]["responses"]["200"]["content"]
+                ["application/json"]["schema"]["$ref"],
+            "#/components/schemas/AgentRechargeRecord"
+        );
+        let record = &schemas["AgentRechargeRecord"];
+        let properties = &record["properties"];
+        for field in ["id", "agent_id", "agent_admin_id", "user_id", "asset_id"] {
+            assert!(schema_has_type(&properties[field], "integer"), "{field}");
+            assert_eq!(properties[field]["maximum"], 9_007_199_254_740_991u64);
+        }
+        for field in ["asset_symbol", "amount", "reason", "mode", "status"] {
+            assert!(schema_has_type(&properties[field], "string"), "{field}");
+        }
+        for field in ["reviewed_by", "review_reason", "reviewed_at", "credited_at"] {
+            assert!(
+                schema_has_type(&properties[field], "null"),
+                "{field} must accept null"
+            );
+            assert!(
+                record["required"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|entry| entry == field),
+                "{field} must be present even when null"
+            );
+        }
+        for field in ["created_at", "reviewed_at", "credited_at"] {
+            assert!(schema_is_unix_millis(&properties[field]), "{field}");
+        }
+        assert_eq!(properties["mode"]["pattern"], "^(review|direct)$");
+        assert_eq!(
+            properties["status"]["pattern"],
+            "^(pending|credited|rejected)$"
+        );
+        assert!(properties.get("idempotency_key").is_none());
+        let create = &schemas["CreateAgentRechargeRequest"];
+        assert_eq!(create["properties"]["amount"]["type"], "string");
+        for field in ["asset_id", "amount", "reason", "idempotency_key"] {
+            assert!(
+                create["required"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|entry| entry == field)
+            );
+        }
+        assert!(create["properties"].get("agent_id").is_none());
+        for (path, method) in [
+            ("/agent/api/v1/users/{user_id}/recharge", "post"),
+            ("/admin/api/v1/agent-recharges/{id}/review", "post"),
+            ("/admin/api/v1/agents/{id}/recharge-policy", "patch"),
+        ] {
+            assert!(
+                document["paths"][path][method]["responses"]
+                    .get("422")
+                    .is_some()
+            );
+        }
+        assert_eq!(
+            schemas["AgentRechargePolicy"]["properties"]["version"]["type"],
+            "integer"
+        );
+        assert_eq!(
+            schemas["AgentRechargeAsset"]["properties"]["precision_scale"]["maximum"],
+            18
+        );
+        assert_eq!(
+            schemas["AgentRechargesResponse"]["properties"]["recharges"]["items"]["$ref"],
+            "#/components/schemas/AgentRechargeRecord"
+        );
+        for path in ["/agent/api/v1/recharges", "/admin/api/v1/agent-recharges"] {
+            let parameters = document["paths"][path]["get"]["parameters"]
+                .as_array()
+                .unwrap();
+            for field in ["status", "user_id", "limit", "offset"] {
+                assert!(
+                    parameters
+                        .iter()
+                        .any(|parameter| parameter["name"] == field)
+                );
+            }
+            assert_eq!(
+                parameters
+                    .iter()
+                    .any(|parameter| parameter["name"] == "agent_id"),
+                path.starts_with("/admin/")
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn openapi_documents_new_coin_market_drafts_in_both_aliases() {
+    for alias in ["/openapi.json", "/api/openapi.json"] {
+        let document = request_json(alias).await;
+        let setup = "/admin/api/v1/new-coins/{id}/market-setup";
+        for (path, method) in [
+            (setup, "get"),
+            (setup, "patch"),
+            ("/admin/api/v1/new-coins/{id}/market-setup/publish", "post"),
+        ] {
+            assert!(operation_has_bearer_security(&document, path, method));
+        }
+        let schemas = &document["components"]["schemas"];
+        assert!(schema_has_type(
+            &schemas["SaveNewCoinMarketDraft"]["properties"]["initial_price"],
+            "string"
+        ));
+        assert!(schema_is_unix_millis(
+            &schemas["NewCoinMarketDraft"]["properties"]["updated_at"]
+        ));
+        assert!(schemas["NewCoinMarketPublication"]["properties"]["replayed"].is_object());
+        let description = document["paths"][setup]["patch"].to_string();
+        assert!(description.contains("new_coin.projects.write"));
+        assert!(description.contains("market.pairs.write"));
+    }
 }
 
 #[tokio::test]

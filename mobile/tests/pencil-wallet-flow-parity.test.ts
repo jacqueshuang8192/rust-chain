@@ -185,7 +185,8 @@ test('交易记录使用正式通栏布局，提币记录和快捷充值继续�
   assert.match(sources.withdrawalRecords, /const filteredRecords = computed/)
   assert.match(sources.withdrawalRecords, /\.records-tabs \{[\s\S]*?min-height: 34px/)
   assert.match(sources.withdrawalRecords, /\.record-row \{[\s\S]*?min-height: 64px/)
-  assert.match(sources.withdrawalRecords, /records\.value = await fetchWithdrawalRecords\(\)/)
+  assert.match(sources.withdrawalRecords, /fetchWithdrawalRecordsPage\(/)
+  assert.match(sources.withdrawalRecords, /pagination\.loadMore\(\)/)
 
   assert.match(sources.quickRecharge, /Promise\.all\(\[fetchQuickRechargeConfig\(\), fetchQuickRechargeOrders\(\)\]\)/)
   assert.match(sources.quickRecharge, /const requestAmount = amountText\.value[\s\S]*createQuickRechargeOrder\(requestAmount, platformTarget\.value\)/)

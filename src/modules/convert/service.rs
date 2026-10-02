@@ -89,6 +89,10 @@ pub(crate) fn route_limit(limit: Option<u32>) -> u32 {
     limit.unwrap_or(50).clamp(1, 100)
 }
 
+pub(crate) fn route_offset(offset: Option<u32>) -> u32 {
+    offset.unwrap_or(0).min(100_000)
+}
+
 /// 裁剪可选查询文本并把纯空白归一为 `None`，使 `status=` 与不传该参数得到相同的不过滤语义。
 /// 不校验订单状态枚举，未知状态词会照常拼进 SQL 条件并自然查不到数据。
 /// 裁剪后的值仍以绑定参数方式下推，本函数不承担任何注入防护职责。

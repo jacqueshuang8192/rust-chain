@@ -75,7 +75,7 @@ use sqlx::{MySql, Pool, Transaction};
 use std::collections::HashSet;
 
 /// 按产品编号倒序列出可申请的借贷产品，状态过滤硬编码为 active，调用方无法查看已下架配置。
-/// 数量默认 50、夹紧到 1..=200，不支持偏移翻页，因此产品较多时只能看到最新的一批。
+/// 数量默认 50、夹紧到 1..=200；产品目录仍只取最近一批，用户订单列表另走 offset 分页。
 /// 不读取调用者的 KYC 等级、既有订单或钱包余额，返回的额度区间是否可用需下单时才知道。
 pub(crate) async fn list_active_products_use_case(
     pool: &Pool<MySql>,
@@ -134,9 +134,15 @@ pub(crate) async fn list_user_orders_use_case(
     query: UserLoanOrdersQuery,
 ) -> AppResult<LoanOrdersResponse> {
     // 按用户聚合查询订单，支持状态过滤和分页限制。
-    let orders =
-        list_user_loan_orders(pool, user_id, query.status, route_limit(query.limit)).await?;
-    Ok(LoanOrdersResponse { orders })
+    let (orders, has_more) = list_user_loan_orders(
+        pool,
+        user_id,
+        query.status,
+        route_limit(query.limit),
+        route_offset(query.offset),
+    )
+    .await?;
+    Ok(LoanOrdersResponse { orders, has_more })
 }
 
 /// 按用户与订单编号读取详情，归属隔离落在 SQL 的 user_id 条件而非应用层判断。

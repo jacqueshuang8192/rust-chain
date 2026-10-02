@@ -255,11 +255,12 @@ pub struct TestQuickRechargeConfigResponse {
     pub(crate) tested_at: i64,
 }
 
-/// 用户侧订单列表响应，只含订单数组，不返回总数，因为该接口不支持偏移分页。
+/// 用户侧订单列表响应，使用 `has_more` 表示是否存在下一页，不暴露全量总数。
 #[derive(Debug, Serialize)]
 pub struct QuickRechargeOrdersResponse {
     /// 按创建时间倒序排列的本人充值订单。
     pub(crate) orders: Vec<QuickRechargeOrderResponse>,
+    pub(crate) has_more: bool,
 }
 
 /// 后台订单列表响应，附带与当前筛选条件一致的总数以支撑分页控件。

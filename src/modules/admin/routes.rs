@@ -6,6 +6,7 @@
 //! 应用层用例在此统一改名为 `*_use_case` 后缀，目的是避免与各 handler 的同名函数在 `use super::*` 展开后互相遮蔽。
 
 mod access_control;
+mod agent_recharges;
 mod config_center;
 mod config_changes;
 mod content;
@@ -14,6 +15,7 @@ mod financial_reconciliation;
 mod financial_retries;
 mod market_trading;
 mod new_coin_convert;
+mod new_coin_market;
 mod risk_security;
 mod system_config;
 mod users_agents;
@@ -240,6 +242,7 @@ use axum::{
 pub fn routes() -> Router<AppState> {
     Router::new()
         .merge(access_control::routes())
+        .merge(agent_recharges::routes())
         .merge(config_changes::routes())
         .merge(config_center::routes())
         .merge(system_config::routes())
@@ -252,6 +255,7 @@ pub fn routes() -> Router<AppState> {
         .merge(financial_reconciliation::routes())
         .merge(market_trading::routes())
         .merge(new_coin_convert::routes())
+        .merge(new_coin_market::routes())
 }
 
 #[cfg(test)]

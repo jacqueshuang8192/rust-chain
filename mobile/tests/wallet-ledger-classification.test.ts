@@ -455,6 +455,7 @@ test('方向与日期筛选、兼容分类以及全部已知变动类型均有�
   assert.deepEqual([...WALLET_LEDGER_KNOWN_CHANGE_TYPES].sort(), [
     'admin_recharge',
     'agent_commission_payout',
+    'agent_recharge',
     'convert_settlement',
     'deposit',
     'deposit_confirm',
@@ -502,6 +503,9 @@ test('方向与日期筛选、兼容分类以及全部已知变动类型均有�
     'withdrawal_release',
     'withdrawal_reserve',
   ].sort())
+  assert.equal(walletLedgerTypePresentation('agent_recharge').translationKey, 'ledger.typeAgentRecharge')
+  assert.equal(zhCN.ledger.typeAgentRecharge, '代理人工充值')
+  assert.equal(en.ledger.typeAgentRecharge, 'Agent manual credit')
 
   // 所有相关 i18n key：筛选、账户、方向、日期、变动类型、页面与组件文案
   const translationKeys = new Set<string>([

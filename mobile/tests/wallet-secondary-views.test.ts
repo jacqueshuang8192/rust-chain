@@ -45,7 +45,8 @@ test('提币流程保留真实资产路由、余额网络加载、校验和提�
 })
 
 test('提币记录、交易记录和快捷买币保留真实读取与支付行为', () => {
-  assert.match(sources.withdrawalRecords, /records\.value = await fetchWithdrawalRecords\(\)/)
+  assert.match(sources.withdrawalRecords, /fetchWithdrawalRecordsPage\(/)
+  assert.match(sources.withdrawalRecords, /pagination\.loadMore\(\)/)
   assert.match(sources.withdrawalRecords, /return statusKeys\[status\] \? t\(statusKeys\[status\]\) : status/)
   assert.match(sources.walletLedger, /createWalletLedgerPaginationController\(\{[\s\S]*?fetchPage: fetchWalletLedger/)
   assert.match(sources.walletLedger, /sessionGeneration: \(\) => session\.generation/)

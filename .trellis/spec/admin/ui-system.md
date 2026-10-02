@@ -102,6 +102,75 @@
 - Read DTO validation requires the actual-time field even when null. Listing
   confirmation sends stage, original configuration snapshot and reason only.
 
+## New-Coin Market Setup
+
+### 1. Scope / Trigger
+
+Apply to the project market tab and its independent draft/publication workflow.
+Reuse the default generator forms, reference directory and preview chart.
+
+### 2. Signatures
+
+- `GET/PATCH /admin/api/v1/new-coins/:id/market-setup`
+- `POST /admin/api/v1/new-coins/:id/market-setup/publish`
+- Existing pair default-generator read, preview and pause endpoints remain
+  authoritative for generator state.
+
+### 3. Contracts
+
+- Read/write UI requires both project and market-pair permissions. Candidate
+  identity comes from server base/quote asset matches, not symbols or purchase
+  linkage. External pairs are identified without a synthetic editor.
+- Save writes only a server draft. Publication requires a saved unchanged
+  revision, a current preview and explicit confirmation. Backend revision,
+  permission and business checks still own authorization; the browser preview
+  prerequisite is not a server-issued approval credential.
+- Keep all financial inputs as decimal strings. Volatility presets change only
+  volatility; advanced settings survive. Initial price is explicitly entered
+  or copied from issuance, never silently used to reset existing prices.
+- Published drafts are receipts. Reopening starts from current live settings;
+  stale unpublished drafts require deliberate conflict recovery. Preview and
+  mutation responses from a previous selection must not update a new editor.
+- Display runtime as a snapshot at `checkedAt`, with price, tick time, source,
+  version and errors. A browser timer must not age a healthy unrefreshed
+  snapshot into an alleged outage. Refresh replaces the evidence.
+- Pause is distinct from disabling trading. Synthetic volume/depth and relative
+  following are never represented as real fills or guaranteed liquidity.
+- At <=720px the Admin sidebar starts collapsed and collapses when entering
+  the breakpoint, while explicit expansion remains possible. Its navigation
+  scrolls within the viewport and the collapse control remains reachable.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required behavior |
+| --- | --- |
+| Missing either read permission | No market request/editor |
+| Missing write permission or inactive project | Read-only state |
+| Dirty input | Guard navigation and invalidate preview |
+| HTTP 409 | Preserve input; explicit discard/reload |
+| Mutation outcome unknown | Block further writes until querying persisted state |
+| Disabled pair | Allow draft/preview; block publish; no implicit activation |
+| Published receipt and newer live version | Hydrate live settings, never replay old values |
+
+### 5. Good / Base / Bad Cases
+
+Good: save `1.000000000000000001`, preview, confirm one revision, then refresh
+runtime independently. Base: inspect a paused pair without changing it.
+Bad: save through the immediate-live PATCH or claim enabled means healthy.
+
+### 6. Tests Required
+
+Run `NewCoinMarketSetup.test.tsx`, `marketSetupModel.test.ts` and
+`AdminLayout.test.tsx`, followed by the full Admin quality gate. Browser mocks
+must exercise saved-draft publication, exact JSON, 60-candle preview and
+1728/390/320px overflow. Mock checks do not certify real market delivery.
+
+### 7. Wrong vs Correct
+
+Wrong: refresh the expected version beneath an old draft and submit it.
+Correct: keep the original version; on conflict retain input until explicit
+discard/reload or an intentional new edit from live configuration.
+
 ## Manual New-Coin Settlement Actions
 
 - Settlement is a subscription row action. User, project and subscription IDs
@@ -881,6 +950,73 @@ Backend ownership, persistence, and exact-agent authorization remain defined by
 For precision metadata, new-intent validation and replay after configuration
 changes, follow [Admin Financial Validation](../backend/admin-financial-validation.md).
 This also defines convert ratio/storage bounds and the legacy pure-disable path.
+
+## Agent Recharge And Approval UI
+
+### 1. Scope / Trigger
+
+Agent team-user recharge, own-account application history, administrator review
+queue, and explicit per-agent direct-credit authorization.
+
+### 2. Signatures
+
+- `/agent/users/:userId/recharge`, `/agent/recharges`
+- `/admin/agent-recharges`, agent-management row `RechargePolicyAction`
+- API contracts and lock/money rules: [Agent Hierarchy](../backend/agent-hierarchy.md).
+
+### 3. Contracts
+
+- Pin user ID to the chosen team user. New requests require authoritative
+  asset precision and exact positive Decimal text, with explicit confirmation.
+  Display actual returned state, not the pre-submit opt-in snapshot.
+- Freeze user/asset/amount/reason and persist the pending draft plus the shared
+  recoverable key before sending. Unknown results, 409 and later 401/403/404
+  retain the original request. A surviving draft with a missing/corrupt key
+  fails closed; never regenerate a new credit identity. Storage failure blocks
+  sending, and successful tombstone persistence precedes key release.
+- Review identity is application ID + administrator + decision + reason, not
+  a new API idempotency key. Preserve it across remounts. A read-only detail
+  query may resolve another administrator's final decision, display its actual
+  reviewer/reason, and unlock the queue. Pending/failed queries retain the draft.
+- Policy editor loads on demand, not per row. Keep the original CAS version
+  on conflict; discard/reload is explicit. Read, review and authorize are
+  independently gated. `agents.write` never grants direct-credit authority.
+- Own history is account-owned and server-paged, not a local first-page slice.
+  Render exact amounts and Chinese mode/status/ledger labels.
+- Narrow agent layouts hide the fixed sidebar behind an accessible menu
+  toggle; choosing a destination closes it. Desktop navigation stays unchanged.
+
+### 4. Validation & Error Matrix
+
+| Condition | UI result |
+| --- | --- |
+| Lost response / auth or scope changed after unknown result | Preserve frozen input and key |
+| Pending draft but key absent/corrupt | No new POST; require record reconciliation |
+| Another administrator already reviewed | Query authoritative detail, no second credit |
+| Read-only role | Read data, no mutation control |
+| Policy version conflict | Keep old draft/version; explicit reload |
+| Invalid record terminal timestamps or review evidence | Contract error, no success acknowledgement |
+
+### 5. Good / Base / Bad Cases
+
+Good: retry a large exact amount after precision tightening using the original
+key. Base: agent has no direct-credit permission and sees pending after submit.
+Bad: infer credited from a flag, silently reset version, or release identity
+solely because a later request is forbidden.
+
+### 6. Tests Required
+
+Real Semi tests cover confirmation accessibility, repeat clicks, remount,
+precision, corrupt/unavailable storage, authority changes, independent
+permissions, concurrent-review reconciliation and policy version conflicts.
+Browser mocks cover 1728/390/320px forms, confirmations and SideSheets. Record
+any screenshot-tool failure separately from DOM/interaction evidence.
+
+### 7. Wrong vs Correct
+
+Wrong: change the key after timeout, or clear an unresolved review on 409.
+Correct: keep immutable identity, query authoritative state where available,
+and only start a genuinely new recharge after the prior outcome is confirmed.
 
 ## Required Tests
 

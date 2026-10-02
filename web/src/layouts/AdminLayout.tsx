@@ -108,8 +108,14 @@ export function AdminLayout() {
   const activePath = normalizePath(location.pathname);
   const navContext = adminNavContext(activePath);
   const [openKeys, setOpenKeys] = useState<string[]>(() => activeGroupKeys(visibleNavItems, activePath));
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(() => window.innerWidth <= 720);
   const environment = adminBuildEnvironmentMeta();
+
+  useEffect(() => {
+    const collapseOnNarrow = () => { if (window.innerWidth <= 720) setIsCollapsed(true); };
+    window.addEventListener('resize', collapseOnNarrow);
+    return () => window.removeEventListener('resize', collapseOnNarrow);
+  }, []);
 
   useEffect(() => {
     document.title = `${navContext.page} · HIPPO 管理后台`;

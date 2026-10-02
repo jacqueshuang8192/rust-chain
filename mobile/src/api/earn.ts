@@ -8,6 +8,7 @@ import {
 import { requiredId, requiredSafeInteger, normalizeTimestamp } from '@/core/numeric'
 import { i18n } from '@/i18n'
 import { requiredDecimalText, normalizeDecimalText, type DecimalText } from '@/core/decimal'
+import { fetchAllHistoryPages, mapHistoryPage, validateHistoryPageRequest, type HistoryPage } from '@/core/historyPagination'
 
 const subscriptionKeys = new RetryStableIdempotencyKeys('mobile-earn', undefined, () => globalThis.sessionStorage)
 
@@ -73,10 +74,29 @@ export async function fetchEarnProducts(limit = 50, options: ReferenceRequestOpt
   }, options)
 }
 
+export async function fetchEarnSubscriptionsPage(input: {
+  limit?: number
+  offset?: number
+} = {}): Promise<HistoryPage<EarnSubscription>> {
+  const limit = input.limit ?? 50
+  const offset = input.offset ?? 0
+  validateHistoryPageRequest(limit, offset)
+  const response = await client.get<{ subscriptions?: Array<Record<string, unknown>>; has_more?: boolean }>(
+    requestUrl('/earn/subscriptions'),
+    { params: { limit, offset } },
+  )
+  return mapHistoryPage(
+    { items: response.data.subscriptions || [], has_more: response.data.has_more },
+    { limit, offset },
+    mapSubscription,
+  )
+}
+
 export async function fetchEarnSubscriptions(limit = 50): Promise<EarnSubscription[]> {
-  requiredSafeInteger(limit, 'limit', 1)
-  const response = await client.get<{ subscriptions?: Array<Record<string, unknown>> }>(requestUrl('/earn/subscriptions'), { params: { limit } })
-  return (response.data.subscriptions || []).map(mapSubscription)
+  return fetchAllHistoryPages(
+    (request) => fetchEarnSubscriptionsPage(request),
+    { pageSize: limit, identity: (item) => String(item.id) },
+  )
 }
 
 export async function subscribeEarnProduct(productId: number, amount: DecimalText): Promise<void> {

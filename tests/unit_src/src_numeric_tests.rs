@@ -1,6 +1,32 @@
 use super::*;
 
 #[test]
+fn strict_decimal_text_rejects_numeric_json_without_changing_legacy_ingress() {
+    #[derive(Deserialize)]
+    struct TextInput {
+        #[serde(deserialize_with = "deserialize_decimal_text")]
+        amount: BigDecimal,
+    }
+    let input: TextInput =
+        serde_json::from_str(r#"{"amount":"9007199254740993.000000000000000001"}"#).unwrap();
+    assert_eq!(
+        input.amount,
+        parse_decimal_input("9007199254740993.000000000000000001").unwrap()
+    );
+    for source in [
+        r#"{"amount":1}"#,
+        r#"{"amount":null}"#,
+        r#"{"amount":"1e20"}"#,
+        r#"{"amount":"1e-19"}"#,
+    ] {
+        assert!(
+            serde_json::from_str::<TextInput>(source).is_err(),
+            "{source}"
+        );
+    }
+}
+
+#[test]
 fn amount_storage_checks_fraction_and_integer_capacity_without_rounding() {
     for source in [
         "99999999999999999999.999999999999999999",

@@ -1,0 +1,28 @@
+.new-coin-market { min-width: 0; padding: 20px 0; }
+.new-coin-market h3, .new-coin-market h4 { margin: 0 0 16px; font-size: 18px; letter-spacing: 0; }
+.new-coin-market-heading, .new-coin-market-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.new-coin-market-pair { display: grid; grid-template-columns: minmax(180px, 480px) auto; align-items: end; gap: 16px; margin-bottom: 20px; }
+.new-coin-market-status { border-block: 1px solid var(--semi-color-border); padding: 20px 0; margin-bottom: 20px; }
+.new-coin-market-status dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin: 0 0 16px; }
+.new-coin-market-status dt { color: var(--semi-color-text-2); margin-bottom: 8px; }
+.new-coin-market-status dd { margin: 0; overflow-wrap: anywhere; }
+.new-coin-market-steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 28px 0; padding: 0; list-style: none; }
+.new-coin-market-steps li { display: flex; align-items: center; gap: 8px; color: var(--semi-color-text-2); }
+.new-coin-market-steps li[aria-current] { color: var(--semi-color-text-0); font-weight: 600; }
+.new-coin-market-steps li[data-complete="true"] { color: var(--semi-color-success); }
+.new-coin-market-steps li span { display: grid; place-items: center; flex: 0 0 28px; height: 28px; border: 1px solid currentColor; border-radius: 50%; font-variant-numeric: tabular-nums; }
+.new-coin-market-advanced { margin-top: 20px; }
+.new-coin-market-advanced summary { cursor: pointer; margin-bottom: 16px; }
+.new-coin-market-actions { border-top: 1px solid var(--semi-color-border); margin-top: 24px; padding-top: 16px; }
+.new-coin-market p, .new-coin-market span { overflow-wrap: anywhere; }
+.new-coin-market .admin-market-preview-grid { max-height: 280px; overflow: auto; }
+.new-coin-market-changes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 24px; }
+.new-coin-market-changes dt { color: var(--semi-color-text-2); }
+.new-coin-market-changes dd { margin: 4px 0 0; overflow-wrap: anywhere; }
+@media (max-width: 840px) {
+  .new-coin-market-status dl { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .new-coin-market-pair { grid-template-columns: minmax(0, 1fr); }
+  .new-coin-market-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .new-coin-market-actions { align-items: stretch; }
+  .new-coin-market-changes { grid-template-columns: minmax(0, 1fr); }
+}

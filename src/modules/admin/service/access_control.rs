@@ -13,6 +13,7 @@ const ADMIN_PERMISSION_RESOURCES: &[&str] = &[
     "agents",
     "agents.commission_rules",
     "agents.commissions",
+    "agents.recharges",
     "audit.logs",
     "config_center",
     "content.news",
@@ -91,6 +92,35 @@ pub(crate) fn admin_scope_from_record(record: AdminAccessRecord) -> AppResult<Ad
 /// 未登记的后台业务路径返回 `admin.unmapped`，仅 `*` 可访问，避免新路由因遗漏映射而默认放行。
 pub(crate) fn required_admin_permission(method: &str, raw_path: &str) -> Option<String> {
     let path = raw_path.strip_prefix("/admin/api/v1").unwrap_or(raw_path);
+    if path.starts_with("/agent-recharges")
+        || (path.starts_with("/agents/") && path.contains("/recharge-policy"))
+    {
+        let parts: Vec<_> = path.split('/').collect();
+        let valid_id = parts.get(2).is_some_and(|id| {
+            id.starts_with(|c: char| c.is_ascii_digit() && c != '0')
+                && id.bytes().all(|c| c.is_ascii_digit())
+                && id.parse::<u64>().is_ok_and(|id| id > 0)
+        });
+        return Some(
+            match (method, parts.as_slice()) {
+                ("GET" | "HEAD" | "OPTIONS", ["", "agent-recharges"]) => "agents.recharges.read",
+                ("GET" | "HEAD" | "OPTIONS", ["", "agent-recharges", _]) if valid_id => {
+                    "agents.recharges.read"
+                }
+                ("POST", ["", "agent-recharges", _, "review"]) if valid_id => {
+                    "agents.recharges.review"
+                }
+                ("GET" | "HEAD" | "OPTIONS", ["", "agents", _, "recharge-policy"]) if valid_id => {
+                    "agents.read"
+                }
+                ("PATCH", ["", "agents", _, "recharge-policy"]) if valid_id => {
+                    "agents.recharges.authorize"
+                }
+                _ => "admin.unmapped.write",
+            }
+            .to_owned(),
+        );
+    }
     if path.starts_with("/seconds-contracts/")
         && (path.contains("/refund-policy") || path.contains("/principal-refund"))
     {
@@ -233,6 +263,7 @@ pub(crate) fn required_admin_permission(method: &str, raw_path: &str) -> Option<
 /// 但统一动作集合让角色编辑器不必从 HTTP 路径猜测字符串。返回顺序固定，便于缓存和差异审计。
 pub(crate) fn admin_permission_catalog() -> Vec<String> {
     let mut permissions = BTreeSet::from(["*".to_owned()]);
+    permissions.insert("agents.recharges.authorize".to_owned());
     for resource in ADMIN_PERMISSION_RESOURCES {
         for action in ["read", "write", "review", "operate", "settle"] {
             permissions.insert(format!("{resource}.{action}"));

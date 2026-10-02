@@ -8,6 +8,7 @@ import {
 import { requiredId, requiredSafeInteger, normalizeTimestamp } from '@/core/numeric'
 import { i18n } from '@/i18n'
 import { requiredDecimalText, normalizeDecimalText, type DecimalText } from '@/core/decimal'
+import { fetchAllHistoryPages, mapHistoryPage, validateHistoryPageRequest, type HistoryPage } from '@/core/historyPagination'
 
 const applicationKeys = new RetryStableIdempotencyKeys('mobile-loan', undefined, () => globalThis.sessionStorage)
 
@@ -73,10 +74,21 @@ export async function fetchLoanProducts(limit = 50, options: ReferenceRequestOpt
   }, options)
 }
 
-export async function fetchLoanOrders(limit = 50): Promise<LoanOrder[]> {
-  requiredSafeInteger(limit, 'limit', 1)
-  const response = await client.get<{ orders?: Array<Record<string, unknown>> }>(requestUrl('/loan/orders'), { params: { limit } })
-  return (response.data.orders || []).map((order) => ({
+export async function fetchLoanOrdersPage(input: {
+  limit?: number
+  offset?: number
+} = {}): Promise<HistoryPage<LoanOrder>> {
+  const limit = input.limit ?? 50
+  const offset = input.offset ?? 0
+  validateHistoryPageRequest(limit, offset)
+  const response = await client.get<{ orders?: Array<Record<string, unknown>>; has_more?: boolean }>(
+    requestUrl('/loan/orders'),
+    { params: { limit, offset } },
+  )
+  return mapHistoryPage(
+    { items: response.data.orders || [], has_more: response.data.has_more },
+    { limit, offset },
+    (order) => ({
     id: requiredId(order.id),
     productId: requiredId(order.product_id),
     productName: String(order.product_name || i18n.global.t('loan.defaultOrder')),
@@ -92,7 +104,15 @@ export async function fetchLoanOrders(limit = 50): Promise<LoanOrder[]> {
     repaymentAmount: productDecimal(order.repayment_amount),
     dueAt: optionalTimestamp(order.due_at),
     createdAt: normalizeTimestamp(order.created_at),
-  }))
+    }),
+  )
+}
+
+export async function fetchLoanOrders(limit = 50): Promise<LoanOrder[]> {
+  return fetchAllHistoryPages(
+    (request) => fetchLoanOrdersPage(request),
+    { pageSize: limit, identity: (item) => String(item.id) },
+  )
 }
 
 export async function applyLoan(input: {

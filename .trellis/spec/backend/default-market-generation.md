@@ -90,9 +90,15 @@ invisible. These defaults make no directional-return guarantee.
    during the current minute. Clear it only after old 1m and its complete
    higher aggregates succeed. This repairs a partial publication, not missing
    historical data; a later restart creates no past candles or full-window fill.
-7. Individual errors are recorded without resetting accepted prices. Default
-   candidates use oldest checkpoints first, with a separate 1..100 bound from
-   the manual scan. A connected socket is not a health guarantee.
+7. Individual publication errors are recorded without resetting accepted prices.
+   Manual and default candidates use oldest scheduling attempts first, with
+   separate 1..100 bounds. Migration 0143 adds `market_generation_attempts`
+   (`pair_id`, DB UTC `last_attempt_at`) and records an attempt before lock
+   acquisition/parameter parsing, including failed or contended candidates.
+   Scheduling metadata never advances runtime prices or success checkpoints.
+   A connected socket is not a health guarantee. Per-item preparation queries
+   can still abort a round on database errors; fairness does not fix throughput
+   or guarantee one-second refresh for every pair.
 
 ## External-reference follow mode
 
@@ -172,3 +178,7 @@ administrator handoff. Keep generator disabled until reviewed.
   price selection, pause drain and seconds capability failures.
 - Existing synthetic strategy/details/worker/migration and seconds capability
   tests; architecture, fmt/check/clippy, Web interaction and mobile release gate.
+- `attempts_rotate_manual_and_default_candidates_without_faking_price_checkpoints`
+  requires a fresh dedicated `MARKET_SCHEDULING_TEST_DATABASE_URL`. Four pairs and
+  a two-item limit must rotate across failed/no-checkpoint candidates; manual
+  schedules must continue suppressing defaults. It applies migrations itself.

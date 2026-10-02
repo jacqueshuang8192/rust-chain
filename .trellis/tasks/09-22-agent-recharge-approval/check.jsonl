@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/agent-hierarchy.md","reason":"Scope and revocation checks"}
+{"file":".trellis/spec/backend/admin-financial-validation.md","reason":"Replay and precision verification"}
+{"file":".trellis/spec/backend/financial-journals.md","reason":"Rollback and balanced journals"}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Architecture tests"}
+{"file":".trellis/spec/admin/ui-system.md","reason":"Financial interaction and release gates"}

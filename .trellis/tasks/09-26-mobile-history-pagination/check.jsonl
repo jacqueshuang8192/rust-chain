@@ -1,0 +1,4 @@
+{"file":".trellis/spec/mobile/index.md","reason":"Mobile quality gate and interaction requirements"}
+{"file":".trellis/spec/mobile/backend-integration.md","reason":"Verify stale session and DTO adapter behavior"}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Verify backend contracts, tests, and architecture"}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Verify pagination query safety and bounded offsets"}

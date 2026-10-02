@@ -2,23 +2,25 @@ import { AdminCheckbox, AdminTextInput } from '../../../../shared/SemiFormContro
 import { MarketStrategyVolatilityField } from '../../../components/MarketStrategyVolatilityField';
 import type { DefaultMarketDraft } from './types';
 
-export function DefaultMarketForm({ draft, disabled, edit, pricePrecision, qtyPrecision }: {
+export function DefaultMarketForm({ draft, disabled, edit, pricePrecision, qtyPrecision, hideEnable = false, hidePriceFields = false }: {
   draft: DefaultMarketDraft;
   disabled: boolean;
   edit: <K extends keyof DefaultMarketDraft>(key: K, value: DefaultMarketDraft[K]) => void;
   pricePrecision: number;
   qtyPrecision: number;
+  hideEnable?: boolean;
+  hidePriceFields?: boolean;
 }) {
   return (
     <>
       <section aria-label="通用生成参数">
         <h4>通用生成参数（独立与跟随均适用）</h4>
-        <AdminCheckbox checked={draft.enabled} disabled={disabled} onChange={(enabled) => edit('enabled', enabled)}>启用默认行情</AdminCheckbox>
+        {!hideEnable ? <AdminCheckbox checked={draft.enabled} disabled={disabled} onChange={(enabled) => edit('enabled', enabled)}>启用默认行情</AdminCheckbox> : null}
         <p className="admin-form-hint">价格精度 {pricePrecision} 位，数量精度 {qtyPrecision} 位。小数原样提交，不自动舍入。</p>
         <div className="admin-action-form admin-action-form-wide">
-          <label>初始价格（可选）<AdminTextInput ariaLabel="初始价格" disabled={disabled} value={draft.initial_price} onChange={(value) => edit('initial_price', value)} placeholder="无已有价格时必须填写" /><span className="admin-form-hint">优先续接已有运行或历史价格；仅无可用价格时使用初始价格，不设隐式初始价。</span></label>
+          {!hidePriceFields ? <label>初始价格（可选）<AdminTextInput ariaLabel="初始价格" disabled={disabled} value={draft.initial_price} onChange={(value) => edit('initial_price', value)} placeholder="无已有价格时必须填写" /><span className="admin-form-hint">优先续接已有运行或历史价格；仅无可用价格时使用初始价格，不设隐式初始价。</span></label> : null}
           <label>盘口档数<AdminTextInput ariaLabel="盘口档数" disabled={disabled} value={draft.depth_levels} onChange={(value) => edit('depth_levels', value)} placeholder="1 至 20" /></label>
-          {([['price_min', '价格下限（可选）'], ['price_max', '价格上限（可选）'], ['volume_min', '分钟成交量下限'], ['volume_max', '分钟成交量上限']] as const).map(([key, label]) => (
+          {([['price_min', '价格下限（可选）'], ['price_max', '价格上限（可选）'], ['volume_min', '分钟成交量下限'], ['volume_max', '分钟成交量上限']] as const).filter(([key]) => !hidePriceFields || !key.startsWith('price_')).map(([key, label]) => (
             <label key={key}>{label}<AdminTextInput ariaLabel={label} disabled={disabled} value={draft[key]} onChange={(value) => edit(key, value)} /></label>
           ))}
         </div>

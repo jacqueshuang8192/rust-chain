@@ -39,6 +39,20 @@ pub(crate) async fn authorize_admin_request(
     {
         return Err(AppError::Forbidden);
     }
+    let segments: Vec<_> = path.trim_end_matches('/').split('/').collect();
+    if segments
+        .windows(3)
+        .any(|parts| parts[0] == "new-coins" && parts[2] == "market-setup")
+    {
+        let permission = if method == "GET" {
+            "market.pairs.read"
+        } else {
+            "market.pairs.write"
+        };
+        if !scope.allows(permission) {
+            return Err(AppError::Forbidden);
+        }
+    }
     Ok(scope)
 }
 

@@ -258,6 +258,14 @@ pub(crate) async fn load_admin_financial_idempotency_audit(
                           AND requests.id = CAST(ledger.ref_id AS UNSIGNED)))
                  OR (ledger.ref_type = 'admin_recharge' AND NOT EXISTS
                        (SELECT 1 FROM admin_wallet_recharges recharges WHERE recharges.recharge_id = ledger.ref_id))
+                 OR (ledger.ref_type = 'agent_recharge' AND NOT EXISTS
+                       (SELECT 1 FROM agent_wallet_recharges recharges
+                        WHERE ledger.ref_id REGEXP '^[0-9]+$'
+                          AND recharges.id = CAST(ledger.ref_id AS UNSIGNED)
+                          AND recharges.status = 'credited'
+                          AND recharges.user_id = ledger.user_id
+                          AND recharges.asset_id = ledger.asset_id
+                          AND recharges.amount = ledger.amount))
                  OR (ledger.ref_type = 'convert_order' AND NOT EXISTS
                        (SELECT 1 FROM convert_orders orders WHERE orders.quote_id = ledger.ref_id))
                  OR (ledger.ref_type = 'loan_liquidation' AND NOT EXISTS

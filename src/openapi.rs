@@ -16,11 +16,13 @@ use utoipa_swagger_ui::SwaggerUi;
 use crate::{HealthResponse, error::ErrorResponse, state::AppState};
 
 mod agent_portal;
+mod agent_recharges;
 mod agents;
 mod auth;
 mod financial_reconciliation;
 mod financial_retries;
 mod loan;
+mod new_coin_market;
 mod news;
 mod quick_recharge;
 mod seconds_refund;
@@ -51,6 +53,8 @@ pub fn routes() -> Router<AppState> {
     document.merge(loan::LoanApiDoc::openapi());
     document.merge(financial_reconciliation::ReconciliationApiDoc::openapi());
     document.merge(seconds_refund::SecondsRefundApiDoc::openapi());
+    document.merge(new_coin_market::NewCoinMarketApiDoc::openapi());
+    document.merge(agent_recharges::AgentRechargesApiDoc::openapi());
     let docs: Router<AppState> = SwaggerUi::new("/docs")
         .url("/openapi.json", document.clone())
         .into();

@@ -121,9 +121,10 @@ pub struct WalletWithdrawalQuery {
     pub status: Option<String>,
     pub user_id: Option<u64>,
     pub limit: Option<u32>,
+    pub offset: Option<u32>,
 }
 
-/// 后台充提列表查询参数：用户端不暴露 offset，避免公开接口承诺未实现的翻页语义。
+/// 后台充提列表查询参数；用户端提现查询也支持受限 offset，后台额外返回 total。
 #[derive(Debug, Deserialize)]
 pub struct AdminWalletListQuery {
     pub status: Option<String>,
@@ -135,6 +136,7 @@ pub struct AdminWalletListQuery {
 #[derive(Debug, Serialize)]
 pub struct WalletWithdrawalsResponse {
     pub withdrawals: Vec<WalletWithdrawalResponse>,
+    pub has_more: bool,
 }
 
 #[derive(Debug, Serialize)]

@@ -86,6 +86,7 @@ fn wallet_ledger_classifier_covers_every_category_and_defaults_unknown_to_other(
         ("deposit_confirm", WalletLedgerCategory::Funding),
         ("withdrawal_release", WalletLedgerCategory::Funding),
         ("admin_recharge", WalletLedgerCategory::Funding),
+        ("agent_recharge", WalletLedgerCategory::Funding),
         ("quick_recharge", WalletLedgerCategory::Funding),
         ("spot_trade_settlement", WalletLedgerCategory::Spot),
         ("margin_position_close", WalletLedgerCategory::Margin),

@@ -32,7 +32,7 @@ use crate::{
                 list_user_margin_positions as list_user_margin_positions_use_case,
                 list_user_margin_wallets as list_user_margin_wallets_use_case, mysql_pool,
                 open_margin_position_with_events as open_margin_position_with_events_use_case,
-                route_limit, transfer_margin_funds as transfer_margin_funds_use_case,
+                route_limit, route_offset, transfer_margin_funds as transfer_margin_funds_use_case,
                 update_margin_product_config as update_margin_product_config_use_case,
                 update_margin_product_status as update_margin_product_status_use_case,
                 update_user_leverage as update_user_leverage_use_case,
@@ -204,8 +204,14 @@ async fn list_positions(
     let user_id = user_id_from_subject(&claims.sub)?;
     let pool = mysql_pool(&state)?;
     Ok(Json(
-        list_user_margin_positions_use_case(&pool, user_id, query.status, route_limit(query.limit))
-            .await?,
+        list_user_margin_positions_use_case(
+            &pool,
+            user_id,
+            query.status,
+            route_limit(query.limit),
+            route_offset(query.offset),
+        )
+        .await?,
     ))
 }
 

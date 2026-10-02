@@ -269,8 +269,9 @@ async fn list_user_withdrawals(
     Query(query): Query<WalletWithdrawalQuery>,
 ) -> AppResult<Json<WalletWithdrawalsResponse>> {
     let user_id = user_id_from_subject(&claims.sub)?;
-    let withdrawals = list_user_withdrawals_use_case(&mysql_pool(&state)?, user_id, query).await?;
-    Ok(Json(WalletWithdrawalsResponse { withdrawals }))
+    Ok(Json(
+        list_user_withdrawals_use_case(&mysql_pool(&state)?, user_id, query).await?,
+    ))
 }
 
 /// 后台提现分页查询，可按用户与状态筛选并返回匹配总数，供运营翻页审阅。

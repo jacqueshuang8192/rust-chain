@@ -1058,6 +1058,7 @@ export default {
     typeWithdrawalRelease: '提币资金释放',
     typeWithdrawalConfirm: '提币确认扣款',
     typeAdminRecharge: '人工充值',
+    typeAgentRecharge: '代理人工充值',
     typeQuickRecharge: '快捷买币',
     typeSpotFreeze: '现货委托冻结',
     typeSpotUnfreeze: '现货委托解冻',

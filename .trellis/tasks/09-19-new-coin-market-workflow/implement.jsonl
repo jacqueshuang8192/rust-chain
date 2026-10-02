@@ -1,0 +1,7 @@
+{"file":".trellis/spec/backend/directory-structure.md","reason":"Layer ownership and transaction orchestration"}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Architecture, documentation and regression gates"}
+{"file":".trellis/spec/backend/default-market-generation.md","reason":"Shared writer fencing, preview and pause semantics"}
+{"file":".trellis/spec/backend/new-coin-project-center.md","reason":"Project identity, lifecycle and authorization"}
+{"file":".trellis/spec/backend/numeric-safety.md","reason":"Exact decimal and bounded numeric input"}
+{"file":".trellis/spec/admin/ui-system.md","reason":"Admin forms, source labels and dirty state"}
+{"file":".trellis/spec/admin/resource-response-contract.md","reason":"Strict API and numeric boundaries"}

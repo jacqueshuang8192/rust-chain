@@ -29,7 +29,8 @@ use crate::{
                 ReviewWithdrawalRequest, TodayReturnResponse, TodayReturnStatus,
                 WalletAccountResponse, WalletDepositEventResponse, WalletDepositsResponse,
                 WalletLedgerQuery, WalletLedgerResponse, WalletWithdrawalQuery,
-                WalletWithdrawalResponse, WithdrawalQuoteResponse, WithdrawalRequestResponse,
+                WalletWithdrawalResponse, WalletWithdrawalsResponse, WithdrawalQuoteResponse,
+                WithdrawalRequestResponse,
             },
             truncate_amount_to_asset_precision,
         },
@@ -947,15 +948,20 @@ pub(crate) async fn list_user_withdrawals(
     pool: &Pool<MySql>,
     user_id: u64,
     query: WalletWithdrawalQuery,
-) -> AppResult<Vec<WalletWithdrawalResponse>> {
+) -> AppResult<WalletWithdrawalsResponse> {
     let status = normalize_withdrawal_status(query.status)?;
-    infrastructure::list_wallet_withdrawals(
+    let (withdrawals, has_more) = infrastructure::list_wallet_withdrawals(
         pool,
         Some(user_id),
         status.as_deref(),
         route_limit(query.limit),
+        route_offset(query.offset),
     )
-    .await
+    .await?;
+    Ok(WalletWithdrawalsResponse {
+        withdrawals,
+        has_more,
+    })
 }
 
 /// 规范后台状态与分页后读取提现请求及匹配总数，供运营侧翻页审阅。

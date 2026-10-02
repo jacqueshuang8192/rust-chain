@@ -48,6 +48,7 @@ pub(crate) struct AdminMarketQuery {
 #[derive(Debug, Deserialize)]
 pub(crate) struct OrdersQuery {
     pub(crate) limit: Option<u32>,
+    pub(crate) offset: Option<u32>,
     pub(crate) status: Option<String>,
     pub(crate) market_id: Option<u64>,
 }
@@ -292,6 +293,7 @@ pub(crate) struct PredictionOrderResponse {
 #[derive(Debug, Serialize)]
 pub(crate) struct PredictionOrdersResponse {
     pub(crate) orders: Vec<PredictionOrderResponse>,
+    pub(crate) has_more: bool,
 }
 
 #[derive(Debug, Serialize)]

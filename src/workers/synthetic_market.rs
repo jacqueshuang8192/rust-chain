@@ -216,7 +216,7 @@ pub async fn run_once_with_dependencies(
     run_once_with_runtime(pool, mongo, ingestion, now, limit, owner, &mut continuity).await
 }
 
-/// 单轮调度主体：先拒绝空白 owner，再把当前时刻对齐到 UTC 整分钟，然后按策略 ID 顺序处理本轮可见的活跃策略。
+/// 单轮调度主体：先拒绝空白 owner，再对齐 UTC 分钟，优先处理最久未尝试的交易对，避免限量扫描饥饿。
 /// 每个策略先做租约 CAS，抢不到计入 skipped 并跳过，抢到计入 leased 后才进入发布流程。
 /// 发布成功的计划写回 `continuity` 供下一轮判断连续性并计入 published；失败只写该策略的 `error_message`
 /// 并计入 failed，既不中断本轮其余策略，也不回滚这一项已经落地的行情。
@@ -249,6 +249,7 @@ async fn run_once_with_runtime(
         let strategy_id = row.strategy_id;
         let row_version = row.version;
         let pair_id = row.pair_id;
+        default_runtime::record_pair_generation_attempt(pool, pair_id).await?;
         let Some(mut pair_lock) = PairGenerationLock::acquire(pool, pair_id, 0).await? else {
             summary.skipped += 1;
             continue;
@@ -786,6 +787,7 @@ async fn load_active_strategies(
            INNER JOIN strategy_versions versions
                    ON versions.strategy_id = strategies.id
                   AND versions.version = runs.active_version
+           LEFT JOIN market_generation_attempts attempts ON attempts.pair_id = pairs.id
            WHERE strategies.status = 'active'
              AND pairs.status = 'active'
              AND pairs.market_type IN ('strategy', 'internal')
@@ -794,7 +796,7 @@ async fn load_active_strategies(
              AND strategies.start_time <= ?
              AND strategies.end_time > ?
              AND (runs.lease_expires_at IS NULL OR runs.lease_expires_at <= ? OR runs.lease_owner = ?)
-           ORDER BY strategies.id
+           ORDER BY attempts.last_attempt_at, strategies.id
            LIMIT ?"#,
     )
     .bind(now.naive_utc())
@@ -1171,3 +1173,7 @@ fn worker_owner() -> &'static str {
     static OWNER: OnceLock<String> = OnceLock::new();
     OWNER.get_or_init(|| format!("synthetic:{}:{}", std::process::id(), Uuid::now_v7()))
 }
+
+#[cfg(test)]
+#[path = "../../tests/unit_src/src_workers_synthetic_market_scheduling_tests.rs"]
+mod tests;

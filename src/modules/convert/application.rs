@@ -19,7 +19,7 @@ use crate::{
                 convert_quote_fingerprint, ensure_convert_amount_precision,
                 ensure_sufficient_convert_balance, map_convert_repository_error,
                 normalize_convert_rate_for_storage, optional_query_string, parse_quote_id,
-                resolve_fixed_convert_rate, resolve_market_convert_rate, route_limit,
+                resolve_fixed_convert_rate, resolve_market_convert_rate, route_limit, route_offset,
                 user_id_from_subject, validate_convert_market_price_snapshot,
                 validate_quote_amount,
             },
@@ -62,15 +62,16 @@ pub(crate) async fn list_convert_orders(
 ) -> AppResult<ConvertOrdersResponse> {
     let user_id = user_id_from_subject(subject)?;
     let pool = mysql_pool(mysql)?;
-    let orders = infrastructure::list_convert_orders(
+    let (orders, has_more) = infrastructure::list_convert_orders(
         &pool,
         user_id,
         optional_query_string(query.status),
         route_limit(query.limit),
+        route_offset(query.offset),
     )
     .await?;
 
-    Ok(ConvertOrdersResponse { orders })
+    Ok(ConvertOrdersResponse { orders, has_more })
 }
 
 /// 为当前用户按启用换币规则生成限时报价，先写 MySQL 权威快照，再尽力写 Redis 展示缓存。

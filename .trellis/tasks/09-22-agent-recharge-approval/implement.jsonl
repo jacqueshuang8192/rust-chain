@@ -1,0 +1,6 @@
+{"file":".trellis/spec/backend/agent-hierarchy.md","reason":"Subtree and active ancestor authorization"}
+{"file":".trellis/spec/backend/admin-financial-validation.md","reason":"Exact manual recharge and idempotency"}
+{"file":".trellis/spec/backend/financial-journals.md","reason":"Atomic per-asset balanced journal"}
+{"file":".trellis/spec/backend/numeric-safety.md","reason":"Decimal storage and integer boundaries"}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Layering and responsibility contracts"}
+{"file":".trellis/spec/admin/ui-system.md","reason":"Recoverable financial forms and UI gates"}

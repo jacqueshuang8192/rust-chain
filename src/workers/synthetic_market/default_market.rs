@@ -53,6 +53,7 @@ pub(super) async fn run_defaults(
     };
     for row in rows {
         let pair_id = row.pair_id;
+        default_runtime::record_pair_generation_attempt(pool, pair_id).await?;
         let Some(mut lock) = PairGenerationLock::acquire(pool, pair_id, 0).await? else {
             summary.skipped += 1;
             continue;

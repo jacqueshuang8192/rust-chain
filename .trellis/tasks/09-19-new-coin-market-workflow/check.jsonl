@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Quality gates and responsibility documentation"}
+{"file":".trellis/spec/backend/default-market-generation.md","reason":"No accidental publication or historical rewrite"}
+{"file":".trellis/spec/backend/new-coin-project-center.md","reason":"Project/pair invariants"}
+{"file":".trellis/spec/admin/ui-system.md","reason":"Real component and responsive verification"}
+{"file":".trellis/spec/backend/numeric-safety.md","reason":"Precision and range regression"}

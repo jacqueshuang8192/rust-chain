@@ -64,7 +64,7 @@ where
 /// 用户端由调用方传入 active 实现只看在售产品，管理端传 None 因而上下架一并可见。
 /// 分类用 LEFT JOIN 关联，分类行被删除时展示名回退为产品自身保存的分类代码，产品不会因此消失。
 /// 按产品编号倒序，编号唯一因而不会出现同排序值行在页间重复或丢失。
-/// 只支持限制条数不支持偏移，查询不加行锁，也不触发任何订阅或资金变化。
+/// 用户订阅列表使用限制条数与偏移，查询不加行锁，也不触发任何订阅或资金变化。
 pub(crate) async fn list_products(
     pool: &Pool<MySql>,
     status: Option<&str>,
@@ -150,6 +150,7 @@ pub(crate) async fn list_user_subscriptions(
     pool: &Pool<MySql>,
     user_id: u64,
     limit: u32,
+    offset: u32,
 ) -> AppResult<EarnSubscriptionsResponse> {
     let subscriptions = sqlx::query_as::<_, EarnSubscriptionResponse>(
         r#"SELECT id, user_id, product_id, asset_id, amount, apr_rate,
@@ -159,13 +160,19 @@ pub(crate) async fn list_user_subscriptions(
            FROM earn_subscriptions
            WHERE user_id = ?
            ORDER BY created_at DESC, id DESC
-           LIMIT ?"#,
+           LIMIT ? OFFSET ?"#,
     )
     .bind(user_id)
-    .bind(limit as i64)
+    .bind((limit + 1) as i64)
+    .bind(offset.min(100_000) as i64)
     .fetch_all(pool)
     .await?;
-    Ok(EarnSubscriptionsResponse { subscriptions })
+    let has_more = subscriptions.len() > limit as usize;
+    let subscriptions = subscriptions.into_iter().take(limit as usize).collect();
+    Ok(EarnSubscriptionsResponse {
+        subscriptions,
+        has_more,
+    })
 }
 
 /// 使用一致的用户、邮箱和状态谓词读取后台订阅分页及 COUNT；费用字段取订阅时快照。

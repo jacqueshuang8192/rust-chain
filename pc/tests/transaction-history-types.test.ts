@@ -28,6 +28,8 @@ test('transaction history uses backend wallet ledger change_type strings', () =>
   assert.doesNotMatch(apiSource, /\.filter\(/)
   assert.doesNotMatch(apiSource, /\.slice\(/)
   assert.match(i18nSource, /type_quick_recharge/)
+  assert.match(apiSource, /'agent_recharge'/)
+  assert.match(i18nSource, /type_agent_recharge: '代理人工充值'/)
   assert.match(i18nSource, /type_convert_settlement/)
   assert.match(i18nSource, /type_spot_trade_settlement/)
   assert.match(i18nSource, /type_loan_disbursement/)

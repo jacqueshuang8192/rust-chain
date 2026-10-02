@@ -11,6 +11,7 @@ import {
   type ConvertPair,
 } from '@/core/swapAssetLogos'
 import { normalizeDecimalText, requiredDecimalText, type DecimalText } from '@/core/decimal'
+import { fetchAllHistoryPages, mapHistoryPage, validateHistoryPageRequest, type HistoryPage } from '@/core/historyPagination'
 
 export type { ConvertPair } from '@/core/swapAssetLogos'
 
@@ -67,13 +68,24 @@ export async function confirmConvertQuote(quoteId: string): Promise<void> {
   await client.post(requestUrl('/convert/confirm'), { quote_id: quoteId })
 }
 
-export async function fetchConvertOrders(limit = 20): Promise<ConvertOrder[]> {
-  requiredSafeInteger(limit, 'limit', 1)
+export async function fetchConvertOrdersPage(input: {
+  limit?: number
+  offset?: number
+} = {}): Promise<HistoryPage<ConvertOrder>> {
+  const limit = input.limit ?? 20
+  const offset = input.offset ?? 0
+  validateHistoryPageRequest(limit, offset)
   const [response, pairs] = await Promise.all([
-    client.get<{ orders?: Array<Record<string, unknown>> }>(requestUrl('/convert/orders'), { params: { limit } }),
+    client.get<{ orders?: Array<Record<string, unknown>>; has_more?: boolean }>(
+      requestUrl('/convert/orders'),
+      { params: { limit, offset } },
+    ),
     fetchConvertPairs(),
   ])
-  return (response.data.orders || []).map((order) => {
+  return mapHistoryPage(
+    { items: response.data.orders || [], has_more: response.data.has_more },
+    { limit, offset },
+    (order) => {
     const fromAssetId = requiredId(order.from_asset_id)
     const toAssetId = requiredId(order.to_asset_id)
     const pair = pairs.find((item) => item.fromAssetId === fromAssetId && item.toAssetId === toAssetId)
@@ -90,7 +102,15 @@ export async function fetchConvertOrders(limit = 20): Promise<ConvertOrder[]> {
     status: String(order.status || ''),
     createdAt: normalizeTimestamp(order.created_at),
     }
-  })
+    },
+  )
+}
+
+export async function fetchConvertOrders(limit = 20): Promise<ConvertOrder[]> {
+  return fetchAllHistoryPages(
+    (request) => fetchConvertOrdersPage(request),
+    { pageSize: limit, identity: (item) => String(item.id) },
+  )
 }
 
 function text(value: unknown): string | undefined {

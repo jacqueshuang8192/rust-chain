@@ -342,7 +342,7 @@ pub(crate) async fn create_gmpay_order_with_name(
 pub(crate) async fn list_user_orders(
     pool: &Pool<MySql>,
     filter: QuickRechargeUserOrderFilter,
-) -> AppResult<Vec<QuickRechargeOrderRow>> {
+) -> AppResult<(Vec<QuickRechargeOrderRow>, bool)> {
     let mut builder = quick_recharge_order_query();
     builder.push(" WHERE orders.user_id = ");
     builder.push_bind(filter.user_id);
@@ -351,13 +351,17 @@ pub(crate) async fn list_user_orders(
         builder.push_bind(status);
     }
     builder.push(" ORDER BY orders.created_at DESC, orders.id DESC LIMIT ");
-    builder.push_bind(filter.limit as i64);
-    let rows = builder
+    builder.push_bind((filter.limit + 1) as i64);
+    builder.push(" OFFSET ");
+    builder.push_bind(filter.offset.min(100_000) as i64);
+    let mut rows = builder
         .build_query_as::<QuickRechargeOrderSqlRow>()
         .fetch_all(pool)
         .await
         .map_err(AppError::from)?;
-    Ok(rows.into_iter().map(Into::into).collect())
+    let has_more = rows.len() > filter.limit as usize;
+    rows.truncate(filter.limit as usize);
+    Ok((rows.into_iter().map(Into::into).collect(), has_more))
 }
 
 /// 为后台查询充值订单分页与匹配总数，支持用户编号、邮箱、状态、本地订单号、支付方交易号五个可选条件。

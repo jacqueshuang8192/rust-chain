@@ -39,6 +39,7 @@ import {
   requiredDecimalText,
   type DecimalText,
 } from '@/core/decimal'
+import { fetchAllHistoryPages, mapHistoryPage, validateHistoryPageRequest, type HistoryPage } from '@/core/historyPagination'
 
 const WALLET_DECIMAL_CONSTRAINTS = {
   allowNegative: false,
@@ -536,27 +537,48 @@ interface BackendWithdrawalRecord {
   created_at: number
 }
 
-export async function fetchWithdrawalRecords(limit = 50): Promise<WithdrawalRecord[]> {
-  const response = await client.get<{ withdrawals?: BackendWithdrawalRecord[] }>(requestUrl('/wallet/withdrawals'), { params: { limit } })
-  return (response.data.withdrawals || []).map((record) => {
-    const amountText = walletDecimal(record.amount, 'withdrawal amount')
-    const feeText = walletDecimal(record.fee, 'withdrawal fee')
+export async function fetchWithdrawalRecordsPage(input: {
+  limit?: number
+  offset?: number
+} = {}): Promise<HistoryPage<WithdrawalRecord>> {
+  const limit = input.limit ?? 50
+  const offset = input.offset ?? 0
+  validateHistoryPageRequest(limit, offset)
+  const response = await client.get<{ withdrawals?: BackendWithdrawalRecord[]; has_more?: boolean }>(
+    requestUrl('/wallet/withdrawals'),
+    { params: { limit, offset } },
+  )
+  return mapHistoryPage(
+    { items: response.data.withdrawals || [], has_more: response.data.has_more },
+    { limit, offset },
+    (record) => {
+    const typedRecord = record as unknown as BackendWithdrawalRecord
+    const amountText = walletDecimal(typedRecord.amount, 'withdrawal amount')
+    const feeText = walletDecimal(typedRecord.fee, 'withdrawal fee')
     return {
-      id: requiredId(record.id),
-      assetSymbol: record.asset_symbol.toUpperCase(),
-      network: record.network || undefined,
-      address: record.address,
+      id: requiredId(typedRecord.id),
+      assetSymbol: typedRecord.asset_symbol.toUpperCase(),
+      network: typeof typedRecord.network === 'string' ? typedRecord.network : undefined,
+      address: typedRecord.address,
       amount: decimalDisplayNumber(amountText, 'withdrawal amount'),
       fee: decimalDisplayNumber(feeText, 'withdrawal fee'),
       amountText,
       feeText,
-      status: record.status,
-      txHash: record.tx_hash || undefined,
-      failureReason: record.failure_reason || undefined,
-      reviewReason: record.review_reason || undefined,
-      createdAt: normalizeTimestamp(record.created_at),
+      status: typedRecord.status,
+      txHash: typedRecord.tx_hash || undefined,
+      failureReason: typedRecord.failure_reason || undefined,
+      reviewReason: typedRecord.review_reason || undefined,
+      createdAt: normalizeTimestamp(typedRecord.created_at),
     }
-  })
+    },
+  )
+}
+
+export async function fetchWithdrawalRecords(limit = 50): Promise<WithdrawalRecord[]> {
+  return fetchAllHistoryPages(
+    (request) => fetchWithdrawalRecordsPage(request),
+    { pageSize: limit, identity: (item) => String(item.id) },
+  )
 }
 
 function createWithdrawalIdempotencyKey(quoteId: string): string {
@@ -615,9 +637,29 @@ interface BackendQuickRechargeOrder {
   created_at?: number | null
 }
 
+export async function fetchQuickRechargeOrdersPage(input: {
+  limit?: number
+  offset?: number
+} = {}): Promise<HistoryPage<QuickRechargeOrder>> {
+  const limit = input.limit ?? 20
+  const offset = input.offset ?? 0
+  validateHistoryPageRequest(limit, offset)
+  const response = await client.get<{ orders?: BackendQuickRechargeOrder[]; has_more?: boolean }>(
+    requestUrl('/wallet/quick-recharge/orders'),
+    { params: { limit, offset } },
+  )
+  return mapHistoryPage(
+    { items: response.data.orders || [], has_more: response.data.has_more },
+    { limit, offset },
+    (order) => mapQuickRechargeOrder(order as unknown as BackendQuickRechargeOrder),
+  )
+}
+
 export async function fetchQuickRechargeOrders(limit = 20): Promise<QuickRechargeOrder[]> {
-  const response = await client.get<{ orders?: BackendQuickRechargeOrder[] }>(requestUrl('/wallet/quick-recharge/orders'), { params: { limit } })
-  return (response.data.orders || []).map(mapQuickRechargeOrder)
+  return fetchAllHistoryPages(
+    (request) => fetchQuickRechargeOrdersPage(request),
+    { pageSize: limit, identity: (item) => String(item.id) },
+  )
 }
 
 export async function transferWalletFunds(

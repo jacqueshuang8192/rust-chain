@@ -264,6 +264,7 @@ const CHANGE_TYPE_TRANSLATION_KEYS = {
   withdrawal_release: 'ledger.typeWithdrawalRelease',
   withdrawal_confirm: 'ledger.typeWithdrawalConfirm',
   admin_recharge: 'ledger.typeAdminRecharge',
+  agent_recharge: 'ledger.typeAgentRecharge',
   quick_recharge: 'ledger.typeQuickRecharge',
   spot_freeze: 'ledger.typeSpotFreeze',
   spot_unfreeze: 'ledger.typeSpotUnfreeze',

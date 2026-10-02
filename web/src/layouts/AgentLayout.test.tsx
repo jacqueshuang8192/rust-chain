@@ -15,7 +15,9 @@ function renderAgentLayout(initialEntry = '/agent/dashboard') {
           { path: 'dashboard', element: <div>代理总览内容</div> },
           { path: 'support', element: <div>在线客服内容</div> },
           { path: 'users', element: <div>团队用户内容</div> },
-          { path: 'users/:userId/portfolio', element: <div>用户资产内容</div> }
+          { path: 'users/:userId/portfolio', element: <div>用户资产内容</div> },
+          { path: 'users/:userId/recharge', element: <div>用户充值内容</div> },
+          { path: 'recharges', element: <div>我的充值申请内容</div> }
         ]
       },
       { path: '/login', element: <div>登录页</div> }
@@ -84,5 +86,16 @@ describe('AgentLayout', () => {
     });
     expect(authStore.getSession()?.generation).toEqual(expect.any(String));
     expect(authStore.getSession('agent')).toBeNull();
+  });
+  it('provides a narrow-screen menu that closes on navigation and reaches recharge history', async () => {
+    renderAgentLayout('/agent/users/42/recharge');
+    expect(screen.getByRole('menuitem', { name: '团队用户' })).toHaveClass('semi-navigation-item-selected');
+    expect(screen.getByLabelText('代理侧边栏')).toHaveAttribute('data-expanded', 'false');
+    // jsdom uses desktop CSS; viewport visibility is verified in the browser.
+    fireEvent.click(screen.getByLabelText('展开代理菜单'));
+    expect(screen.getByLabelText('代理侧边栏')).toHaveAttribute('data-expanded', 'true');
+    fireEvent.click(screen.getByRole('menuitem', { name: '我的充值申请' }));
+    expect(await screen.findByText('我的充值申请内容')).toBeInTheDocument();
+    expect(screen.getByLabelText('展开代理菜单')).toHaveAttribute('aria-expanded', 'false');
   });
 });

@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiRequest } from '../../api/client';
 import type { ApiRecord } from '../../api/types';
 import { AdminRequestActionBoundary, useCanAdminRequest } from '../access';
+import { RechargePolicyAction } from '../recharges/RechargePolicyAction';
 import { PageHeader } from '../../layouts/PageHeader';
 import { ConfirmAction } from '../../shared/ConfirmAction';
 import { DataTable } from '../../shared/DataTable';
@@ -396,6 +397,7 @@ export function AgentManagementPage() {
                 </AdminRequestActionBoundary>
               ))}
               <AgentPasswordResetAction agentId={agentId} disabled={!agentId || !record.admin_user_id} />
+              <RechargePolicyAction agentId={agentId} />
             </Space>
           );
         },

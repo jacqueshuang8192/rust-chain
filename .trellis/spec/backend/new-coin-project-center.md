@@ -120,3 +120,80 @@ old scanners while applying 0123 and switching API/worker/Admin; never mix an ol
 release path with newly gated holdings. Rollback versions must retain the gate.
 Historical invalid paid evidence is an audit/reconciliation issue, not permission
 to fabricate settlement legs, automatically charge again or release early.
+
+## Project Market Drafts
+
+### Scope and Signatures
+
+Migration 0142 adds `new_coin_market_drafts`, one row per project. It links a
+pair independently of `post_listing_pair_id`; no migration enables a generator
+or pair. The Admin project page exposes a market tab.
+
+```text
+GET   /admin/api/v1/new-coins/:id/market-setup
+PATCH /admin/api/v1/new-coins/:id/market-setup
+POST  /admin/api/v1/new-coins/:id/market-setup/publish
+```
+
+### Contracts
+
+Read requires both `new_coin.projects.read` and `market.pairs.read`; writes
+require both corresponding `.write` permissions. Candidate pairs use exact
+project base/quote asset IDs, capped at 100 with an explicit overflow error.
+External pairs can be identified but never configured as synthetic.
+
+Save accepts `{pair_id, expected_revision, expected_market_version,
+initial_price, config, reason}`. Amounts use bounded decimal input. Complete
+parameters are validated against pair precision; a draft can omit an initial
+price, but publication still needs authoritative history or an explicit price.
+Project lock then pair row serializes saves. Only the draft and its audit change.
+
+Publish accepts `{pair_id, expected_revision, reason}`. Lock order is shared
+generation named lock -> project -> pair -> generator. Reuse the default-market
+save transaction and append the publication receipt/audit in the same commit.
+Compare live version to draft `base_version`. Identical revision replay returns
+`{revision, published_version, replayed:true}` without reapplying parameters or
+reenabling paused/disabled settings. Project lifecycle/purchase linkage, pair
+status, historical candles and user orders remain untouched.
+
+Client saves explicitly, previews the unchanged draft with the existing
+read-only generator preview, then confirms publication. Editing invalidates
+preview. Amounts stay strings; preset selection changes only volatility.
+Unpublished old-base drafts are conflicts; published drafts are receipts, not
+authority over current live parameters. A lost mutation response locks writes
+until persisted state is queried; 409 retains local input and offers explicit
+discard/reload. Do not silently rebase a stale edit to the newest version.
+
+### Validation and Error Matrix
+
+| Condition | Result |
+| --- | --- |
+| Either required permission absent | 403 |
+| Project inactive, wrong assets, external pair | 400, no write |
+| Missing history/initial price or pair disabled on publish | 400, no live write |
+| Draft revision/live version changed | 409, preserve draft |
+| Decimal exceeds 38,18 or unknown request field | Axum 422 before use case |
+| Final audit fails | Entire publication/receipt rolled back |
+| Same published revision retried after pause | Original receipt, pause preserved |
+
+### Good/Base/Bad Cases
+
+- Good: save exact `1.000000000000000001`, preview, publish once, replay once.
+- Base: unconfigured pair remains disabled until an explicit publish.
+- Bad: use the purchase pair as an implicit market link, silently activate a
+  disabled pair, use a browser Number for price, or reapply a published draft.
+
+### Tests Required
+
+`admin_routes::new_coin_market` checks permission intersection, CAS, exact
+precision, no draft price effects, invalid-pair rejection, final-audit rollback,
+concurrent publication and paused replay. `openapi_routes` checks both aliases.
+Web model/component tests cover exact strings, stale preview, unknown writes,
+conflict recovery, read-only controls and current-live hydration.
+
+### Wrong vs Correct
+
+Wrong: label the existing immediate generator PATCH as "Save draft".
+Correct: persist the project draft separately, then publish under the shared
+writer lock and existing generator transaction. A fresh displayed price still
+does not prove financial price eligibility or worker lease health.

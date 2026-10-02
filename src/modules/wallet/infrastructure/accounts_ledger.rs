@@ -329,7 +329,12 @@ struct WalletLedgerCategoryRule {
 const WALLET_LEDGER_CATEGORY_RULES: &[WalletLedgerCategoryRule] = &[
     WalletLedgerCategoryRule {
         category: WalletLedgerCategory::Funding,
-        exact_change_types: &["deposit", "admin_recharge", "quick_recharge"],
+        exact_change_types: &[
+            "deposit",
+            "admin_recharge",
+            "agent_recharge",
+            "quick_recharge",
+        ],
         change_type_prefixes: &["deposit_", "withdrawal_"],
     },
     WalletLedgerCategoryRule {

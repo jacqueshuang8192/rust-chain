@@ -10,6 +10,8 @@ use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+pub(crate) mod recharges;
+
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub(crate) struct AgentMeResponse {
     pub(crate) agent_admin_id: u64,

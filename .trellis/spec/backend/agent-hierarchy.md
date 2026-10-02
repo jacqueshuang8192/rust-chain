@@ -325,3 +325,110 @@ Rows and COUNT repeat the server-derived subtree predicate, and the surrounding 
 - Test actual MySQL concurrency, restart/raw replay conflict, changing agent
   bindings, insufficient balances, journal/audit rollback, source refund races,
   per-asset zero-sum legs and settle-only frontend/backend authorization.
+
+## Scenario: Agent-Initiated Manual Recharge
+
+### 1. Scope / Trigger
+
+An authenticated portal account credits a user in its current subtree. This is
+manual platform funding into the user's Spot available balance, not a debit
+from the agent wallet, an on-chain deposit, or evidence of external custody.
+Migration `0144_agent_wallet_recharges.sql` must precede application rollout.
+
+### 2. Signatures
+
+- Agent GET `/agent/api/v1/recharges/options` provides the current opt-in flag
+  and active asset IDs, symbols and authoritative precision.
+- Agent POST `/agent/api/v1/users/:user_id/recharge` accepts only
+  `{asset_id, amount: string, reason, idempotency_key}`.
+- Agent GET `/agent/api/v1/recharges` lists this portal account's records for
+  users still in its subtree, not all subordinate agents' submissions.
+- Admin GET `/admin/api/v1/agent-recharges` and `/:id` require
+  `agents.recharges.read`. Detail is read-only authoritative recovery.
+- Admin POST `/admin/api/v1/agent-recharges/:id/review` accepts
+  `{decision: approve|reject, reason}` and requires `agents.recharges.review`.
+- Admin GET/PATCH `/admin/api/v1/agents/:id/recharge-policy` read requires
+  `agents.read`; PATCH requires independent `agents.recharges.authorize` and
+  `{direct_recharge_enabled, expected_version, reason}`.
+- Wire amounts are Decimal strings, timestamps Unix milliseconds, IDs and
+  policy versions safe integers. Unknown request fields are rejected.
+
+### 3. Contracts
+
+- All agents default to review. Explicit opt-in applies to that agent only,
+  never ancestors or descendants. Revocation changes newly accepted requests;
+  policy changes never auto-execute an old pending application.
+- States are `pending|credited|rejected`; modes are `review|direct`. Pending
+  writes no wallet/ledger/journal. Direct is always credited with null review
+  fields. Reviewed terminal records have reviewer, reason and time; credited
+  records additionally have a credit time. Amount/user/asset/reason are immutable.
+- Scope hints outside the transaction only select locks. Lock user, then at
+  most three ancestor agent primary keys in sorted ID order, portal account,
+  referral, application/asset and wallet. Canonical `/agent:<id>` segments must
+  be nonzero, unique, at most three levels and end at their declared leaf.
+  Each locked row must still have the expected full path and active status.
+  Never use reverse `LIKE` predicates for locking: MySQL may lock every agent.
+- Portal account uses `FOR UPDATE` to serialize same-account intents across
+  different users. Validate current agent ownership and session version.
+  The first key lookup is a consistent read after those current/locking reads;
+  do not create an earlier RR snapshot or lock a missing-key index gap.
+- Agent identity comes from the verified token; reject its linked user as a
+  recharge target. A current ancestor, portal, user or subtree failure blocks
+  new credit. Approval must recheck original portal-to-agent ownership and
+  current hierarchy. Rejection may clear inactive/reassigned applications.
+- `(agent_admin_id, idempotency_key VARBINARY(128))` is unique. Replay compares
+  raw key and the complete normalized request, returns the existing row's
+  current state, and never credits twice. Check existing receipt before current
+  asset precision/status; old successful receipts survive asset changes.
+- Pending approval/rejection is a one-way transition. Terminal replay requires
+  the same administrator, decision and trimmed reason; other decisions conflict.
+  On another reviewer's conflict, GET detail resolves the actual result.
+- Strings use bounded lossless decimal parsing, positive DECIMAL(38,18) capacity
+  and locked authoritative asset precision. Do not round input or historical
+  wallet dust. Reasons contain 1..500 Unicode scalars after trimming.
+- Application, available balance, `agent_recharge` ledger with decimal-string
+  numeric application ref_id, balanced journal and required recharge audit
+  share one transaction. Review and authorization also write admin audit.
+  Journal key `agent_recharge:{id}` has `agent_recharge_clearing +amount` and
+  `user_wallet_liability -amount`, in the same asset.
+- Authorization changes lock one agent, compare expected_version and increment
+  within JS safe-integer bounds; the audit and new flag/version commit together.
+  `agents.write` or approval permission cannot substitute for authorization.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required result |
+| --- | --- |
+| JSON numeric amount or unrepresentable decimal text | 422; no write |
+| Nonpositive amount, asset precision excess, invalid reason | 400; no partial write |
+| Out-of-subtree, nonexistent, self or malformed hierarchy | Not found / denied; no credit |
+| Scope/account/state changed while acquiring locks | Conflict / unauthorized; no credit |
+| Same raw key, changed request | 409; preserve original record |
+| Different terminal reviewer/decision/reason | 409; read-only detail remains available |
+| Stale policy version | 409; flag/version/audit unchanged |
+| Wallet overflow, journal or required audit failure | Full transaction rollback |
+
+### 5. Good / Base / Bad Cases
+
+Good: apply once, lose the response, retry the same key, then approve
+concurrently; exactly one credit is visible. Base: no opt-in creates pending.
+Bad: inherit opt-in from a parent, accept a client agent ID, turn old pending
+records into credits on authorization, or treat accounting as custody proof.
+
+### 6. Tests Required
+
+Real MySQL routes cover subtree and active-state guards, reassignments, self,
+separate portal identities, raw-key replay/conflicts, parallel decisions,
+authorization CAS/revoke/noninheritance, precision 0/2/18, overflow and
+audit/journal rollback. Hold a recharge on an asset after scope locking and
+prove unrelated-agent authorization still completes; observe actual lock waits.
+OpenAPI covers all eight operations and exact permissions. Browser mock tests
+do not replace database concurrency or production-version migration rehearsal.
+
+### 7. Wrong vs Correct
+
+Wrong: accept `approved=true` from a portal, update balance before approval,
+rotate the key on timeout, or lock ancestors through a full-table path scan.
+
+Correct: server-derived scope, bounded primary-key locks, explicit per-agent
+policy, immutable request/review identity and one atomic money transaction.

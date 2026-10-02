@@ -4,14 +4,16 @@ import {
   IconExit,
   IconHomeStroked,
   IconList,
+  IconMenu,
   IconUserGroup
 } from '@douyinfe/semi-icons';
 import { Avatar, Button, Layout, Nav, Space, Typography } from '@douyinfe/semi-ui';
 import type { NavItems, OnSelectedData } from '@douyinfe/semi-ui/lib/es/navigation';
-import type { CSSProperties, ReactNode } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { authStore } from '../auth/authStore';
+import './AgentLayout.css';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -26,6 +28,7 @@ const navItems: AgentNavItem[] = [
   { path: '/agent/dashboard', label: '总览', icon: <IconHomeStroked aria-hidden="true" /> },
   { path: '/agent/support', label: '在线客服', icon: <IconCustomerSupportStroked aria-hidden="true" /> },
   { path: '/agent/users', label: '团队用户', icon: <IconUserGroup aria-hidden="true" /> },
+  { path: '/agent/recharges', label: '我的充值申请', icon: <IconCoinMoneyStroked aria-hidden="true" /> },
   { path: '/agent/invite-codes', label: '邀请码', icon: <IconList aria-hidden="true" /> },
   { path: '/agent/commissions', label: '佣金记录', icon: <IconCoinMoneyStroked aria-hidden="true" /> },
   { path: '/agent/convert-stats', label: '闪兑统计', icon: <IconCoinMoneyStroked aria-hidden="true" /> },
@@ -76,6 +79,7 @@ function normalizePath(pathname: string): string {
 }
 
 export function AgentLayout() {
+  const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const session = authStore.getSession('agent');
@@ -85,12 +89,13 @@ export function AgentLayout() {
     const nextPath = String(itemKey);
     if (nextPath.startsWith('/agent')) {
       navigate(nextPath);
+      setMenuOpen(false);
     }
   };
 
   return (
-    <Layout className="semi-always-light" style={shellStyle}>
-      <Sider aria-label="代理侧边栏" style={{ width: 240 }}>
+    <Layout className="semi-always-light agent-layout" style={shellStyle}>
+      <Sider aria-label="代理侧边栏" className="agent-sidebar" data-expanded={menuOpen} style={{ width: 240 }}>
         <Nav
           aria-label="代理导航"
           bodyStyle={navBodyStyle}
@@ -106,7 +111,10 @@ export function AgentLayout() {
         />
       </Sider>
       <Layout style={{ minWidth: 0 }}>
-        <Header style={headerStyle}>
+        <Header className="agent-header" style={headerStyle}>
+          <Button className="agent-menu-toggle" icon={<IconMenu />} theme="borderless"
+            aria-label={menuOpen ? '收起代理菜单' : '展开代理菜单'} title={menuOpen ? '收起代理菜单' : '展开代理菜单'}
+            aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)} />
           <Space>
             <Avatar size="small">{subject.slice(0, 1).toUpperCase()}</Avatar>
             <Text>{subject}</Text>

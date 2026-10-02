@@ -345,7 +345,7 @@ pub(crate) async fn update_loan_product_status_in_tx(
 /// 读取借贷产品列表并联表补上资产符号，状态为空时返回全部产品，非空时按等值过滤。
 /// 借贷类型固定不参与过滤，用户端列表由调用方传入 active 实现只看在售产品。
 /// 排序取产品编号倒序，编号唯一因而不会出现同排序值行在页间重复或丢失的问题。
-/// 只支持限制条数不支持偏移，产品较多时只能看到编号最大的一批。
+/// 产品目录只支持限制条数；用户订单查询使用限制条数与偏移。
 /// 该查询只读产品配置，不加行锁，也不读取用户借贷或资金状态。
 pub(crate) async fn list_loan_products(
     pool: &Pool<MySql>,
@@ -554,7 +554,8 @@ pub(crate) async fn list_user_loan_orders(
     user_id: u64,
     status: Option<String>,
     limit: u32,
-) -> AppResult<Vec<LoanOrderResponse>> {
+    offset: u32,
+) -> AppResult<(Vec<LoanOrderResponse>, bool)> {
     let mut builder = loan_order_query_builder();
     builder.push(" WHERE orders.user_id = ");
     builder.push_bind(user_id);
@@ -563,12 +564,17 @@ pub(crate) async fn list_user_loan_orders(
         builder.push_bind(status);
     }
     builder.push(" ORDER BY orders.id DESC LIMIT ");
-    builder.push_bind(limit as i64);
+    builder.push_bind((limit + 1) as i64);
+    builder.push(" OFFSET ");
+    builder.push_bind(offset.min(100_000) as i64);
 
-    Ok(builder
+    let mut orders = builder
         .build_query_as::<LoanOrderResponse>()
         .fetch_all(pool)
-        .await?)
+        .await?;
+    let has_more = orders.len() > limit as usize;
+    orders.truncate(limit as usize);
+    Ok((orders, has_more))
 }
 
 /// 后台订单分页查询，五项筛选在同一个循环里同时推给行查询与 COUNT 查询。
