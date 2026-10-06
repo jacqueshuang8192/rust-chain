@@ -106,10 +106,18 @@ describe('staff support API', () => {
     vi.stubGlobal('fetch', fetchMock);
     const api = createStaffSupportApi('admin');
 
-    await api.listConversations({ unassigned: true, limit: 100, offset: 0 });
+    await api.listConversations({
+      status: 'open',
+      unread_only: true,
+      unassigned: true,
+      limit: 100,
+      offset: 0
+    });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0][0]).toBe('http://127.0.0.1:8080/admin/api/v1/support/conversations?unassigned=true&limit=100&offset=0');
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      'http://127.0.0.1:8080/admin/api/v1/support/conversations?status=open&unread_only=true&unassigned=true&limit=100&offset=0'
+    );
     expect((fetchMock.mock.calls[0][1].headers as Headers).get('Authorization')).toBe('Bearer admin-token');
   });
 

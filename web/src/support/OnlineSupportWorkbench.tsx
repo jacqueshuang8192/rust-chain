@@ -1,5 +1,6 @@
 import { adminErrorMessage } from '../shared/adminErrorMessage';
 import {
+  IconBellStroked,
   IconLockStroked,
   IconRefresh,
   IconSearch,
@@ -123,7 +124,8 @@ export function filterSupportConversations(
   conversations: SupportConversation[],
   status: SupportQueueStatusFilter,
   keyword: string,
-  assignment: SupportAssignmentFilter
+  assignment: SupportAssignmentFilter,
+  unreadOnly = false
 ): SupportConversation[] {
   const normalizedKeyword = keyword.trim().toLocaleLowerCase('zh-CN');
   return conversations.filter((conversation) => {
@@ -131,6 +133,9 @@ export function filterSupportConversations(
       return false;
     }
     if (assignment === 'unassigned' && conversation.assigned_agent_id !== null && conversation.assigned_agent_id !== undefined) {
+      return false;
+    }
+    if (unreadOnly && conversation.staff_unread_count <= 0) {
       return false;
     }
     return !normalizedKeyword || conversationSearchText(conversation).includes(normalizedKeyword);
@@ -195,6 +200,7 @@ export function OnlineSupportWorkbench({
   });
   const [statusFilter, setStatusFilter] = useState<SupportQueueStatusFilter>('open');
   const [assignmentFilter, setAssignmentFilter] = useState<SupportAssignmentFilter>('all');
+  const [unreadOnly, setUnreadOnly] = useState(false);
   const [queuePage, setQueuePage] = useState(1);
   const [queuePageSize, setQueuePageSize] = useState(DEFAULT_PAGE_SIZE);
   const [keywordDraft, setKeywordDraft] = useState('');
@@ -255,6 +261,7 @@ export function OnlineSupportWorkbench({
       const result = await api.listConversations({
         status: statusFilter === 'all' ? undefined : statusFilter,
         unassigned: scope === 'admin' && assignmentFilter === 'unassigned' ? true : undefined,
+        unread_only: unreadOnly ? true : undefined,
         limit: queuePageSize,
         offset: (queuePage - 1) * queuePageSize
       });
@@ -275,7 +282,7 @@ export function OnlineSupportWorkbench({
         setQueueLoading(false);
       }
     }
-  }, [api, assignmentFilter, queuePage, queuePageSize, scope, statusFilter]);
+  }, [api, assignmentFilter, queuePage, queuePageSize, scope, statusFilter, unreadOnly]);
 
   const loadConversation = useCallback(async (
     conversationId: number,
@@ -379,8 +386,8 @@ export function OnlineSupportWorkbench({
   }, [loadConversation, loadQueue, pollIntervalMs, selectedConversationId]);
 
   const visibleConversations = useMemo(
-    () => filterSupportConversations(conversations, statusFilter, keyword, assignmentFilter),
-    [assignmentFilter, conversations, keyword, statusFilter]
+    () => filterSupportConversations(conversations, statusFilter, keyword, assignmentFilter, unreadOnly),
+    [assignmentFilter, conversations, keyword, statusFilter, unreadOnly]
   );
   const selectedConversation = conversationDetail
     ?? conversations.find((conversation) => conversation.id === selectedConversationId)
@@ -390,6 +397,8 @@ export function OnlineSupportWorkbench({
     [messages]
   );
   const composerLength = scalarLength(composerDraft);
+  const visibleUnreadCount = visibleConversations.filter((conversation) => conversation.staff_unread_count > 0).length;
+  const visibleUnassignedCount = visibleConversations.filter((conversation) => conversation.assigned_agent_id == null).length;
 
   const queueColumns = useMemo<Array<ColumnProps<SupportConversation>>>(() => [
     {
@@ -655,7 +664,7 @@ export function OnlineSupportWorkbench({
     : '仅显示精确分配给当前代理的客户会话；上级代理不会自动看到下级代理会话。';
 
   return (
-    <main className="exchange-page support-workbench-page">
+    <main className={`exchange-page support-workbench-page ${scope === 'admin' ? 'support-workbench-page--admin' : ''}`}>
       <PageHeader
         actions={
           <Button
@@ -671,7 +680,7 @@ export function OnlineSupportWorkbench({
       />
 
       <Card bordered={false} className="support-queue-card" shadows="always">
-        <div className="support-queue-toolbar">
+        <div className={`support-queue-toolbar ${scope === 'admin' ? 'support-queue-toolbar--admin' : ''}`}>
           <div className="support-filter-section">
             <Text className="support-filter-label" strong>会话状态</Text>
             <div aria-label="会话状态筛选" className="support-filter-actions-row" role="group">
@@ -721,6 +730,26 @@ export function OnlineSupportWorkbench({
             </div>
           ) : null}
 
+          {scope === 'admin' ? (
+            <div className="support-filter-section">
+              <Text className="support-filter-label" strong>快速筛选</Text>
+              <div aria-label="客服快捷筛选" className="support-filter-actions-row" role="group">
+                <Button
+                  aria-pressed={unreadOnly}
+                  icon={<IconBellStroked aria-hidden="true" />}
+                  onClick={() => {
+                    setUnreadOnly((current) => !current);
+                    setQueuePage(1);
+                  }}
+                  theme={unreadOnly ? 'solid' : 'light'}
+                  type="primary"
+                >
+                  仅未读
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
           <form className="support-search-form" onSubmit={submitKeyword}>
             <label className="support-search-label">
               <span>当前页关键词</span>
@@ -740,10 +769,18 @@ export function OnlineSupportWorkbench({
         </div>
 
         <div className="support-queue-summary">
-          <Text type="tertiary">
-            服务端共 {conversationTotal} 条，当前页筛选后显示 {visibleConversations.length} 条
-          </Text>
-          <Text type="tertiary">
+          <div className="support-queue-summary-main">
+            <Text type="tertiary">
+              服务端共 {conversationTotal} 条，当前页筛选后显示 {visibleConversations.length} 条
+            </Text>
+            {scope === 'admin' ? (
+              <div className="support-queue-summary-metrics">
+                <Tag color={visibleUnreadCount > 0 ? 'red' : 'grey'}>当前页未读 {visibleUnreadCount}</Tag>
+                <Tag color={visibleUnassignedCount > 0 ? 'orange' : 'grey'}>当前页未分配 {visibleUnassignedCount}</Tag>
+              </div>
+            ) : null}
+          </div>
+          <Text className="support-queue-sync-status" type="tertiary">
             {lastReconciledAt ? <>最近同步：<TimestampText value={lastReconciledAt} /></> : '等待首次同步'}
           </Text>
         </div>
@@ -802,6 +839,9 @@ export function OnlineSupportWorkbench({
                   ) : null}
                 </Space>
                 <Text type="tertiary">联系方式：{contactLabel(selectedConversation)}</Text>
+                <Text className="support-conversation-id" type="tertiary">
+                  会话 ID：{selectedConversation.id} · 最近更新：<TimestampText value={selectedConversation.updated_at} />
+                </Text>
               </div>
               <Space className="support-conversation-actions" spacing={8} wrap>
                 <Button

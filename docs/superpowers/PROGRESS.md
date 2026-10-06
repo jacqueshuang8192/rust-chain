@@ -1,3 +1,10 @@
+## 2026-10-06 07:46 - 后台在线客服页面优化
+
+- 完成内容：管理员 `/admin/support` 增加服务端“仅未读”筛选，筛选状态与状态、未分配、分页、刷新和轮询保持一致；队列摘要区区分服务端总量与当前页结果并展示当前页未读/未分配数量及最近同步时间；管理员桌面端采用稳定队列/对话双栏工作台，消息区和回复区保持可用高度；会话头部补充会话 ID 和最近更新时间；修复管理员窄队列下搜索按钮被挤出容器的问题；窄屏下筛选、会话操作、消息历史和回复区纵向排列且无页面级横向溢出。新增 API `unread_only=true` 请求断言与管理员/代理工作台回归覆盖。
+- 修改文件：`web/src/api/support.test.ts`、`web/src/support/OnlineSupportWorkbench.tsx`、`web/src/support/OnlineSupportWorkbench.test.tsx`、`web/src/styles.css`、`.trellis/spec/admin/ui-system.md`、`.trellis/tasks/10-07-admin-support-page-optimization/prd.md`。
+- 验证结果：客服定向测试 `16/16`；Web 全量 `105` 个测试文件、`993/993`；生产策略 `15/15`；覆盖率 `23/23`，Statements `85.61%`、Branches `81.78%`、Functions `85.33%`、Lines `92.87%`；typecheck、lint、build、`git diff --check` 通过。桌面与 390px 浏览器检查已完成，包含双栏、搜索、消息区、回复区和页面宽度检查；本地模拟数据不等同线上 API。`budget` 失败但 `HEAD` 基线同样失败：基线 JavaScript `2614951` bytes，本次 `2614909` bytes，预算为 `2600000`，非本次改动引入。
+- 后续事项：提交本地改动并归档 Trellis 任务；不推送远程。`.vite/` 为原有无关未跟踪目录，不纳入提交。
+
 ## 2026-10-07 07:14 - 代理固定唯一邀请码
 
 - 完成内容：代理后台邀请码创建接口改为幂等初始化；每个代理最多保留一条固定邀请码，重复请求返回原记录且不修改配置。新增迁移收敛历史重复代理码、合并使用次数与上限并建立代理维度唯一索引；关联用户在邀请码停用后仍读取同一条记录，不自动生成替代码；后台入口和 OpenAPI 文案同步调整。

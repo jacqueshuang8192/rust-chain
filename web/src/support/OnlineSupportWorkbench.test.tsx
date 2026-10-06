@@ -144,6 +144,30 @@ describe('OnlineSupportWorkbench', () => {
     expect(await screen.findByText('用户 101')).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: '会话归属筛选' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '未分配客户' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '仅未读' })).not.toBeInTheDocument();
+  });
+
+  it('lets admin operators focus the queue on unread conversations', async () => {
+    const api = supportApi([
+      conversation({ staff_unread_count: 2 }),
+      conversation({ id: 12, user_id: 102, staff_unread_count: 0 })
+    ]);
+    const { container } = render(<OnlineSupportWorkbench api={api} pollIntervalMs={0} scope="admin" />);
+
+    expect(await screen.findByText('用户 101')).toBeInTheDocument();
+    expect(screen.getByText('用户 102')).toBeInTheDocument();
+    expect(container.querySelector('.support-workbench-page--admin')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '仅未读' }));
+
+    await waitFor(() => expect(api.listConversations).toHaveBeenLastCalledWith(expect.objectContaining({
+      offset: 0,
+      status: 'open',
+      unread_only: true
+    })));
+    expect(screen.getByText('用户 101')).toBeInTheDocument();
+    expect(screen.queryByText('用户 102')).not.toBeInTheDocument();
+    expect(screen.getByText('当前页未读 1')).toBeInTheDocument();
   });
 
   it('reuses the same client message id when a failed reply is retried', async () => {
@@ -278,12 +302,19 @@ describe('support queue presentation helpers', () => {
   it('applies status, keyword and assignment filters without rewriting DTOs', () => {
     const rows = [
       conversation(),
-      conversation({ id: 12, status: 'closed', assigned_agent_id: null, last_message_preview: '需要重置密码' })
+      conversation({
+        id: 12,
+        status: 'closed',
+        assigned_agent_id: null,
+        last_message_preview: '需要重置密码',
+        staff_unread_count: 0
+      })
     ];
 
     expect(filterSupportConversations(rows, 'open', '', 'all').map((row) => row.id)).toEqual([11]);
     expect(filterSupportConversations(rows, 'all', '重置密码', 'all').map((row) => row.id)).toEqual([12]);
     expect(filterSupportConversations(rows, 'all', '', 'unassigned').map((row) => row.id)).toEqual([12]);
+    expect(filterSupportConversations(rows, 'all', '', 'all', true).map((row) => row.id)).toEqual([11]);
   });
 
   it.each<SupportConversationStatus>(['open', 'closed'])('retains the backend %s status in fixtures', (status) => {

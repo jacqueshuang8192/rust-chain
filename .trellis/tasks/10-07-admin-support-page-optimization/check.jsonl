@@ -1,0 +1,3 @@
+{"file":".trellis/spec/admin/index.md","reason":"执行 Admin typecheck、lint、test、production policy、coverage、build 和 budget 门禁。"}
+{"file":".trellis/spec/admin/ui-system.md","reason":"检查客服工作台桌面/窄屏布局、滚动、筛选控件和可访问性。"}
+{"file":".trellis/spec/admin/chinese-presentation.md","reason":"检查新增客服筛选和摘要文案保持中文并不改写接口原值。"}

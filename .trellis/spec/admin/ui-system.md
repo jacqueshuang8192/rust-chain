@@ -852,8 +852,18 @@ Pages never concatenate an alternate staff identity or agent ID into a route.
   `offset=(page-1)*pageSize` and `limit=pageSize`; changing a server filter
   resets to page 1. Never page only the first fixed 100 rows against a larger
   backend `total`.
+- Admin may expose an `仅未读` queue filter backed by `unread_only=true`;
+  preserve it across status, assignment, pagination, refresh, and polling.
+  Queue summaries distinguish the server `total` from current-page rows and
+  may show current-page unread/unassigned counts without presenting them as
+  global totals.
 - Any keyword filter that is not implemented by the backend must be labelled as
   a current-page filter and must not claim global result coverage.
+- On desktop, the admin workbench keeps the queue and selected conversation in
+  a stable two-column surface; the message history owns bounded vertical
+  scrolling and the composer remains visible. At narrow widths, the columns
+  stack, filter/search controls and conversation actions wrap vertically, and
+  the document must not acquire horizontal overflow.
 - Opening a conversation loads its current metadata and newest message page.
   “Load older” uses `next_before_id`, keeps existing messages on failure,
   deduplicates immutable IDs, and preserves chronological order.
@@ -894,8 +904,8 @@ Pages never concatenate an alternate staff identity or agent ID into a route.
   fields, exact request bodies, and message/queue pagination parameters.
 - Workbench tests cover agent/admin control differences, runtime write
   permission, page-to-offset mapping, filter page reset, current-page keyword
-  semantics, older-history merge/retry, unread/status actions, same-ID reply
-  retry, stale request suppression, and polling cleanup.
+  semantics, admin unread filtering, older-history merge/retry, unread/status
+  actions, same-ID reply retry, stale request suppression, and polling cleanup.
 - Route/navigation/access tests prove the admin read permission and agent route
   registration; browser checks cover 1280px, empty/error/long-message states,
   resizable queue columns, no action wrapping, and zero document overflow.
