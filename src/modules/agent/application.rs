@@ -270,9 +270,9 @@ pub(crate) async fn list_agent_invite_codes(
     Ok(AgentInviteCodesResponse { invite_codes })
 }
 
-/// 校验使用上限后为当前代理生成六位大写字母/数字邀请码。
+/// 返回当前代理的固定邀请码；代理节点没有邀请码时才生成六位大写字母/数字邀请码。
 /// 创建事务锁定代理节点，与关联用户的首次 my-code 共用锁顺序；全局码值冲突只在有界次数内换码重试。
-/// 请求体只能指定使用上限；没有幂等键，重复提交会各生成新码，旧长码保留 active 与原有关系。
+/// 重复提交直接返回已有记录，不修改既有状态、使用次数或使用上限。
 pub(crate) async fn create_agent_invite_code(
     mysql: Option<Pool<MySql>>,
     subject: &str,
@@ -284,6 +284,13 @@ pub(crate) async fn create_agent_invite_code(
     let mut tx = pool.begin().await?;
     if !infrastructure::lock_active_agent_for_invite_code_in_tx(&mut tx, scope.agent_id).await? {
         return Err(AppError::Unauthorized);
+    }
+
+    if let Some(existing) =
+        infrastructure::load_agent_invite_code_in_tx(&mut tx, scope.agent_id).await?
+    {
+        tx.commit().await?;
+        return Ok(existing);
     }
 
     for _ in 0..INVITE_CODE_CREATE_ATTEMPTS {
@@ -315,7 +322,7 @@ pub(crate) async fn create_agent_invite_code(
 
 /// 仅允许邀请码所属代理在启用与停用之间切换，不匹配所有权时返回未找到。
 /// 事务按邀请码、代理的顺序加锁，与注册兑换保持相同锁序；同时与“我的邀请码”和门户创建
-/// 共用代理协调锁，避免状态写入在读取最新启用码期间穿插完成。重复设置同值按幂等成功处理。
+/// 共用代理协调锁，避免状态写入与固定邀请码读取穿插完成。重复设置同值按幂等成功处理。
 pub(crate) async fn update_agent_invite_code_status(
     mysql: Option<Pool<MySql>>,
     subject: &str,

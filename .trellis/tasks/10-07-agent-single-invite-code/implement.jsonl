@@ -1,0 +1,3 @@
+{"file":".trellis/spec/backend/agent-hierarchy.md","reason":"代理层级、邀请码归属、代理用户邀请码读取及状态约束。"}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"新增 SQLx 迁移、历史数据收敛、唯一约束及迁移验证要求。"}
+{"file":".trellis/spec/admin/index.md","reason":"后台 Web 页面测试、类型检查、lint 和构建验证要求。"}

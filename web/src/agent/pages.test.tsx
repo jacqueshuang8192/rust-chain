@@ -69,10 +69,10 @@ describe('Agent portal pages', () => {
   it('does not send rounded invitation limits', async () => {
     getAgentInviteCodesMock.mockResolvedValue({ invite_codes: [] });
     render(<AgentInviteCodesPage />);
-    await screen.findByRole('button', { name: '创建邀请码' });
+    await screen.findByRole('button', { name: '初始化邀请码' });
     for (const value of ['9007199254740993', '2147483648', '1.000000000000000001', '1e3', 'Infinity']) {
       fireEvent.change(screen.getByRole('textbox', { name: '使用上限' }), { target: { value } });
-      fireEvent.click(screen.getByRole('button', { name: '创建邀请码' }));
+      fireEvent.click(screen.getByRole('button', { name: '初始化邀请码' }));
     }
     expect(createAgentInviteCodeMock).not.toHaveBeenCalled();
   });
@@ -167,10 +167,9 @@ describe('Agent portal pages', () => {
     render(<AgentInviteCodesPage />);
 
     expect(await screen.findByText('A1B2C3')).toBeInTheDocument();
-    expect(screen.getByText('最新启用邀请码会与代理关联用户的手机端邀请页同步。')).toBeInTheDocument();
-    fireEvent.change(screen.getByRole('textbox', { name: '使用上限' }), { target: { value: '10' } });
-    fireEvent.click(screen.getByRole('button', { name: '创建邀请码' }));
-    await waitFor(() => expect(createAgentInviteCodeMock).toHaveBeenCalledWith(10));
+    expect(screen.getByText('每个代理固定一个邀请码；重复初始化会返回同一条记录，停用后也不会自动生成替代码。')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '初始化邀请码' })).not.toBeInTheDocument();
+    expect(createAgentInviteCodeMock).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: '禁用' }));
     await waitFor(() => expect(updateAgentInviteCodeStatusMock).toHaveBeenCalledWith(7, 'disabled'));

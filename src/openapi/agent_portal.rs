@@ -508,8 +508,8 @@ fn list_agent_user_spot_orders() {}
 )]
 fn list_agent_user_seconds_contract_orders() {}
 
-/// 分页查询当前代理名下的邀请码及其状态，单页最多返回一百条。
-/// 邀请码是新用户注册时归属到该代理的凭据，列表主要用于确认哪些码仍然可用。
+/// 查询当前代理的固定邀请码及其状态，单页最多返回一百条。
+/// 邀请码是新用户注册时归属到该代理的凭据，每个代理最多返回一条固定记录。
 #[utoipa::path(
     get,
     path = "/agent/api/v1/invite-codes",
@@ -529,17 +529,17 @@ fn list_agent_user_seconds_contract_orders() {}
 )]
 fn list_agent_invite_codes() {}
 
-/// 为当前代理创建一个新的邀请码，创建后即可分发给潜在用户用于注册归属。
-/// 代理只能给自己创建邀请码，归属由令牌确定，请求中无法指定挂到其他代理名下。
+/// 初始化并返回当前代理的固定邀请码，首次调用后即可分发给潜在用户用于注册归属。
+/// 代理只能初始化自己的邀请码，归属由令牌确定；重复调用返回同一条记录，不会创建新码。
 #[utoipa::path(
     post,
     path = "/agent/api/v1/invite-codes",
     tag = "agent-portal",
-    summary = "创建代理邀请码",
+    summary = "初始化代理固定邀请码",
     request_body = CreateAgentInviteCodeRequest,
     security(("bearerAuth" = [])),
     responses(
-        (status = 200, description = "创建成功", body = AgentInviteCodeResponse),
+        (status = 200, description = "固定邀请码已返回", body = AgentInviteCodeResponse),
         (status = 400, description = "参数错误", body = ErrorResponse),
         (status = 401, description = "未登录或代理已停用", body = ErrorResponse),
         (status = 403, description = "鉴权 scope 不匹配", body = ErrorResponse),
@@ -548,8 +548,8 @@ fn list_agent_invite_codes() {}
 )]
 fn create_agent_invite_code() {}
 
-/// 启用或停用自己名下的某个邀请码，停用之后该码不能再用于新用户注册。
-/// 已经通过该码注册的用户归属不受影响，邀请码不存在时返回资源不存在。
+/// 启用或停用自己名下的固定邀请码，停用之后该码不能再用于新用户注册。
+/// 已经通过该码注册的用户归属不受影响，邀请码不存在时返回资源不存在；停用不会生成替代码。
 #[utoipa::path(
     patch,
     path = "/agent/api/v1/invite-codes/{id}/status",

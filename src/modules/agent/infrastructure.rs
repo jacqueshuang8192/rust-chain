@@ -787,9 +787,9 @@ pub(crate) async fn list_agent_commissions(
     Ok(commissions)
 }
 
-/// 按所有者类型和代理 ID 分页读取自有邀请码，不混入用户或子代理记录。
-/// active 码优先且按创建时间、主键双倒序，门户最新创建值因而与手机端主码顺序一致。
-/// 返回使用上限、已用次数与启用状态三项运营关注的字段，下级代理自建的邀请码不会混入本结果。
+/// 按所有者类型和代理 ID 读取代理固定邀请码，不混入用户或子代理记录。
+/// 代理业务约束为每个代理只有一条记录；LIMIT/OFFSET 仍保留分页契约，偏移超过零时返回空集。
+/// 返回使用上限、已用次数与启用状态三项运营关注的字段。
 pub(crate) async fn list_agent_invite_codes(
     pool: &Pool<MySql>,
     agent_id: u64,
@@ -800,7 +800,7 @@ pub(crate) async fn list_agent_invite_codes(
            FROM invite_codes
            WHERE owner_type = 'agent' AND owner_id = ?
            ORDER BY CASE WHEN status = 'active' THEN 0 ELSE 1 END,
-                    created_at DESC, id DESC
+                    created_at ASC, id ASC
            LIMIT ? OFFSET ?"#,
     )
     .bind(agent_id)
@@ -841,7 +841,7 @@ pub(crate) async fn lock_active_agent_for_invite_code_in_tx(
     Ok(matched.is_some())
 }
 
-/// 在已锁定代理节点的事务中尝试插入新邀请码和可选使用上限。
+/// 在已锁定代理节点的事务中尝试插入代理固定邀请码和可选使用上限。
 /// 成功返回数据库主键；全局 `invite_codes.code` 唯一键的 MySQL 1062 冲突返回 `None`，
 /// 由应用层重新生成六位安全随机码；其他 SQL 错误保持上抛并使事务回滚。
 /// 状态与已用次数使用数据库默认值，既有长码不被停用或改写。
@@ -935,6 +935,26 @@ pub(crate) async fn load_agent_invite_code_by_id_in_tx(
            LIMIT 1"#,
     )
     .bind(invite_code_id)
+    .bind(agent_id)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(AppError::from)
+}
+
+/// 在事务内读取代理唯一邀请码，包含 active 与 disabled 状态。
+/// 代理节点已由调用方先加排他锁，因此该读取与首次创建串行；没有记录时返回 `None`，
+/// 由应用层生成唯一的一条固定邀请码。
+pub(crate) async fn load_agent_invite_code_in_tx(
+    tx: &mut Transaction<'_, MySql>,
+    agent_id: u64,
+) -> AppResult<Option<AgentInviteCodeResponse>> {
+    sqlx::query_as::<_, AgentInviteCodeResponse>(
+        r#"SELECT id, owner_id, code, usage_limit, used_count, status, created_at
+           FROM invite_codes
+           WHERE owner_type = 'agent' AND owner_id = ?
+           ORDER BY created_at ASC, id ASC
+           LIMIT 1"#,
+    )
     .bind(agent_id)
     .fetch_optional(&mut **tx)
     .await

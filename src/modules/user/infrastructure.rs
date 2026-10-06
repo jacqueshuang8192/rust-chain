@@ -338,11 +338,10 @@ pub(crate) async fn lock_active_linked_agent_id_in_tx(
     .map_err(AppError::from)
 }
 
-/// 在已锁定代理节点的事务中，读取该代理最新的 active 邀请码。
-/// 排序以创建时间倒序并用主键破同时刻平局，因此代理门户新建的码会立即成为手机端展示值。
-/// 响应的 `root_agent_id` 保持历史直属归属语义，即等于邀请码 `owner_id`；旧长码不做格式迁移。
-/// 查询不改状态和使用次数，未有 active 码时返回 `None`交由应用层补建。
-pub(crate) async fn load_latest_active_agent_invite_code_in_tx(
+/// 在已锁定代理节点的事务中读取该代理唯一邀请码，包含 active 与 disabled 状态。
+/// 代理邀请码停用后仍返回同一条固定记录，不因缺少 active 码自动生成替代码。
+/// 响应的 `root_agent_id` 保持直属代理语义，即等于邀请码 `owner_id`。
+pub(crate) async fn load_agent_invite_code_in_tx(
     tx: &mut Transaction<'_, MySql>,
     agent_id: u64,
 ) -> AppResult<Option<ReferralCodeResponse>> {
@@ -353,8 +352,7 @@ pub(crate) async fn load_latest_active_agent_invite_code_in_tx(
            FROM invite_codes codes
            WHERE codes.owner_type = 'agent'
              AND codes.owner_id = ?
-             AND codes.status = 'active'
-           ORDER BY codes.created_at DESC, codes.id DESC
+           ORDER BY codes.created_at ASC, codes.id ASC
            LIMIT 1"#,
     )
     .bind(agent_id)

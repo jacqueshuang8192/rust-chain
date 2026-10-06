@@ -2386,8 +2386,7 @@ async fn agent_lists_support_newest_first_commission_pagination() -> Result<(), 
             .await,
         );
     }
-    let invite_code_a = create_invite_code(&pool, agent.agent_id, "active").await;
-    let invite_code_b = create_invite_code(&pool, agent.agent_id, "active").await;
+    let invite_code = create_invite_code(&pool, agent.agent_id, "active").await;
     let token = issue_token(
         &settings,
         format!("agent:{}", agent.admin_user_id),
@@ -2433,14 +2432,21 @@ async fn agent_lists_support_newest_first_commission_pagination() -> Result<(), 
         .collect::<Vec<_>>();
     assert_eq!(second_page_ids, vec![commission_ids[0]]);
 
-    let invite_page = get_json("/agent/api/v1/invite-codes?limit=1&offset=1".to_owned()).await?;
+    let invite_page = get_json("/agent/api/v1/invite-codes?limit=1".to_owned()).await?;
     let invite_page_ids = invite_page["invite_codes"]
         .as_array()
         .unwrap()
         .iter()
         .map(|code| code["id"].as_u64().unwrap())
         .collect::<Vec<_>>();
-    assert_eq!(invite_page_ids, vec![invite_code_a]);
+    assert_eq!(invite_page_ids, vec![invite_code]);
+    let invite_second_page =
+        get_json("/agent/api/v1/invite-codes?limit=1&offset=1".to_owned()).await?;
+    assert!(
+        invite_second_page["invite_codes"]
+            .as_array()
+            .is_some_and(Vec::is_empty)
+    );
 
     let users_page = get_json("/agent/api/v1/users?limit=1".to_owned()).await?;
     assert_eq!(users_page["users"].as_array().unwrap().len(), 1);
@@ -2451,7 +2457,6 @@ async fn agent_lists_support_newest_first_commission_pagination() -> Result<(), 
             .execute(&pool)
             .await?;
     }
-    let _ = (invite_code_a, invite_code_b);
     cleanup_agent_fixture(&pool, &[agent], &[team_user]).await?;
     Ok(())
 }
@@ -2569,7 +2574,7 @@ async fn agent_password_change_requires_current_password_and_rotates_login()
 }
 
 #[tokio::test]
-async fn linked_agent_user_my_code_is_concurrent_safe_and_tracks_latest_portal_code()
+async fn linked_agent_user_my_code_is_concurrent_safe_and_keeps_one_fixed_code()
 -> Result<(), Box<dyn Error>> {
     let Some(pool) = mysql_pool().await else {
         return Ok(());
@@ -2629,15 +2634,6 @@ async fn linked_agent_user_my_code_is_concurrent_safe_and_tracks_latest_portal_c
     .await?;
     assert_eq!(initial_active_count, 1);
 
-    let legacy_code = format!("legacy-agent-code-{}", Uuid::now_v7().simple());
-    sqlx::query(
-        "INSERT INTO invite_codes (owner_type, owner_id, code, status) VALUES ('agent', ?, ?, 'active')",
-    )
-    .bind(agent.agent_id)
-    .bind(&legacy_code)
-    .execute(&pool)
-    .await?;
-
     let create_response = app
         .clone()
         .oneshot(
@@ -2654,6 +2650,9 @@ async fn linked_agent_user_my_code_is_concurrent_safe_and_tracks_latest_portal_c
     assert_eq!(create_status, StatusCode::OK, "payload: {portal_code}");
     let portal_code_text = portal_code["code"].as_str().unwrap();
     assert_eq!(portal_code_text.len(), 6);
+    assert_eq!(portal_code["id"], first_payload["id"]);
+    assert_eq!(portal_code["code"], first_payload["code"]);
+    assert_eq!(portal_code["usage_limit"], Value::Null);
     assert!(
         portal_code_text
             .chars()
@@ -2666,8 +2665,7 @@ async fn linked_agent_user_my_code_is_concurrent_safe_and_tracks_latest_portal_c
     assert_eq!(latest["code"], portal_code["code"]);
     assert_eq!(latest["owner_type"], "agent");
 
-    // 状态切换与关联用户读取共用代理协调锁；停用最新码后必须立即回退到仍启用的历史码。
-    // 重复停用是幂等成功，而不是依赖 MySQL changed rows 把既有记录误报为不存在。
+    // 固定邀请码停用后仍返回同一条记录，不会为了补 active 码再生成新邀请码。
     for _ in 0..2 {
         let disabled_response = app
             .clone()
@@ -2688,10 +2686,12 @@ async fn linked_agent_user_my_code_is_concurrent_safe_and_tracks_latest_portal_c
         assert_eq!(disabled_status, StatusCode::OK, "payload: {disabled}");
         assert_eq!(disabled["status"], "disabled");
     }
-    let (fallback_status, fallback) =
+    let (disabled_status, disabled_code) =
         agent_get_json(app.clone(), &user_token, "/api/v1/referral/my-code").await?;
-    assert_eq!(fallback_status, StatusCode::OK, "payload: {fallback}");
-    assert_eq!(fallback["code"], legacy_code);
+    assert_eq!(disabled_status, StatusCode::OK, "payload: {disabled_code}");
+    assert_eq!(disabled_code["id"], portal_code["id"]);
+    assert_eq!(disabled_code["code"], portal_code["code"]);
+    assert_eq!(disabled_code["status"], "disabled");
 
     let reenabled_response = app
         .clone()
@@ -2735,24 +2735,24 @@ async fn linked_agent_user_my_code_is_concurrent_safe_and_tracks_latest_portal_c
     );
     assert_eq!(portal_bind_payload["root_agent_id"], agent.agent_id);
 
-    let legacy_bind = app
+    let second_bind = app
         .oneshot(
             Request::builder()
                 .method("POST")
                 .uri("/api/v1/referral/bind")
                 .header("authorization", format!("Bearer {invitee_token}"))
                 .header("content-type", "application/json")
-                .body(Body::from(json!({ "code": legacy_code }).to_string()))?,
+                .body(Body::from(json!({ "code": portal_code_text }).to_string()))?,
         )
         .await?;
-    let legacy_bind_status = legacy_bind.status();
-    let legacy_bind_payload = response_json(legacy_bind).await?;
+    let second_bind_status = second_bind.status();
+    let second_bind_payload = response_json(second_bind).await?;
     assert_eq!(
-        legacy_bind_status,
+        second_bind_status,
         StatusCode::OK,
-        "payload: {legacy_bind_payload}"
+        "payload: {second_bind_payload}"
     );
-    assert_eq!(legacy_bind_payload["root_agent_id"], agent.agent_id);
+    assert_eq!(second_bind_payload["root_agent_id"], agent.agent_id);
 
     cleanup_agent_fixture(&pool, &[agent], &[portal_invitee, legacy_invitee]).await?;
     Ok(())

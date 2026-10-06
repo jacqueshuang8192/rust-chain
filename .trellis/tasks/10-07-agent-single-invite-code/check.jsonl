@@ -1,0 +1,3 @@
+{"file":".trellis/spec/backend/agent-hierarchy.md","reason":"检查固定邀请码与代理归属、停用状态和用户端展示行为是否符合代理层级契约。"}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"检查新增迁移的不可变性、历史数据处理、唯一索引和未跟踪 SQL 文件空白校验。"}
+{"file":".trellis/spec/admin/index.md","reason":"检查代理后台页面的定向测试、类型检查、lint 和构建门禁。"}

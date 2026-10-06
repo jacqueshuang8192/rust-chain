@@ -212,7 +212,9 @@ The shared domain function converts cumulative rates into positive differences a
 
 - Shared invite generator: `generate_invite_code()`, six characters from `A-Z0-9`, backed by the system secure random source and rejection sampling rather than biased byte modulo.
 - Linked identity: `agents.user_id`; clients never choose this association while reading their effective code.
-- Effective agent code: latest `invite_codes` row with `owner_type = 'agent'`, matching `owner_id`, and `status = 'active'`, ordered by `created_at DESC, id DESC`.
+- Effective agent code: the single `invite_codes` row with `owner_type = 'agent'`
+  and matching `owner_id`; its `active` or `disabled` status is returned as-is.
+  Each agent has at most one row, enforced by migration `0145_agent_single_invite_code.sql`.
 - Read-only routes:
   - `GET /agent/api/v1/users/{user_id}/assets`
   - `GET /agent/api/v1/users/{user_id}/margin-positions`
@@ -224,10 +226,10 @@ The shared domain function converts cumulative rates into positive differences a
 ### 3. Contracts
 
 - Newly generated user-owned and agent-owned codes share the same format and the global unique index on `invite_codes.code`. MySQL duplicate-key collisions retry with a fresh code for a bounded number of attempts.
-- A regular user continues to receive its earliest valid user-owned code. A user referenced by an active `agents.user_id` instead receives that agent's latest active agent-owned code.
-- If an active linked agent has no active code, `/referral/my-code` locks the agent row, creates one, and returns it. Portal creation locks the same row, so concurrent first reads and portal writes use one lock order.
+- A regular user continues to receive its earliest valid user-owned code. A user referenced by an active `agents.user_id` instead receives that agent's single fixed agent-owned code, including when the code is disabled.
+- If an active linked agent has no agent-owned code, `/referral/my-code` locks the agent row, creates one, and returns it. Portal initialization locks the same row, so concurrent first reads and portal writes converge on one code.
 - Portal status mutation locks the owned invite-code row before the agent coordination row, matching registration's `invite code -> agent` order. It then updates and rereads in one transaction; same-status requests are idempotent, and a completed disable cannot interleave inside an effective-code read.
-- Creating a newer active portal code changes only the linked user's displayed effective code. Existing codes, including historical long-format agent codes, remain valid for registration/binding until separately disabled or exhausted.
+- Repeating portal initialization returns the existing fixed record without changing its status, usage count, or usage limit. Disabling the fixed code does not create a replacement code; users continue to see the same disabled record and registration/binding follows the existing disabled-code validation.
 - Agent financial authorization comes exclusively from the authenticated `AgentAccessScope.path`. No path, query, or request-body agent ID can enlarge it.
 - Parent agents may read users owned by descendant agents. Parent, sibling, unrelated-root, unassigned, and nonexistent users are indistinguishable as `NOT_FOUND` to an out-of-scope caller.
 - Membership pre-checks are not persistent authorization. Each wallet/position/order row query and its COUNT query must independently join `user_referrals -> agents` and repeat the materialized-path predicate.
@@ -262,7 +264,7 @@ The shared domain function converts cumulative rates into positive differences a
 
 ### 6. Tests Required
 
-- Invite integration: generated portal codes are six uppercase alphanumeric characters; concurrent linked-user first reads converge; a newer portal active code becomes effective immediately; disabling it falls back to the next latest active code; same-status mutation is idempotent; a historical long code still binds.
+- Invite integration: generated portal codes are six uppercase alphanumeric characters; concurrent linked-user first reads converge; repeated portal initialization returns the same ID and code without changing its configuration; disabling it still returns the same fixed record without creating a replacement; same-status mutation is idempotent; migration merges historical duplicate usage counts and preserves one canonical code.
 - Scope integration: root reads direct/descendant users while child requests for parent, sibling, other root, unassigned, and nonexistent users all return not-found, including requests that append an `agent_id` query.
 - Financial integration: spot/margin accounts remain distinct, status-filtered totals match rows, default seconds results include `opened`, Decimal/timestamp fields retain their wire types, invalid stored precision fails closed, and before/after wallet and order snapshots are identical.
 - Route unit tests: all five endpoints require agent scope, validate statuses, and enforce pagination bounds.

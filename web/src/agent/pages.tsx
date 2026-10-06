@@ -283,8 +283,9 @@ export function AgentInviteCodesPage() {
   const reload = useCallback(() => setReloadVersion((value) => value + 1), []);
   const loadInviteCodes = useCallback(async () => (await getAgentInviteCodes()).invite_codes, [reloadVersion]);
   const { data, error, loading } = useLoader<AgentInviteCode[]>(loadInviteCodes, reloadVersion);
+  const fixedInviteCode = data?.[0] ?? null;
 
-  async function createInviteCode() {
+  async function initializeInviteCode() {
     const trimmed = usageLimit.trim();
     const limit = trimmed ? parseSafeInteger(trimmed, 1, 2_147_483_647) : undefined;
     if (limit === null) {
@@ -294,7 +295,7 @@ export function AgentInviteCodesPage() {
 
     try {
       await createAgentInviteCode(limit);
-      Toast.success('邀请码已创建');
+      Toast.success('固定邀请码已初始化');
       setUsageLimit('');
       reload();
     } catch (caught) {
@@ -341,15 +342,15 @@ export function AgentInviteCodesPage() {
   return (
     <main className="exchange-page">
       <PageHeader
-        actions={
+        actions={!loading && !error && !fixedInviteCode ? (
           <Space>
             <AdminTextInput ariaLabel="使用上限" onChange={setUsageLimit} placeholder="使用上限" value={usageLimit} />
-            <Button onClick={createInviteCode} theme="solid" type="primary">创建邀请码</Button>
+            <Button onClick={initializeInviteCode} theme="solid" type="primary">初始化邀请码</Button>
           </Space>
-        }
+        ) : undefined}
         title="邀请码"
       />
-      <Banner description="最新启用邀请码会与代理关联用户的手机端邀请页同步。" type="info" />
+      <Banner description="每个代理固定一个邀请码；重复初始化会返回同一条记录，停用后也不会自动生成替代码。" type="info" />
       <DataTable columns={columns} data={data ?? []} error={error} loading={loading} />
     </main>
   );

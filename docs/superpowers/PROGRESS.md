@@ -1,3 +1,10 @@
+## 2026-10-07 07:14 - 代理固定唯一邀请码
+
+- 完成内容：代理后台邀请码创建接口改为幂等初始化；每个代理最多保留一条固定邀请码，重复请求返回原记录且不修改配置。新增迁移收敛历史重复代理码、合并使用次数与上限并建立代理维度唯一索引；关联用户在邀请码停用后仍读取同一条记录，不自动生成替代码；后台入口和 OpenAPI 文案同步调整。
+- 修改文件：`src/modules/agent/{application,infrastructure,repository,routes}.rs`、`src/modules/user/{application,infrastructure,routes}.rs`、`src/openapi/agent_portal.rs`、`migrations/0145_agent_single_invite_code.sql`、`tests/agent_routes.rs`、`web/src/agent/{pages.tsx,pages.test.tsx}`、`.trellis/spec/backend/agent-hierarchy.md`、`.trellis/tasks/10-07-agent-single-invite-code/{prd.md,task.json,implement.jsonl,check.jsonl}`。
+- 验证结果：`cargo check --all-targets --all-features`、`cargo fmt --all -- --check`、`cargo test --lib`（507/507）、后端文档测试（1/1）、Web 邀请码定向测试（21/21）、Web typecheck/lint、`python3 ./.trellis/scripts/task.py validate .trellis/tasks/10-07-agent-single-invite-code`、`git diff --check` 均通过。真实生产 MySQL 尚未应用迁移 0145。
+- 后续事项：提交本次相关改动；部署前在目标 MySQL 上应用迁移 0145 并做迁移回归。无远程推送。
+
 ## 2026-09-18 23:29 - 行情成交深度来源与人工成交审计及贷款敞口
 
 - 完成内容：成交/深度 REST、WS、缓存和 PC/Mobile 展示保留来源，未知来源不伪装真实成交；人工成交传入认证管理员与必填原因，审计和资金同事务，后台双单预览及不确定结果重放；贷款新增可空用户同币种本金限额、产品容量和可选逾期禁借，待审预占、终态释放并发串行校验。

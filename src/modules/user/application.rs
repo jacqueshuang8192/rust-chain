@@ -47,7 +47,7 @@ use crate::{
                 increment_invite_code_used_count_in_tx, insert_active_agent_invite_code_in_tx,
                 insert_pending_email_verification_in_tx, insert_user_audit_event_in_tx,
                 insert_user_referral_in_tx, list_direct_invited_users,
-                list_user_third_party_bindings, load_latest_active_agent_invite_code_in_tx,
+                list_user_third_party_bindings, load_agent_invite_code_in_tx,
                 load_referral_link_in_tx, load_user_account_label, load_user_invite_code,
                 load_user_profile, load_user_referral_in_tx, lock_active_invite_code_in_tx,
                 lock_active_linked_agent_id_in_tx, lock_active_user_username_in_tx,
@@ -189,8 +189,8 @@ pub(crate) async fn submit_user_kyc_submission(
     Ok(submission)
 }
 
-/// 返回当前用户应展示的有效邀请码：普通用户继续使用最早的 user-owned 码，
-/// 关联了 active 代理节点的用户则改用该代理最新的 active agent-owned 码。
+/// 返回当前用户应展示的邀请码：普通用户继续使用最早的 user-owned 码，
+/// 关联了 active 代理节点的用户则使用该代理唯一的固定 agent-owned 码。
 /// 代理码分支先锁定 `agents` 行，再检查与补建，与门户创建入口共用锁顺序；
 /// 因此并发首读不会因缺码报错，也不会越界返回其他代理的码。
 /// 普通用户的历史修复行为保持不变：缺码或无效格式在有界冲突重试后生成六位码。
@@ -203,13 +203,11 @@ pub(crate) async fn get_user_referral_code(
     // 代理关联只信任 agents.user_id；锁住节点后再检查和补建，避免并发首读产生多枚主码。
     let mut tx = pool.begin().await?;
     if let Some(agent_id) = lock_active_linked_agent_id_in_tx(&mut tx, user_id).await? {
-        let response = if let Some(code) =
-            load_latest_active_agent_invite_code_in_tx(&mut tx, agent_id).await?
-        {
+        let response = if let Some(code) = load_agent_invite_code_in_tx(&mut tx, agent_id).await? {
             code
         } else {
             create_linked_agent_invite_code_in_tx(&mut tx, agent_id).await?;
-            load_latest_active_agent_invite_code_in_tx(&mut tx, agent_id)
+            load_agent_invite_code_in_tx(&mut tx, agent_id)
                 .await?
                 .ok_or_else(|| {
                     AppError::Internal("failed to create agent invite code".to_owned())
@@ -236,7 +234,7 @@ pub(crate) async fn get_user_referral_code(
 
 /// 在持有代理节点排他锁时，用共享六位安全随机规则补建一枚 active 代理码。
 /// 每轮直接尝试全局唯一索引，只对 1062 碰撞换码重试；其他 SQL 错误会使读取事务回滚。
-/// 本函数不关闭历史邀请码且不自行提交，旧长码因而仍可被注册与绑定流程查找。
+/// 本函数只在代理尚无固定邀请码时调用，不自行提交；提交由上层读取用例负责。
 async fn create_linked_agent_invite_code_in_tx(
     tx: &mut sqlx::Transaction<'_, MySql>,
     agent_id: u64,

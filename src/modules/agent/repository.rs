@@ -50,7 +50,7 @@ pub(crate) struct AgentConvertStatsRecord {
     pub(crate) total_to_amount: BigDecimal,
 }
 
-/// 新建代理邀请码的写入入参，码文本由服务端生成，使用上限为空表示不限次数。
+/// 初始化代理固定邀请码的写入入参，码文本由服务端生成，使用上限为空表示不限次数。
 #[derive(Debug, Clone)]
 pub(crate) struct AgentInviteCodeWrite {
     pub(crate) agent_id: u64,
