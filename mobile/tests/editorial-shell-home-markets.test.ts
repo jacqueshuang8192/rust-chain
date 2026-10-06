@@ -121,7 +121,7 @@ test('行情页压缩 Hero 并把搜索、五分类、真实广度和连续列�
   assert.match(marketsSource, /<strong v-if="hasTemperatureSample" class="numeric">/)
   assert.doesNotMatch(marketsSource, /hasTemperatureSample \? marketTemperature : '--'/)
   assert.match(marketsSource, /class="market-list"/)
-  assert.match(marketsSource, /fetchKlines\(symbol, '15m', 24\)/)
+  assert.match(marketsSource, /fetchKlines\(symbol, DEFAULT_MARKET_KLINE_INTERVAL, 24\)/)
   assert.match(marketsSource, /router\.push\(\{ name: 'market-detail'/)
 
   assert.match(parityCss, /\.markets-view \.markets-hero\s*\{[\s\S]*?min-height:\s*128px/)

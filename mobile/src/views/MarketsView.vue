@@ -6,6 +6,7 @@ import { RefreshCw, Search, SlidersHorizontal, Star } from 'lucide-vue-next'
 import AssetMark from '@/components/AssetMark.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { fetchKlines } from '@/api/market'
+import { DEFAULT_MARKET_KLINE_INTERVAL } from '@/api/marketSocketProtocol'
 import { formatCompact, formatPercent, formatPrice } from '@/core/format'
 import { useMarketStore } from '@/stores/market'
 import { useMarketFavoritesStore } from '@/stores/marketFavorites'
@@ -121,7 +122,7 @@ async function loadSparklines(): Promise<void> {
   }
 
   const results = await Promise.allSettled(
-    symbols.map((symbol) => fetchKlines(symbol, '15m', 24)),
+    symbols.map((symbol) => fetchKlines(symbol, DEFAULT_MARKET_KLINE_INTERVAL, 24)),
   )
   if (requestId !== sparklineRequestId) return
 

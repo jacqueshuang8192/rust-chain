@@ -9216,3 +9216,17 @@
 - 修改文件：`src/modules/convert/service.rs`、`docs/superpowers/PROGRESS.md`
 - 验证结果：`cargo fmt --all -- --check`、`cargo test --test backend_documentation --quiet`（1/1）、`git diff --check` 均通过。
 - 后续事项：提交并推送文档门禁修复。
+
+## 2026-10-07 - 修复生产数据库迁移 140 触发器失败
+
+- 完成内容：核对生产 MySQL 8.4.9 中迁移 140 的两张对账证据表、外键、约束和四个不可变/追加保护触发器；在 `log_bin_trust_function_creators=1` 生效后补齐四个触发器，并仅在 SQLx SHA-384 checksum 匹配时将 `_sqlx_migrations.version=140` 标记成功。
+- 修改文件：无代码文件；生产数据库 `hipoex` 的迁移状态与触发器。
+- 验证结果：四个触发器存在，迁移 134–140 均为 `success=1`，`dirty_count=0`；未删除 `_sqlx_migrations` 或业务表。当前账号无法设置全局变量，`log_bin_trust_function_creators` 需由高权限账号维护。
+- 后续事项：在部署服务器重新运行 `docker compose -f docker-compose.1panel.yml up migrate`，确认迁移 141–144 完成后启动 API；完成后恢复 `log_bin_trust_function_creators=0` 并更换已暴露的数据库密码。
+
+## 2026-10-07 - 手机端 H5 默认 K 线统一为 1m
+
+- 完成内容：行情列表迷你 K 线改为复用 `DEFAULT_MARKET_KLINE_INTERVAL`，与行情详情、交易页和 API 保持一致，H5 默认打开时统一请求 `1m`；用户主动切换周期的行为保持不变。
+- 修改文件：`mobile/src/views/MarketsView.vue`、`mobile/tests/editorial-shell-home-markets.test.ts`、`mobile/tests/root-prototype-parity.test.ts`、`.trellis/tasks/10-07-mobile-h5-default-kline-1m/prd.md`
+- 验证结果：`npm test` 793/793、`npm run type-check`、`npm run type-check:tests`、`git diff --check`、源码固定 `15m` 检查均通过。
+- 后续事项：无。

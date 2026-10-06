@@ -225,7 +225,7 @@ test('根视图继续调用真实 API/store，访客与加载错误状态不改�
 
 test('行情曲线、自选和加载失败状态保持真实语义与固定五行几何', () => {
   assert.match(views.markets, /import \{ fetchKlines \} from '@\/api\/market'/)
-  assert.match(views.markets, /Promise\.allSettled\([\s\S]*?fetchKlines\(symbol, '15m', 24\)/)
+  assert.match(views.markets, /Promise\.allSettled\([\s\S]*?fetchKlines\(symbol, DEFAULT_MARKET_KLINE_INTERVAL, 24\)/)
   assert.match(views.markets, /useMarketFavoritesStore\(\)/)
   assert.match(views.markets, /marketFavorites\.isFavorite\(item\.symbol\)/)
   assert.doesNotMatch(views.markets, /prototypeSparkPoints|new Set\(\['BTC\/USDT'/)
