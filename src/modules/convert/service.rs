@@ -89,6 +89,8 @@ pub(crate) fn route_limit(limit: Option<u32>) -> u32 {
     limit.unwrap_or(50).clamp(1, 100)
 }
 
+/// 将闪兑查询偏移量限制在 100000 以内，缺省时从首条记录开始。
+/// 该边界与列表接口的有界分页约束保持一致，避免客户端传入过大偏移拖慢数据库查询。
 pub(crate) fn route_offset(offset: Option<u32>) -> u32 {
     offset.unwrap_or(0).min(100_000)
 }

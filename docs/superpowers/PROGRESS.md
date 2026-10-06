@@ -9209,3 +9209,10 @@
 - 修改文件：`src/lib.rs`、`src/infra/email.rs`、`src/modules/auth/repository.rs`、`docs/superpowers/PROGRESS.md`
 - 验证结果：`cargo fmt --all -- --check`、nightly/stable `cargo clippy --all-targets --all-features -- -D warnings`、`cargo test --lib --quiet` 均通过，Rust 单测 507/507。
 - 后续事项：提交并推送本次全库兼容修复。
+
+## 2026-10-06 - 补齐闪兑分页偏移量中文文档
+
+- 完成内容：为 `src/modules/convert/service.rs::route_offset` 增加自身中文职责说明，明确默认值、最大偏移和有界分页目的。
+- 修改文件：`src/modules/convert/service.rs`、`docs/superpowers/PROGRESS.md`
+- 验证结果：`cargo fmt --all -- --check`、`cargo test --test backend_documentation --quiet`（1/1）、`git diff --check` 均通过。
+- 后续事项：提交并推送文档门禁修复。
