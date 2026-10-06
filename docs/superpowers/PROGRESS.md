@@ -9195,3 +9195,10 @@
 - 修改文件：本条仅更新 `.trellis/tasks/09-28-admin-active-trading/task.json` 与 `docs/superpowers/PROGRESS.md` 的任务收口记录；业务代码暂存范围以 staged diff 为准。
 - 验证结果：选择性暂存后 staged diff 仍通过边界检查，待执行 `git diff --cached --check` 和提交前状态核对。
 - 后续事项：提交本任务专用 commit；不推送其他未完成任务改动。
+
+## 2026-10-06 - 修复 async_trait double_must_use Clippy 兼容性
+
+- 完成内容：针对高版本 Clippy 对 `async_trait` 宏展开的 `double_must_use` 报错，在邮件发送和认证仓储 trait 上增加局部 lint 允许项；不改变异步接口、业务逻辑或错误处理。
+- 修改文件：`src/infra/email.rs`、`src/modules/auth/repository.rs`、`docs/superpowers/PROGRESS.md`
+- 验证结果：`cargo fmt --all -- --check`、`cargo +nightly clippy --all-targets --all-features -- -D warnings`、`cargo clippy --all-targets --all-features -- -D warnings` 均通过。
+- 后续事项：提交并推送本次兼容性修复。
