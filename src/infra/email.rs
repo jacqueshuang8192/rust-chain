@@ -62,7 +62,6 @@ pub enum SmtpSecurity {
     Tls,
 }
 
-#[allow(clippy::double_must_use)]
 #[async_trait]
 pub trait EmailSender: Send + Sync {
     /// 使用调用方快照配置构建并提交一封 SMTP 邮件；返回成功表示服务器接受本次发送请求，不代表收件箱最终投递。

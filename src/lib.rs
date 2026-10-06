@@ -3,6 +3,8 @@
 //! 健康检查、接口文档与事件推送不加前缀，直接挂在根路径，方便探针与网关无差别访问。
 //! 二进制入口只负责建立外部依赖并拉起后台任务，请求处理链路的组合全部收敛在本文件的路由装配里。
 
+#![allow(clippy::double_must_use)] // async_trait 生成的 boxed Future 已带 must_use，高版本 Clippy 会重复诊断。
+
 pub mod architecture;
 pub mod bootstrap;
 pub mod config;

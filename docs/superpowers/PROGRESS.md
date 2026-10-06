@@ -9202,3 +9202,10 @@
 - 修改文件：`src/infra/email.rs`、`src/modules/auth/repository.rs`、`docs/superpowers/PROGRESS.md`
 - 验证结果：`cargo fmt --all -- --check`、`cargo +nightly clippy --all-targets --all-features -- -D warnings`、`cargo clippy --all-targets --all-features -- -D warnings` 均通过。
 - 后续事项：提交并推送本次兼容性修复。
+
+## 2026-10-06 - 扩展 async_trait lint 兼容范围
+
+- 完成内容：根据新增错误全文确认问题覆盖事件、行情和新币等多个 `async_trait` trait；将兼容声明提升到库根，移除重复的局部声明，避免逐个 trait 漏修。
+- 修改文件：`src/lib.rs`、`src/infra/email.rs`、`src/modules/auth/repository.rs`、`docs/superpowers/PROGRESS.md`
+- 验证结果：`cargo fmt --all -- --check`、nightly/stable `cargo clippy --all-targets --all-features -- -D warnings`、`cargo test --lib --quiet` 均通过，Rust 单测 507/507。
+- 后续事项：提交并推送本次全库兼容修复。

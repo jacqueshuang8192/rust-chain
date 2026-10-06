@@ -18,7 +18,6 @@ use crate::{
 use axum::async_trait;
 use chrono::{DateTime, NaiveDateTime, Utc};
 
-#[allow(clippy::double_must_use)]
 #[async_trait]
 /// 认证主体仓储端口，统一承载用户、管理员和代理账号的凭据及登录状态持久化。
 ///
@@ -120,7 +119,6 @@ pub trait AuthRepository: Clone + Send + Sync + 'static {
     async fn clear_login_failures(&self, actor_type: ActorType, identifier: &str) -> AppResult<()>;
 }
 
-#[allow(clippy::double_must_use)]
 #[async_trait]
 /// 项目刷新令牌存储端口，隔离 Sa-Token 模式使用的 Redis 会话实现。
 ///
