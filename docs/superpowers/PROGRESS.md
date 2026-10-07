@@ -1,3 +1,10 @@
+## 2026-10-07 11:00 - 修复移动端 vue-tsc 依赖入口缺失
+
+- 完成内容：确认 `vue-tsc@2.0.0` 发布包缺少其启动脚本要求的 `index.js`，将移动端最低版本提升至 `^2.2.12`；同步 `mobile/package-lock.json`，并显式声明测试源码直接使用的 `@vue/compiler-sfc`，兼容 pnpm 严格依赖隔离。重建本地 pnpm 依赖后，类型检查、测试和 PWA 构建恢复正常。
+- 修改文件：`mobile/package.json`、`mobile/package-lock.json`、`.trellis/spec/mobile/index.md`、`.trellis/tasks/10-07-mobile-vue-tsc-missing-entry/prd.md`、`docs/superpowers/PROGRESS.md`。
+- 验证结果：`pnpm run type-check`、`pnpm run type-check:tests`、`pnpm test`（793/793）、`pnpm run build:pwa`、`pnpm run check:artifacts:pwa`、`pnpm run check:bundle`、`git diff --check` 均通过。PWA 构建使用 `vue-tsc 2.2.12`，未再出现 `Cannot find module '../index.js'`。
+- 后续事项：提交本地改动；未提交或推送未跟踪的 `mobile/pnpm-lock.yaml`、`mobile/pnpm-workspace.yaml` 和 `.vite/`。
+
 ## 2026-10-06 07:46 - 后台在线客服页面优化
 
 - 完成内容：管理员 `/admin/support` 增加服务端“仅未读”筛选，筛选状态与状态、未分配、分页、刷新和轮询保持一致；队列摘要区区分服务端总量与当前页结果并展示当前页未读/未分配数量及最近同步时间；管理员桌面端采用稳定队列/对话双栏工作台，消息区和回复区保持可用高度；会话头部补充会话 ID 和最近更新时间；修复管理员窄队列下搜索按钮被挤出容器的问题；窄屏下筛选、会话操作、消息历史和回复区纵向排列且无页面级横向溢出。新增 API `unread_only=true` 请求断言与管理员/代理工作台回归覆盖。

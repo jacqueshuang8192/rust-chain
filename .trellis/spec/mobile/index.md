@@ -24,6 +24,11 @@ The gate includes production/test type checks, all behavior tests, isolated PWA
 and Tauri builds, generated-artifact assertions, bundle budgets, source-size
 budgets, and critical-test quality checks.
 
+Test helpers that import a package directly must have that package declared in
+`mobile/package.json` (usually under `devDependencies`). Do not rely on npm's
+flat installation exposing a transitive dependency; pnpm's strict dependency
+graph must be able to resolve the same import.
+
 For changes that affect Tauri startup or dependencies, also build Android and iOS targets:
 
 ```bash
