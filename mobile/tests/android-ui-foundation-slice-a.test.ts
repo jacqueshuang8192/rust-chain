@@ -44,8 +44,8 @@ test('根头部与首页对齐选中品牌 Hero、成员资产图、双资金动
   assert.equal((homeSource.match(/class="home-guest-hero__image"/g) || []).length, 1)
   assert.match(homeSource, /class="portfolio-overview home-portfolio home-portfolio--member"/)
   assert.match(homeSource, /class="portfolio-chart"/)
-  assert.match(homeSource, /v-for="period in portfolioPeriods"/)
-  assert.match(homeSource, /t\('home\.periodDays', \{ days \}\)/)
+  assert.match(homeSource, /class="home-carousel"/)
+  assert.match(homeSource, /v-if="activeCarouselSlide"/)
   assert.match(homeSource, /rootPrototype\.todayReturn/)
   assert.match(homeSource, /class="funding-actions"/)
   assert.doesNotMatch(homeSource, /portfolio-kicker|home-auth-primary|portfolio-retry/)
@@ -61,20 +61,20 @@ test('根头部与首页对齐选中品牌 Hero、成员资产图、双资金动
   assert.doesNotMatch(shortcutSection, /name: 'prediction'/)
 })
 
-test('首页保留真实数据链路并呈现实时市场简报与三行行情', () => {
+test('首页保留真实数据链路并呈现后台轮播与三行行情', () => {
   for (const contract of [
     /fetchWalletAccounts\(\)/,
     /fetchMarginWallets\(\)/,
     /marketStore\.startLiveUpdates\('home'\)/,
-    /buildHomeMarketBrief\(marketStore\.tickers\)/,
+    /fetchHomeCarousel\(\)/,
     /visibleTickers\.slice\(0,\s*3\)/,
-    /marketBrief\.focusTicker\.lastPrice/,
+    /activeCarouselSlide/,
   ]) assert.match(homeSource, contract)
 
   assert.match(homeSource, /type HomeTab = 'favorites' \| 'mainstream' \| 'popular' \| 'gainers' \| 'newCoins'/)
-  assert.match(homeSource, /class="market-brief"/)
+  assert.match(homeSource, /class="home-carousel"/)
   assert.match(homeSource, /class="home-market-section"/)
-  assert.doesNotMatch(homeSource, /fetchNews|briefNotice|name: 'news-detail'/)
+  assert.doesNotMatch(homeSource, /fetchNews|briefNotice|marketBrief/)
   assert.doesNotMatch(homeSource, /\b128(?:,\d{3})?\b/)
 })
 

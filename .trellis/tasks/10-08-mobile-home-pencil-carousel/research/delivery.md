@@ -175,3 +175,14 @@ Backend and Admin results above are prior verification, not rerun claims.
 The existing Admin bundle blocker remains open; no budgets were raised.
 TaskSpace 11 was finished once with no retained pages. The existing 5182/5184
 preview servers remain running. No commit, push or deployment was performed.
+
+## Remote CI Follow-Up
+
+Commit `f393770` passed the local Mobile suite but its GitHub Actions run
+`37839967263` reported 10 Mobile failures. The failed names all belonged to
+seven pre-existing Home contract files that were updated locally but omitted
+from the first selective commit. The remote checkout therefore still expected
+the removed market brief, period controls and old card geometry.
+
+The follow-up includes only those seven test updates. It does not change runtime
+behavior. Local reproduction on the complete working tree remained 800/800.

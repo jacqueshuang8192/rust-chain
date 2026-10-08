@@ -83,8 +83,6 @@ test('五项导航保留真实路由、当前项与键盘焦点，中央交易�
 
 test('首页按选中访客 Hero，登录后使用真实资产与收益历史曲线', () => {
   assert.equal((homeSource.match(/class="portfolio-overview\s+home-portfolio\s+home-portfolio--member"/g) || []).length, 1)
-  assert.match(homeSource, /const portfolioPeriods = computed/)
-  assert.match(homeSource, /t\('home\.periodDays', \{ days \}\)/)
   assert.match(homeSource, /const assetEstimateReady = ref\(false\)/)
   assert.match(homeSource, /const returnHistoryState = ref<ReturnHistoryViewState>\('idle'\)/)
   assert.match(homeSource, /home-portfolio--guest/)
@@ -93,8 +91,8 @@ test('首页按选中访客 Hero，登录后使用真实资产与收益历史曲
   assert.match(homeSource, /class="portfolio-chart"/)
   assert.match(homeSource, /<svg viewBox="0 0 358 153"[\s\S]*?v-if="portfolioGeometry"[\s\S]*?:d="portfolioGeometry\.path"/)
   assert.match(homeSource, /rootPrototype\.todayReturn/)
-  assert.match(homeSource, /v-for="period in portfolioPeriods"/)
-  assert.match(homeSource, /:aria-pressed="period\.days === selectedReturnHistoryPeriod"/)
+  assert.match(homeSource, /class="home-carousel"/)
+  assert.match(homeSource, /v-for="\(slide, index\) in carouselSlides"/)
   assert.match(homeSource, /name: 'quick-recharge'/)
   assert.match(homeSource, /name: 'deposit-asset'/)
   assert.doesNotMatch(homeSource, /portfolio-kicker|home-auth-primary|portfolio-retry|assetEstimateState|hasAssetEstimate/)
@@ -104,12 +102,12 @@ test('首页按选中访客 Hero，登录后使用真实资产与收益历史曲
     'class="portfolio-overview home-portfolio home-portfolio--member"',
     'class="funding-actions"',
     'class="shortcut-section"',
-    'class="market-brief"',
+    'class="home-carousel"',
     'class="home-market-section"',
   ])
-  assert.match(parityCss, /\.home-portfolio--member\.portfolio-overview\s*\{[\s\S]*?min-height:\s*302px/)
-  assert.match(parityCss, /\.home-view \.home-guest-hero\s*\{[\s\S]*?height:\s*270px/)
-  assert.match(parityCss, /\.home-view \.market-brief\s*\{[\s\S]*?min-height:\s*166px/)
+  assert.match(parityCss, /\.home-portfolio--member\.portfolio-overview\s*\{[^}]*min-height:\s*128px/)
+  assert.match(parityCss, /\.home-view \.home-guest-hero\s*\{[^}]*min-height:\s*128px/)
+  assert.match(parityCss, /\.home-view \.home-carousel__slide\s*\{[^}]*height:\s*108px/)
 })
 
 test('行情页压缩 Hero 并把搜索、五分类、真实广度和连续列表组成单一层级', () => {

@@ -138,7 +138,7 @@ test('根栏目保持既有首页行情，并让现货、合约、资产与我�
     'class="portfolio-overview home-portfolio home-portfolio--member"',
     'class="funding-actions"',
     'class="shortcut-section"',
-    'class="market-brief"',
+    'class="home-carousel"',
     'class="home-market-section"',
   ])
   assertOrdered(views.markets, [
@@ -188,7 +188,8 @@ test('根栏目保持既有首页行情，并让现货、合约、资产与我�
   for (const source of Object.values(views)) assert.doesNotMatch(source, /\p{Extended_Pictographic}/u)
   for (const source of [views.assets, views.profile]) assert.match(source, /<style scoped>/)
   assert.match(views.home, /<svg viewBox="0 0 358 153"[\s\S]*?v-if="portfolioGeometry"[\s\S]*?:d="portfolioGeometry\.path"/)
-  assert.match(views.home, /v-for="period in portfolioPeriods"[\s\S]*?period\.days === selectedReturnHistoryPeriod/)
+  assert.match(views.home, /data-return-history-status="assetVisible \? returnHistoryState : 'hidden'"/)
+  assert.match(views.home, /class="home-carousel"[\s\S]*?class="home-market-section"/)
   assert.doesNotMatch(views.home, /portfolio-kicker|home-auth-primary|assetEstimateState|hasAssetEstimate/)
   assert.match(views.markets, /<svg[\s\S]*?class="sparkline"[\s\S]*?<polyline/)
   for (const source of [views.trade, views.assets, views.profile]) assert.doesNotMatch(source, /<svg/)
@@ -199,7 +200,7 @@ test('根视图继续调用真实 API/store，访客与加载错误状态不改�
     /fetchWalletAccounts\(\)/,
     /fetchMarginWallets\(\)/,
     /marketStore\.startLiveUpdates\('home'\)/,
-    /buildHomeMarketBrief\(marketStore\.tickers\)/,
+    /fetchHomeCarousel\(\)/,
   ]) assert.match(views.home, contract)
 
   assert.match(views.markets, /marketStore\.startLiveUpdates\('markets'\)/)
@@ -218,9 +219,8 @@ test('根视图继续调用真实 API/store，访客与加载错误状态不改�
   assert.match(views.profile, /await updateUsername\(nameDraft\.value\)/)
   assert.match(views.profile, /v-if="!session\.isAuthenticated" class="profile-auth-actions"/)
   assert.match(views.profile, /v-else class="profile-status-row"/)
-  assert.doesNotMatch(views.home, /fetchNews|fallbackNews|usingFallbackNews|briefNotice/)
-  assert.match(views.home, /marketBrief\.focusTicker\.lastPrice/)
-  assert.match(views.home, /marketBrief\.topMover\.changePercent/)
+  assert.doesNotMatch(views.home, /fetchNews|fallbackNews|usingFallbackNews|briefNotice|buildHomeMarketBrief|marketBrief/)
+  assert.match(views.home, /openCarouselTarget\(slide: HomeCarouselSlide\)/)
 })
 
 test('行情曲线、自选和加载失败状态保持真实语义与固定五行几何', () => {

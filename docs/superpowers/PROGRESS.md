@@ -1,3 +1,10 @@
+## 2026-10-09 05:05 - 修复首页轮播提交遗漏的契约测试
+
+- 完成内容：定位远程 GitHub Actions 在提交 `f393770` 上的 Mobile 10 项失败；确认业务实现本地 800/800 正常，失败来自首次选择性暂存遗漏 7 个既有首页契约测试，远程仍断言已移除的市场简报、周期按钮和旧卡片高度。补齐这些测试对后台轮播、固定 1 天真实收益、128px 顶部卡片及内部目标导航的断言，不修改产品行为。
+- 修改文件：`mobile/tests/{android-ui-foundation-slice-a,core-discovery-views,editorial-shell-home-markets,home-prototype-parity,return-history,root-prototype-parity,today-return}.test.ts`、`.trellis/tasks/10-08-mobile-home-pencil-carousel/research/delivery.md`、`docs/superpowers/PROGRESS.md`。
+- 验证结果：本地 `npm --prefix mobile test` 800/800；远程失败日志通过 `gh run view 37839967263 --log-failed` 核对，10 项失败均对应上述旧断言。补提交前继续执行 7 文件定向测试、完整 Mobile 测试和暂存 diff 检查。
+- 后续事项：提交并推送遗漏测试，等待新一轮 GitHub Actions；不纳入主题、K 线、PC、Pencil 或锁文件改动。
+
 ## 2026-10-08 19:30 - 首页顶部卡片 Pencil 细化与轮播控件收敛
 
 - 完成内容：重新对照 Pencil 明暗主题、登录与未登录顶部卡片；访客卡恢复 78×30px 登录/注册按钮、6px 间距、4px 文案间距、内描边及主题阴影。登录区修复原型样式叠加的间距与额外边框高度，恢复 128px 标准高度和 14px 隐私图标；真实收益曲线末端改为不随 SVG 拉伸的 8px 圆点，并隔离全局涨跌文字色对图表薄荷绿的覆盖。移除轮播暂停/开始按钮、无效状态及文案，恢复 8px 间距、20px 分页轨道，保留自动轮播和环境暂停。
