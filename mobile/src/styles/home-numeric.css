@@ -1,11 +1,11 @@
 .app-stage .mobile-canvas .home-view .home-portfolio.home-portfolio--member[data-long-amount='true'] {
-  grid-template-rows: minmax(82px, auto) 153px 43px;
+  grid-template-columns: minmax(0, 1fr) 96px;
 }
 
 .app-stage .mobile-canvas .home-view .home-portfolio.home-portfolio--member[data-long-amount='true'] .portfolio-heading {
-  gap: 12px;
+  gap: 6px;
   height: auto;
-  min-height: 82px;
+  min-height: 104px;
 }
 
 .app-stage .mobile-canvas .home-view .home-portfolio.home-portfolio--member[data-long-amount='true'] .portfolio-balance {

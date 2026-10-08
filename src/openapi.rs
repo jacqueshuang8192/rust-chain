@@ -21,6 +21,7 @@ mod agents;
 mod auth;
 mod financial_reconciliation;
 mod financial_retries;
+mod home_carousel;
 mod loan;
 mod new_coin_market;
 mod news;
@@ -36,6 +37,7 @@ use self::agent_portal::*;
 use self::agents::*;
 use self::auth::*;
 use self::financial_retries::*;
+use self::home_carousel::*;
 use self::news::*;
 use self::quick_recharge::*;
 use self::support::*;
@@ -194,6 +196,9 @@ pub fn routes() -> Router<AppState> {
         reset_admin_user_two_factor,
         list_public_news,
         get_public_news,
+        get_public_home_carousel,
+        get_admin_home_carousel,
+        save_admin_home_carousel,
         get_user_support_conversation,
         list_user_support_messages,
         send_user_support_message,
@@ -400,6 +405,7 @@ pub fn routes() -> Router<AppState> {
         (name = "admin-smtp", description = "后台 SMTP 邮件配置"),
         (name = "admin-agent", description = "后台代理、归属和佣金管理"),
         (name = "admin-news", description = "后台新闻中心管理"),
+        (name = "home-carousel", description = "首页推广轮播"),
         (name = "admin-security", description = "后台用户安全策略和 2FA 重置"),
         (name = "news", description = "用户端公开新闻中心"),
         (name = "agent-portal", description = "代理门户数据查询、邀请码管理与 token-derived 子树内的用户资产/仓位/订单只读视图"),

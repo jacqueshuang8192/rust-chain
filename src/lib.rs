@@ -48,6 +48,7 @@ pub fn build_router(state: AppState) -> Router {
         .merge(modules::loan::user_routes())
         .merge(modules::prediction::user_routes())
         .merge(modules::news::routes::routes())
+        .merge(modules::home_carousel::routes::public_routes())
         .merge(modules::support::routes::user_routes())
         .merge(modules::events::routes::routes());
 
@@ -63,6 +64,7 @@ pub fn build_router(state: AppState) -> Router {
         .merge(modules::loan::admin_routes())
         .merge(modules::prediction::admin_routes())
         .merge(modules::support::routes::admin_routes())
+        .merge(modules::home_carousel::routes::admin_routes())
         .layer(middleware::from_fn_with_state(
             state.clone(),
             modules::auth::admin_auth_gate_middleware,

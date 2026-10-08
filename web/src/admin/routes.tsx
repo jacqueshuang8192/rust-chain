@@ -101,6 +101,7 @@ export const adminRoutes: RouteObject[] = [
   resourceRoute('agent-commissions', 'agentCommissions'),
   resourceRoute('agent-commission-rules', 'agentCommissionRules'),
   resourceRoute('news', 'news'),
+  guardedLazyRoute('home/carousel', async () => (await import('./actions/HomeCarouselPage')).HomeCarouselPage),
   resourceRoute('assets', 'assets'),
   resourceRoute('wallet/accounts', 'walletAccounts'),
   resourceRoute('wallet/deposit-network-configs', 'depositNetworkConfigs'),

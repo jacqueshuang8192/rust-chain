@@ -7,6 +7,9 @@ use secrecy::SecretString;
 use serde_json::Value;
 use tower::ServiceExt;
 
+#[path = "openapi_routes/home_carousel.rs"]
+mod home_carousel;
+
 fn test_state() -> AppState {
     AppState::new(Settings {
         app_env: "test".to_owned(),

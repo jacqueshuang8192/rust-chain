@@ -4,28 +4,28 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
-  Activity,
   ArrowDownLeft,
-  ArrowRight,
-  ArrowUpRight,
   CandlestickChart,
   ChevronRight,
   CircleDollarSign,
-  CreditCard,
   Eye,
   EyeOff,
   Grid2X2,
   Landmark,
   Layers3,
+  LockKeyhole,
+  LogIn,
   Repeat2,
   Rocket,
   ScanQrCode,
   Search,
+  UserPlus,
   Zap,
 } from 'lucide-vue-next'
 import AssetMark from '@/components/AssetMark.vue'
 import guestHeroDark from '@/assets/home/market-hero-dark.jpg'
 import guestHeroLight from '@/assets/home/market-hero-light.jpg'
+import { fetchHomeCarousel, type HomeCarouselSlide } from '@/api/homeCarousel'
 import { fetchMarginWallets } from '@/api/trading'
 import {
   createReturnHistoryRequestLifecycle,
@@ -33,14 +33,12 @@ import {
   fetchReturnHistory,
   fetchTodayReturn,
   fetchWalletAccounts,
-  RETURN_HISTORY_PERIODS,
   type ReturnHistory,
   type ReturnHistoryPeriodDays,
   type ReturnHistoryViewState,
   type TodayReturn,
 } from '@/api/wallet'
 import { formatAmount, formatPercent, formatPrice } from '@/core/format'
-import { buildHomeMarketBrief } from '@/core/homeMarketBrief'
 import { buildReturnHistoryGeometry } from '@/core/returnHistoryGeometry'
 import { decimalAdd, decimalMultiply, decimalSign, normalizeDecimalText, type DecimalText } from '@/core/decimal'
 import { walletTotal } from '@/core/walletAmounts'
@@ -74,6 +72,16 @@ const todayReturnState = ref<'idle' | 'loading' | 'complete' | 'partial' | 'erro
 const selectedReturnHistoryPeriod = ref<ReturnHistoryPeriodDays>(1)
 const returnHistory = ref<ReturnHistory | null>(null)
 const returnHistoryState = ref<ReturnHistoryViewState>('idle')
+const carouselSlides = ref<HomeCarouselSlide[]>([])
+const carouselState = ref<'idle' | 'loading' | 'ready' | 'empty' | 'error'>('idle')
+const carouselIndex = ref(0)
+const carouselRef = ref<HTMLElement | null>(null)
+const carouselImageErrors = ref<Set<string>>(new Set())
+const carouselHovering = ref(false)
+const carouselFocused = ref(false)
+const carouselReducedMotion = ref(false)
+const carouselHidden = ref(false)
+const carouselTouching = ref(false)
 const todayReturnRequestLifecycle = createTodayReturnRequestLifecycle({
   sessionKey: () => session.token,
   fetchTodayReturn,
@@ -83,6 +91,12 @@ const returnHistoryRequestLifecycle = createReturnHistoryRequestLifecycle({
   fetchReturnHistory: () => fetchReturnHistory(selectedReturnHistoryPeriod.value),
 })
 let viewActive = true
+let carouselTimer: number | undefined
+let carouselTouchStart: { x: number; y: number } | null = null
+let carouselSuppressClickUntil = 0
+let carouselRequestVersion = 0
+let assetRequestVersion = 0
+let reducedMotionMediaQuery: MediaQueryList | null = null
 
 const tabs = computed(() => [
   { key: 'favorites' as const, label: t('home.favorites') },
@@ -91,11 +105,6 @@ const tabs = computed(() => [
   { key: 'gainers' as const, label: t('home.gainers') },
   { key: 'newCoins' as const, label: t('products.newCoins') },
 ])
-
-const portfolioPeriods = computed(() => RETURN_HISTORY_PERIODS.map((days) => ({
-  days,
-  label: t('home.periodDays', { days }),
-})))
 
 const visibleTickers = computed(() => {
   const rows = activeTab.value === 'favorites'
@@ -107,17 +116,16 @@ const visibleTickers = computed(() => {
   return rows
 })
 const marketRowsUnavailable = computed(() => marketStore.tickers.length === 0)
-const marketBrief = computed(() => buildHomeMarketBrief(marketStore.tickers))
-const marketBriefToneLabel = computed(() => {
-  const tone = marketBrief.value?.tone
-  if (tone === 'positive') return t('home.marketBriefPositive')
-  if (tone === 'negative') return t('home.marketBriefNegative')
-  return t('home.marketBriefNeutral')
-})
-const marketBriefActionLabel = computed(() => marketBrief.value
-  ? t('home.openMarketBrief')
-  : t(marketStore.error ? 'home.retryMarketBrief' : 'home.marketBriefLoading'))
 const guestHeroImage = computed(() => theme.isDark ? guestHeroDark : guestHeroLight)
+const activeCarouselSlide = computed(() => carouselSlides.value[carouselIndex.value] || null)
+const carouselHasMultipleSlides = computed(() => carouselSlides.value.length > 1)
+const carouselPaused = computed(() => (
+  carouselReducedMotion.value
+  || carouselHovering.value
+  || carouselFocused.value
+  || carouselHidden.value
+  || carouselTouching.value
+))
 
 const totalAssetEstimate = computed(() => [...spotAccounts.value, ...marginAccounts.value].reduce((total, account) => {
   const accountAmount = walletTotal(account)
@@ -155,7 +163,11 @@ const todayReturnPresentation = computed(() => resolveTodayReturnPresentation({
     error: t('home.todayReturnUnavailable'),
   },
 }))
-const displayedTodayReturnAmount = computed(() => todayReturnPresentation.value.amount)
+const displayedTodayReturnAmount = computed(() => (
+  assetVisible.value && todayReturnState.value === 'complete' && todayReturn.value?.status === 'complete'
+    ? formatSignedReturnAmount(todayReturn.value.amount)
+    : todayReturnPresentation.value.amount
+))
 const displayedTodayReturnDetail = computed(() => todayReturnPresentation.value.detail)
 const todayReturnTone = computed(() => todayReturnPresentation.value.tone)
 
@@ -227,25 +239,141 @@ function openTrade(mode: TradeMode = 'spot', symbol = 'BTC/USDT'): void {
   })
 }
 
-function openMarketBrief(): void {
-  if (!marketBrief.value) {
-    void refreshMarkets(true)
-    return
-  }
-  void router.replace({ name: 'markets' })
-}
-
-function marketChangeClass(value: number): 'positive' | 'negative' | '' {
-  if (value > 0) return 'positive'
-  if (value < 0) return 'negative'
-  return ''
-}
-
 function openLogin(): void {
   void router.push({ name: 'login', query: { redirect: '/' } })
 }
 
+function openRegister(): void {
+  void router.push({ name: 'register', query: { redirect: '/' } })
+}
+
+function selectCarousel(index: number): void {
+  if (!carouselSlides.value.length) return
+  carouselIndex.value = (index + carouselSlides.value.length) % carouselSlides.value.length
+  restartCarouselTimer()
+}
+
+function nextCarousel(): void {
+  selectCarousel(carouselIndex.value + 1)
+}
+
+function previousCarousel(): void {
+  selectCarousel(carouselIndex.value - 1)
+}
+
+function openCarouselTarget(slide: HomeCarouselSlide): void {
+  if (Date.now() < carouselSuppressClickUntil) return
+  if (slide.target.type === 'news_detail' && slide.target.id) {
+    void router.push({ name: 'news-detail', params: { id: String(slide.target.id) } })
+  } else if (slide.target.type === 'news_center') {
+    void router.push({ name: 'news' })
+  } else if (slide.target.type === 'referrals') {
+    void router.push({ name: 'referrals' })
+  }
+}
+
+function markCarouselImageError(id: string): void {
+  carouselImageErrors.value = new Set(carouselImageErrors.value).add(id)
+}
+
+function stopCarouselTimer(): void {
+  if (carouselTimer !== undefined) {
+    window.clearInterval(carouselTimer)
+    carouselTimer = undefined
+  }
+}
+
+function restartCarouselTimer(): void {
+  stopCarouselTimer()
+  if (!viewActive || carouselPaused.value || !carouselHasMultipleSlides.value) return
+  carouselTimer = window.setInterval(nextCarousel, 5_500)
+}
+
+function updateCarouselReducedMotion(): void {
+  carouselReducedMotion.value = typeof window !== 'undefined'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  restartCarouselTimer()
+}
+
+function updateCarouselVisibility(): void {
+  carouselHidden.value = document.hidden
+  restartCarouselTimer()
+}
+
+function onCarouselKeydown(event: KeyboardEvent): void {
+  if (!carouselHasMultipleSlides.value) return
+  if (event.key === 'ArrowRight') {
+    event.preventDefault()
+    nextCarousel()
+  } else if (event.key === 'ArrowLeft') {
+    event.preventDefault()
+    previousCarousel()
+  }
+}
+
+function onCarouselFocusOut(event: FocusEvent): void {
+  const nextTarget = event.relatedTarget
+  if (!(nextTarget instanceof Node) || !carouselRef.value?.contains(nextTarget)) {
+    carouselFocused.value = false
+    restartCarouselTimer()
+  }
+}
+
+function onCarouselTouchStart(event: TouchEvent): void {
+  const touch = event.touches.length === 1 ? event.touches[0] : undefined
+  carouselTouchStart = touch ? { x: touch.clientX, y: touch.clientY } : null
+  carouselTouching.value = Boolean(touch)
+  carouselSuppressClickUntil = 0
+  restartCarouselTimer()
+}
+
+function onCarouselTouchCancel(): void {
+  carouselTouchStart = null
+  carouselTouching.value = false
+  restartCarouselTimer()
+}
+
+function onCarouselTouchEnd(event: TouchEvent): void {
+  const start = carouselTouchStart
+  const touch = event.changedTouches[0]
+  onCarouselTouchCancel()
+  if (!start || !touch) return
+  const dx = touch.clientX - start.x
+  const dy = touch.clientY - start.y
+  if (Math.max(Math.abs(dx), Math.abs(dy)) > 12) carouselSuppressClickUntil = Date.now() + 500
+  if (Math.abs(dx) < 40 || Math.abs(dx) <= Math.abs(dy) || !carouselHasMultipleSlides.value) return
+  if (dx < 0) nextCarousel()
+  else previousCarousel()
+}
+
+async function loadCarousel(): Promise<void> {
+  const requestVersion = ++carouselRequestVersion
+  stopCarouselTimer()
+  carouselSlides.value = []
+  carouselIndex.value = 0
+  carouselState.value = 'loading'
+  try {
+    const slides = (await fetchHomeCarousel()).filter((slide) => slide.enabled)
+    if (!viewActive || requestVersion !== carouselRequestVersion) return
+    carouselSlides.value = slides
+    carouselIndex.value = Math.min(carouselIndex.value, Math.max(0, slides.length - 1))
+    carouselImageErrors.value = new Set()
+    carouselState.value = slides.length ? 'ready' : 'empty'
+    restartCarouselTimer()
+  } catch {
+    if (!viewActive || requestVersion !== carouselRequestVersion) return
+    carouselSlides.value = []
+    carouselIndex.value = 0
+    carouselState.value = 'error'
+    stopCarouselTimer()
+  }
+}
+
 async function loadAssetEstimate(): Promise<void> {
+  const requestVersion = ++assetRequestVersion
+  const token = session.token
+  spotAccounts.value = []
+  marginAccounts.value = []
   if (!session.isAuthenticated) {
     spotAccounts.value = []
     marginAccounts.value = []
@@ -259,10 +387,12 @@ async function loadAssetEstimate(): Promise<void> {
       fetchWalletAccounts(),
       fetchMarginWallets(),
     ])
+    if (!viewActive || requestVersion !== assetRequestVersion || session.token !== token) return
     spotAccounts.value = nextSpotAccounts
     marginAccounts.value = marginState.wallets
     assetEstimateReady.value = true
   } catch {
+    if (!viewActive || requestVersion !== assetRequestVersion || session.token !== token) return
     spotAccounts.value = []
     marginAccounts.value = []
   }
@@ -318,13 +448,6 @@ async function loadReturnHistory(): Promise<void> {
   returnHistoryState.value = 'error'
 }
 
-function selectReturnHistoryPeriod(periodDays: ReturnHistoryPeriodDays): void {
-  if (periodDays === selectedReturnHistoryPeriod.value) return
-  selectedReturnHistoryPeriod.value = periodDays
-  returnHistoryRequestLifecycle.invalidate()
-  void loadReturnHistory()
-}
-
 function retryReturnHistory(): void {
   returnHistoryRequestLifecycle.invalidate()
   void loadReturnHistory()
@@ -336,15 +459,26 @@ async function refreshMarkets(force = false): Promise<void> {
 }
 
 onMounted(async () => {
+  updateCarouselReducedMotion()
+  reducedMotionMediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)')
+  reducedMotionMediaQuery.addEventListener('change', updateCarouselReducedMotion)
+  updateCarouselVisibility()
+  document.addEventListener('visibilitychange', updateCarouselVisibility)
+  void loadCarousel()
   await refreshMarkets()
 })
 onUnmounted(() => {
   viewActive = false
+  carouselRequestVersion++
+  assetRequestVersion++
+  stopCarouselTimer()
+  reducedMotionMediaQuery?.removeEventListener('change', updateCarouselReducedMotion)
+  document.removeEventListener('visibilitychange', updateCarouselVisibility)
   todayReturnRequestLifecycle.stop()
   returnHistoryRequestLifecycle.stop()
   marketStore.stopLiveUpdates('home')
 })
-watch(() => session.isAuthenticated, () => { void loadAssetEstimate() }, { immediate: true })
+watch(() => session.token, () => { void loadAssetEstimate() }, { immediate: true })
 watch(() => session.token, () => {
   todayReturnRequestLifecycle.invalidate()
   void loadTodayReturn()
@@ -356,6 +490,8 @@ watch(() => session.token, () => {
   selectedReturnHistoryPeriod.value = 1
   void loadReturnHistory()
 }, { immediate: true })
+watch(locale, () => { void loadCarousel() })
+watch([carouselSlides, carouselPaused], restartCarouselTimer)
 </script>
 
 <template>
@@ -383,18 +519,24 @@ watch(() => session.token, () => {
       <article class="home-guest-hero">
         <img class="home-guest-hero__image" :src="guestHeroImage" alt="">
         <span class="home-guest-hero__overlay" aria-hidden="true" />
-        <span class="home-guest-hero__bloom" aria-hidden="true" />
+        <span class="home-guest-hero__accent" aria-hidden="true">
+          <span class="home-guest-hero__trail" />
+        </span>
         <div class="home-guest-hero__copy">
-          <h1>
-            <span>{{ t('home.guestHeroLine1') }}</span>
-            <span>{{ t('home.guestHeroLine2') }}</span>
-          </h1>
+          <span class="home-guest-hero__eyebrow">{{ t('home.guestAssetAccount') }} <LockKeyhole :size="13" aria-hidden="true" /></span>
+          <strong class="home-guest-hero__title">{{ t('home.guestAssetTitle') }}</strong>
           <p>{{ t('home.guestHeroDescription') }}</p>
         </div>
-        <button class="home-guest-hero__login" type="button" @click="openLogin">
-          {{ t('home.guestHeroLogin') }}
-          <ArrowRight :size="18" aria-hidden="true" />
-        </button>
+        <div class="home-guest-hero__actions">
+          <button class="home-guest-hero__login" type="button" @click="openLogin">
+            <LogIn :size="14" aria-hidden="true" />
+            {{ t('home.guestHeroLogin') }}
+          </button>
+          <button class="home-guest-hero__register" type="button" @click="openRegister">
+            <UserPlus :size="14" aria-hidden="true" />
+            {{ t('home.guestHeroRegister') }}
+          </button>
+        </div>
       </article>
     </section>
 
@@ -416,12 +558,12 @@ watch(() => session.token, () => {
                 :aria-pressed="!assetVisible"
                 @click="assetVisible = !assetVisible"
               >
-                <Eye v-if="assetVisible" :size="15" aria-hidden="true" />
-                <EyeOff v-else :size="15" aria-hidden="true" />
+                <Eye v-if="assetVisible" :size="14" aria-hidden="true" />
+                <EyeOff v-else :size="14" aria-hidden="true" />
               </button>
             </div>
             <strong class="portfolio-balance numeric">
-              {{ assetVisible ? displayedAssetAmount : '••••••' }}
+              <span>{{ assetVisible ? displayedAssetAmount : '••••••' }}</span>
               <small> USDT</small>
             </strong>
           </div>
@@ -432,7 +574,7 @@ watch(() => session.token, () => {
             aria-live="polite"
           >
             <span>{{ t('rootPrototype.todayReturn') }}</span>
-            <strong class="numeric" :class="todayReturnTone">{{ displayedTodayReturnAmount }}</strong>
+            <strong class="numeric" :class="todayReturnTone" :aria-label="todayReturnPresentation.amount">{{ displayedTodayReturnAmount }}</strong>
             <small class="numeric" :class="todayReturnTone">{{ displayedTodayReturnDetail }}</small>
           </div>
         </div>
@@ -444,32 +586,24 @@ watch(() => session.token, () => {
           :aria-busy="assetVisible && returnHistoryState === 'loading'"
           :aria-label="returnHistoryChartLabel"
         >
-          <svg viewBox="0 0 358 153" preserveAspectRatio="none" aria-hidden="true">
-            <path
-              v-if="portfolioGeometry"
-              :d="portfolioGeometry.path"
-              class="portfolio-return-line"
-              :class="portfolioGeometry.tone"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              vector-effect="non-scaling-stroke"
-            />
-            <circle
-              v-if="portfolioGeometry"
-              :cx="portfolioGeometry.latest.x"
-              :cy="portfolioGeometry.latest.y"
-              class="portfolio-return-dot"
-              :class="portfolioGeometry.tone"
-              r="5"
-              fill="var(--surface)"
-              stroke="currentColor"
-              stroke-width="2"
-              vector-effect="non-scaling-stroke"
-            />
-          </svg>
+          <div class="portfolio-chart__plot" aria-hidden="true">
+            <svg viewBox="0 0 358 153" preserveAspectRatio="none">
+              <path
+                v-if="portfolioGeometry"
+                :d="portfolioGeometry.path"
+                class="portfolio-return-line"
+                :data-tone="portfolioGeometry.tone"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                vector-effect="non-scaling-stroke"
+              />
+            </svg>
+            <span v-if="portfolioGeometry" class="portfolio-return-dot" :data-tone="portfolioGeometry.tone"
+              :style="{ left: `${portfolioGeometry.latest.x / 358 * 100}%`, top: `${portfolioGeometry.latest.y / 153 * 100}%` }" />
+          </div>
           <div
             v-if="returnHistoryStatusMessage"
             class="portfolio-history-state"
@@ -506,29 +640,16 @@ watch(() => session.token, () => {
             </tbody>
           </table>
         </figure>
-        <div class="portfolio-periods" role="group" :aria-label="t('home.returnHistoryPeriodLabel')">
-          <button
-            v-for="period in portfolioPeriods"
-            :key="period.days"
-            type="button"
-            :class="{ active: period.days === selectedReturnHistoryPeriod }"
-            :aria-pressed="period.days === selectedReturnHistoryPeriod"
-            aria-controls="portfolio-return-history-chart"
-            @click="selectReturnHistoryPeriod(period.days)"
-          >
-            {{ period.label }}
-          </button>
-        </div>
     </section>
 
-    <section class="funding-actions" :aria-label="t('assets.operations')">
+    <section v-if="session.isAuthenticated" class="funding-actions" :aria-label="t('assets.operations')">
       <button class="buy-crypto" type="button" @click="router.push({ name: 'quick-recharge' })">
-        <CreditCard :size="18" aria-hidden="true" />
-        {{ t('rootPrototype.buyCrypto') }}
+        <Zap :size="18" aria-hidden="true" />
+        {{ t('home.quickDeposit') }}
       </button>
       <button class="deposit-crypto" type="button" @click="router.push({ name: 'deposit-asset' })">
         <ArrowDownLeft :size="18" aria-hidden="true" />
-        {{ t('home.deposit') }}
+        {{ t('home.onchainDeposit') }}
       </button>
     </section>
 
@@ -545,82 +666,57 @@ watch(() => session.token, () => {
       </div>
     </section>
 
-    <button
-      class="market-brief"
-      type="button"
-      :data-tone="marketBrief?.tone || (marketStore.error ? 'negative' : 'loading')"
-      :aria-busy="!marketBrief && !marketStore.error"
-      :aria-label="marketBriefActionLabel"
-      @click="openMarketBrief"
+    <section
+      v-if="activeCarouselSlide"
+      ref="carouselRef"
+      class="home-carousel"
+      aria-roledescription="carousel"
+      :aria-label="t('home.carouselLabel')"
+      :aria-busy="carouselState === 'loading'"
+      tabindex="0"
+      @keydown="onCarouselKeydown"
+      @mouseenter="carouselHovering = true; restartCarouselTimer()"
+      @mouseleave="carouselHovering = false; restartCarouselTimer()"
+      @focusin="carouselFocused = true; restartCarouselTimer()"
+      @focusout="onCarouselFocusOut"
     >
-      <span class="market-brief__wash" aria-hidden="true" />
-      <span class="market-brief__topline">
-        <span class="market-brief__identity">
-          <Activity :size="15" aria-hidden="true" />
-          <small>{{ t('home.marketBriefTitle') }}</small>
-          <i aria-hidden="true" />
-          <em>{{ t('home.marketBriefLive') }}</em>
+      <button
+        class="home-carousel__slide"
+        type="button"
+        :aria-label="`${activeCarouselSlide.title}. ${activeCarouselSlide.description}`"
+        @click="openCarouselTarget(activeCarouselSlide)"
+        @touchstart.passive="onCarouselTouchStart"
+        @touchend.passive="onCarouselTouchEnd"
+        @touchcancel.passive="onCarouselTouchCancel"
+      >
+        <span class="home-carousel__copy">
+          <strong><span>{{ activeCarouselSlide.title }}</span><ChevronRight :size="18" aria-hidden="true" /></strong>
+          <span class="home-carousel__description">{{ activeCarouselSlide.description }}</span>
         </span>
-        <span v-if="marketBrief" class="market-brief__count">
-          {{ t('home.marketBriefMarketCount', { count: marketBrief.total }) }}
-        </span>
-        <span class="market-brief__open" aria-hidden="true">
-          <ArrowUpRight :size="16" />
-        </span>
-      </span>
-
-      <template v-if="marketBrief">
-        <span class="market-brief__hero">
-          <span class="market-brief__signal">
-            <strong>{{ marketBriefToneLabel }}</strong>
-            <small>
-              {{ t('home.marketBriefBreadthDetail', {
-                rising: marketBrief.rising,
-                falling: marketBrief.falling,
-                unchanged: marketBrief.unchanged,
-              }) }}
-            </small>
-          </span>
-          <span class="market-brief__breadth">
-            <small>{{ t('home.marketBriefAdvancing') }}</small>
-            <strong class="numeric">{{ marketBrief.advancingPercent }}<em>%</em></strong>
-          </span>
-        </span>
-
-        <span class="market-brief__meter" aria-hidden="true">
-          <i :style="{ width: `${marketBrief.advancingPercent}%` }" />
-        </span>
-
-        <span class="market-brief__quotes">
-          <span class="market-brief__quote">
-            <small>{{ marketBrief.focusTicker.symbol }}</small>
-            <span>
-              <strong class="numeric">{{ formatPrice(marketBrief.focusTicker.lastPrice) }}</strong>
-              <em class="numeric" :class="marketChangeClass(marketBrief.focusTicker.changePercent)">
-                {{ formatPercent(marketBrief.focusTicker.changePercent) }}
-              </em>
-            </span>
-          </span>
-          <span class="market-brief__quote market-brief__quote--mover">
-            <small>{{ t('home.marketBriefTopMover') }}</small>
-            <span>
-              <strong>{{ marketBrief.topMover.base }}</strong>
-              <em class="numeric" :class="marketChangeClass(marketBrief.topMover.changePercent)">
-                {{ formatPercent(marketBrief.topMover.changePercent) }}
-              </em>
-            </span>
-          </span>
-        </span>
-      </template>
-
-      <span v-else class="market-brief__state" :role="marketStore.error ? 'alert' : 'status'">
-        <i aria-hidden="true" />
-        <span>
-          <strong>{{ t(marketStore.error ? 'home.marketBriefUnavailable' : 'home.marketBriefLoading') }}</strong>
-          <small>{{ t(marketStore.error ? 'home.marketBriefTapToRetry' : 'home.marketBriefWaiting') }}</small>
-        </span>
-      </span>
-    </button>
+        <img
+          v-if="!carouselImageErrors.has(activeCarouselSlide.id)"
+          class="home-carousel__image"
+          :src="activeCarouselSlide.imageUrl"
+          alt=""
+          @error="markCarouselImageError(activeCarouselSlide.id)"
+        >
+        <span v-else class="home-carousel__image-fallback" aria-hidden="true" />
+      </button>
+      <div v-if="carouselHasMultipleSlides" class="home-carousel__controls">
+        <div class="home-carousel__pagination">
+          <span v-for="(slide, index) in carouselSlides" :key="slide.id"
+            class="home-carousel__dot" :class="{ active: carouselIndex === index }" aria-hidden="true" />
+          <input type="range" min="0" :max="carouselSlides.length - 1" step="1" :value="carouselIndex"
+            :aria-label="t('home.carouselPagination')"
+            :aria-valuetext="t('home.carouselSelect', { index: carouselIndex + 1 })"
+            @keydown.stop @input="selectCarousel(Number(($event.target as HTMLInputElement).value))">
+        </div>
+      </div>
+    </section>
+    <div v-else-if="carouselState === 'error'" class="home-carousel-error" role="status">
+      <span>{{ t('home.carouselUnavailable') }}</span>
+      <button type="button" @click="loadCarousel">{{ t('common.retry') }}</button>
+    </div>
 
     <section class="home-market-section">
       <div class="section-heading">

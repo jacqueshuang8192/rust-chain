@@ -22,6 +22,7 @@ the feature contract for the business context being modified.
 | [Quality Guidelines](./quality-guidelines.md) | Executable architecture/documentation guards, adapter-independent services, hotspot limits, and validation | Active |
 | [Logging Guidelines](./logging-guidelines.md) | Structured logging and log-level guidance | Draft |
 | [Public News Contract](./public-news-contract.md) | Public news API locale, response, and rich-text rendering contract | Active |
+| [Home Carousel Contract](./home-carousel.md) | Public filtering, versioned Admin configuration, transactional audit, and Mobile lifecycle | Active |
 | [Spot Order Contracts](./spot-orders.md) | Spot market order reference-price protection, Redis ticker execution, and wallet reservation contract | Active |
 | [Margin Trading Actions](./margin-trading-actions.md) | Margin ticker, wallet-scope settlement, transfer idempotency, bulk actions, and supported-mode contracts | Active |
 | [Earn Product Contracts](./earn-products.md) | Earn product fee snapshots and redemption settlement contracts | Active |

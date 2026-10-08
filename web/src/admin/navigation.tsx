@@ -146,7 +146,10 @@ export const adminNavItems: AdminNavItem[] = [
   {
     label: '内容运营',
     icon: <IconHornStroked aria-hidden="true" />,
-    children: [{ path: '/admin/news', label: '新闻中心' }]
+    children: [
+      { path: '/admin/news', label: '新闻中心' },
+      { path: '/admin/home/carousel', label: '首页轮播' }
+    ]
   },
   {
     label: '风控中心',

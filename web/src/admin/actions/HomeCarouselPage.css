@@ -1,0 +1,60 @@
+.admin-carousel-page {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+.admin-carousel-toolbar,
+.admin-carousel-item__header {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.admin-carousel-item {
+  background: var(--admin-color-bg);
+  border: 1px solid var(--admin-color-border);
+  border-radius: 8px;
+  margin: 0;
+  min-width: 0;
+  padding: 16px;
+}
+
+.admin-carousel-item legend {
+  font-size: 14px;
+  font-weight: 600;
+  padding: 0 8px;
+}
+
+.admin-carousel-form {
+  margin-top: 16px;
+}
+
+.admin-carousel-form__full {
+  grid-column: 1 / -1;
+}
+
+.admin-carousel-commands,
+.admin-carousel-toggle {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.admin-carousel-empty {
+  color: var(--admin-color-text-secondary);
+  padding: 40px 16px;
+  text-align: center;
+}
+
+@media (max-width: 480px) {
+  .admin-carousel-item {
+    padding: 12px;
+  }
+
+  .admin-carousel-commands {
+    gap: 0;
+  }
+}

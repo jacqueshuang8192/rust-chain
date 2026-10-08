@@ -13,6 +13,7 @@ pub mod convert;
 pub mod countries;
 pub mod earn;
 pub mod events;
+pub mod home_carousel;
 pub mod kyc;
 pub mod loan;
 pub mod margin;

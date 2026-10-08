@@ -404,6 +404,7 @@ fn permission_resource(path: &str) -> Option<&'static str> {
         ("/agent-commission-rules", "agents.commission_rules"),
         ("/assets", "wallet.assets"),
         ("/news", "content.news"),
+        ("/home/carousel", "content.news"),
         ("/risk/events", "risk.events"),
         ("/risk", "risk.rules"),
         ("/countries", "system.countries"),

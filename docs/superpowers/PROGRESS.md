@@ -1,3 +1,80 @@
+## 2026-10-08 19:30 - 首页顶部卡片 Pencil 细化与轮播控件收敛
+
+- 完成内容：重新对照 Pencil 明暗主题、登录与未登录顶部卡片；访客卡恢复 78×30px 登录/注册按钮、6px 间距、4px 文案间距、内描边及主题阴影。登录区修复原型样式叠加的间距与额外边框高度，恢复 128px 标准高度和 14px 隐私图标；真实收益曲线末端改为不随 SVG 拉伸的 8px 圆点，并隔离全局涨跌文字色对图表薄荷绿的覆盖。移除轮播暂停/开始按钮、无效状态及文案，恢复 8px 间距、20px 分页轨道，保留自动轮播和环境暂停。
+- 修改文件：`mobile/src/views/HomeView.vue`、`mobile/src/styles/{prototype-parity,home-numeric}.css`、`mobile/src/i18n/messages/{zh-CN,en}.ts`、`mobile/tests/{home-carousel,pencil-selected-home-layout}.test.ts`、`.trellis/spec/backend/home-carousel.md`、`.trellis/tasks/10-08-mobile-home-pencil-carousel/{prd.md,task.json,research/delivery.md}`、`docs/superpowers/PROGRESS.md`。
+- 验证结果：定向 24/24；最终 Mobile `npm --prefix mobile run release:gate` 全部通过，包含 800/800 测试、类型、PWA/Tauri 构建、产物及包体/源码预算。浏览器 16 组宽度/主题/登录状态，以及 8 组英文窄屏/长金额检查无横向溢出或顶部重叠；实际验证自动播放、悬停暂停与恢复、键盘选页、焦点/低动态暂停、触摸滑动且不误跳转、隐私隐藏及空/单页/错误降级。已查看六张最终截图；透明 range 的首次可见性等待超时经检查确认为测试等待条件问题，后续真实键盘操作通过。task validate 和 diff 检查通过。
+- 后续事项：等待最终视觉确认及本任务范围提交授权；本轮未提交、推送或部署。此前后台包体超限仍未解决，本轮未改后台或重跑其门禁。长金额/英文允许增高，真实曲线不伪造 Pencil 示例。Ego TaskSpace 11 已关闭，5182/5184 预览服务保留；浏览器使用隔离响应，不作为生产端到端验证。
+
+## 2026-10-08 18:04 - 首页轮播全链路与最终本地验收
+
+- 完成内容：完成轮播公开 API、后台版本化配置、同事务审计及迁移 0146；后台增加内容运营下的首页轮播编辑页，支持图片上传、排序、启停、删除、语言和站内目标。手机端完成访客/登录结构、双主题和真实收益接线，分页收紧为原生 range 覆盖的紧凑点列，补齐自动播放/暂停/生命周期与异常处理，并新增跨层规范和可重放浏览器验证页。
+- 修改文件：`src/modules/home_carousel/**`、`src/openapi/home_carousel.rs`、`src/{lib,openapi}.rs`、`src/modules/{mod.rs,admin/service/access_control.rs}`、`migrations/0146_home_carousel.sql`、`tests/{openapi_routes.rs,openapi_routes/home_carousel.rs,unit_src/src_modules_home_carousel_domain_tests.rs}`；`web/src/admin/{access.tsx,navigation.tsx,routes.tsx,actions/HomeCarouselPage*,actions/homeCarouselModel.ts}`、`web/tests/fixtures/home-carousel.*`、`web/tsconfig.json`；前条 Mobile 文件及 `mobile/src/core/homeCarouselContract.ts`、`mobile/src/styles/home-numeric.css`、`mobile/tests/{today-return.test.ts,fixtures/home-carousel-browser.*}`；`.trellis/spec/backend/{home-carousel,index}.md`、`.trellis/tasks/10-08-mobile-home-pencil-carousel/{prd.md,task.json,research/delivery.md}`。
+- 验证结果：Rust 全库 511/511、OpenAPI/实库路由 14/14、架构 11/11、文档 1/1，以及全目标全特性 check、严格 Clippy、fmt 通过；隔离 MySQL 覆盖迁移重复执行、权限、过滤、409、并发单成功、审计与回滚。Mobile 最终 release gate 799/799、类型、双构建、产物与预算通过；Web 106 文件 999/999，类型/lint/build、策略 15/15、覆盖率 23/23 通过。16 组手机宽度/主题/登录状态及中英文长金额无横向溢出；浏览器自动播放/暂停/隐私/图片失败、后台桌面与390px编辑保存和上传回填通过。Web 包体仍失败：2626539 > 2600000 bytes，历史基线也超限，未提高阈值。task validate 与 diff 检查通过。
+- 后续事项：发布前应用迁移 0146、配置正式轮播及独立图片上传权限，并解决后台包体超限。44px 触控、显式暂停与真实收益曲线保留必要视觉差异，不宣称静态逐像素 1:1；等待视觉确认和本任务范围提交授权。浏览器为隔离响应、数据库为本地测试，不代表生产端到端；专用 MySQL 与 Ego TaskSpace 10 已关闭，5182/5184 预览服务保留。未提交、推送、部署或归档其他任务。
+
+## 2026-10-08 17:24 - 首页选稿结构与轮播生命周期接线
+
+- 完成内容：访客卡改为资产账户提示、登录/注册竖排入口；登录资产区改为左侧真实余额及今日收益、右侧紧凑收益图，移除周期和辅助线。轮播改为后台内容、左文案右图片的 108px 卡片，增加公开请求隔离、手势方向判断、隐藏/低动态/焦点暂停、显式暂停和卸载迟到响应保护。
+- 修改文件：`mobile/src/views/HomeView.vue`、`mobile/src/styles/{prototype-parity,home-numeric}.css`、`mobile/src/api/homeCarousel.ts`、`mobile/src/core/homeCarouselContract.ts`、`mobile/src/i18n/messages/{zh-CN,en}.ts`、`mobile/tests/{home-carousel,home-prototype-parity,root-prototype-parity,core-discovery-views,editorial-shell-home-markets,android-ui-foundation-slice-a,pencil-selected-home-layout,return-history}.test.ts`。
+- 验证结果：上述 8 个 Mobile 定向测试文件 46/46 通过；Pencil 三个参考节点截图已核对。尚未完成生产页面浏览器截图、全量测试和跨层集成，暂不宣称视觉 1:1 验收完成。
+- 后续事项：补行为测试、后台编辑与实库路由验证，完成窄屏/双主题/双登录状态截图和最终门禁。
+
+## 2026-10-08 10:47 - Pencil 未登录资产区图片与动效视觉优化
+
+- 完成内容：重新优化浅色 `ZGf2W` 与深色 `u1hhY` 未登录资产区；在紧凑登录提示结构上加入主题背景图片、柔和光晕、流动曲线、轨迹环和浮动圆点。浅色使用轻量波纹效果，深色使用更强的绿色轨迹和深色科技纹理，同时保持登录/注册内容清晰。
+- 修改文件：`mobile/pencil/hippo-mobile-uiux.pen`、`.trellis/tasks/10-08-pencil-replace-market-brief/prd.md`、`docs/superpowers/PROGRESS.md`。
+- 验证结果：完成浅色/深色选中节点与完整未登录首页截图检查，图片和装饰没有覆盖文字或按钮；卡片边界已恢复裁切，底部导航 FAB 的局部裁切仍为原稿既有状态。Pencil 仅用于静态视觉稿，真实动效未接入生产代码。
+- 后续事项：等待用户确认这版图片与动效视觉方向；确认后再继续轮播后台配置和移动端真实交互实现。
+
+## 2026-10-08 10:24 - Pencil 未登录资产提示条优化
+
+- 完成内容：继续优化当前选中的浅色 `ZGf2W` 与深色 `u1hhY` 未登录资产区；参考交易所移动端未登录信息密度，将原资产大卡收紧为轻量“资产概览”提示条，移除余额占位和大背景图，保留“登录后查看余额与收益”“持仓数据将同步显示”，登录为主按钮、注册为次按钮。
+- 修改文件：`mobile/pencil/hippo-mobile-uiux.pen`、`.trellis/tasks/10-08-pencil-replace-market-brief/prd.md`、`docs/superpowers/PROGRESS.md`。
+- 验证结果：Pencil 选中节点与完整浅色/深色未登录首页截图通过；节点问题检查未发现资产区新增 `problems`，旧资金操作区仍保持隐藏，行情区域提前出现。底部导航 FAB 的局部裁切为原稿既有状态，本轮未改动。
+- 后续事项：等待用户确认未登录首页视觉稿；确认后再继续轮播后台配置和移动端真实交互实现。
+
+## 2026-10-08 10:15 - 隐藏未登录首页选中资金操作区
+
+- 完成内容：根据当前 Pencil 选中的浅色 `ysQIB` 与深色 `KhrN7` 资金操作区，在未登录首页中将两者隐藏；隐藏后快捷入口、轮播、行情和底部导航自然上移，未影响已登录首页。
+- 修改文件：`mobile/pencil/hippo-mobile-uiux.pen`、`.trellis/tasks/10-08-pencil-replace-market-brief/prd.md`、`docs/superpowers/PROGRESS.md`。
+- 验证结果：Pencil 浅色/深色未登录完整首页截图通过；节点结构确认 `ysQIB`、`KhrN7` 为 `enabled:false`，隐藏后无新增折叠或溢出。底部导航 FAB 的局部裁切为原稿既有状态，本轮未改动。
+- 后续事项：等待用户确认未登录首页最终视觉稿；确认后再继续轮播后台配置和移动端真实交互实现。
+
+## 2026-10-08 10:05 - Pencil 未登录首页状态优化
+
+- 完成内容：优化未登录首页浅色 `FwNBM` 与深色 `W1cWyh` 中选中的资产概览和资金操作区域；将大幅宣传卡改为紧凑访客资产状态卡，使用 `-- / USDT` 占位并明确提示登录查看，新增“去登录/注册账号”入口；资金按钮统一为“快捷充币/链上充币”，同步修正按钮高度与间距。
+- 修改文件：`mobile/pencil/hippo-mobile-uiux.pen`、`.trellis/tasks/10-08-pencil-replace-market-brief/prd.md`、`docs/superpowers/PROGRESS.md`。
+- 验证结果：Pencil 截图检查通过：浅色/深色资产区和完整未登录首页无新增折叠、裁切或溢出；结构复查无访客区域问题，旧“买币/充币”文案已无残留。底部导航 FAB 的局部裁切为原稿既有状态，本轮未改动。
+- 后续事项：等待用户确认未登录首页视觉稿；确认后再继续轮播后台配置和移动端真实交互实现。
+
+## 2026-10-08 05:07 - Pencil 资产区周期与曲线背景优化
+
+- 完成内容：按用户反馈更新浅色 `ODxuP` 与深色 `GBzuP` 资产概览；移除 `1 天`、`7 天`、`30 天`、`180 天` 周期栏，删除右侧曲线背景横线，并将深色主题同步为与浅色一致的紧凑右侧曲线和单行今日收益布局。
+- 修改文件：`mobile/pencil/hippo-mobile-uiux.pen`、`.trellis/tasks/10-08-pencil-replace-market-brief/prd.md`、`docs/superpowers/PROGRESS.md`。
+- 验证结果：Pencil 截图检查通过：浅色/深色资产区及完整首页均无新增裁切、折叠或溢出；节点问题检查未报告 `problems`；结构复查确认两个主题均无周期栏和曲线横线残留。`python3 ./.trellis/scripts/task.py validate .trellis/tasks/10-08-pencil-replace-market-brief`、`git diff --check` 通过。未修改后台、接口或生产移动端代码。
+- 后续事项：等待用户确认设计稿；确认后再继续轮播后台配置和移动端真实交互实现。
+
+## 2026-10-08 04:56 - Pencil 资产曲线与充币入口优化
+
+- 完成内容：依据用户提供的资产首页模板，优化当前选中的 Pencil 资产概览：将曲线收紧为余额右侧的紧凑平滑走势，将今日收益/数值/百分比整理为同一行；资金操作按钮由买币/充币调整为“快捷充币”和“链上充币”，快捷入口图标同步改为闪电。
+- 修改文件：`mobile/pencil/hippo-mobile-uiux.pen`、`.trellis/tasks/10-08-pencil-replace-market-brief/prd.md`、`docs/superpowers/PROGRESS.md`。
+- 验证结果：完成资产概览、两个资金按钮和完整浅色登录首页截图检查；选中节点结构检查未发现新增裁切、折叠或溢出问题。未修改后台、生产移动端代码或接口。
+- 后续事项：等待用户确认这版资产首页视觉稿；确认后再继续轮播后台配置和移动端真实交互实现。
+
+## 2026-10-08 04:32 - Pencil 首页轮播视觉稿第一版
+
+- 完成内容：将 Pencil 首页四个选中的 `Market Brief` 区域替换为首页推广轮播视觉稿；新增邀请好友示例卡片、标题箭头、两行说明、右侧原生几何插画和 5 页分页指示，浅色/深色主题分别保留对应卡片与文字颜色。
+- 修改文件：`mobile/pencil/hippo-mobile-uiux.pen`、`.trellis/tasks/10-08-pencil-replace-market-brief/prd.md`、`docs/superpowers/PROGRESS.md`。
+- 验证结果：Pencil 四个选中节点截图与四个完整首页截图均完成；四个轮播节点及其子节点无新增裁切/溢出问题。完整首页中报告的装饰元素裁切为原稿既有状态；后台、生产移动端和接口尚未修改。
+- 后续事项：等待用户确认轮播视觉方向；确认后再实施后台配置、公开接口和移动端真实轮播交互。
+
+## 2026-10-08 - Pencil 选中行情简报替换需求确认
+
+- 完成内容：读取项目执行规则与历史进度；定位 Pencil 文件 `mobile/pencil/hippo-mobile-uiux.pen` 中当前选中的四个 `Market Brief` 帧，确认其现有文案与浅色/深色卡片变体；创建任务 `10-08-pencil-replace-market-brief` 并记录待确认需求。
+- 修改文件：`.trellis/tasks/10-08-pencil-replace-market-brief/prd.md`、`docs/superpowers/PROGRESS.md`。
+- 验证结果：通过 Pencil `get_app_state`、节点结构读取和四个选中节点截图确认当前选区；尚未修改画布，因替换目标内容待用户确认。
+- 后续事项：确认替换为公告、活动入口、资产概览或其他具体内容后，修改四个选中节点并进行截图与布局验证。
+
 ## 2026-10-07 11:00 - 修复移动端 vue-tsc 依赖入口缺失
 
 - 完成内容：确认 `vue-tsc@2.0.0` 发布包缺少其启动脚本要求的 `index.js`，将移动端最低版本提升至 `^2.2.12`；同步 `mobile/package-lock.json`，并显式声明测试源码直接使用的 `@vue/compiler-sfc`，兼容 pnpm 严格依赖隔离。重建本地 pnpm 依赖后，类型检查、测试和 PWA 构建恢复正常。
@@ -9251,3 +9328,23 @@
 - 修改文件：`mobile/src/views/MarketsView.vue`、`mobile/tests/editorial-shell-home-markets.test.ts`、`mobile/tests/root-prototype-parity.test.ts`、`.trellis/tasks/10-07-mobile-h5-default-kline-1m/prd.md`
 - 验证结果：`npm test` 793/793、`npm run type-check`、`npm run type-check:tests`、`git diff --check`、源码固定 `15m` 检查均通过。
 - 后续事项：无。
+
+## 2026-10-07 20:39 - 移除 K 线来源展示
+
+- 完成内容：移除手机端和 PC 端图表上方的“K线来源/外部参考”来源汇总行及专用样式与聚合逻辑；保留逐根 K 线来源元数据、图表供应商选择、1m 默认周期、历史加载、实时更新、生成行情提示，以及盘口和成交明细中的来源信息。
+- 修改文件：`mobile/src/components/MobileMarketChart.vue`、`mobile/tests/mobile-market-chart-history.test.ts`、`pc/src/components/chart/MarketChart.vue`、`pc/tests/chart-provider.test.ts`、`.trellis/spec/backend/market-provenance.md`、`.trellis/tasks/10-07-remove-kline-source-display/prd.md`、`docs/superpowers/PROGRESS.md`
+- 验证结果：Mobile `npm run release:gate` 通过（793/793 测试、PWA/Tauri 构建、产物、包体和治理门禁）；PC `npm run type-check` 与 `chart-provider`、`market-provenance` 定向测试 8/8 通过；`git diff --check` 与 Trellis task validate 通过。浏览器独立挂载检查因页面评估超时未作为验收依据，专用浏览器任务空间已关闭。
+- 后续事项：提交确认后归档任务；本轮未提交或推送，保留既有未跟踪文件。本地 Mobile/PC 开发服务分别保留在 5186/5187 供预览。
+
+## 2026-10-07 23:54 - 手机端默认深色主题
+
+- 完成内容：手机端无主题存储或存储值无效时默认使用深色主题；保留用户显式选择的浅色/深色主题；初始 HTML、PWA manifest 和运行时主题初始化统一为深色默认。
+- 修改文件：`mobile/src/stores/theme.ts`、`mobile/index.html`、`mobile/vite.config.ts`、`mobile/tests/theme.test.ts`、`.trellis/spec/mobile/pwa-and-shell.md`、`.trellis/tasks/10-07-mobile-default-dark-theme/prd.md`、`docs/superpowers/PROGRESS.md`
+- 验证结果：主题回归测试通过；Mobile `npm run release:gate` 通过（793/793 测试、类型检查、PWA/Tauri 构建、产物、包体和治理门禁）；PWA manifest 重建确认 `theme_color=#070908`、`background_color=#070908`；`git diff --check` 与 Trellis task validate 通过。
+- 后续事项：提交确认后归档当前主题任务；上一项 K 线来源移除任务仍保留未归档；本轮未提交或推送，保留既有未跟踪文件。
+## 2026-10-08 12:10 - 首页轮播后端与 Mobile 公开适配器
+
+- 完成内容：完成首页轮播单例配置的后端编译闭环；补充 OpenAPI 路径、公开/后台 DTO 的未知字段拒绝、领域校验单测。Mobile 新增严格轮播响应适配器，首页开始接入真实轮播，访客卡增加注册入口，登录卡移除周期切换和曲线横线，资金按钮同步为快捷充币/链上充币。
+- 修改文件：`src/openapi.rs`、`src/openapi/home_carousel.rs`、`src/modules/home_carousel/{domain,presentation}.rs`、`tests/unit_src/src_modules_home_carousel_domain_tests.rs`、`mobile/src/api/homeCarousel.ts`、`mobile/tests/home-carousel.test.ts`、`mobile/src/views/HomeView.vue`、`mobile/src/styles/prototype-parity.css`、`mobile/src/i18n/messages/{zh-CN,en}.ts`。
+- 验证结果：`cargo check --all-targets` 通过；`cargo test --lib home_carousel -- --nocapture`（2/2）通过；`pnpm --dir mobile run type-check` 通过；Mobile 测试类型检查暂因新增测试仍使用错误的 Vitest 入口而失败，已在本轮修正，待重新执行。`git diff --check` 通过。
+- 后续事项：重新执行 Mobile 测试类型检查与轮播单测；补齐 Web 首页轮播后台编辑页、权限/路由测试和浏览器验证。
