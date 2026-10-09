@@ -100,3 +100,19 @@ See `commit-plan.md` for the proposed single-task commit and excluded work.
 - Confirm the proposed task-only commit before staging or committing.
 - Validate real end-to-end behavior with a backend running this route; browser
   fixtures and MySQL9.3 tests do not certify production/MySQL8.4 deployment.
+
+## Follow-Up: Portal OpenAPI Regression
+
+The shared seconds-order schema correctly included `refunded`, but
+`tests/openapi_routes.rs::openapi_json_documents_agent_portal_contract` still
+expected the older three-state pattern. The previous verification omitted
+this test target. Updated the literal expectation without weakening the
+assertion or changing any runtime/refund behavior, and added the missing
+test command to the agent hierarchy verification contract.
+
+- `cargo test --test openapi_routes`: 14 passed, 0 failed.
+- `cargo fmt --all -- --check` and `git diff --check`: passed.
+- This run does not add new real-database or production validation.
+- The earlier batch was pushed as `fd09126` with record commit `34b8eef`;
+  the user explicitly authorized committing and pushing this follow-up as
+  `test: include refunded in agent portal OpenAPI contract`.

@@ -518,6 +518,9 @@ Bad: treating `user_referrals.root_agent_id` as the top-level agent, or letting
   empty/error/retry, session/business late responses and countdown cleanup.
 - OpenAPI must register each concrete generic instantiation and its flattened
   children explicitly; deriving the outer enum alone can leave unresolved refs.
+- When changing a reused agent schema, also run `cargo test --test openapi_routes`.
+  The portal status-pattern assertion must include `refunded`; team-order tests
+  alone do not cover the existing portal schema assertions.
 - Browser: desktop and 390/320px, advanced filters, table containment and real
   resize interaction, all four navigation entries and detail drawers.
 

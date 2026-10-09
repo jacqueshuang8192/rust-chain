@@ -954,7 +954,7 @@ async fn openapi_json_documents_agent_portal_contract() {
     }
     assert_eq!(
         seconds_properties["status"]["pattern"].as_str(),
-        Some("^(opened|settled|manual_review)$")
+        Some("^(opened|settled|manual_review|refunded)$")
     );
     assert_eq!(
         seconds_properties["result"]["pattern"].as_str(),

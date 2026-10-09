@@ -9438,3 +9438,10 @@
 - 修改文件：前述全部源码、测试、设计及项目文档；本条补充实际推送结果。
 - 验证结果：暂存区 `git diff --cached --check` 通过；敏感文件名与常见凭据模式扫描未发现真实凭据，唯一命中为脱敏测试假连接串；推送返回 `main -> main`，本地状态与 `origin/main` 同步，仅 `.vite/` 临时缓存未跟踪。
 - 后续事项：本条结果记录单独提交并同步；既有发布限制及生产环境联调仍需继续，不视为已部署验收。
+
+## 2026-10-10 03:37 - 修复代理 OpenAPI 退款状态测试遗漏
+
+- 完成内容：核对服务端合法状态及共享OpenAPI定义，修正代理门户回归断言中遗漏的 `refunded`；保留精确枚举断言，不回退退款状态或修改结算逻辑。全仓检索确认旧三状态正则仅此一处，并在规范中补充共享schema变更必须执行OpenAPI整组测试的要求。
+- 修改文件：`tests/openapi_routes.rs`、`.trellis/spec/backend/agent-hierarchy.md`、`.trellis/tasks/10-10-agent-team-orders/research/delivery.md`、`docs/superpowers/PROGRESS.md`。
+- 验证结果：`cargo test --test openapi_routes` 14/14通过，`cargo fmt --all -- --check` 与 `git diff --check` 通过。本轮未新增实库或生产环境验证；上一轮遗漏该测试目标属于验证范围不足，已记录。
+- 后续事项：用户已明确确认提交并推送，本次断言和验证文档单独提交为 `test: include refunded in agent portal OpenAPI contract`，普通推送至 `origin/main` 并核对远程哈希；原有发布限制不变，`.vite/`缓存保留且不纳入。
