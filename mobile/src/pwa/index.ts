@@ -3,6 +3,7 @@ import { isTauriRuntime } from '@/core/platform'
 import { createPwaInstallEligibilitySession } from './eligibility'
 import { isIosBrowser, isStandaloneDisplay, resolveServiceWorkerLocation } from './runtime'
 import { runPwaUpdate } from './update'
+import { preparePwaStartup } from './startup'
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>
@@ -38,7 +39,7 @@ let installPrompt: BeforeInstallPromptEvent | null = null
 let installEligibility = createPwaInstallEligibilitySession()
 let installEligibilityTimer: number | null = null
 let registration: ServiceWorkerRegistration | null = null
-let initializePromise: Promise<void> | null = null
+let initializePromise: Promise<boolean> | null = null
 let reloadTriggered = false
 let updatePromise: Promise<boolean> | null = null
 let updateGeneration = 0
@@ -161,7 +162,6 @@ async function waitForWindowLoad(): Promise<void> {
 async function registerServiceWorker(): Promise<void> {
   if (!__PWA_ENABLED__ || isTauriRuntime() || !('serviceWorker' in navigator)) return
 
-  await waitForWindowLoad()
   const location = resolveServiceWorkerLocation(import.meta.env.BASE_URL, window.location.origin)
 
   try {
@@ -205,7 +205,7 @@ function bindRuntimeEvents(): void {
   window.setInterval(() => void checkForUpdate(), UPDATE_INTERVAL_MS)
 }
 
-async function initializeBrowserPwa(): Promise<void> {
+async function initializeBrowserPwa(): Promise<boolean> {
   installEligibility = createPwaInstallEligibilitySession(Date.now())
   state.enabled = true
   state.isOnline = navigator.onLine
@@ -213,12 +213,26 @@ async function initializeBrowserPwa(): Promise<void> {
   refreshInstallAvailability()
   scheduleInstallEligibilityRefresh()
   bindRuntimeEvents()
-  await registerServiceWorker()
+  if (!navigator.serviceWorker?.controller || !state.isOnline) {
+    void waitForWindowLoad().then(registerServiceWorker)
+    return false
+  }
+  return preparePwaStartup({
+    controllerTarget: navigator.serviceWorker,
+    register: async () => {
+      await registerServiceWorker()
+      return registration
+    },
+    reload: () => {
+      reloadTriggered = true
+      window.location.reload()
+    },
+  })
 }
 
-export function initializePwa(): Promise<void> {
+export function initializePwa(): Promise<boolean> {
   if (!__PWA_ENABLED__ || isTauriRuntime() || typeof window === 'undefined' || typeof navigator === 'undefined') {
-    return Promise.resolve()
+    return Promise.resolve(false)
   }
 
   initializePromise ||= initializeBrowserPwa()

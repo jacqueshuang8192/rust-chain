@@ -79,6 +79,50 @@ npm run build:tauri
 - `index.html`、`sw.js` 和 `manifest.webmanifest` 应使用 `no-cache` 或短期重新验证；带哈希的静态资源可使用长期 `immutable` 缓存。
 - 身份认证、账户、钱包、订单、KYC 和其他金融接口必须返回 `Cache-Control: private, no-store`，且 CDN/反向代理不得缓存。
 
+### 部署后仍显示旧版
+
+普通刷新不会自动替换正在控制页面的 Service Worker。客户端现在会在已受控页面启动、
+挂载应用之前检查新版：在最多 4 秒内安装就绪则激活并重新加载一次；无更新、离线或超时
+则进入应用，之后发现的更新仍由用户确认，避免交易过程中突然刷新。
+
+- 首次上线这个修复时，已经运行旧启动代码的客户端仍需回到首页点击“立即更新”；
+  或在新版下载完成后关闭同域名所有标签页和独立 PWA 窗口，再重新进入。
+  仅覆盖服务器文件不能让已运行的旧代码立即获得新逻辑。
+- 部署前最后执行 `npm run build:pwa`，上传完整 `dist/`，不要上传 `build:tauri`
+  生成的同名目录。原子切换发布目录，并保留上一版哈希资源供尚未退出的标签页加载。
+- HTML、`sw.js` 和 manifest 不允许 CDN 强缓存；有 CDN 时同步清理这几个入口的旧缓存。
+  `updateViaCache: 'none'` 只能控制浏览器更新请求，不能修正 CDN 回源缓存策略。
+- 不要通过清空全部 localStorage、注销用户或删除所有同源缓存来做正常版本升级。
+
+独立 PWA 域名的 Nginx `server` 块可采用以下静态文件规则（保留现有 API 代理规则；
+子路径部署需将路径同步改为实际前缀）：
+
+```nginx
+location = /index.html {
+    add_header Cache-Control "no-store" always;
+    try_files $uri =404;
+}
+location = /sw.js {
+    add_header Cache-Control "no-store" always;
+    try_files $uri =404;
+}
+location = /manifest.webmanifest {
+    add_header Cache-Control "no-cache" always;
+    try_files $uri =404;
+}
+location /assets/ {
+    add_header Cache-Control "public, max-age=31536000, immutable";
+    try_files $uri =404;
+}
+location / {
+    add_header Cache-Control "no-cache" always;
+    try_files $uri $uri/ /index.html;
+}
+```
+
+发布后检查实际域名的 `index.html`、`sw.js` 响应头和内容是否已更新；若 CDN 仍返回旧文件，
+客户端无法自行制造新版本。该示例不修改仓库中仅用于后台站点的 `docker/nginx.conf`。
+
 ### `PwaStatus` 集成
 
 PWA 注册由 `src/main.ts` 完成，`App.vue` 已在根 `.app-frame` 内唯一挂载

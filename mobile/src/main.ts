@@ -12,8 +12,12 @@ import './styles/pencil-selected-pages.css'
 
 document.documentElement.dataset.performanceTier = detectPerformanceTier(globalThis.navigator)
 
-createApp(App).use(createPinia()).use(router).use(i18n).mount('#app')
-
-if (__PWA_ENABLED__ && !isTauriRuntime()) {
-  void initializePwa()
+async function bootstrap(): Promise<void> {
+  if (__PWA_ENABLED__ && !isTauriRuntime()) {
+    const reloading = await initializePwa().catch(() => false)
+    if (reloading) return
+  }
+  createApp(App).use(createPinia()).use(router).use(i18n).mount('#app')
 }
+
+void bootstrap()

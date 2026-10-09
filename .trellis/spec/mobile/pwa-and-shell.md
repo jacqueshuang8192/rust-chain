@@ -219,7 +219,7 @@ createTurnstileLifecycle(options?: TurnstileLifecycleOptions): {
   and the install sheet may contract, but the document must not overflow
   horizontally. Under `prefers-reduced-motion`, entry and decorative breathing
   motion are disabled; functional busy feedback remains truthful.
-- Updates stay user-controlled: a waiting worker receives `SKIP_WAITING`, then
+- Updates after application mount stay user-controlled: a waiting worker receives `SKIP_WAITING`, then
   the page reloads on `controllerchange`.
 - The root theme is `data-theme="light|dark"` on `<html>`, persists through
   `hippo_mobile_theme`, updates `color-scheme` and every `theme-color` meta tag,
@@ -711,7 +711,8 @@ createTurnstileLifecycle(options?: TurnstileLifecycleOptions): {
 | Browser has no install prompt | Hide the offer except on iOS; the iOS CTA focuses the visible manual-install note instead of silently doing nothing |
 | Install prompt was dismissed | Suppress it for seven days |
 | Native install prompt rejects | Close the install modal and prioritize the existing install-error island below any waiting update |
-| Worker update is waiting | Offer update on a safe route; reload only after user accepts |
+| Worker update is waiting during controlled online startup | Check/activate before mount within one 4-second deadline; reload only after controller change |
+| Worker update is waiting after mount | Offer update on a safe route; reload only after user accepts |
 | Browser is offline | Render cached shell and truthful unavailable/error states |
 | Offline and one primary PWA state are both active | Keep install modal suppressed; stack the offline island only with update, offline-ready, or error according to established priority |
 | Pointer is outside a visible non-install PWA card | Let the underlying application receive the pointer; the island adds no backdrop, body scroll lock, or full-root hit target |
@@ -1621,12 +1622,23 @@ createPwaInstallEligibilitySession(input: PwaInstallEligibilityInput): PwaInstal
 createRouteAccessibilityCoordinator(input): RouteAccessibilityCoordinator
 
 PWA_UPDATE_TIMEOUT_MS = 15_000
+PWA_STARTUP_TIMEOUT_MS = 4_000
 PWA_INSTALL_SESSION_DELAY_MS = 60_000
 PWA_INSTALL_FREQUENCY_CAP_MS = 7 * 24 * 60 * 60 * 1000
 ```
 
 ### 3. Contracts
 
+- An already-controlled online PWA checks for updates before Vue mounts.
+  Registration, downloading and activation share one 4-second startup deadline.
+  Reload requires a changed non-null controller. No update, errors and deadline
+  expiry release mounting; late registration/installation/controller events
+  cannot trigger automatic activation or reload after that window.
+- First visits and offline visits do not wait for startup activation. Tauri
+  never enters the PWA startup path. Preserve manual updates after mount.
+- Deploy complete PWA output atomically, retain previous hashed assets for
+  existing tabs, and prevent HTTP/CDN caching of HTML and the worker script.
+  Legacy cached clients need one explicit update before this policy executes.
 - An update races one 15-second deadline, always releases timers/listeners, and
   leaves an explicit retry/recovery state after timeout, worker rejection, or
   controller loss. It never reloads indefinitely.
