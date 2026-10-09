@@ -1,9 +1,8 @@
-//! 秒合约事件时点结算 worker。
+//! 秒合约到期缓存取价结算 worker。
 //!
-//! 结算价格只从 MySQL 的 append-only `market_price_ticks` 历史读取。明确规则是选择
-//! `[expires_at, expires_at + 5s)` 内按事件时间排序的第一条 ticker；窗口关闭前保持 `opened`，历史缺失则在可配置上限内重试。
-//! 超过上限仍无快照时，订单与一条追加式异常证据原子转入 `manual_review`，绝不使用处理时 Redis 最新价、猜测价格或修改钱包。
-//! 选中的行主键、来源、观察时间、generation 与源版本和订单终态在同一事务固化，处理时机与重启不改变选价。
+//! 普通 opened 订单到期即读取 Redis 当前报价，不等待历史窗口，也不按观察时间年龄拒绝。
+//! 原始报价时间、缓存摘要、资金流水和订单终态原子提交；已提交重放不会重新选价或派奖。
+//! 缓存不可用或事务失败按一秒重试，不伪造价格。保留显式历史入口供旧证据回归，不用于生产自动调度。
 
 use crate::{
     error::{AppError, AppResult},
@@ -61,7 +60,7 @@ impl SecondsContractSettlementWorkerConfig {
     pub fn from_env() -> Self {
         Self {
             enabled: env_bool("SECONDS_CONTRACT_SETTLEMENT_ENABLED", true),
-            interval_seconds: env_u64("SECONDS_CONTRACT_SETTLEMENT_INTERVAL_SECONDS", 5),
+            interval_seconds: env_u64("SECONDS_CONTRACT_SETTLEMENT_INTERVAL_SECONDS", 1),
             batch_limit: env_u32("SECONDS_CONTRACT_SETTLEMENT_BATCH_LIMIT", 100),
             max_snapshot_wait_seconds: normalize_max_snapshot_wait_seconds(env_u64(
                 "SECONDS_CONTRACT_SETTLEMENT_MAX_SNAPSHOT_WAIT_SECONDS",
@@ -72,7 +71,7 @@ impl SecondsContractSettlementWorkerConfig {
 }
 
 impl SecondsContractSettlementWorker {
-    /// 执行一轮结算；唯一价格依赖是 MySQL 历史表，Redis 不参与结算判定。
+    /// 执行一轮结算；订单到期由 MySQL 时钟确认，普通 opened 单的价格从 Redis 缓存读取。
     pub async fn run_once(
         &self,
         state: &AppState,
@@ -115,10 +114,10 @@ pub struct SecondsContractSettlementEvent {
     stake_amount: BigDecimal,
     payout_amount: BigDecimal,
     settlement_price: BigDecimal,
-    settlement_price_tick_id: u64,
+    settlement_price_tick_id: Option<u64>,
     settlement_price_source: String,
     settlement_price_observed_at: DateTime<Utc>,
-    settlement_price_generation: u64,
+    settlement_price_generation: Option<u64>,
     settlement_price_version: String,
     result: String,
 }
@@ -131,6 +130,28 @@ enum SettlementOutcome {
     Skipped,
 }
 
+#[derive(Clone, Copy)]
+enum SettlementPriceSource<'a> {
+    History,
+    Cache(&'a ConnectionManager),
+}
+
+impl SettlementPriceSource<'_> {
+    fn eligibility_delay(self) -> i64 {
+        match self {
+            Self::History => SETTLEMENT_PRICE_WINDOW_SECONDS,
+            Self::Cache(_) => 0,
+        }
+    }
+
+    fn retry_seconds(self) -> i64 {
+        match self {
+            Self::History => 60,
+            Self::Cache(_) => 1,
+        }
+    }
+}
+
 /// 比较开仓价与结算价得出胜负；保留公开入口供既有调用方和测试复用。
 pub fn seconds_contract_settlement_result(
     direction: &str,
@@ -140,7 +161,7 @@ pub fn seconds_contract_settlement_result(
     settlement_result_from_prices(direction, entry_price, exit_price)
 }
 
-/// 从应用状态取得 MySQL 后执行一轮；未配置 Redis 不影响结算。
+/// 从应用状态取得 MySQL 和 Redis 执行一轮到期结算；数据库时钟确认到期，缓存提供实际价格。
 pub async fn run_once(
     state: &AppState,
     _now: DateTime<Utc>,
@@ -150,19 +171,13 @@ pub async fn run_once(
         AppError::Internal("mysql pool is required for seconds contract settlement".to_owned())
     })?;
     let now = database_now(pool).await?;
-    let max_snapshot_wait_seconds =
-        SecondsContractSettlementWorkerConfig::from_env().max_snapshot_wait_seconds;
-    run_once_with_broadcast_and_max_wait(
-        pool,
-        state.event_broadcast_hub.as_ref(),
-        now,
-        limit,
-        max_snapshot_wait_seconds,
-    )
-    .await
+    let redis = state.redis.as_ref().ok_or_else(|| {
+        AppError::Internal("redis is required for seconds contract settlement".to_owned())
+    })?;
+    run_once_with_cached_prices(pool, redis, state.event_broadcast_hub.as_ref(), now, limit).await
 }
 
-/// 在显式 MySQL 池上执行一轮，供集成测试和独立调度复用。
+/// 显式历史证据兼容入口；只用于旧事件时间规则回归，生产调度使用 Redis 入口。
 pub async fn run_once_with_pool(
     pool: &Pool<MySql>,
     now: DateTime<Utc>,
@@ -189,15 +204,34 @@ pub async fn run_once_with_pool_and_max_wait(
     .await
 }
 
-/// 兼容旧测试装配签名；Redis 参数被刻意忽略，不能成为结算价格来源。
-#[deprecated(note = "use run_once_with_pool; Redis is not a settlement authority")]
+/// 在显式 MySQL 与 Redis 上执行到期缓存结算，供独立调度和集成回归使用。
 pub async fn run_once_with_dependencies(
     pool: &Pool<MySql>,
-    _redis: &ConnectionManager,
+    redis: &ConnectionManager,
     now: DateTime<Utc>,
     limit: u32,
 ) -> AppResult<SecondsContractSettlementSummary> {
-    run_once_with_pool(pool, now, limit).await
+    run_once_with_cached_prices(pool, redis, None, now, limit).await
+}
+
+/// 读取当前 Redis 报价完成到期订单，提交后只向原用户发布一次事件；错误一秒后重试。
+/// 报价年龄不影响取价，但缓存缺失、损坏、身份冲突或非正价格仍不能触发资金写入。
+pub async fn run_once_with_cached_prices(
+    pool: &Pool<MySql>,
+    redis: &ConnectionManager,
+    hub: Option<&EventBroadcastHub>,
+    now: DateTime<Utc>,
+    limit: u32,
+) -> AppResult<SecondsContractSettlementSummary> {
+    run_once_with_price_source(
+        pool,
+        hub,
+        now,
+        limit,
+        DEFAULT_MAX_SNAPSHOT_WAIT_SECONDS,
+        SettlementPriceSource::Cache(redis),
+    )
+    .await
 }
 
 /// 扫描并逐单结算；每单独立事务，缺历史在默认上限内退避，超龄则转人工审核且不改变资金。
@@ -219,8 +253,33 @@ async fn run_once_with_broadcast_and_max_wait(
     limit: u32,
     max_snapshot_wait_seconds: u64,
 ) -> AppResult<SecondsContractSettlementSummary> {
+    run_once_with_price_source(
+        pool,
+        hub,
+        now,
+        limit,
+        max_snapshot_wait_seconds,
+        SettlementPriceSource::History,
+    )
+    .await
+}
+
+async fn run_once_with_price_source(
+    pool: &Pool<MySql>,
+    hub: Option<&EventBroadcastHub>,
+    now: DateTime<Utc>,
+    limit: u32,
+    max_snapshot_wait_seconds: u64,
+    price_source: SettlementPriceSource<'_>,
+) -> AppResult<SecondsContractSettlementSummary> {
     let settlement_limit = seconds_contract_settlement_limit(limit);
-    let rows = fetch_due_orders(pool, now, seconds_contract_settlement_scan_limit(limit)).await?;
+    let rows = fetch_due_orders(
+        pool,
+        now,
+        seconds_contract_settlement_scan_limit(limit),
+        price_source.eligibility_delay(),
+    )
+    .await?;
     let mut summary = SecondsContractSettlementSummary::default();
 
     for row in rows {
@@ -228,7 +287,15 @@ async fn run_once_with_broadcast_and_max_wait(
             break;
         }
         summary.scanned += 1;
-        match settle_order_by_id(pool, row.order_id, now, max_snapshot_wait_seconds).await {
+        match settle_order_by_id(
+            pool,
+            row.order_id,
+            now,
+            max_snapshot_wait_seconds,
+            price_source,
+        )
+        .await
+        {
             Ok(SettlementOutcome::Settled(event)) => {
                 summary.settled += 1;
                 publish_settlement_event(hub, &event);
@@ -236,13 +303,25 @@ async fn run_once_with_broadcast_and_max_wait(
             Ok(SettlementOutcome::ManualReview) => summary.manual_review += 1,
             Ok(SettlementOutcome::Pending) => {
                 summary.skipped += 1;
-                reschedule_settlement_attempt(pool, row.order_id, now).await?;
+                reschedule_settlement_attempt(
+                    pool,
+                    row.order_id,
+                    now,
+                    price_source.retry_seconds(),
+                )
+                .await?;
             }
             Ok(SettlementOutcome::Skipped) => summary.skipped += 1,
             Err(error) => {
                 summary.failed += 1;
-                reschedule_settlement_attempt(pool, row.order_id, now).await?;
-                warn!(order_id = row.order_id, %error, "秒合约事件时点结算失败");
+                reschedule_settlement_attempt(
+                    pool,
+                    row.order_id,
+                    now,
+                    price_source.retry_seconds(),
+                )
+                .await?;
+                warn!(order_id = row.order_id, %error, "秒合约结算失败");
             }
         }
     }
@@ -261,9 +340,9 @@ pub async fn run_loop(state: AppState, interval_seconds: u64, limit: u32) -> App
                 manual_review = summary.manual_review,
                 skipped = summary.skipped,
                 failed = summary.failed,
-                "秒合约事件时点结算周期完成"
+                "秒合约缓存取价结算周期完成"
             ),
-            Err(error) => error!(%error, "秒合约事件时点结算周期失败"),
+            Err(error) => error!(%error, "秒合约缓存取价结算周期失败"),
         }
     }
 }
@@ -280,17 +359,19 @@ async fn fetch_due_orders(
     pool: &Pool<MySql>,
     now: DateTime<Utc>,
     limit: u32,
+    eligibility_delay: i64,
 ) -> AppResult<Vec<DueSecondsContractOrder>> {
     sqlx::query_as::<_, DueSecondsContractOrder>(
         r#"SELECT id AS order_id
            FROM seconds_contract_orders
            WHERE status = 'opened'
-             AND expires_at <= DATE_SUB(?, INTERVAL 5 SECOND)
+             AND expires_at <= DATE_SUB(?, INTERVAL ? SECOND)
              AND (next_settlement_attempt_at IS NULL OR next_settlement_attempt_at <= ?)
            ORDER BY expires_at ASC, id ASC
            LIMIT ?"#,
     )
     .bind(now.naive_utc())
+    .bind(eligibility_delay)
     .bind(now.naive_utc())
     .bind(limit.clamp(1, 500) as i64)
     .fetch_all(pool)
@@ -302,11 +383,12 @@ async fn reschedule_settlement_attempt(
     pool: &Pool<MySql>,
     order_id: u64,
     now: DateTime<Utc>,
+    retry_seconds: i64,
 ) -> AppResult<()> {
     sqlx::query(
         "UPDATE seconds_contract_orders SET next_settlement_attempt_at = ? WHERE id = ? AND status = 'opened'",
     )
-    .bind((now + chrono::TimeDelta::seconds(60)).naive_utc())
+    .bind((now + chrono::TimeDelta::seconds(retry_seconds)).naive_utc())
     .bind(order_id)
     .execute(pool)
     .await?;
@@ -319,6 +401,7 @@ async fn settle_order_by_id(
     order_id: u64,
     processing_time: DateTime<Utc>,
     max_snapshot_wait_seconds: u64,
+    price_source: SettlementPriceSource<'_>,
 ) -> AppResult<SettlementOutcome> {
     let mut tx = pool.begin().await?;
     let order = match infrastructure::lock_order_by_id(&mut tx, order_id).await {
@@ -338,15 +421,25 @@ async fn settle_order_by_id(
         return Ok(SettlementOutcome::Skipped);
     }
     let window_closes_at =
-        order.expires_at + chrono::TimeDelta::seconds(SETTLEMENT_PRICE_WINDOW_SECONDS);
+        order.expires_at + chrono::TimeDelta::seconds(price_source.eligibility_delay());
     if processing_time < window_closes_at {
         tx.rollback().await?;
         return Ok(SettlementOutcome::Pending);
     }
-    let Some(snapshot) =
-        infrastructure::select_settlement_price_snapshot(&mut tx, &order.symbol, order.expires_at)
+    let selected_snapshot = match price_source {
+        SettlementPriceSource::Cache(redis) => {
+            Some(infrastructure::cached_settlement_price(Some(redis), &order.symbol).await?)
+        }
+        SettlementPriceSource::History => {
+            infrastructure::select_settlement_price_snapshot(
+                &mut tx,
+                &order.symbol,
+                order.expires_at,
+            )
             .await?
-    else {
+        }
+    };
+    let Some(snapshot) = selected_snapshot else {
         let max_wait =
             chrono::TimeDelta::seconds(i64::try_from(max_snapshot_wait_seconds).map_err(|_| {
                 AppError::Validation(

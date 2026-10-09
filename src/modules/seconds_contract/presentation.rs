@@ -259,13 +259,16 @@ pub(crate) struct SecondsContractProductResponse {
     pub(crate) status: String,
 }
 
-/// 行情缓存中 ticker 快照的最小反序列化视图，只取秒合约开仓定价所需的两个字段。
+/// 行情缓存中 ticker 快照的最小反序列化视图，供秒合约开仓与到期结算共用。
 /// 该结构对应 Redis 里由行情模块写入的 JSON，字段缺失或类型不符会被判定为数据契约破损。
 #[derive(Debug, Deserialize)]
 pub(crate) struct CachedTickerPayload {
-    /// 最新成交价，秒合约据此确定开仓价；非正数会被拒绝下单。
+    /// 载荷中的交易对身份；旧载荷缺失时仍由服务端缓存键确定，存在时必须一致。
+    #[serde(default)]
+    pub(crate) symbol: Option<String>,
+    /// 最新成交价，秒合约据此确定开仓和结算价；非正数一律拒绝。
     pub(crate) last_price: BigDecimal,
-    /// 该报价的观测时刻，以毫秒时间戳传输；早于当前 60 秒即视为陈旧行情并拒绝开仓。
+    /// 该报价的原始观测时刻，以毫秒时间戳传输；保留证据，不按年龄拒绝秒合约取价。
     #[serde(with = "unix_millis")]
     pub(crate) observed_at: DateTime<Utc>,
 }

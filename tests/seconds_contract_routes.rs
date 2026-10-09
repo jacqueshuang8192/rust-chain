@@ -151,6 +151,10 @@ async fn make_order_due_with_event_price(pool: &MySqlPool, order_id: u64, price:
     .await
     .unwrap();
     seed_order_event_price(pool, order_id, price).await;
+    let symbol: String = sqlx::query_scalar(
+        "SELECT pairs.symbol FROM seconds_contract_orders orders JOIN trading_pairs pairs ON pairs.id = orders.pair_id WHERE orders.id = ?",
+    ).bind(order_id).fetch_one(pool).await.unwrap();
+    seed_ticker(&redis_manager().await, &symbol, price).await;
 }
 
 async fn seed_order_event_price(pool: &MySqlPool, order_id: u64, price: &str) {
@@ -577,7 +581,7 @@ async fn settlement_history_capability_fails_closed_for_activation_and_opening()
         open_payload["message"]
             .as_str()
             .unwrap()
-            .contains("settlement history is unavailable")
+            .contains("cached ticker is required")
     );
     let wallet_available: BigDecimal = sqlx::query_scalar(
         "SELECT available FROM wallet_accounts WHERE user_id = ? AND asset_id = ?",
@@ -710,7 +714,7 @@ async fn settlement_history_capability_fails_closed_for_activation_and_opening()
 }
 
 #[tokio::test]
-async fn seconds_contract_open_requires_fresh_positive_ticker_before_mutation()
+async fn seconds_contract_open_accepts_aged_prices_but_rejects_invalid_cache_before_mutation()
 -> Result<(), Box<dyn Error>> {
     let Some(pool) = mysql_pool().await else {
         return Ok(());
@@ -730,6 +734,8 @@ async fn seconds_contract_open_requires_fresh_positive_ticker_before_mutation()
         .execute(&mut *tx)
         .await?;
     tx.commit().await?;
+    sqlx::query("UPDATE market_feed_configs SET enabled=FALSE WHERE JSON_CONTAINS(symbols_json,JSON_QUOTE(?))")
+        .bind(&symbol).execute(&pool).await?;
     let token = issue_token(&settings, format!("user:{user_id}"), TokenScope::User, 900).unwrap();
 
     let no_redis = user_routes()
@@ -775,6 +781,30 @@ async fn seconds_contract_open_requires_fresh_positive_ticker_before_mutation()
             .await?;
         assert_eq!(missing.status(), StatusCode::BAD_REQUEST);
 
+        for payload in [
+            r#"{"last_price":"bad","observed_at":1}"#.to_owned(),
+            serde_json::json!({
+                "symbol": "BTC-USDT",
+                "last_price": "100",
+                "observed_at": chrono::Utc::now().timestamp_millis(),
+            })
+            .to_string(),
+        ] {
+            let _: () = connection
+                .set(market_ticker_redis_key(&symbol), payload)
+                .await?;
+            let invalid = app.clone().oneshot(
+                Request::builder().method("POST").uri("/seconds-contracts/orders")
+                    .header("authorization", format!("Bearer {token}"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(serde_json::json!({
+                        "product_id": product_id, "direction": "up", "stake_amount": "10",
+                        "idempotency_key": format!("seconds-invalid-cache-{}", Uuid::now_v7()),
+                    }).to_string())).unwrap(),
+            ).await?;
+            assert_eq!(invalid.status(), StatusCode::BAD_REQUEST);
+        }
+
         seed_ticker_at(
             &redis,
             &symbol,
@@ -797,7 +827,12 @@ async fn seconds_contract_open_requires_fresh_positive_ticker_before_mutation()
                     .unwrap(),
             )
             .await?;
-        assert_eq!(stale.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(stale.status(), StatusCode::OK);
+        let opened = body_json(stale).await?;
+        assert_eq!(
+            decimal(opened["order"]["entry_price"].as_str().unwrap()),
+            decimal("100")
+        );
 
         seed_ticker_at(
             &redis,
@@ -806,7 +841,7 @@ async fn seconds_contract_open_requires_fresh_positive_ticker_before_mutation()
             chrono::Utc::now().timestamp_millis(),
         )
         .await;
-        let non_positive = app
+        let non_positive = app.clone()
             .oneshot(
                 Request::builder()
                     .method("POST")
@@ -821,6 +856,37 @@ async fn seconds_contract_open_requires_fresh_positive_ticker_before_mutation()
             )
             .await?;
         assert_eq!(non_positive.status(), StatusCode::BAD_REQUEST);
+        seed_ticker_at(
+            &redis,
+            &symbol,
+            "300",
+            chrono::Utc::now().timestamp_millis(),
+        )
+        .await;
+        let replay = app
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/seconds-contracts/orders")
+                    .header("authorization", format!("Bearer {token}"))
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        serde_json::json!({
+                            "product_id": product_id, "direction": "up", "stake_amount": "10",
+                            "idempotency_key": opened["order"]["idempotency_key"],
+                        })
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await?;
+        assert_eq!(replay.status(), StatusCode::OK);
+        let replay = body_json(replay).await?;
+        assert_eq!(replay["order"]["id"], opened["order"]["id"]);
+        assert_eq!(
+            replay["order"]["entry_price"],
+            opened["order"]["entry_price"]
+        );
     }
 
     let (order_count,): (i64,) =
@@ -840,9 +906,10 @@ async fn seconds_contract_open_requires_fresh_positive_ticker_before_mutation()
     .bind(user_id)
     .fetch_one(&pool)
     .await?;
-    assert_eq!(order_count, 0);
-    assert_eq!(available, decimal("50.000000000000000000"));
-    assert_eq!(ledger_count, 0);
+    let accepted = i64::from(redis_manager().await.is_some());
+    assert_eq!(order_count, accepted);
+    assert_eq!(available, decimal("50") - BigDecimal::from(accepted * 10));
+    assert_eq!(ledger_count, accepted);
     Ok(())
 }
 
@@ -1064,7 +1131,11 @@ async fn seconds_contract_stake_and_manual_payout_respect_asset_precision()
     make_order_due_with_event_price(&pool, order_id, "105.000000000000000000").await;
 
     let settled = admin_routes()
-        .with_state(AppState::new(settings).with_mysql(pool.clone()))
+        .with_state(state_with_mysql_and_redis(
+            settings,
+            pool.clone(),
+            redis_manager().await,
+        ))
         .oneshot(
             Request::builder()
                 .method("POST")
@@ -3142,7 +3213,8 @@ async fn seconds_contract_settle_win_credits_payout_and_writes_ledger() -> Resul
     make_order_due_with_event_price(&pool, order_id, "105.000000000000000000").await;
 
     let settle_app = admin_routes().with_state(
-        state_with_mysql_and_redis(settings, pool.clone(), None).with_event_broadcast_hub(hub),
+        state_with_mysql_and_redis(settings, pool.clone(), redis_manager().await)
+            .with_event_broadcast_hub(hub),
     );
     for attempt in 0..2 {
         let settle_response = settle_app
@@ -3306,8 +3378,11 @@ async fn seconds_contract_settle_rejects_different_result_replay() -> Result<(),
     let open_payload: Value = serde_json::from_slice(&open_body)?;
     let order_id = open_payload["order"]["id"].as_u64().unwrap();
     make_order_due_with_event_price(&pool, order_id, "105.000000000000000000").await;
-    let settle_app =
-        admin_routes().with_state(state_with_mysql_and_redis(settings, pool.clone(), None));
+    let settle_app = admin_routes().with_state(state_with_mysql_and_redis(
+        settings,
+        pool.clone(),
+        redis_manager().await,
+    ));
 
     let first_response = settle_app
         .clone()
@@ -3638,8 +3713,11 @@ async fn assert_seconds_contract_settlement_idempotent_loss() -> Result<(), Box<
     let open_payload: Value = serde_json::from_slice(&open_body)?;
     let order_id = open_payload["order"]["id"].as_u64().unwrap();
     make_order_due_with_event_price(&pool, order_id, "105.000000000000000000").await;
-    let settle_app =
-        admin_routes().with_state(state_with_mysql_and_redis(settings, pool.clone(), None));
+    let settle_app = admin_routes().with_state(state_with_mysql_and_redis(
+        settings,
+        pool.clone(),
+        redis_manager().await,
+    ));
 
     for _ in 0..2 {
         let response = settle_app

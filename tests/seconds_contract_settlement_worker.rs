@@ -1,7 +1,8 @@
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, TimeDelta, TimeZone, Utc};
 use exchange_api::workers::seconds_contract_settlement::{
-    run_once_with_pool, run_once_with_pool_and_max_wait, seconds_contract_settlement_result,
+    run_once_with_cached_prices, run_once_with_pool, run_once_with_pool_and_max_wait,
+    seconds_contract_settlement_result,
 };
 use sqlx::{MySql, MySqlPool, Transaction, mysql::MySqlPoolOptions};
 use std::{error::Error, str::FromStr};
@@ -12,6 +13,211 @@ static TEST_LOCK: Mutex<()> = Mutex::const_new(());
 
 fn decimal(value: &str) -> BigDecimal {
     BigDecimal::from_str(value).unwrap()
+}
+
+async fn cached_test_redis() -> Result<Option<redis::aio::ConnectionManager>, Box<dyn Error>> {
+    let Ok(url) = std::env::var("REDIS_URL") else {
+        eprintln!("skipping cached-price settlement test because REDIS_URL is not set");
+        return Ok(None);
+    };
+    Ok(Some(
+        redis::aio::ConnectionManager::new(redis::Client::open(url)?).await?,
+    ))
+}
+
+async fn seed_cached_price(
+    redis: &redis::aio::ConnectionManager,
+    symbol: &str,
+    price: &str,
+    observed_at: DateTime<Utc>,
+) -> Result<(), Box<dyn Error>> {
+    use redis::AsyncCommands;
+    let mut connection = redis.clone();
+    let _: () = connection
+        .set(
+            exchange_api::modules::market::market_ticker_redis_key(symbol),
+            serde_json::json!({
+                "symbol": symbol.replace('-', ""), "last_price": price,
+                "observed_at": observed_at.timestamp_millis(),
+            })
+            .to_string(),
+        )
+        .await?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn redis_settlement_is_due_immediately_and_replay_retains_the_selected_old_quote()
+-> Result<(), Box<dyn Error>> {
+    let _guard = TEST_LOCK.lock().await;
+    let (Some(pool), Some(redis)) = (mysql_pool_or_skip().await?, cached_test_redis().await?)
+    else {
+        return Ok(());
+    };
+    sqlx::query("UPDATE seconds_contract_orders SET status='settled' WHERE status='opened' AND idempotency_key LIKE 'event-price-%'")
+        .execute(&pool).await?;
+    let fixture = seed_fixture(&pool).await?;
+    let expires_at = Utc.with_ymd_and_hms(2020, 1, 1, 0, 0, 0).unwrap();
+    let observed_at = expires_at - TimeDelta::hours(2);
+    let order_id = seed_order(&pool, &fixture, expires_at, "up").await?;
+    // A conflicting historical price proves the new path takes Redis, not the event window.
+    insert_tick(&pool, &fixture.pair_symbol, "90", "bitget", expires_at, 1).await?;
+    seed_cached_price(
+        &redis,
+        &fixture.pair_symbol,
+        "101.123456789012345678",
+        observed_at,
+    )
+    .await?;
+    let early = run_once_with_cached_prices(
+        &pool,
+        &redis,
+        None,
+        expires_at - TimeDelta::milliseconds(1),
+        1,
+    )
+    .await?;
+    assert_eq!(early.scanned, 0);
+    use exchange_api::modules::events::{EventBroadcastHub, WebSocketChannel};
+    let user_id: u64 = sqlx::query_scalar("SELECT user_id FROM seconds_contract_orders WHERE id=?")
+        .bind(order_id)
+        .fetch_one(&pool)
+        .await?;
+    let hub = EventBroadcastHub::new(16);
+    let mut events = hub.subscribe(&WebSocketChannel::private_user(user_id));
+    let (first, second) = tokio::join!(
+        run_once_with_cached_prices(&pool, &redis, Some(&hub), expires_at, 1),
+        run_once_with_cached_prices(&pool, &redis, Some(&hub), expires_at, 1),
+    );
+    assert_eq!(first?.settled + second?.settled, 1);
+    let event =
+        tokio::time::timeout(std::time::Duration::from_millis(100), events.recv()).await??;
+    let event: serde_json::Value = serde_json::from_str(event.payload())?;
+    assert_eq!(event["status"], "settled");
+    assert_eq!(event["settlement_price_source"], "redis");
+    assert!(event["settlement_price_tick_id"].is_null());
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(20), events.recv())
+            .await
+            .is_err()
+    );
+    let snapshot = order_snapshot(&pool, order_id).await?;
+    assert_eq!(snapshot.0, "settled");
+    assert_eq!(snapshot.1, Some(decimal("101.123456789012345678")));
+    assert_eq!(snapshot.2, None);
+    assert_eq!(snapshot.3.as_deref(), Some("redis"));
+    assert_eq!(snapshot.4, Some(observed_at));
+    assert_eq!(snapshot.5, None);
+    assert!(snapshot.6.as_deref().unwrap().starts_with("redis:"));
+    let funds: (BigDecimal, i64) = sqlx::query_as(
+        "SELECT wallet.available, (SELECT COUNT(*) FROM wallet_ledger WHERE ref_type='seconds_contract_order' AND ref_id=CAST(orders.id AS CHAR)) FROM seconds_contract_orders orders JOIN wallet_accounts wallet ON wallet.user_id=orders.user_id AND wallet.asset_id=orders.stake_asset WHERE orders.id=?",
+    ).bind(order_id).fetch_one(&pool).await?;
+    assert_eq!(funds, (decimal("58"), 1));
+    seed_cached_price(&redis, &fixture.pair_symbol, "1", expires_at).await?;
+    let replay =
+        run_once_with_cached_prices(&pool, &redis, None, expires_at + TimeDelta::seconds(1), 1)
+            .await?;
+    assert_eq!(replay.settled, 0);
+    assert_eq!(order_snapshot(&pool, order_id).await?, snapshot);
+    let journal: (i64, BigDecimal) = sqlx::query_as(
+        "SELECT COUNT(*),COALESCE(SUM(amount),0) FROM platform_financial_journal WHERE transaction_key=?",
+    ).bind(format!("seconds_contract:{order_id}:settle")).fetch_one(&pool).await?;
+    assert_eq!(journal, (3, decimal("0")));
+    Ok(())
+}
+
+#[tokio::test]
+async fn redis_settlement_transaction_failure_rolls_back_price_funds_and_event()
+-> Result<(), Box<dyn Error>> {
+    let _guard = TEST_LOCK.lock().await;
+    let (Some(pool), Some(redis)) = (mysql_pool_or_skip().await?, cached_test_redis().await?)
+    else {
+        return Ok(());
+    };
+    sqlx::query("UPDATE seconds_contract_orders SET status='settled' WHERE status='opened' AND idempotency_key LIKE 'event-price-%'")
+        .execute(&pool).await?;
+    let fixture = seed_fixture(&pool).await?;
+    let expires_at = Utc.with_ymd_and_hms(2020, 3, 1, 0, 0, 0).unwrap();
+    let order_id = seed_order(&pool, &fixture, expires_at, "up").await?;
+    seed_cached_price(&redis, &fixture.pair_symbol, "101", expires_at).await?;
+    sqlx::raw_sql(&format!(
+        "CREATE TRIGGER seconds_cache_reject_ledger BEFORE INSERT ON wallet_ledger FOR EACH ROW BEGIN IF NEW.ref_type='seconds_contract_order' AND NEW.ref_id='{order_id}' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='seconds cache rollback probe'; END IF; END"
+    )).execute(&pool).await?;
+    let result = run_once_with_cached_prices(&pool, &redis, None, expires_at, 1).await;
+    sqlx::raw_sql("DROP TRIGGER seconds_cache_reject_ledger")
+        .execute(&pool)
+        .await?;
+    assert_eq!(result?.failed, 1);
+    let snapshot = order_snapshot(&pool, order_id).await?;
+    assert_eq!(snapshot.0, "opened");
+    assert!(snapshot.1.is_none() && snapshot.2.is_none() && snapshot.3.is_none());
+    let available: BigDecimal = sqlx::query_scalar(
+        "SELECT available FROM wallet_accounts WHERE (user_id,asset_id)=(SELECT user_id,stake_asset FROM seconds_contract_orders WHERE id=?)",
+    ).bind(order_id).fetch_one(&pool).await?;
+    assert_eq!(available, decimal("40"));
+    let journal_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM platform_financial_journal WHERE transaction_key=?",
+    )
+    .bind(format!("seconds_contract:{order_id}:settle"))
+    .fetch_one(&pool)
+    .await?;
+    assert_eq!(journal_count, 0);
+    let settled =
+        run_once_with_cached_prices(&pool, &redis, None, expires_at + TimeDelta::seconds(1), 1)
+            .await?;
+    assert_eq!(settled.settled, 1);
+    Ok(())
+}
+#[tokio::test]
+async fn redis_settlement_retries_missing_and_invalid_cache_after_one_second()
+-> Result<(), Box<dyn Error>> {
+    let _guard = TEST_LOCK.lock().await;
+    let (Some(pool), Some(redis)) = (mysql_pool_or_skip().await?, cached_test_redis().await?)
+    else {
+        return Ok(());
+    };
+    sqlx::query("UPDATE seconds_contract_orders SET status='settled' WHERE status='opened' AND idempotency_key LIKE 'event-price-%'")
+        .execute(&pool).await?;
+    let fixture = seed_fixture(&pool).await?;
+    let expires_at = Utc.with_ymd_and_hms(2020, 2, 1, 0, 0, 0).unwrap();
+    let order_id = seed_order(&pool, &fixture, expires_at, "down").await?;
+    let pending = run_once_with_cached_prices(&pool, &redis, None, expires_at, 1).await?;
+    assert_eq!(pending.failed, 1);
+    let retry_at: DateTime<Utc> = sqlx::query_scalar(
+        "SELECT next_settlement_attempt_at FROM seconds_contract_orders WHERE id=?",
+    )
+    .bind(order_id)
+    .fetch_one(&pool)
+    .await?;
+    assert_eq!(retry_at, expires_at + TimeDelta::seconds(1));
+    let skipped = run_once_with_cached_prices(
+        &pool,
+        &redis,
+        None,
+        expires_at + TimeDelta::milliseconds(500),
+        1,
+    )
+    .await?;
+    assert_eq!(skipped.scanned, 0);
+    seed_cached_price(&redis, &fixture.pair_symbol, "0", expires_at).await?;
+    let invalid = run_once_with_cached_prices(&pool, &redis, None, retry_at, 1).await?;
+    assert_eq!(invalid.failed, 1);
+    let unchanged: (String, BigDecimal, i64) = sqlx::query_as(
+        "SELECT orders.status,wallet.available,(SELECT COUNT(*) FROM wallet_ledger WHERE ref_type='seconds_contract_order' AND ref_id=CAST(orders.id AS CHAR)) FROM seconds_contract_orders orders JOIN wallet_accounts wallet ON wallet.user_id=orders.user_id AND wallet.asset_id=orders.stake_asset WHERE orders.id=?",
+    ).bind(order_id).fetch_one(&pool).await?;
+    assert_eq!(unchanged, ("opened".to_owned(), decimal("40"), 0));
+    seed_cached_price(
+        &redis,
+        &fixture.pair_symbol,
+        "99",
+        expires_at - TimeDelta::days(1),
+    )
+    .await?;
+    let settled =
+        run_once_with_cached_prices(&pool, &redis, None, expires_at + TimeDelta::seconds(2), 1)
+            .await?;
+    assert_eq!(settled.settled, 1);
+    Ok(())
 }
 
 async fn mysql_pool_or_skip() -> Result<Option<MySqlPool>, Box<dyn Error>> {

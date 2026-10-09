@@ -380,10 +380,10 @@ fn default_seconds_contract_settlement_enabled() -> bool {
     true
 }
 
-/// 提供 `SECONDS_CONTRACT_SETTLEMENT_INTERVAL_SECONDS` 缺省值 5 秒，控制秒合约到期结算的轮询频率。
+/// 提供 `SECONDS_CONTRACT_SETTLEMENT_INTERVAL_SECONDS` 缺省值 1 秒，控制秒合约到期结算的轮询频率。
 /// 秒级产品对结算及时性最敏感，该间隔会直接叠加成到期后出结果的额外延迟，一般不建议再往上调。
 fn default_seconds_contract_settlement_interval_seconds() -> u64 {
-    5
+    1
 }
 
 /// 提供 `SECONDS_CONTRACT_SETTLEMENT_BATCH_LIMIT` 缺省值 100，限制单轮结算最多领取的到期订单条数。

@@ -51,12 +51,12 @@ fn manual_review_requires_evidence_based_settlement_mode() {
 
 fn snapshot(expires_at: chrono::DateTime<Utc>) -> repository::SecondsContractSettlementPriceRow {
     repository::SecondsContractSettlementPriceRow {
-        id: 1,
+        id: Some(1),
         symbol: "BTCUSDT".to_owned(),
         price: BigDecimal::from(100),
         source: "bitget".to_owned(),
         observed_at: expires_at,
-        generation: 1,
+        generation: Some(1),
         source_version: "event-v1".to_owned(),
     }
 }
@@ -83,7 +83,7 @@ fn settlement_snapshot_validates_all_provenance_and_window_boundaries() {
     assert!(service::validate_settlement_price_snapshot(&invalid, "BTCUSDT", expires_at).is_err());
 
     invalid = valid.clone();
-    invalid.generation = 0;
+    invalid.generation = Some(0);
     assert!(service::validate_settlement_price_snapshot(&invalid, "BTCUSDT", expires_at).is_err());
 
     invalid = valid.clone();

@@ -27,12 +27,13 @@ pub(crate) mod refund;
 
 use crate::{
     error::{AppError, AppResult},
-    modules::market::market_ticker_redis_key,
+    modules::market::{ValidatedMarketSymbol, market_ticker_redis_key},
 };
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
 use redis::{AsyncCommands, aio::ConnectionManager};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use sqlx::{MySql, Pool, QueryBuilder, Transaction, types::Json as SqlxJson};
 
 pub(crate) mod exposure;
@@ -780,31 +781,60 @@ pub(crate) async fn existing_order_for_idempotency_key_readonly(
 /// 从 `market:ticker:{symbol}` 的 Redis 缓存读取 `last_price` 作为服务端认定的开仓价。
 /// 开仓价只取自服务端缓存，绝不接受客户端上送，避免用户挑选对自己有利的价格开仓。
 /// 未配置 Redis 连接时直接返回校验错误而不是回落到数据库或默认价，宁可拒绝下单也不用不可信价格锁定盈亏。
-/// 价格必须为正数；`observed_at` 早于当前时间 60 秒即判定为陈旧行情并拒绝，
-/// 使开仓价的时间锚定被限制在一分钟内，防止行情推送中断期间按旧价成交。
-/// 缓存缺失或 JSON 解析失败同样报错。本函数只负责开仓一侧，不参与到期时刻的结算取价与胜负判定。
+/// 价格必须为正数且可无损存储；按秒合约缓存取价规则，不因 observed_at 较旧而拒绝。
+/// 缓存缺失、身份冲突或 JSON 解析失败仍报错，不会用客户端价格或零价格补位。
 pub(crate) async fn cached_entry_price(
     redis: Option<&ConnectionManager>,
-    pair_id: u64,
+    _pair_id: u64,
     symbol: &str,
 ) -> AppResult<BigDecimal> {
+    Ok(cached_settlement_price(redis, symbol).await?.price)
+}
+
+/// 从服务端 Redis 读取秒合约实际取价证据；不检查报价年龄，不查询或伪造历史行情。
+/// 保留原始 observed_at 和完整缓存 SHA-256 摘要，历史 tick ID/代际为空；
+/// 调用方在订单锁之后读取，并把这些证据与钱包、流水、订单终态同事务提交。
+pub(crate) async fn cached_settlement_price(
+    redis: Option<&ConnectionManager>,
+    symbol: &str,
+) -> AppResult<SecondsContractSettlementPriceRow> {
     let redis = redis.ok_or_else(|| {
-        AppError::Validation(
-            "fresh cached ticker is required to open seconds contract orders".to_owned(),
-        )
+        AppError::Validation("cached ticker is required for seconds contract pricing".to_owned())
     })?;
-    let ticker = cached_ticker_price(redis, symbol).await?;
+    let symbol = ValidatedMarketSymbol::from_raw(symbol)
+        .map_err(|error| AppError::Validation(error.to_string()))?;
+    let mut connection = redis.clone();
+    let payload: Option<String> = connection
+        .get(market_ticker_redis_key(symbol.as_str()))
+        .await?;
+    let payload = payload.ok_or_else(|| {
+        AppError::Validation("cached ticker is required for seconds contract pricing".to_owned())
+    })?;
+    let ticker: CachedTickerPayload = serde_json::from_str(&payload)
+        .map_err(|error| AppError::Validation(format!("invalid seconds cached ticker: {error}")))?;
+    if ticker.symbol.as_deref().is_some_and(|cached_symbol| {
+        !ValidatedMarketSymbol::from_raw(cached_symbol).is_ok_and(|cached| cached == symbol)
+    }) {
+        return Err(AppError::Validation(
+            "seconds cached ticker symbol does not match".to_owned(),
+        ));
+    }
     if ticker.last_price <= 0 {
-        return Err(AppError::Validation(format!(
-            "seconds contract entry price must be positive for pair {pair_id}"
-        )));
+        return Err(AppError::Validation(
+            "seconds cached price must be positive".to_owned(),
+        ));
     }
-    if ticker.observed_at < Utc::now() - chrono::TimeDelta::seconds(60) {
-        return Err(AppError::Validation(format!(
-            "seconds contract entry ticker is stale for pair {pair_id}"
-        )));
-    }
-    Ok(ticker.last_price)
+    crate::numeric::ensure_amount_storage(&ticker.last_price, "seconds cached price")?;
+    crate::time::ensure_timestamp_storage(&ticker.observed_at, "seconds cached observed_at")?;
+    Ok(SecondsContractSettlementPriceRow {
+        id: None,
+        symbol: symbol.as_str().to_owned(),
+        price: ticker.last_price,
+        source: "redis".to_owned(),
+        observed_at: ticker.observed_at,
+        generation: None,
+        source_version: format!("redis:{}", hex::encode(Sha256::digest(payload.as_bytes()))),
+    })
 }
 
 /// 下单路径上锁定可交易的秒合约产品，并解析出本次下单实际适用的那条周期规则。
@@ -1255,23 +1285,6 @@ pub(crate) async fn insert_admin_audit_log_in_tx(
     .execute(&mut **tx)
     .await?;
     Ok(())
-}
-
-/// 按行情模块约定的键名从 Redis 取出该交易对的 ticker 快照并反序列化。
-/// 键缺失返回校验错误，提示必须先有行情缓存才能开仓；JSON 结构不匹配则返回 `AppError::Internal`，
-/// 因为那属于行情写入方与本模块的数据契约破损而非用户输入问题。
-/// 本函数只做读取与解码，价格正负和新鲜度判断留给调用方。
-async fn cached_ticker_price(
-    redis: &ConnectionManager,
-    symbol: &str,
-) -> AppResult<CachedTickerPayload> {
-    let mut connection = redis.clone();
-    let payload: Option<String> = connection.get(market_ticker_redis_key(symbol)).await?;
-    let payload = payload.ok_or_else(|| {
-        AppError::Validation("cached ticker is required to open seconds contract orders".to_owned())
-    })?;
-    serde_json::from_str::<CachedTickerPayload>(&payload)
-        .map_err(|error| AppError::Internal(format!("invalid cached ticker payload: {error}")))
 }
 
 /// 为一批产品行一次性补齐周期集合，用单条 `IN` 查询取回所有周期后在内存中按产品编号分组。

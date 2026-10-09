@@ -1,3 +1,31 @@
+## 2026-10-09 22:45 - 秒合约改用 Redis 实时缓存开仓与结算
+
+- 完成内容：秒合约开仓移除 60 秒行情年龄保护，仍要求 Redis 缓存存在、交易对身份匹配、价格可解析且为正；普通 `opened` 订单到期后直接读取 Redis 当前价，不再等待 5 秒历史事件窗口。结算记录原始 `observed_at`、`source=redis` 和缓存载荷 SHA-256，订单、钱包、流水、平台分录和结算证据同事务提交；缺缓存/非法缓存/事务失败按 1 秒重试，成功重放不重新取价、不重复派奖。保留旧 `manual_review` 的历史证据恢复和退款规则；默认扫描间隔改为 1 秒，启动时要求 MySQL 与 Redis 同时存在；外部行情原有“写 Redis 后再广播”顺序不变。
+- 修改文件：`src/config.rs`、`src/main.rs`、`src/modules/seconds_contract/{application,infrastructure,presentation,repository,routes,service}.rs`、`src/workers/seconds_contract_settlement.rs`、`tests/seconds_contract_routes.rs`、`tests/seconds_contract_settlement_worker.rs`、`tests/unit_src/{src_config_tests.rs,src_modules_seconds_contract_tests.rs}`、`.trellis/spec/backend/{seconds-contracts.md,market-provenance.md}`。
+- 验证结果：隔离 MySQL 9.3 + Redis 实跑秒合约路由 28/28、worker 9/9、退款专用实库 1/1；覆盖旧报价开仓、Redis 结算、缺缓存 1 秒重试、并发只结算一次、事务回滚、历史人工审核恢复和退款。`cargo test --lib` 512/512、`cargo check --all-targets`、严格 Clippy、架构 11/11、文档 1/1、`cargo fmt --all -- --check`、`git diff --check`、Trellis task validate 均通过。
+- 后续事项：部署环境若显式设置 `SECONDS_CONTRACT_SETTLEMENT_INTERVAL_SECONDS=5`，仍会覆盖新的 1 秒默认值；上线前应将生产配置改为 `1` 或移除该覆盖，并确认生产 Redis 与结算 worker 同时启用。未提交、推送或部署。
+
+## 2026-10-09 20:24 - 秒合约缓存取价规则需求收敛
+
+- 完成内容：记录用户接受缓存报价不论新旧，并明确要求移除秒合约开仓 60 秒行情保护；更新任务为开仓锁定服务端缓存价、讨论到期处理时缓存价结算。保留缺失/非法/非正价格拒绝、幂等原单回放、资金事务和原始时间戳证据，未将旧行情称为真实新行情。存量未结算订单是否改规则尚待确认。
+- 修改文件：`.trellis/tasks/10-09-seconds-entry-ticker-stale/prd.md`、`docs/superpowers/PROGRESS.md`。
+- 验证结果：`python3 ./.trellis/scripts/task.py validate .trellis/tasks/10-09-seconds-entry-ticker-stale` 与 `git diff --check` 通过。本轮为需求讨论与文档变更，尚未修改业务代码，未运行业务测试；不宣称已取消开仓保护或上线新结算规则。
+- 后续事项：确认新结算规则是否作用于已有未结算订单，然后启动任务实施并补对应资金、取价和重放回归；不影响其他交易产品，不改已完成订单、历史开仓价或已派款金额。
+
+## 2026-10-09 20:13 - 秒合约结算延迟机制核对
+
+- 完成内容：按用户最新澄清，将“持续待结算”纠正为“最终结算但延迟较长”；确认到期后 5 秒事件窗口、默认 5 秒扫描、缺快照与结算错误固定 60 秒重试、每轮最多 100 单串行处理及手机端 5 秒重查。行情过期与归档迟到可能关联，但尚无线上订单与日志证据，不宣称已确认具体根因。
+- 修改文件：`.trellis/tasks/10-09-seconds-entry-ticker-stale/{prd.md,research/diagnosis.md}`、`docs/superpowers/PROGRESS.md`；未修改业务代码。
+- 验证结果：`cargo test --lib workers::seconds_contract_settlement::tests -- --nocapture` 4/4 通过；静态核对 worker、历史选价 SQL、启动条件与手机端刷新逻辑。未运行真实 MySQL/Redis 集成或线上延迟测量，单测不作为生产性能证明。
+- 后续事项：取得一笔延迟订单编号与实际延迟时长，对照 next_settlement_attempt_at、到期窗口历史行情及 worker 错误日志，区分行情归档迟到、事务失败、队列积压与展示延迟。未修改重试/选价/资金规则，未提交、推送或部署。
+
+## 2026-10-09 19:44 - 秒合约开仓行情过期错误初步定位
+
+- 完成内容：确认报错来自 Redis 开仓报价 observed_at 超过 60 秒的保护校验，发生在订单插入、钱包扣款与流水写入之前；核对供应商时间解析、无 TTL 缓存和已有拒单回归。尚无报错实例的行情状态或日志，未将本地环境问题误判为线上根因，未放宽时效门禁或修改业务代码。
+- 修改文件：`.trellis/tasks/10-09-seconds-entry-ticker-stale/{prd.md,research/diagnosis.md}`、`docs/superpowers/PROGRESS.md`；任务创建工具生成对应元数据。
+- 验证结果：`cargo test --test market_adapters -- --nocapture` 6/6 通过；本地监听检查未发现 API/Redis；使用本地 .env 的只读 MySQL 查询因 Access denied 未能执行。已有秒合约真实数据库/Redis拒单测试本轮未运行，不宣称线上修复或资金端到端验证完成。
+- 后续事项：取得报错实例的交易对 2 符号、行情订阅运行状态、缓存观察时间与服务端时间及供应商/归档/缓存写入日志后继续定位并修复。任务保持 planning；未提交、推送、部署或操作生产配置。
+
 ## 2026-10-09 05:05 - 修复首页轮播提交遗漏的契约测试
 
 - 完成内容：定位远程 GitHub Actions 在提交 `f393770` 上的 Mobile 10 项失败；确认业务实现本地 800/800 正常，失败来自首次选择性暂存遗漏 7 个既有首页契约测试，远程仍断言已移除的市场简报、周期按钮和旧卡片高度。补齐这些测试对后台轮播、固定 1 天真实收益、128px 顶部卡片及内部目标导航的断言，不修改产品行为。

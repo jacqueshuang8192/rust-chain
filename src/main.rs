@@ -182,7 +182,10 @@ async fn main() -> anyhow::Result<()> {
         );
     }
 
-    if state.settings.seconds_contract_settlement_enabled && state.mysql.is_some() {
+    if state.settings.seconds_contract_settlement_enabled
+        && state.mysql.is_some()
+        && state.redis.is_some()
+    {
         let seconds_contract_settlement_state = state.clone();
         let interval_seconds = state.settings.seconds_contract_settlement_interval_seconds;
         let batch_limit = state.settings.seconds_contract_settlement_batch_limit;
@@ -197,6 +200,12 @@ async fn main() -> anyhow::Result<()> {
                 tracing::error!(%error, "秒合约结算循环已停止");
             }
         });
+    } else if state.settings.seconds_contract_settlement_enabled {
+        tracing::warn!(
+            mysql = state.mysql.is_some(),
+            redis = state.redis.is_some(),
+            "秒合约结算未启动：缺少 MySQL 或 Redis"
+        );
     }
 
     if state.settings.earn_auto_redemption_enabled && state.mysql.is_some() {

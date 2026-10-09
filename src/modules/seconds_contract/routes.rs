@@ -255,9 +255,9 @@ async fn open_order(
 }
 
 /// 处理后台人工结算秒合约订单请求，会按胜负结果实际向用户钱包派奖，属于高风险资金入口。
-/// 胜负只能由服务端事件时间历史价格推导；result=auto 可恢复人工审核单，不接受客户端结算价。
+/// 普通到期单取服务端 Redis 价；result=auto 可按历史证据恢复旧人工审核单，不接受客户端结算价。
 /// 结算幂等：订单已结算且结果相同则回读原结果不重复派奖，结果不同则返回冲突并拒绝覆盖。
-/// 不需要 Redis，因为不读行情；事件在结算事务提交成功后才推送，管理员编号写入审计作为操作人。
+/// 普通单要求 Redis，已结算重放与旧审核恢复不要求缓存；事件在事务提交后推送，管理员编号写入审计。
 async fn settle_order(
     AdminAuth(claims): AdminAuth,
     State(state): State<AppState>,
@@ -267,6 +267,7 @@ async fn settle_order(
     let admin_id = admin_id_from_subject(&claims.sub)?;
     let response = settle_order_with_events_use_case(
         state.mysql.as_ref(),
+        state.redis.as_ref(),
         admin_id,
         order_id,
         request,

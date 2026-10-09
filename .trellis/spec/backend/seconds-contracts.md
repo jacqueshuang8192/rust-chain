@@ -175,7 +175,9 @@ the continuation signal without an additional count query.
 
 ### 3. Contracts
 
-- Opening requires a positive Redis ticker observed within the last 60 seconds; missing Redis or a stale ticker is rejected before wallet debit and order insertion.
+- Opening snapshots the server's positive Redis ticker regardless of observation
+  age. Missing Redis/cache, malformed values, mismatching symbol or an
+  unstorable/non-positive price is rejected before wallet debit and insertion.
 - The product, trading pair, stake asset, and both pair assets must all be active.
 - `stake_amount` must fit the stake asset `precision_scale` in addition to the configured cycle limits.
 - Manual and worker settlement use the same payout function.
@@ -184,7 +186,10 @@ the continuation signal without an additional count query.
 
 ### 4. Validation & Error Matrix
 
-- Redis not configured, ticker missing, or ticker stale -> `VALIDATION_ERROR`, no order/wallet/ledger mutation.
+- Redis not configured, ticker missing/malformed, or symbol inconsistent ->
+  `VALIDATION_ERROR`, no order/wallet/ledger mutation.
+- Old but valid positive ticker -> accepted; original observation is not
+  rewritten or represented as a newly received quote.
 - Ticker price zero or negative -> `VALIDATION_ERROR`.
 - Product, pair, stake asset, base asset, or quote asset inactive -> `NOT_FOUND` before mutation.
 - Stake exceeds asset precision or selected-cycle bounds -> `VALIDATION_ERROR`.
@@ -200,7 +205,8 @@ the continuation signal without an additional count query.
 
 ### 6. Tests Required
 
-- Open tests cover missing Redis, missing/stale/non-positive ticker, and assert zero database mutations.
+- Open tests cover missing Redis, missing/non-positive ticker and zero mutations
+  on rejection; an old positive price is accepted and replay retains its entry.
 - Inactive pair/base/quote/stake asset tests reject before debit.
 - Stake precision test rejects excessive decimals.
 - Manual and worker settlement tests assert the same truncated payout, wallet balance, and ledger amount.
@@ -476,57 +482,97 @@ const accounts = await GET("/api/v1/wallet/accounts");
 await POST("/api/v1/seconds-contracts/orders", order);
 ```
 
-## Scenario: Event-time Settlement Capability And Exception State
+## Scenario: Redis Settlement And Historical Review Recovery
 
 ### 1. Scope / Trigger
 
-- Trigger: activating a seconds product, opening an order, archiving a market tick, or retrying an expired order settlement.
+- Trigger: activating a seconds product, opening an order, or settling an expired
+  opened order. This supersedes ordinary event-time settlement on 2026-10-09.
 - Applies to external-feed and strategy/internal trading pairs.
 
 ### 2. Signatures
 
 ```text
-authoritative history: market_price_ticks
-settlement evidence: one deterministic tick inside the order event-time window
-exception terminal state: manual_review
+ordinary price authority: market:ticker:{SANITIZED_SYMBOL}
+ordinary evidence: price, original observed_at, source=redis, payload SHA-256
+legacy review recovery: market_price_ticks in [expires_at, expires_at + 5s)
 ```
 
 ### 3. Contracts
 
-- Product activation and order opening call the same settlement-history-capability check.
+- Product activation retains its existing market configuration capability check;
+  ordinary opening does not require archival availability in addition to Redis.
 - External pairs must be covered by an enabled feed configuration with a supported provider. Strategy/internal pairs must have a current runnable strategy, active immutable version, non-blank lease owner, and an unexpired archival-writer lease.
-- Capability failure rejects activation/opening before the shared wallet is debited.
-- Settlement reads append-only event-time snapshots. It never substitutes the current Redis ticker, processing time, a generated candle, or a guessed price for a missing historical tick. Archived `default`-generator ticks are valid settlement evidence when they already exist in the event-time window; they are not synthesized at settlement time.
-- Tick selection is deterministic for an order window and records tick id, source, observed time, and price on the order.
-- After the configured maximum wait, a still-unprovable order transitions atomically from `opened` to `manual_review`, records a stable failure code/time/window, and appends one settlement-exception record.
+- Capability failure rejects product activation; opening still requires active
+  product/pair/assets, valid stake, capacity, wallet and a positive cached price.
+- Automatic and Admin settlement of `opened` orders read Redis after taking the
+  order lock. Database time must reach `expires_at`; no five-second history
+  window or archival query blocks this path. Quote age is deliberately ignored.
+- Processing-time pricing is the explicit rule: different processing times may
+  select different quotes before commit. After successful commit, replay never
+  reselects the price or credits again.
+- Store price, original `observed_at`, `source=redis` and `redis:<SHA-256 of raw
+  cache payload>` in the existing order evidence columns. Tick ID and worker
+  generation remain null; do not invent historical rows or provider provenance.
+- Order result, price evidence, wallet, ledger and financial journal commit
+  atomically. Cache/query/transaction errors cause no guessed payout and retry
+  after one second. Default production scan interval is one second; explicit
+  deployment interval overrides are retained.
+- New and existing `opened` orders use the current cache policy without changing
+  original entry prices. Settled/refunded/cancelled/manual-review records are
+  excluded from automatic processing. A pre-upgrade retry timestamp can still
+  defer its first scan until that timestamp; do not mutate orders during deploy.
 - `manual_review` is an operational terminal state for automatic settlement. It causes no guessed payout and no implicit refund. Explicit principal refund is governed only by the prospective snapshot contract below; it never invents a commission rollback.
 - Admin `POST /seconds-contracts/orders/:id/settle` with `result=auto` and a
   required reason may resolve `manual_review` using the same validated event-time
-  history as ordinary settlement. No client price or requested win/loss can
+  history as the original review rule. No client price or requested win/loss can
   resolve a reviewed order. Missing evidence leaves review and funds unchanged.
 - Recovery retains the original exception, writes a
   `seconds_contract_order.recover` audit with operator/reason/before/after price
   evidence, and commits wallet/ledger/final state atomically. Replays return the
   stored result without selecting a new price or paying twice.
-- Repeated scans and worker restart cannot settle or exception the same order twice.
+- Repeated scans and worker restart cannot settle an order twice. Redis cache
+  availability does not authorize automatic recovery or refund of old reviews.
+- Explicit pool-only historical worker entry points remain for legacy evidence
+  regressions, not the production scheduler. Principal-refund rules below remain
+  unchanged.
 
 ### 4. Validation & Error Matrix
 
 | Condition | Required result |
 | --- | --- |
-| Pair lacks archival capability | Product activation/opening fails closed |
-| Strategy run has no owner or an expired lease | Product activation/opening fails closed before debit |
-| Valid event-time tick exists | Deterministic normal settlement |
-| No tick but maximum wait not reached | Bounded retry, order remains opened |
-| No tick after maximum wait | One transition to manual_review and one exception record |
-| Redis has a current price but MySQL history is absent | Do not settle |
+| Pair lacks configured archival capability | Product activation fails closed |
+| Order is not yet expired | No settlement or price selection |
+| Valid positive cached quote, even old | Settle ordinary opened order at that quote |
+| Cache is missing, malformed or invalid | Keep opened and retry after one second |
+| Redis has a price but MySQL event history is absent | Ordinary settlement still succeeds |
+| Old manual-review order has only Redis evidence | Leave review/funds unchanged |
 | Worker restarts after settlement/manual review | No duplicate wallet or audit effect |
 
-### 5. Tests Required
+### 5. Good / Base / Bad Cases
 
-- Route tests cover capability checks at both activation and opening, and prove failure occurs before debit.
-- Worker tests cover deterministic tick choice, restart replay, normal win/loss settlement, bounded missing-tick retry, and one-time manual-review transition.
-- Database assertions cover settlement provenance and the append-only exception record.
+- Good: an expired opened order has an old positive Redis quote and no matching
+  history; settle using the quoted price and preserve its original timestamp.
+- Base: already-settled replay returns the stored result after Redis changes.
+- Bad: set `observed_at=now`, invent a `market_price_ticks` ID, or pay before
+  the order/evidence transaction commits.
+
+### 6. Tests Required
+
+- Real MySQL/Redis tests cover settlement at expiry, old quote acceptance,
+  conflicting historical price exclusion, missing/invalid cache retry, exact
+  decimals, concurrent single payment/event, restart replay and transaction
+  rollback. Preserve legacy history recovery/refund tests and evidence.
+- Market feed tests preserve successful cache-write-before-event sequencing.
+
+### 7. Wrong Vs Correct
+
+```text
+Wrong: cache unavailable -> choose zero price -> determine result -> credit wallet
+Correct: cache unavailable -> no financial mutation -> retry after one second
+Wrong: Redis settlement -> label redis as bitget history with an invented tick ID
+Correct: Redis settlement -> source=redis, original time, payload hash, null tick ID
+```
 
 ## Scenario: Prospective Manual-Review Principal Refund
 

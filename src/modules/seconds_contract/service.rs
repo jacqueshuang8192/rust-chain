@@ -80,7 +80,10 @@ pub(crate) fn validate_settlement_price_snapshot(
             "seconds contract settlement price source is invalid".to_owned(),
         ));
     }
-    if snapshot.generation == 0 || snapshot.source_version.trim().is_empty() {
+    if snapshot.id.is_none()
+        || snapshot.generation.is_none_or(|generation| generation == 0)
+        || snapshot.source_version.trim().is_empty()
+    {
         return Err(AppError::Validation(
             "seconds contract settlement price provenance is incomplete".to_owned(),
         ));

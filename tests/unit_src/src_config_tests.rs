@@ -14,6 +14,11 @@ fn timer_config_rejects_overflow_without_rewriting_valid_values() {
 }
 
 #[test]
+fn seconds_contract_settlement_interval_default_is_one_second() {
+    assert_eq!(default_seconds_contract_settlement_interval_seconds(), 1);
+}
+
+#[test]
 fn settings_from_env_parses_market_feed_lists() {
     let _guard = ENV_LOCK
         .lock()
@@ -134,6 +139,7 @@ fn settings_from_env_accepts_empty_market_feed_lists() {
     unsafe {
         env::remove_var("MARKET_FEED_RECONNECT_SECONDS");
     }
+    set_test_env("SECONDS_CONTRACT_SETTLEMENT_INTERVAL_SECONDS", "1");
 
     let settings = Settings::from_env().unwrap();
 
@@ -157,7 +163,7 @@ fn settings_from_env_accepts_empty_market_feed_lists() {
     assert_eq!(settings.kline_recovery_interval_seconds, 30);
     assert_eq!(settings.kline_recovery_batch_limit, 100);
     assert!(settings.seconds_contract_settlement_enabled);
-    assert_eq!(settings.seconds_contract_settlement_interval_seconds, 5);
+    assert_eq!(settings.seconds_contract_settlement_interval_seconds, 1);
     assert_eq!(settings.seconds_contract_settlement_batch_limit, 100);
     assert!(settings.earn_auto_redemption_enabled);
     assert_eq!(settings.earn_auto_redemption_interval_seconds, 60);

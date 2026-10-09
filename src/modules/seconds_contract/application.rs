@@ -71,7 +71,7 @@ pub(crate) fn mysql_pool(state: &AppState) -> AppResult<Pool<MySql>> {
 /// `strategy`/`internal` 必须存在当前 active、在有效期、绑定精确版本且租约 owner 非空未过期的 running/live 策略；
 /// 或具有显式启用、未整体暂停、无运行错误且最近六十秒同版本同代际归档的默认来源；默认展示本身不等于结算能力。
 /// `external` 必须被某条已启用 `market_feed_configs` 覆盖，且同一配置至少含一个运行时支持的 provider。
-/// 产品创建/更新/上架和新订单开仓均调用本函数，任一路径都不能自行降级或绕过。
+/// 产品创建/更新/上架保留此配置门禁；普通开仓和结算改用 Redis，不在下单时等待历史能力。
 async fn ensure_settlement_history_capability(
     tx: &mut sqlx::Transaction<'_, MySql>,
     pair_id: u64,
@@ -422,7 +422,6 @@ pub(crate) async fn open_order(
     validate_product_stake(&request.stake_amount, &product)?;
     infrastructure::exposure::ensure_open_capacity(&mut tx, &product, &request.stake_amount)
         .await?;
-    ensure_settlement_history_capability(&mut tx, product.pair_id).await?;
     let entry_price =
         infrastructure::cached_entry_price(redis, product.pair_id, product.symbol.as_str()).await?;
     crate::numeric::ensure_amount_storage(&entry_price, "seconds entry_price")?;
@@ -542,14 +541,15 @@ pub(crate) async fn open_order_with_events(
     Ok(response)
 }
 
-/// 管理员请求结算秒合约订单；实际结果必须由事件时间窗口中的 MySQL 历史价格推导并与请求一致。
-/// 事务先锁订单，再以数据库时间确认窗口已关闭并选择不可变快照；胜单随后锁共享现货钱包，
+/// 管理员请求结算秒合约订单；opened 单使用当前 Redis 缓存价，旧人工审核单仍使用事件时间历史证据。
+/// 事务先锁订单，再以数据库时间确认已到期并选价；胜单随后锁共享现货钱包，
 /// 入账与流水、价格证据、订单终态及管理员审计原子提交。
 /// 人工审核单仅接受 result=auto，由历史证据判定后同事务恢复结算；原异常记录不删除。
 /// 负单不入账；已 settled 重放读原结果，指定结果冲突仍拒绝且不重复派奖。
 /// 成功提交后仅事件包装层对首次结算发布通知，重放与失败路径均不得产生外部副作用。
 pub(crate) async fn settle_order(
     pool: Option<&Pool<MySql>>,
+    redis: Option<&ConnectionManager>,
     admin_id: u64,
     order_id: u64,
     request: SettleSecondsContractOrderRequest,
@@ -587,14 +587,17 @@ pub(crate) async fn settle_order(
         ));
     }
     let database_now = infrastructure::database_now(&mut tx).await?;
-    let settlement_window_closes_at =
-        order.expires_at + chrono::TimeDelta::seconds(SETTLEMENT_PRICE_WINDOW_SECONDS);
+    let settlement_window_closes_at = if order.status == "manual_review" {
+        order.expires_at + chrono::TimeDelta::seconds(SETTLEMENT_PRICE_WINDOW_SECONDS)
+    } else {
+        order.expires_at
+    };
     if database_now < settlement_window_closes_at {
         return Err(AppError::Conflict(
-            "seconds contract settlement event window has not closed".to_owned(),
+            "seconds contract order is not yet eligible for settlement".to_owned(),
         ));
     }
-    let snapshot =
+    let snapshot = if order.status == "manual_review" {
         infrastructure::select_settlement_price_snapshot(&mut tx, &order.symbol, order.expires_at)
             .await?
             .ok_or_else(|| {
@@ -602,7 +605,10 @@ pub(crate) async fn settle_order(
                     "seconds contract settlement price history is pending for the event window"
                         .to_owned(),
                 )
-            })?;
+            })?
+    } else {
+        infrastructure::cached_settlement_price(redis, &order.symbol).await?
+    };
     let entry_price = order.entry_price.as_ref().ok_or_else(|| {
         AppError::Validation("seconds contract entry price is required for settlement".to_owned())
     })?;
@@ -612,7 +618,7 @@ pub(crate) async fn settle_order(
         .is_some_and(|expected| expected != result)
     {
         return Err(AppError::Conflict(
-            "requested seconds contract result does not match the event-time price".to_owned(),
+            "requested seconds contract result does not match the selected price".to_owned(),
         ));
     }
 
@@ -690,13 +696,15 @@ pub(crate) async fn settle_order(
 /// 派奖入账已在 `settle_order` 的事务中完成，这里只做投递，广播失败不会回滚已入账资金。
 pub(crate) async fn settle_order_with_events(
     pool: Option<&Pool<MySql>>,
+    redis: Option<&ConnectionManager>,
     admin_id: u64,
     order_id: u64,
     request: SettleSecondsContractOrderRequest,
     hub: Option<&crate::modules::events::EventBroadcastHub>,
 ) -> AppResult<SettleSecondsContractOrderResponse> {
     // 秒合约结算统一返回响应对象，同时在应用层根据是否为新结算推送事件。
-    let (response, is_new_settlement) = settle_order(pool, admin_id, order_id, request).await?;
+    let (response, is_new_settlement) =
+        settle_order(pool, redis, admin_id, order_id, request).await?;
     publish_seconds_contract_order_settled_event_if_needed(
         hub,
         response.order.user_id,
