@@ -32,6 +32,16 @@ column `valueMap` can label values, but automatic shared dictionaries do not
 change raw enum/amount/JSON exports. Never rewrite `ApiError.message/status/code`
 to localize it, since request decisions and diagnostics depend on the original.
 
+Shared object details render semantic `dl/dt/dd` fields, two columns in wide
+containers and one in narrow containers. Long values and nested objects span
+the row; nested objects/arrays retain item boundaries. Raw primitive values and
+field names remain available through titles. `DetailFieldTable` keeps its export
+name for existing callers; only actual record arrays remain resizable tables.
+The object SideSheet is 780px, array SideSheet 920px, and narrow screens cap it
+to the viewport. Keep source decimals intact even when display precision rounds.
+Test consumers by labeled detail region and field/value semantics, not the old
+generic "field/content" table headers.
+
 ## Validation matrix
 
 | Input | Display / behavior |

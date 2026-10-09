@@ -5,9 +5,8 @@ import { chartPoints } from './helpers/market-chart-renderer.ts'
 import type { KlinePoint } from '../src/core/types.ts'
 import { mapMarketTicker } from '../src/core/marketMapper.ts'
 
-test('actual chart labels mixed evidence, unknown receipt time, stale/future observations and releases timer', async (context) => {
+test('actual chart omits the source row in both locales while retaining mixed candle evidence', async () => {
   const now = 1_790_000_000_000
-  context.mock.timers.enable({ apis: ['Date', 'setInterval'], now })
   const points = chartPoints(3).map((point, index) => ({
     ...point,
     ...(index === 0 ? { source: 'external', provider: 'htx' } : index === 1 ? { source: 'generated', provider: 'strategy' } : {}),
@@ -16,22 +15,24 @@ test('actual chart labels mixed evidence, unknown receipt time, stale/future obs
   try {
     const ticker = mapMarketTicker({ symbol: 'BTCUSDT' }, { last_price: '10', source: 'external', provider: 'htx', observed_at: now })
     await wrapper.update({ ticker })
-    assert.match(wrapper.text(), /外部参考/)
-    assert.match(wrapper.text(), /平台生成（模拟）/)
-    assert.match(wrapper.text(), /来源未知/)
-    assert.doesNotMatch(wrapper.text(), /已陈旧/)
-    context.mock.timers.tick(61_000)
+    assert.doesNotMatch(wrapper.text(), /K线来源|外部参考|平台生成（模拟）|来源未知/)
+    assert.equal(wrapper.all().some((node) => node.props.class === 'mobile-market-chart__provenance'), false)
+    assert.deepEqual(wrapper.chart().props.points, points)
+    assert.equal(wrapper.root.children[0].props['data-chart-state'], 'ready')
+    assert.equal(wrapper.chart().props.interval, '1m')
+    wrapper.i18n.global.locale.value = 'en'
     await wrapper.flush()
-    assert.match(wrapper.text(), /已陈旧/)
-    await wrapper.update({ ticker: { ...ticker, sourceObservedAt: now + 120_000 } })
-    assert.match(wrapper.text(), /已陈旧/)
-    await wrapper.update({ ticker: { ...ticker, sourceObservedAt: undefined } })
-    assert.match(wrapper.text(), /时间未知/)
-    assert.doesNotMatch(wrapper.text(), /已陈旧/)
+    assert.doesNotMatch(wrapper.text(), /Candle sources|External reference|Generated|Unknown source/)
+    assert.deepEqual(wrapper.chart().props.points, points)
+    await wrapper.update({ symbol: 'ETHUSDT', points: [], loading: true })
+    assert.doesNotMatch(wrapper.text(), /Candle sources|Unknown source/)
+    assert.equal(wrapper.root.children[0].props['data-chart-state'], 'loading')
+    await wrapper.update({ loading: false })
+    assert.doesNotMatch(wrapper.text(), /Candle sources|Unknown source/)
+    assert.equal(wrapper.root.children[0].props['data-chart-state'], 'empty')
   } finally {
     wrapper.unmount()
   }
-  context.mock.timers.tick(1000)
   assert.equal(wrapper.root.children.length, 0)
 })
 

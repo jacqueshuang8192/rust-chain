@@ -56,7 +56,7 @@ function errorMessage(error: unknown) {
 }
 
 function displayNumber(value: string | number | null | undefined) {
-  return formatAdminNumber(value) ?? '-';
+  return formatAdminNumber(value, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) ?? '-';
 }
 
 export function commissionPageTotals(rows: AgentCommission[]): Array<{ assetId: number; amount: string | null }> {
@@ -136,8 +136,8 @@ function AgentPasswordChangeCard() {
   }
 
   return (
-    <Card bordered={false} shadows="always">
-      <Space align="start" spacing={12} vertical style={{ width: '100%' }}>
+    <section className="agent-section">
+      <div className="agent-form">
         <Title heading={4}>修改登录密码</Title>
         <label>当前密码<AdminPasswordInput ariaLabel="当前密码" value={currentPassword} onChange={setCurrentPassword} /></label>
         <label>新密码<AdminPasswordInput ariaLabel="新密码" value={newPassword} onChange={setNewPassword} /></label>
@@ -145,8 +145,8 @@ function AgentPasswordChangeCard() {
         <Button disabled={!currentPassword.trim() || !newPassword.trim()} loading={submitting} onClick={submit} theme="solid" type="primary">
           提交修改
         </Button>
-      </Space>
-    </Card>
+      </div>
+    </section>
   );
 }
 
@@ -195,7 +195,7 @@ export function AgentDashboardPage() {
       <ErrorBanner error={error} />
       {data ? (
         <>
-          <Card bordered={false} shadows="always" style={{ marginBottom: 16 }}>
+          <section className="agent-section agent-identity">
             <Space align="start" spacing={12} vertical>
               <Title heading={4}>{data.me.username}</Title>
               <Text>代理编号：{data.me.agent_code}</Text>
@@ -209,10 +209,10 @@ export function AgentDashboardPage() {
               </Space>
               <Text>最近登录：{<TimestampText value={data.me.last_login_at ?? null} />}</Text>
             </Space>
-          </Card>
+          </section>
           <KpiGrid cards={kpis} />
           <section className="admin-dashboard-detail-grid">
-            <Card bordered={false} shadows="always">
+            <section className="agent-section">
               <Space align="start" spacing={12} vertical>
                 <Title heading={4}>佣金资产汇总</Title>
                 {data.dashboard.commission_assets?.map((row, index) => <div key={row.payout_asset_id ?? `unknown-${index}`}>
@@ -220,7 +220,7 @@ export function AgentDashboardPage() {
                   {row.payout_asset_id === null ? <Text>暂不合计</Text> : <Text>待结算 <AmountText value={row.pending_commission_amount} />；已结算 <AmountText value={row.settled_commission_amount} />；累计 <AmountText value={row.total_commission_amount} /></Text>}
                 </div>) ?? <Text>暂缺按资产统计</Text>}
               </Space>
-            </Card>
+            </section>
             <AgentPasswordChangeCard />
           </section>
         </>
@@ -239,13 +239,13 @@ export function AgentUsersPage() {
   const { data, error, loading } = useLoader<AgentTeamUser[]>(loadUsers);
   const columns = useMemo<Array<ColumnProps<AgentTeamUser>>>(
     () => [
-      { dataIndex: 'user_id', key: 'user_id', title: '用户ID' },
-      { dataIndex: 'email', key: 'email', title: '邮箱' },
-      { dataIndex: 'phone', key: 'phone', title: '手机号' },
-      { dataIndex: 'status', key: 'status', render: (value) => <StatusTag value={typeof value === 'string' ? value : null} />, title: '状态' },
-      { dataIndex: 'kyc_level', key: 'kyc_level', title: 'KYC等级' },
-      { dataIndex: 'depth', key: 'depth', title: '层级深度' },
-      { dataIndex: 'referred_at', key: 'referred_at', render: (value) => <TimestampText value={typeof value === 'number' ? value : null} />, title: '加入时间' },
+      { dataIndex: 'user_id', key: 'user_id', title: '用户ID', width: 96 },
+      { dataIndex: 'email', key: 'email', title: '邮箱', width: 240 },
+      { dataIndex: 'phone', key: 'phone', title: '手机号', width: 160 },
+      { dataIndex: 'status', key: 'status', render: (value) => <StatusTag value={typeof value === 'string' ? value : null} />, title: '状态', width: 104 },
+      { dataIndex: 'kyc_level', key: 'kyc_level', title: 'KYC等级', width: 104 },
+      { dataIndex: 'depth', key: 'depth', title: '层级深度', width: 104 },
+      { dataIndex: 'referred_at', key: 'referred_at', render: (value) => <TimestampText value={typeof value === 'number' ? value : null} />, title: '加入时间', width: 184 },
       {
         dataIndex: 'user_id',
         fixed: 'right',
@@ -341,15 +341,13 @@ export function AgentInviteCodesPage() {
 
   return (
     <main className="exchange-page">
-      <PageHeader
-        actions={!loading && !error && !fixedInviteCode ? (
-          <Space>
-            <AdminTextInput ariaLabel="使用上限" onChange={setUsageLimit} placeholder="使用上限" value={usageLimit} />
+      <PageHeader title="邀请码" />
+      {!loading && !error && !fixedInviteCode ? (
+          <section className="agent-form-toolbar" aria-label="初始化邀请码">
+            <label>使用上限<AdminTextInput ariaLabel="使用上限" onChange={setUsageLimit} placeholder="不限制" value={usageLimit} /></label>
             <Button onClick={initializeInviteCode} theme="solid" type="primary">初始化邀请码</Button>
-          </Space>
-        ) : undefined}
-        title="邀请码"
-      />
+          </section>
+        ) : null}
       <Banner description="每个代理固定一个邀请码；重复初始化会返回同一条记录，停用后也不会自动生成替代码。" type="info" />
       <DataTable columns={columns} data={data ?? []} error={error} loading={loading} />
     </main>
@@ -384,7 +382,7 @@ export function AgentCommissionsPage() {
     <main className="exchange-page">
       <PageHeader title="佣金记录" />
       {data ? (
-        <Card bordered={false} shadows="always" style={{ marginBottom: 16 }}>
+        <section className="agent-section">
           <Space wrap>
             <Text>已加载记录数：{data.commissions.length}</Text>
             {commissionPageTotals(data.commissions).map(({ assetId, amount }) =>
@@ -393,7 +391,7 @@ export function AgentCommissionsPage() {
             {data.commissions.some((row) => row.payout_asset_id == null) ? <Text>发放资产未确认的记录不计入汇总</Text> : null}
             <Text type="tertiary">仅当前已加载记录，非全量；不同资产不合计</Text>
           </Space>
-        </Card>
+        </section>
       ) : null}
       <DataTable columns={columns} data={data?.commissions ?? []} error={error} loading={loading} />
     </main>
@@ -421,12 +419,12 @@ export function AgentConvertStatsPage() {
 }
 
 const subAgentColumns: Array<ColumnProps<AgentSubAgent>> = [
-  { dataIndex: 'agent_code', key: 'agent_code', title: '代理编号' },
-  { dataIndex: 'level', key: 'level', render: (value) => `L${String(value || 1)}`, title: '层级' },
-  { dataIndex: 'status', key: 'status', render: (value) => <StatusTag value={typeof value === 'string' ? value : null} />, title: '状态' },
-  { dataIndex: 'direct_user_count', key: 'direct_user_count', title: '直属用户数' },
-  { dataIndex: 'team_user_count', key: 'team_user_count', title: '团队用户数' },
-  { dataIndex: 'parent_agent_id', key: 'parent_agent_id', title: '上级代理ID' }
+  { dataIndex: 'agent_code', key: 'agent_code', title: '代理编号', width: 200 },
+  { dataIndex: 'level', key: 'level', render: (value) => `L${String(value || 1)}`, title: '层级', width: 96 },
+  { dataIndex: 'status', key: 'status', render: (value) => <StatusTag value={typeof value === 'string' ? value : null} />, title: '状态', width: 104 },
+  { dataIndex: 'direct_user_count', key: 'direct_user_count', title: '直属用户数', width: 128 },
+  { dataIndex: 'team_user_count', key: 'team_user_count', title: '团队用户数', width: 128 },
+  { dataIndex: 'parent_agent_id', key: 'parent_agent_id', title: '上级代理ID', width: 128 }
 ];
 
 export function AgentSubAgentsPage() {

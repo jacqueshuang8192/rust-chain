@@ -538,12 +538,10 @@ describe('AdminResourcePage', () => {
     expect(screen.queryByRole('button', { name: '查看JSON' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: '查看详情' }));
 
-    expect(await screen.findByText('字段')).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: '详情字段' })).toBeInTheDocument();
     expect(screen.getByText('详情').closest('.semi-sidesheet')).toHaveClass('admin-detail-drawer');
-    expect(screen.getByText('详情').closest('.semi-sidesheet-inner')).toHaveStyle({ width: '920px' });
-    expect(screen.getByText('内容')).toBeInTheDocument();
-    const detailTableWrapper = screen.getAllByRole('grid').at(-1)?.closest('.semi-table-wrapper');
-    expect(detailTableWrapper).toHaveStyle({ maxWidth: '100%', width: '100%' });
+    expect(screen.getByText('详情').closest('.semi-sidesheet-inner')).toHaveStyle({ width: '780px' });
+    expect(screen.getByRole('region', { name: '详情字段' }).querySelector('dl')).toHaveClass('admin-detail-fields');
     expect(screen.getAllByText('市场类型').length).toBeGreaterThan(0);
     expect(screen.getAllByText('外部行情').length).toBeGreaterThan(0);
     expect(screen.getAllByText('1,234.50').length).toBeGreaterThan(0);
@@ -551,9 +549,9 @@ describe('AdminResourcePage', () => {
     expect(screen.getAllByText('买单号').length).toBeGreaterThan(0);
     expect(screen.getAllByText(/^SP0+F$/).length).toBeGreaterThan(0);
     expect(screen.queryByText('买单ID')).not.toBeInTheDocument();
-    expect(screen.getByText(/订单数: 1,200.00/)).toBeInTheDocument();
-    expect(screen.getByText(/市场类型: 外部行情/)).toBeInTheDocument();
-    expect(screen.getByText(/用户ID: 42/)).toBeInTheDocument();
+    expect(screen.getByText('订单数').nextElementSibling).toHaveTextContent('1,200.00');
+    expect(screen.getAllByText('市场类型').filter(node => node.tagName === 'DT').every(node => node.nextElementSibling?.textContent === '外部行情')).toBe(true);
+    expect(screen.getAllByText('用户ID').filter(node => node.tagName === 'DT').every(node => node.nextElementSibling?.textContent === '42')).toBe(true);
     expect(screen.queryByText(/用户ID: 42.00/)).not.toBeInTheDocument();
     expect(screen.queryByText('market_type')).not.toBeInTheDocument();
     expect(screen.queryByText('external')).not.toBeInTheDocument();

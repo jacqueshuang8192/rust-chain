@@ -182,13 +182,14 @@ pub async fn run_loop(state: AppState, interval_seconds: u64, limit: u32) -> App
     loop {
         ticker.tick().await;
         match run_once(&state, Utc::now(), limit).await {
-            Ok(summary) => info!(
+            Ok(summary) if summary.released > 0 || summary.blocked_fee > 0 => info!(
                 scanned = summary.scanned,
                 released = summary.released,
                 blocked_fee = summary.blocked_fee,
                 skipped = summary.skipped,
                 "解禁扫描周期完成"
             ),
+            Ok(_) => {}
             Err(error) => error!(%error, "解禁扫描周期失败"),
         }
     }

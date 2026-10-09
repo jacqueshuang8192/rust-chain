@@ -11,6 +11,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 pub(crate) mod recharges;
+pub(crate) mod team_orders;
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub(crate) struct AgentMeResponse {

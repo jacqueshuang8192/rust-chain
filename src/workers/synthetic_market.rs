@@ -15,7 +15,7 @@ use mongodb::{
 use serde_json::Value;
 use sqlx::{MySql, Pool, types::Json as SqlxJson};
 use tokio::time::{Duration, interval};
-use tracing::{info, warn};
+use tracing::warn;
 use uuid::Uuid;
 
 mod default_market;
@@ -157,12 +157,17 @@ pub async fn run_loop(state: AppState, interval_seconds: u64, limit: u32) -> App
     loop {
         ticker.tick().await;
         match run_once_for_owner(&state, Utc::now(), limit, &owner, &mut continuity).await {
-            Ok(summary) => info!(
+            Ok(summary) if summary.failed > 0 => warn!(
                 scanned = summary.scanned,
                 leased = summary.leased,
                 published = summary.published,
                 skipped = summary.skipped,
                 failed = summary.failed,
+                "模拟行情实时轮次存在失败"
+            ),
+            Ok(summary) => tracing::debug!(
+                scanned = summary.scanned,
+                published = summary.published,
                 "模拟行情实时轮次完成"
             ),
             Err(error) => tracing::error!(%error, "模拟行情实时轮次失败"),

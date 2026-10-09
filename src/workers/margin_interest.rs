@@ -152,13 +152,14 @@ pub async fn run_loop(pool: Pool<MySql>, interval_seconds: u64, limit: u32) -> A
     loop {
         ticker.tick().await;
         match run_once_with_dependencies(&pool, Utc::now(), limit).await {
-            Ok(summary) => info!(
+            Ok(summary) if summary.accrued > 0 || summary.failed > 0 => info!(
                 scanned = summary.scanned,
                 accrued = summary.accrued,
                 skipped = summary.skipped,
                 failed = summary.failed,
                 "杠杆利息周期完成"
             ),
+            Ok(_) => {}
             Err(error) => error!(%error, "杠杆利息周期失败"),
         }
     }

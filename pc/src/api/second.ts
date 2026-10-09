@@ -65,12 +65,6 @@ export async function fetchSecondCurrentOrders(symbol: string): Promise<{ data: 
   return fetchSecondOrders({ symbol, status: 'open' })
 }
 
-export async function fetchSecondOrderResult(id: number, symbol: string): Promise<{ data: any }> {
-  const response = await request.instance.get<BackendSecondsOrdersResponse>(backendApiUrl('/seconds-contracts/orders'))
-  const order = mapSecondsOrdersToPcOrders({ orders: response.data.orders.filter((item) => item.id === id && symbolMatches(item.symbol, symbol)) }).data[0] ?? null
-  return { data: { code: 0, message: 'success', data: order } }
-}
-
 export async function fetchSecondHistoryOrders(params: SecondHistoryParams): Promise<{ data: any }> {
   return fetchSecondOrders({ symbol: params.symbol, status: 'closed' })
 }
@@ -96,7 +90,7 @@ export async function fetchSecondBalance(symbol: string): Promise<{ data: any }>
   return { data: { code: 0, message: 'success', data: Number(account?.available ?? 0) || 0 } }
 }
 
-async function fetchSecondOrders(params: { symbol?: string; status?: 'open' | 'closed' }): Promise<{ data: any }> {
+export async function fetchSecondOrders(params: { symbol?: string; status?: 'open' | 'closed' }): Promise<{ data: any }> {
   const response = await request.instance.get<BackendSecondsOrdersResponse>(backendApiUrl('/seconds-contracts/orders'))
   const orders = response.data.orders.filter((order) => {
     const statusMatches = !params.status || (params.status === 'open' ? isOpenStatus(order.status) : !isOpenStatus(order.status))

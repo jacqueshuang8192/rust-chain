@@ -51,6 +51,7 @@ export function AdminPasswordInput({ ariaLabel, disabled, onChange, placeholder,
 
 type SelectProps = {
   ariaLabel: string;
+  ariaLabelledBy?: string;
   disabled?: boolean;
   filter?: boolean;
   loading?: boolean;
@@ -61,10 +62,11 @@ type SelectProps = {
   value: string;
 };
 
-export function AdminSelect({ ariaLabel, disabled, filter, loading, onChange, optionList, placeholder, showClear, value }: SelectProps) {
+export function AdminSelect({ ariaLabel, ariaLabelledBy, disabled, filter, loading, onChange, optionList, placeholder, showClear, value }: SelectProps) {
   return (
     <Select
       aria-label={ariaLabel}
+      aria-labelledby={ariaLabelledBy}
       disabled={disabled}
       filter={filter}
       loading={loading}

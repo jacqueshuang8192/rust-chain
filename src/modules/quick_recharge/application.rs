@@ -425,8 +425,7 @@ pub(crate) async fn delete_admin_quick_recharge_order(
 /// 校验顺序刻意先验签再取业务字段：签名不通过时不做任何数据库查询，也不暴露订单是否存在。
 /// 锁单之后的任一项不匹配都直接返回错误，事务随函数返回被丢弃而回滚，订单保持未支付且余额不变，
 /// 即失败时绝不入账，也不会留下半截的已支付状态。
-/// 入参 `payload` 会被原样记入日志并落库为回调原文，其中包含支付方给出的 `signature` 字段，
-/// 但不含商户密钥；调整日志时须保持这一边界，禁止把 `runtime.merchant_secret` 打进日志。
+/// 入参 `payload` 落库保留回调证据，统一日志格式化隐藏该载荷字段，不输出支付签名或商户密钥。
 pub(crate) async fn handle_gmpay_notify(
     pool: Option<Pool<MySql>>,
     key: Option<&str>,

@@ -223,7 +223,9 @@ createTurnstileLifecycle(options?: TurnstileLifecycleOptions): {
   the page reloads on `controllerchange`.
 - The root theme is `data-theme="light|dark"` on `<html>`, persists through
   `hippo_mobile_theme`, updates `color-scheme` and every `theme-color` meta tag,
-  and falls back to the system preference when storage is invalid.
+  and defaults to `dark` when storage is absent or invalid. A valid stored
+  `light` value remains authoritative; the system color-scheme preference must
+  not override the product default.
 - Canvas-backed widgets that copy CSS tokens into an imperative renderer must
   resolve tokens from their nearest `.app-stage`, observe that stage's `class`
   and `<html data-theme>`, and reapply renderer colors without resetting user

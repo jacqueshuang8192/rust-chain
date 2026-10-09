@@ -1,4 +1,10 @@
 export const ADMIN_FIELD_VALUE_LABELS: Record<string, Record<string, string>> = {
+  settlement_price_source: { redis: 'Redis 缓存报价', bitget: 'Bitget 行情', coinbase: 'Coinbase 行情', htx: 'HTX 行情', strategy: '策略行情', default: '默认行情' },
+  settlement_failure_code: { missing_settlement_snapshot: '缺少结算行情快照' },
+  task_kind: { seconds: '秒合约结算', earn: '理财赎回', loan: '贷款回收', commission: '代理佣金' },
+  lease_status: { active: '处理中', expired: '已过期', none: '未占用' },
+  wallet_scope: { margin: '杠杆账户', spot: '现货账户' },
+  account_type: { margin: '杠杆账户', spot: '现货账户' },
   environment: { production: '生产环境', staging: '预发布环境', development: '开发环境', test: '测试环境' },
   runtime_status: { error: '运行异常', healthy: '健康', running: '运行中', stopped: '已停止', unknown: '状态未知', not_applicable: '无需运行态' },
   config_status: { normal: '正常', pending_apply: '待应用', runtime_error: '运行异常', unconfigured: '未配置' },

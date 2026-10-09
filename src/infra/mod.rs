@@ -7,6 +7,7 @@
 pub mod admin_request_context;
 pub mod auth;
 pub mod email;
+pub mod logging;
 pub mod mongo;
 pub mod mysql;
 pub mod rabbitmq;

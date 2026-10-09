@@ -394,16 +394,20 @@ test('connects private websocket with stored token and dispatches user events', 
   })
 
   const messages: string[] = []
+  let opened = 0
   const subscription = await service.subscribePrivate((message) => {
     messages.push(message.body)
-  })
+  }, () => { opened++ })
 
   const socket = latestSocket()
   assert.equal(socket.url, 'ws://127.0.0.1:8080/ws/private?token=access%20token%2F%3F%3D')
   socket.open()
   assert.equal(service.isConnected('private'), true)
+  assert.equal(opened, 1)
 
   socket.onmessage?.({ data: '{"type":"subscribed","channel":"private:user:1"}' })
+  socket.onmessage?.({ data: '{malformed' })
+  socket.onmessage?.({ data: 'null' })
   assert.deepEqual(messages, [])
 
   socket.onmessage?.({ data: '{"type":"spot.order.created","order":{"id":1}}' })
@@ -429,6 +433,39 @@ test('does not connect private websocket without a stored token', async (t) => {
   subscription.unsubscribe()
 })
 
+test('private heartbeat keeps pong out of business events and repairs silent sockets', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval', 'setTimeout', 'Date'], now: 1_000 })
+  installAuthToken('private-token')
+  const { service } = setupService({ reconnectDelayMs: 1 })
+  t.after(() => {
+    service.disconnect()
+    restoreWebSocket()
+    restoreLocalStorage()
+    t.mock.timers.reset()
+  })
+  const messages: string[] = []
+  const subscription = await service.subscribePrivate(message => messages.push(message.body))
+  const socket = latestSocket()
+  socket.open()
+  t.mock.timers.tick(25_000)
+  assert.deepEqual(socket.sent, ['ping'])
+  socket.onmessage?.({ data: 'pong' })
+  t.mock.timers.tick(50_000)
+  assert.equal(socket.closeCount, 0)
+  assert.deepEqual(messages, [])
+  t.mock.timers.tick(25_000)
+  assert.equal(socket.closeCount, 1)
+  t.mock.timers.tick(1)
+  const replacement = latestSocket()
+  assert.notEqual(replacement, socket)
+  replacement.open()
+  socket.onmessage?.({ data: '{"type":"seconds_contract.order.settled"}' })
+  assert.deepEqual(messages, [])
+  subscription.unsubscribe()
+  t.mock.timers.tick(100_000)
+  assert.equal(MockWebSocket.instances.length, 2)
+})
+
 test('reconnects private websocket while token remains and stops after token removal', async (t) => {
   installAuthToken('private-token')
   const { service } = setupService({ reconnectDelayMs: 1 })
@@ -438,7 +475,8 @@ test('reconnects private websocket while token remains and stops after token rem
     restoreLocalStorage()
   })
 
-  await service.subscribePrivate(() => undefined)
+  let opened = 0
+  await service.subscribePrivate(() => undefined, () => { opened++ })
   const socket = latestSocket()
   socket.open()
   socket.serverClose()
@@ -450,6 +488,9 @@ test('reconnects private websocket while token remains and stops after token rem
 
   localStorage.removeItem('token')
   reconnectedSocket.open()
+  assert.equal(opened, 2)
+  socket.onopen?.()
+  assert.equal(opened, 2, 'a late open from the replaced socket is ignored')
   reconnectedSocket.serverClose()
   await delay(5)
 

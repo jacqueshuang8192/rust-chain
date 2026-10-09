@@ -10,7 +10,6 @@ use exchange_api::bootstrap::{
 use exchange_api::migration::{
     MigrationConnectConfig, collect_migration_diagnostics, connect_with_retry, format_error_chain,
 };
-use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 
@@ -22,12 +21,8 @@ static MIGRATOR: sqlx::migrate::Migrator = sqlx::migrate!("./migrations");
 /// 最终按新建还是跳过打印不同日志，两种情况都算执行成功，只有真正的错误才会中断流水线。
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::registry()
-        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
-        .with(tracing_subscriber::fmt::layer())
-        .init();
-
     dotenvy::dotenv().ok();
+    exchange_api::infra::logging::init();
     let database_url = std::env::var("DATABASE_URL").context("DATABASE_URL 未配置")?;
     let connect_config = MigrationConnectConfig::from_env().context("解析迁移连接重试配置失败")?;
     let pool = connect_with_retry(&database_url, connect_config).await?;
@@ -36,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
         let error_chain = format_error_chain(&error);
         tracing::error!(
             error_chain = %error_chain,
-            "执行 SQLx migrations 失败（原始错误链）"
+            "执行数据库迁移失败（原始错误链）"
         );
         let diagnostics = collect_migration_diagnostics(&pool).await;
         tracing::error!(
@@ -64,7 +59,7 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!(
         migration_count,
         latest_version = ?latest_version,
-        "数据库 migrations 已全部应用"
+        "数据库迁移已全部应用"
     );
 
     let bootstrap_result = match BootstrapAdminMode::from_env() {

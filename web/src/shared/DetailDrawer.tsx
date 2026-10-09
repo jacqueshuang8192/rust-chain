@@ -1,5 +1,5 @@
 import { adminErrorFieldValue } from './adminErrorMessage';
-import { SideSheet, Typography } from '@douyinfe/semi-ui';
+import { Empty, SideSheet } from '@douyinfe/semi-ui';
 import type { ColumnProps } from '@douyinfe/semi-ui/lib/es/table';
 
 import { adminFieldLabel, adminEnumLabel } from './adminPresentation';
@@ -10,8 +10,7 @@ import { formatBusinessOrderNo } from './orderNo';
 import { ResizableTable } from './ResizableTable';
 import { containedTableStyle } from './tableLayout';
 import { formatAdminTimestamp } from './TimestampText';
-
-const { Text } = Typography;
+import './DetailDrawer.css';
 
 type DetailFieldType = 'amount' | 'json' | 'status' | 'text' | 'timestamp';
 
@@ -31,11 +30,6 @@ type DetailDrawerData = {
 type DetailDrawerProps = {
   detail: DetailDrawerData | null;
   onClose: () => void;
-};
-
-type FieldRow = {
-  field: string;
-  value: unknown;
 };
 
 function fieldLabel(key: string, meta?: DetailDrawerFieldMeta) {
@@ -121,25 +115,31 @@ export function displayDetailValue(value: unknown, key = '', meta?: DetailDrawer
   return adminErrorFieldValue(key, value) ?? formatAdminDisplayValue(key, value) ?? String(value);
 }
 
-function toRows(record: ApiRecord): FieldRow[] {
-  return Object.entries(record).map(([field, value]) => ({ field, value }));
+function DetailValue({ value, field, meta }: { value: unknown; field: string; meta?: DetailDrawerFieldMeta }) {
+  if (value && typeof value === 'object' && !isAdminBetContentField(field, fieldLabel(field, meta))) {
+    if (Array.isArray(value)) {
+      return value.length ? <ol className="admin-detail-list">
+        {value.map((item, index) => <li key={index}><DetailValue value={item} field={field} meta={meta} /></li>)}
+      </ol> : <span>-</span>;
+    }
+    const nestedMeta = field === 'nodes' ? { ...meta, labels: { ...meta?.labels, target_type: '目标类型' } } : meta;
+    return <DetailFields record={value as ApiRecord} meta={nestedMeta} nested />;
+  }
+  return <span className="admin-detail-value" title={value === null || value === undefined ? undefined : String(value)}>
+    {displayDetailValue(value, field, meta)}
+  </span>;
 }
 
-function fieldColumns(meta?: DetailDrawerFieldMeta): Array<ColumnProps<FieldRow>> {
-  return [
-    {
-      dataIndex: 'field',
-      title: '字段',
-      width: 220,
-      render: (value: string) => <Text strong>{fieldLabel(value, meta)}</Text>
-    },
-    {
-      dataIndex: 'value',
-      title: '内容',
-      width: 640,
-      render: (value: unknown, row: FieldRow) => <span>{displayDetailValue(value, row.field, meta)}</span>
-    }
-  ];
+function DetailFields({ record, meta, nested = false }: { record: ApiRecord; meta?: DetailDrawerFieldMeta; nested?: boolean }) {
+  return <dl className={`admin-detail-fields${nested ? ' admin-detail-fields--nested' : ''}`}>
+    {Object.entries(record).map(([field, value]) => {
+      const wide = (value !== null && typeof value === 'object') || String(value ?? '').length > 72;
+      return <div className={`admin-detail-field${wide ? ' admin-detail-field--wide' : ''}`} key={field}>
+        <dt title={field}>{fieldLabel(field, meta)}</dt>
+        <dd><DetailValue value={value} field={field} meta={meta} /></dd>
+      </div>;
+    })}
+  </dl>;
 }
 
 function recordColumns(records: ApiRecord[], meta?: DetailDrawerFieldMeta): Array<ColumnProps<ApiRecord>> {
@@ -148,7 +148,7 @@ function recordColumns(records: ApiRecord[], meta?: DetailDrawerFieldMeta): Arra
     dataIndex: key,
     title: fieldLabel(key, meta),
     width: 180,
-    render: (value: unknown) => <span>{displayDetailValue(value, key, meta)}</span>
+    render: (value: unknown) => <DetailValue value={value} field={key} meta={meta} />
   }));
 }
 
@@ -159,14 +159,11 @@ type DetailFieldTableProps = {
 
 export function DetailFieldTable({ fieldMeta, record }: DetailFieldTableProps) {
   return (
-    <ResizableTable
-      bordered
-      columns={fieldColumns(fieldMeta)}
-      dataSource={record ? toRows(record) : []}
-      pagination={false}
-      rowKey="field"
-      style={containedTableStyle}
-    />
+    <section className="admin-detail-record" aria-label="详情字段">
+      {record && Object.keys(record).length
+        ? <DetailFields record={record} meta={fieldMeta} />
+        : <Empty description="暂无详情" />}
+    </section>
   );
 }
 
@@ -184,7 +181,7 @@ export function DetailDrawer({ detail, onClose }: DetailDrawerProps) {
       onCancel={onClose}
       title={detail?.title ?? '详情'}
       visible={detail !== null}
-      width={920}
+      width={Array.isArray(data) ? 920 : 780}
     >
       {Array.isArray(data) ? (
         <ResizableTable

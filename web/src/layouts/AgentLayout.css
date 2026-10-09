@@ -4,7 +4,101 @@
 .agent-layout .agent-menu-toggle {
   display: none;
 }
+
+.agent-layout .exchange-page {
+  padding: 24px 24px 40px;
+  min-width: 0;
+}
+
+.agent-layout .page-header {
+  min-height: 64px;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.agent-layout .page-header h2 {
+  font-size: 24px;
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+
+.agent-layout .page-header-actions {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.agent-layout .agent-section {
+  min-width: 0;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--semi-color-border);
+}
+
+.agent-layout .agent-identity { padding-top: 0; margin-bottom: 20px; }
+
+.agent-layout .agent-form {
+  display: grid;
+  gap: 16px;
+  width: 100%;
+  max-width: 560px;
+}
+
+.agent-layout .agent-form label,
+.agent-layout .agent-form-toolbar label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.agent-layout .agent-form > .semi-button { justify-self: start; }
+
+.agent-layout .agent-form-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin: 0 0 20px;
+}
+
+.agent-layout .agent-form-toolbar > label { width: 260px; max-width: 100%; }
+
+.agent-layout :is(.semi-input-wrapper, .semi-select) {
+  min-height: 36px;
+  border-radius: 6px;
+}
+
+.agent-layout .semi-input { min-height: 34px; }
+.agent-layout .semi-typography { overflow-wrap: anywhere; }
+.agent-layout .semi-banner { margin-bottom: 16px; }
+.agent-layout .admin-table-state { background: var(--semi-color-bg-0); min-height: 240px; }
+.agent-layout .admin-business-table { --admin-table-border: var(--semi-color-border); }
+.agent-layout .semi-table-pagination-outer { flex-wrap: wrap; gap: 12px; }
+.agent-layout .semi-table-pagination-info { max-width: 100%; }
+.agent-layout .semi-page { display: flex; flex-wrap: wrap; max-width: 100%; }
+.agent-layout .admin-dashboard-detail-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.agent-layout .admin-dashboard-kpi-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.agent-layout .admin-dashboard-card { min-width: 0; min-height: 120px; border-radius: 8px; box-shadow: none; border: 1px solid var(--semi-color-border); }
+.agent-layout .admin-dashboard-card::after { content: none; }
+.agent-layout .admin-dashboard-card h3 { margin: 8px 0; font-size: 24px; letter-spacing: 0; }
+
+@media (min-width: 721px) and (max-width: 1280px) {
+  .agent-layout > .agent-sidebar { width: 208px !important; }
+}
+
 @media (max-width: 720px) {
+  .agent-layout .exchange-page { padding: 16px 12px 28px; }
+  .agent-layout .page-header h2 { font-size: 22px; }
+  .agent-layout .admin-dashboard-detail-grid { grid-template-columns: minmax(0, 1fr); }
+  .agent-layout .admin-dashboard-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .agent-layout .admin-dashboard-card .semi-card-body { padding: 12px; }
+  .agent-layout .admin-dashboard-card h3 { font-size: 20px; }
+  .agent-layout .agent-form-toolbar > label { width: 100%; }
+  .agent-layout :is(.semi-input-wrapper, .semi-select) { min-height: 44px; }
+  .agent-layout .semi-input { min-height: 42px; }
+  .agent-layout .semi-table-pagination-outer { padding: 12px 0; }
   .agent-layout > .agent-sidebar {
     position: fixed;
     z-index: 100;

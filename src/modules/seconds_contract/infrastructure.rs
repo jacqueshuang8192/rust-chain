@@ -804,9 +804,12 @@ pub(crate) async fn cached_settlement_price(
     let symbol = ValidatedMarketSymbol::from_raw(symbol)
         .map_err(|error| AppError::Validation(error.to_string()))?;
     let mut connection = redis.clone();
-    let payload: Option<String> = connection
-        .get(market_ticker_redis_key(symbol.as_str()))
-        .await?;
+    let payload: Option<String> = tokio::time::timeout(
+        std::time::Duration::from_secs(2),
+        connection.get(market_ticker_redis_key(symbol.as_str())),
+    )
+    .await
+    .map_err(|_| AppError::Internal("秒合约读取 Redis 报价超时".to_owned()))??;
     let payload = payload.ok_or_else(|| {
         AppError::Validation("cached ticker is required for seconds contract pricing".to_owned())
     })?;
@@ -1074,8 +1077,33 @@ pub(crate) async fn lock_order_by_id(
     tx: &mut Transaction<'_, MySql>,
     order_id: u64,
 ) -> AppResult<SecondsContractOrderResponse> {
+    select_locked_order(tx, order_id, false)
+        .await?
+        .ok_or(AppError::NotFound)
+}
+
+/// 自动调度仅锁定订单自身，跳过其他事务占用的订单，避免单笔锁等待阻塞整个到期批次。
+/// 关联交易对和用户只作展示读取；资金、资产精度仍由结算事务的专用查询与钱包锁校验。
+pub(crate) async fn try_lock_settlement_order(
+    tx: &mut Transaction<'_, MySql>,
+    order_id: u64,
+) -> AppResult<Option<SecondsContractOrderResponse>> {
+    select_locked_order(tx, order_id, true).await
+}
+
+/// 共享订单投影；人工操作保持原锁语义，自动扫描使用订单表限定锁及跳锁语义。
+async fn select_locked_order(
+    tx: &mut Transaction<'_, MySql>,
+    order_id: u64,
+    skip_locked: bool,
+) -> AppResult<Option<SecondsContractOrderResponse>> {
+    let lock_clause = if skip_locked {
+        "FOR UPDATE OF orders SKIP LOCKED"
+    } else {
+        "FOR UPDATE"
+    };
     sqlx::query_as::<_, SecondsContractOrderResponse>(
-        r#"SELECT orders.id, orders.user_id, orders.product_id, orders.pair_id,
+        &format!(r#"SELECT orders.id, orders.user_id, orders.product_id, orders.pair_id,
                   users.email, pairs.symbol, orders.stake_asset, assets.symbol AS stake_asset_symbol,
                   orders.direction, orders.stake_amount, orders.duration_seconds,
                   orders.payout_rate, orders.entry_price, orders.settlement_price,
@@ -1089,12 +1117,12 @@ pub(crate) async fn lock_order_by_id(
            INNER JOIN assets ON assets.id = orders.stake_asset
            WHERE orders.id = ?
            LIMIT 1
-           FOR UPDATE"#,
+           {lock_clause}"#),
     )
     .bind(order_id)
     .fetch_optional(&mut **tx)
-    .await?
-    .ok_or(AppError::NotFound)
+    .await
+    .map_err(AppError::from)
 }
 
 /// 把已由调用方持锁并确认 opened 的订单更新为 settled，写入结果与数据库当前结算时间。

@@ -17,6 +17,7 @@ use crate::{HealthResponse, error::ErrorResponse, state::AppState};
 
 mod agent_portal;
 mod agent_recharges;
+mod agent_team_orders;
 mod agents;
 mod auth;
 mod financial_reconciliation;
@@ -57,6 +58,7 @@ pub fn routes() -> Router<AppState> {
     document.merge(seconds_refund::SecondsRefundApiDoc::openapi());
     document.merge(new_coin_market::NewCoinMarketApiDoc::openapi());
     document.merge(agent_recharges::AgentRechargesApiDoc::openapi());
+    document.merge(agent_team_orders::AgentTeamOrdersApiDoc::openapi());
     let docs: Router<AppState> = SwaggerUi::new("/docs")
         .url("/openapi.json", document.clone())
         .into();

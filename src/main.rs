@@ -20,7 +20,6 @@ use exchange_api::{
     },
 };
 use std::sync::Arc;
-use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitExt};
 
 /// 完成服务的整体启动装配，按固定顺序推进：日志订阅、配置解析、外部连接、共享状态、后台协程、HTTP 监听。
 /// 日志过滤器优先取自环境变量，缺失时回落到 info 级别；配置与 MySQL、Mongo、Redis、认证存储、RabbitMQ 的连接
@@ -31,10 +30,8 @@ use tracing_subscriber::{EnvFilter, layer::SubscriberExt, util::SubscriberInitEx
 /// 所有协程都在监听建立之前拉起，`axum::serve` 之后函数将一直阻塞，正常情况下不会返回。
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::registry()
-        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
-        .with(tracing_subscriber::fmt::layer())
-        .init();
+    dotenvy::dotenv().ok();
+    infra::logging::init();
 
     let settings = Settings::from_env()?;
     let addr = settings.socket_addr();

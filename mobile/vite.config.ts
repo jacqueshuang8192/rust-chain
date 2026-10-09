@@ -59,8 +59,8 @@ export default defineConfig(({ mode }) => {
           scope: appBase,
           display: 'standalone',
           orientation: 'portrait-primary',
-          theme_color: '#f7faf8',
-          background_color: '#f7faf8',
+          theme_color: '#070908',
+          background_color: '#070908',
           categories: ['finance'],
           icons: [
             {

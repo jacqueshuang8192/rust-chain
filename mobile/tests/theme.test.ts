@@ -36,22 +36,25 @@ function contrastRatio(left: string, right: string): number {
   return (values[0] + .05) / (values[1] + .05)
 }
 
-test('主题偏好只接受受支持值并以系统偏好兜底', () => {
+test('主题偏好只接受受支持值并默认使用深色主题', () => {
   assert.equal(normalizeAppTheme('light'), 'light')
   assert.equal(normalizeAppTheme('dark'), 'dark')
   assert.equal(normalizeAppTheme('system'), null)
-  assert.equal(resolveAppTheme(null, false), 'light')
-  assert.equal(resolveAppTheme(undefined, true), 'dark')
-  assert.equal(resolveAppTheme('light', true), 'light')
+  assert.equal(resolveAppTheme(null), 'dark')
+  assert.equal(resolveAppTheme(undefined), 'dark')
+  assert.equal(resolveAppTheme('system'), 'dark')
+  assert.equal(resolveAppTheme('light'), 'light')
+  assert.equal(resolveAppTheme('dark'), 'dark')
 })
 
 test('明暗主题提供高对比共享令牌与稳定主题色', () => {
   assert.equal(THEME_META_COLORS.light, '#f7faf8')
   assert.equal(THEME_META_COLORS.dark, '#070908')
-  assert.match(indexHtml, /name="theme-color" content="#f7faf8" media="\(prefers-color-scheme: light\)"/)
-  assert.match(indexHtml, /name="theme-color" content="#070908" media="\(prefers-color-scheme: dark\)"/)
-  assert.match(viteConfigSource, /theme_color: '#f7faf8'/)
-  assert.match(viteConfigSource, /background_color: '#f7faf8'/)
+  assert.match(indexHtml, /<html lang="zh-CN" data-theme="dark">/)
+  assert.match(indexHtml, /name="theme-color" content="#070908"/)
+  assert.doesNotMatch(indexHtml, /prefers-color-scheme/)
+  assert.match(viteConfigSource, /theme_color: '#070908'/)
+  assert.match(viteConfigSource, /background_color: '#070908'/)
   assert.match(baseCss, /:root\[data-theme='dark'\]/)
   for (const token of [
     '--background',

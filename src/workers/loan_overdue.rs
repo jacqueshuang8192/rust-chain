@@ -125,15 +125,18 @@ pub async fn run_loop(pool: Pool<MySql>, interval_seconds: u64, limit: u32) -> A
         ticker.tick().await;
         let now = Utc::now();
         match run_once_with_dependencies(&pool, now, limit).await {
-            Ok(summary) => info!(
-                scanned = summary.scanned,
-                marked = summary.marked,
-                collected = summary.collected,
-                skipped = summary.skipped,
-                failed = summary.failed,
-                waiting_balance = summary.waiting_balance,
-                "贷款逾期扫描周期完成"
-            ),
+            Ok(summary) if summary.marked > 0 || summary.collected > 0 || summary.failed > 0 => {
+                info!(
+                    scanned = summary.scanned,
+                    marked = summary.marked,
+                    collected = summary.collected,
+                    skipped = summary.skipped,
+                    failed = summary.failed,
+                    waiting_balance = summary.waiting_balance,
+                    "贷款逾期扫描周期完成"
+                )
+            }
+            Ok(_) => {}
             Err(error) => error!(%error, "贷款逾期扫描周期失败"),
         }
         if health_redis.is_none() {
@@ -149,7 +152,7 @@ pub async fn run_loop(pool: Pool<MySql>, interval_seconds: u64, limit: u32) -> A
             // 逾期扫描可能耗时，健康检查必须重新取时钟，避免把已过期 ticker 当成仍然新鲜。
             let health_now = Utc::now();
             match loan_health::run_once_with_dependencies(&pool, redis, health_now, limit).await {
-                Ok(summary) => info!(
+                Ok(summary) if summary.liquidated > 0 || summary.failed > 0 => info!(
                     scanned = summary.scanned,
                     liquidated = summary.liquidated,
                     healthy = summary.healthy,
@@ -157,6 +160,7 @@ pub async fn run_loop(pool: Pool<MySql>, interval_seconds: u64, limit: u32) -> A
                     failed = summary.failed,
                     "贷款健康与清算扫描周期完成"
                 ),
+                Ok(_) => {}
                 Err(error) => error!(%error, "贷款健康与清算扫描周期失败"),
             }
         }

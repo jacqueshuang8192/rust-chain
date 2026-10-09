@@ -308,15 +308,15 @@ function UserPortfolio() {
 
       {activeTab === 'margin' ? (
         <div aria-labelledby="semiTabmargin" id="semiTabPanelmargin" role="tabpanel" tabIndex={0}>
-          <div style={{ marginBottom: 12 }}>
-            <div style={{ maxWidth: 280 }}>
+          <div className="agent-portfolio-filters">
+            <label>杠杆持仓状态
               <AdminSelect
                 ariaLabel="杠杆持仓状态"
                 onChange={(value) => { setMarginPage(1); setMarginStatus(value as AgentMarginPositionStatus | ''); }}
                 optionList={marginStatusOptions}
                 value={marginStatus}
               />
-            </div>
+            </label>
           </div>
           <DataTable
             columns={marginColumns}
@@ -337,17 +337,15 @@ function UserPortfolio() {
 
       {activeTab === 'seconds' ? (
         <div aria-labelledby="semiTabseconds" id="semiTabPanelseconds" role="tabpanel" tabIndex={0}>
-          <div style={{ marginBottom: 12 }}>
-            <Space align="center">
-              <div style={{ width: 280, maxWidth: '100%' }}>
+          <div className="agent-portfolio-filters">
+              <label>秒合约订单状态
                 <AdminSelect
                   ariaLabel="秒合约订单状态"
                   onChange={(value) => { setSecondsPage(1); setSecondsStatus(value as AgentSecondsContractOrderStatus | ''); }}
                   optionList={secondsStatusOptions}
                   value={secondsStatus}
                 />
-              </div>
-            </Space>
+              </label>
           </div>
           <DataTable
             columns={secondsColumns}
@@ -368,10 +366,10 @@ function UserPortfolio() {
 
       {activeTab === 'margin-orders' ? (
         <div aria-labelledby="semiTabmargin-orders" id="semiTabPanelmargin-orders" role="tabpanel" tabIndex={0}>
-          <div style={{ maxWidth: 280, marginBottom: 12 }}>
+          <div className="agent-portfolio-filters"><label>杠杆订单状态
             <AdminSelect ariaLabel="杠杆订单状态" value={marginOrderStatus} optionList={marginOrderStatusOptions}
               onChange={(value) => { setMarginOrderPage(1); setMarginOrderStatus(value as AgentMarginOrderStatus | ''); }} />
-          </div>
+          </label></div>
           <DataTable columns={marginOrderColumns} data={marginOrders.data?.orders ?? []} error={marginOrders.error} loading={marginOrders.loading}
             pagination={{ currentPage: marginOrderPage, pageSize: marginOrderPageSize, total: marginOrders.data?.total ?? 0,
               onPageChange: setMarginOrderPage, onPageSizeChange: (next) => { setMarginOrderPage(1); setMarginOrderPageSize(next); } }} rowKey="id" />
@@ -380,10 +378,10 @@ function UserPortfolio() {
 
       {activeTab === 'spot' ? (
         <div aria-labelledby="semiTabspot" id="semiTabPanelspot" role="tabpanel" tabIndex={0}>
-          <div style={{ maxWidth: 280, marginBottom: 12 }}>
+          <div className="agent-portfolio-filters"><label>现货订单状态
             <AdminSelect ariaLabel="现货订单状态" value={spotStatus} optionList={spotStatusOptions}
               onChange={(value) => { setSpotPage(1); setSpotStatus(value as AgentSpotOrderStatus | ''); }} />
-          </div>
+          </label></div>
           <DataTable columns={spotColumns} data={spot.data?.orders ?? []} error={spot.error} loading={spot.loading}
             pagination={{ currentPage: spotPage, pageSize: spotPageSize, total: spot.data?.total ?? 0,
               onPageChange: setSpotPage, onPageSizeChange: (next) => { setSpotPage(1); setSpotPageSize(next); } }} rowKey="id" />

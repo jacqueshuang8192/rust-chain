@@ -109,13 +109,14 @@ pub async fn run_loop(
     loop {
         ticker.tick().await;
         match run_once_with_dependencies(&pool, Utc::now(), min_age_seconds, limit).await {
-            Ok(summary) => info!(
+            Ok(summary) if summary.settled > 0 || summary.failed > 0 => info!(
                 scanned = summary.scanned,
                 settled = summary.settled,
                 skipped = summary.skipped,
                 failed = summary.failed,
                 "代理佣金自动结算周期完成"
             ),
+            Ok(_) => {}
             Err(error) => error!(%error, "代理佣金自动结算周期失败"),
         }
     }

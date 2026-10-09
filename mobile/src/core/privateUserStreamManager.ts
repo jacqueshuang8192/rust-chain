@@ -3,7 +3,7 @@ import type {
   PrivateUserTransportState,
 } from '../api/privateUserStream.ts'
 
-export type PrivateUserTopic = 'margin' | 'support'
+export type PrivateUserTopic = 'margin' | 'support' | 'seconds'
 export type PrivateUserConnectionState = 'idle' | 'connecting' | 'live' | 'stale' | 'offline'
 
 export interface PrivateUserManagerSession {
@@ -52,6 +52,7 @@ export interface PrivateUserStreamManagerSnapshot {
   readonly consumerCount: number
   readonly marginConsumerCount: number
   readonly supportConsumerCount: number
+  readonly secondsConsumerCount: number
   readonly sessionGeneration: number
 }
 
@@ -95,9 +96,11 @@ export function createPrivateUserStreamManager(
   const snapshot = (): PrivateUserStreamManagerSnapshot => {
     let marginConsumerCount = 0
     let supportConsumerCount = 0
+    let secondsConsumerCount = 0
     for (const lease of leases.values()) {
       if (lease.topic === 'margin') marginConsumerCount += 1
-      else supportConsumerCount += 1
+      else if (lease.topic === 'support') supportConsumerCount += 1
+      else secondsConsumerCount += 1
     }
     return Object.freeze({
       connection,
@@ -109,6 +112,7 @@ export function createPrivateUserStreamManager(
       consumerCount: leases.size,
       marginConsumerCount,
       supportConsumerCount,
+      secondsConsumerCount,
       sessionGeneration: session.generation,
     })
   }
@@ -321,6 +325,11 @@ export function eventMatchesTopic(
   topic: PrivateUserTopic,
 ): boolean {
   if (topic === 'support') return event.type === 'support.refresh'
+  if (topic === 'seconds') return [
+    'seconds_contract.order.opened',
+    'seconds_contract.order.settled',
+    'seconds_contract.order.refunded',
+  ].includes(event.type)
   return MARGIN_EVENT_TYPES.has(event.type)
 }
 

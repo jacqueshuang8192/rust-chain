@@ -31,7 +31,11 @@ Semantic sources: `platform`, `external`, `strategy`, `default`, `generated`,
 - PC numeric candle compatibility rows retain sidecar provenance that the
   normalized candle model carries to either chart implementation. Mobile
   normalized candles retain per-candle provenance through history merging.
-  Chart source summaries show every observed category, including unknown.
+  Mobile and PC chart wrappers do not render a candle-source summary row.
+  Removing that presentation must not strip per-candle evidence or affect
+  history loading, live updates, provider selection or the 1m default.
+  Existing ticker/book/trade labels outside the chart and the Mobile
+  generated-market notice remain unchanged.
 - Ticker presentation uses real observation time and marks older-than-60s or
   future-dated evidence stale. Historical closed candles are not labelled as
   stale realtime tickers. Local receipt time is never source observation.

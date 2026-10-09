@@ -38,7 +38,7 @@ use tokio::time::sleep;
 pub async fn run_sync_loop(state: AppState) -> AppResult<()> {
     loop {
         if let Err(error) = run_due_sync_once(&state).await {
-            tracing::warn!(%error, "prediction market sync tick failed");
+            tracing::warn!(%error, "预测市场同步失败");
         }
         sleep(tokio::time::Duration::from_secs(DEFAULT_SYNC_POLL_SECONDS)).await;
     }

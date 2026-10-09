@@ -195,7 +195,7 @@ pub(super) struct AgentUserSecondsContractOrderResponse {
     entry_price: Option<String>,
     #[schema(required = true)]
     settlement_price: Option<String>,
-    #[schema(pattern = "^(opened|settled|manual_review)$")]
+    #[schema(pattern = "^(opened|settled|manual_review|refunded)$")]
     status: String,
     #[schema(pattern = "^(win|loss)$", required = true)]
     result: Option<String>,
@@ -483,7 +483,7 @@ fn list_agent_user_margin_orders() {}
 fn list_agent_user_spot_orders() {}
 
 /// 分页查询团队用户的秒合约订单，缺省不限状态，因而直接包含进行中 opened 订单。
-/// opened、settled 或 manual_review 筛选同时作用于行集与 total，范围只来自令牌对应子树。
+/// opened、settled、manual_review 或 refunded 筛选同时作用于行集与 total，范围只来自令牌对应子树。
 /// 该端点只读已落库订单，不扫描到期单、不结算、不读行情也不改钱包。
 #[utoipa::path(
     get,
@@ -492,7 +492,7 @@ fn list_agent_user_spot_orders() {}
     summary = "查询团队用户秒合约订单",
     params(
         ("user_id" = u64, Path, description = "团队用户 ID"),
-        ("status" = Option<String>, Query, description = "状态：opened | settled | manual_review；缺省为全部"),
+        ("status" = Option<String>, Query, description = "状态：opened | settled | manual_review | refunded；缺省为全部"),
         ("limit" = Option<u32>, Query, description = "返回条数，默认 20，最大 100"),
         ("offset" = Option<u32>, Query, description = "偏移量，默认 0，最大 100000")
     ),

@@ -1,5 +1,5 @@
 {
-  "version": "2.17",
+  "version": "2.20",
   "children": [
     {
       "type": "frame",
@@ -1263,7 +1263,7 @@
                         "type": "image",
                         "enabled": true,
                         "url": "images/generated-1785687557714.png",
-                        "mode": "fill"
+                        "mode": "cover"
                       },
                       "width": 358,
                       "height": 236
@@ -1430,7 +1430,7 @@
                         "type": "image",
                         "enabled": true,
                         "url": "images/generated-1785687557714.png",
-                        "mode": "fill"
+                        "mode": "cover"
                       },
                       "width": 358,
                       "height": 236
@@ -1804,7 +1804,7 @@
                         "type": "image",
                         "enabled": true,
                         "url": "images/generated-1785685909638.png",
-                        "mode": "fill"
+                        "mode": "cover"
                       },
                       "width": 358,
                       "height": 236
@@ -3312,7 +3312,7 @@
                 "type": "image",
                 "enabled": true,
                 "url": "images/hippo-logo.png",
-                "mode": "fit"
+                "mode": "contain"
               },
               "width": 136,
               "height": 34
@@ -3482,184 +3482,321 @@
           "strokeAlignment": "inner",
           "layout": "vertical",
           "gap": 8,
-          "padding": 16,
+          "padding": [
+            8,
+            16
+          ],
           "children": [
             {
               "type": "frame",
-              "id": "Bohwk",
-              "name": "Guest Hero",
+              "id": "IpIMQ",
+              "name": "Guest Asset Motion Card",
               "clip": true,
               "width": "fill_container",
-              "height": 270,
-              "cornerRadius": "$radius-l",
+              "height": 128,
+              "fill": "$surface-2",
+              "cornerRadius": 10,
               "stroke": "$border",
               "strokeWidth": 1,
               "strokeAlignment": "inner",
-              "layout": "vertical",
-              "gap": 24,
-              "padding": [
-                18,
-                20,
-                16,
-                20
-              ],
-              "justifyContent": "center",
+              "effect": {
+                "type": "shadow",
+                "shadowType": "outer",
+                "color": "#09251A1F",
+                "offset": {
+                  "x": 0,
+                  "y": 4
+                },
+                "blur": 12
+              },
+              "layout": "none",
               "children": [
                 {
                   "type": "rectangle",
-                  "id": "DuVRj",
+                  "id": "g3QKx",
                   "layoutPosition": "absolute",
-                  "x": 0,
-                  "y": 0,
-                  "name": "Card BG Image",
+                  "x": 1,
+                  "y": 1,
+                  "name": "Guest Motion Background",
                   "fill": {
                     "type": "image",
                     "enabled": true,
                     "url": "images/generated-1785687557714.png",
-                    "mode": "fill"
+                    "mode": "cover"
                   },
-                  "width": 358,
-                  "height": 270
+                  "width": 356,
+                  "height": 126
                 },
                 {
                   "type": "rectangle",
-                  "id": "VWJQW",
+                  "id": "Rdh90",
                   "layoutPosition": "absolute",
-                  "x": 0,
-                  "y": 0,
-                  "name": "Card BG Overlay",
-                  "fill": "#FFFFFF00",
-                  "width": 358,
-                  "height": 270
-                },
-                {
-                  "type": "ellipse",
-                  "id": "Uitzp",
-                  "layoutPosition": "absolute",
-                  "x": -70,
-                  "y": 150,
-                  "name": "Bloom",
-                  "fill": {
-                    "type": "gradient",
-                    "gradientType": "radial",
-                    "enabled": true,
-                    "rotation": 0,
-                    "size": {
-                      "width": 1,
-                      "height": 1
-                    },
-                    "colors": [
-                      {
-                        "color": "#43EFA92E",
-                        "position": 0
-                      },
-                      {
-                        "color": "#43EFA900",
-                        "position": 1
-                      }
-                    ]
-                  },
-                  "width": 200,
-                  "height": 200
+                  "x": 1,
+                  "y": 1,
+                  "name": "Guest Motion Light Veil",
+                  "fill": "#FFFFFF99",
+                  "width": 356,
+                  "height": 126
                 },
                 {
                   "type": "frame",
-                  "id": "RUQkz",
-                  "name": "Guest Mid",
-                  "width": "fill_container",
-                  "layout": "vertical",
-                  "gap": 10,
+                  "id": "lEJKx",
+                  "layoutPosition": "absolute",
+                  "x": 230,
+                  "y": 0,
+                  "name": "Guest Motion Accent",
+                  "width": 124,
+                  "height": 128,
+                  "layout": "none",
                   "children": [
                     {
-                      "type": "frame",
-                      "id": "FQP6k",
-                      "name": "Guest Headline",
-                      "width": "fill_container",
-                      "layout": "vertical",
-                      "gap": 2,
-                      "children": [
-                        {
-                          "type": "text",
-                          "id": "qJpHv",
-                          "name": "Headline Line 1",
-                          "fill": "$text",
-                          "content": "全球市场",
-                          "fontFamily": "$font-sans",
-                          "fontSize": 44,
-                          "fontWeight": "750"
+                      "type": "ellipse",
+                      "id": "K5bYAT",
+                      "x": 50,
+                      "y": 22,
+                      "name": "Guest Motion Glow",
+                      "fill": {
+                        "type": "gradient",
+                        "gradientType": "radial",
+                        "enabled": true,
+                        "rotation": 0,
+                        "size": {
+                          "width": 1,
+                          "height": 1
                         },
-                        {
-                          "type": "frame",
-                          "id": "tyyFY",
-                          "name": "Headline Line 2 Offset",
-                          "width": "fill_container",
-                          "justifyContent": "end",
-                          "children": [
-                            {
-                              "type": "text",
-                              "id": "k9amCA",
-                              "name": "Headline Line 2",
-                              "fill": "$mint-strong",
-                              "content": "一手掌握",
-                              "fontFamily": "$font-sans",
-                              "fontSize": 44,
-                              "fontWeight": "750"
-                            }
-                          ]
-                        }
-                      ]
+                        "colors": [
+                          {
+                            "color": "#43EFA96B",
+                            "position": 0
+                          },
+                          {
+                            "color": "#43EFA900",
+                            "position": 1
+                          }
+                        ]
+                      },
+                      "width": 70,
+                      "height": 70
                     },
                     {
-                      "type": "text",
-                      "id": "qiynb",
-                      "name": "Guest Sub",
-                      "fill": "$muted",
-                      "content": "登录后同步资产估值、收益走势与持仓",
-                      "fontFamily": "$font-sans",
-                      "fontSize": 11,
-                      "fontWeight": "450"
+                      "type": "ellipse",
+                      "id": "r070K",
+                      "x": 42,
+                      "y": 28,
+                      "name": "Guest Motion Orbit Outer",
+                      "fill": "#00000000",
+                      "width": 62,
+                      "height": 62,
+                      "stroke": "#43EFA95C",
+                      "strokeWidth": 1
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "U7sWkE",
+                      "x": 58,
+                      "y": 10,
+                      "name": "Guest Motion Orbit Inner",
+                      "fill": "#00000000",
+                      "width": 40,
+                      "height": 40,
+                      "stroke": "#43EFA9A8",
+                      "strokeWidth": 2
+                    },
+                    {
+                      "type": "path",
+                      "id": "uSHwf",
+                      "x": 6,
+                      "y": 34,
+                      "name": "Guest Motion Trail",
+                      "geometry": "M0 62c14-7 22-4 34-14 13-11 20-5 32-16 12-11 22-3 32-14 10-10 16-6 22-14",
+                      "viewBox": [
+                        0,
+                        0,
+                        120,
+                        70
+                      ],
+                      "width": 110,
+                      "height": 60,
+                      "stroke": "$mint",
+                      "strokeWidth": 2,
+                      "strokeLinecap": "round"
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "yN6kd",
+                      "x": 92,
+                      "y": 30,
+                      "name": "Guest Motion Dot One",
+                      "fill": "$mint",
+                      "width": 7,
+                      "height": 7
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "J7S996",
+                      "x": 106,
+                      "y": 12,
+                      "name": "Guest Motion Dot Two",
+                      "fill": "#FFFFFF",
+                      "width": 4,
+                      "height": 4
                     }
                   ]
                 },
                 {
                   "type": "frame",
-                  "id": "sUdHK",
-                  "name": "Guest Bottom",
-                  "width": "fill_container",
-                  "layout": "vertical",
-                  "gap": 10,
+                  "id": "Q45EMO",
+                  "layoutPosition": "absolute",
+                  "x": 0,
+                  "y": 0,
+                  "name": "Guest Motion Content",
+                  "width": 358,
+                  "height": 128,
+                  "gap": 12,
+                  "padding": [
+                    18,
+                    16
+                  ],
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
                   "children": [
                     {
                       "type": "frame",
-                      "id": "LewT9",
-                      "name": "Guest Login CTA",
+                      "id": "JjV9O",
+                      "name": "Guest Asset Copy",
                       "width": "fill_container",
-                      "height": 48,
-                      "fill": "$mint",
-                      "cornerRadius": 4,
-                      "gap": 8,
-                      "justifyContent": "center",
-                      "alignItems": "center",
+                      "layout": "vertical",
+                      "gap": 4,
                       "children": [
                         {
-                          "type": "text",
-                          "id": "o88P7l",
-                          "name": "CTA Label",
-                          "fill": "#07110D",
-                          "content": "去登录",
-                          "fontFamily": "$font-sans",
-                          "fontSize": 13,
-                          "fontWeight": "650"
+                          "type": "frame",
+                          "id": "L7uJd8",
+                          "name": "Guest Asset Label Row",
+                          "gap": 5,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "JSNWQ",
+                              "name": "Guest Asset Label",
+                              "fill": "$muted",
+                              "content": "资产账户",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 12,
+                              "fontWeight": "500"
+                            },
+                            {
+                              "type": "icon",
+                              "id": "u0aRcH",
+                              "name": "Guest Asset Lock",
+                              "width": 13,
+                              "height": 13,
+                              "icon": "lock-keyhole",
+                              "library": "lucide",
+                              "fill": "$muted"
+                            }
+                          ]
                         },
                         {
-                          "type": "icon",
-                          "id": "VGUB9",
-                          "name": "CTA Arrow",
-                          "width": 16,
-                          "height": 16,
-                          "icon": "arrow-right",
-                          "library": "lucide",
-                          "fill": "#07110D"
+                          "type": "text",
+                          "id": "rKtzW",
+                          "name": "Guest Asset Title",
+                          "fill": "$text",
+                          "content": "登录后解锁资产视图",
+                          "fontFamily": "$font-sans",
+                          "fontSize": 16,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "j5JFx",
+                          "name": "Guest Asset Description",
+                          "fill": "$muted",
+                          "content": "查看余额、收益与持仓",
+                          "fontFamily": "$font-sans",
+                          "fontSize": 11,
+                          "fontWeight": "450"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "I10ARM",
+                      "name": "Guest Auth Actions",
+                      "width": 78,
+                      "layout": "vertical",
+                      "gap": 6,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "UOoTX",
+                          "name": "Guest Login Action",
+                          "width": 78,
+                          "height": 30,
+                          "fill": "$mint",
+                          "cornerRadius": 4,
+                          "gap": 4,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "RAHsu",
+                              "name": "Guest Login Icon",
+                              "width": 14,
+                              "height": 14,
+                              "icon": "log-in",
+                              "library": "lucide",
+                              "fill": "#07110D"
+                            },
+                            {
+                              "type": "text",
+                              "id": "OcXUj",
+                              "name": "Guest Login Label",
+                              "fill": "#07110D",
+                              "content": "登录",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 12,
+                              "fontWeight": "650"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "QlCPl",
+                          "name": "Guest Register Action",
+                          "width": 78,
+                          "height": 30,
+                          "fill": "#FFFFFFB8",
+                          "cornerRadius": 4,
+                          "stroke": "#FFFFFFD6",
+                          "strokeWidth": 1,
+                          "strokeAlignment": "inner",
+                          "gap": 4,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "t1OS8S",
+                              "name": "Guest Register Icon",
+                              "width": 14,
+                              "height": 14,
+                              "icon": "user-plus",
+                              "library": "lucide",
+                              "fill": "$text"
+                            },
+                            {
+                              "type": "text",
+                              "id": "so2k8",
+                              "name": "Guest Register Label",
+                              "fill": "$text",
+                              "content": "注册",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 12,
+                              "fontWeight": "650"
+                            }
+                          ]
                         }
                       ]
                     }
@@ -3672,21 +3809,24 @@
         {
           "type": "frame",
           "id": "ysQIB",
+          "x": 0,
+          "y": 342,
           "name": "Funding Actions",
-          "width": "fill_container",
+          "enabled": false,
+          "width": "fill_container(390)",
           "height": 64,
           "gap": 8,
           "padding": [
-            12,
+            8,
             16
           ],
           "children": [
             {
               "type": "frame",
               "id": "hVF4v",
-              "name": "Buy Crypto",
+              "name": "Quick Deposit",
               "width": "fill_container",
-              "height": 52,
+              "height": 48,
               "fill": "$mint",
               "cornerRadius": 4,
               "stroke": "$mint",
@@ -3703,19 +3843,19 @@
                 {
                   "type": "icon",
                   "id": "b4u9i",
-                  "name": "Buy Crypto Icon",
+                  "name": "Quick Deposit Icon",
                   "width": 18,
                   "height": 18,
-                  "icon": "credit-card",
+                  "icon": "zap",
                   "library": "lucide",
                   "fill": "#07110D"
                 },
                 {
                   "type": "text",
                   "id": "NSljl",
-                  "name": "Buy Crypto Label",
+                  "name": "Quick Deposit Label",
                   "fill": "#07110D",
-                  "content": "买币",
+                  "content": "快捷充币",
                   "lineHeight": 1.25,
                   "fontFamily": "$font-sans",
                   "fontSize": 14,
@@ -3726,9 +3866,9 @@
             {
               "type": "frame",
               "id": "cSWBz",
-              "name": "Deposit",
+              "name": "Onchain Deposit",
               "width": "fill_container",
-              "height": 52,
+              "height": 48,
               "fill": "$text",
               "cornerRadius": 4,
               "stroke": "$text",
@@ -3745,7 +3885,7 @@
                 {
                   "type": "icon",
                   "id": "fmgNv",
-                  "name": "Deposit Icon",
+                  "name": "Onchain Deposit Icon",
                   "width": 18,
                   "height": 18,
                   "icon": "arrow-down-left",
@@ -3755,9 +3895,9 @@
                 {
                   "type": "text",
                   "id": "k8B8Uf",
-                  "name": "Deposit Label",
+                  "name": "Onchain Deposit Label",
                   "fill": "$canvas",
-                  "content": "充币",
+                  "content": "链上充币",
                   "lineHeight": 1.25,
                   "fontFamily": "$font-sans",
                   "fontSize": 14,
@@ -4224,15 +4364,17 @@
         {
           "type": "frame",
           "id": "MnV84",
-          "name": "Market Brief",
+          "name": "Home Promotion Carousel",
           "width": "fill_container",
-          "height": 80,
           "fill": "#00000000",
           "stroke": "#00000000",
           "strokeAlignment": "inner",
-          "gap": 12,
+          "layout": "vertical",
+          "gap": 8,
           "padding": [
             8,
+            16,
+            0,
             16
           ],
           "alignItems": "center",
@@ -4240,94 +4382,195 @@
             {
               "type": "frame",
               "id": "cwArZ",
-              "name": "Brief Card",
+              "name": "Carousel Slide / Invite Friends",
               "width": "fill_container",
-              "height": 64,
-              "fill": "#07110D",
-              "cornerRadius": 12,
+              "height": 108,
+              "fill": "#F0F1F2",
+              "cornerRadius": "$radius-m",
               "stroke": "#00000000",
               "gap": 12,
               "padding": [
-                12,
-                14
+                14,
+                18
               ],
               "alignItems": "center",
               "children": [
                 {
                   "type": "frame",
-                  "id": "b1rJwe",
-                  "name": "Brief Icon Plate",
-                  "width": 36,
-                  "height": 36,
-                  "fill": "$mint-soft",
-                  "cornerRadius": 10,
-                  "justifyContent": "center",
-                  "alignItems": "center",
+                  "id": "RgKqw",
+                  "name": "Slide Copy",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 8,
                   "children": [
                     {
-                      "type": "icon",
-                      "id": "kDxOx",
-                      "name": "Brief Icon",
-                      "width": 20,
-                      "height": 20,
-                      "icon": "newspaper",
-                      "library": "lucide",
-                      "fill": "$mint-strong"
+                      "type": "frame",
+                      "id": "NQ4bT",
+                      "name": "Slide Heading",
+                      "width": "fill_container",
+                      "gap": 6,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "cShKF",
+                          "name": "Slide Title",
+                          "fill": "#17191B",
+                          "content": "邀请好友",
+                          "lineHeight": 1.3,
+                          "fontFamily": "$font-sans",
+                          "fontSize": 17,
+                          "fontWeight": "650"
+                        },
+                        {
+                          "type": "icon",
+                          "id": "V8Zi8",
+                          "name": "Open Invitation Details",
+                          "width": 18,
+                          "height": 18,
+                          "icon": "chevron-right",
+                          "library": "lucide",
+                          "fill": "#17191B"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "Bum9o",
+                      "name": "Slide Description",
+                      "fill": "#60666C",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "分享专属邀请码，邀请好友加入。\n查看邀请记录，了解活动规则。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12
                     }
                   ]
                 },
                 {
                   "type": "frame",
-                  "id": "JrUdu",
-                  "name": "Brief Copy",
-                  "width": "fill_container",
-                  "layout": "vertical",
-                  "gap": 3,
+                  "id": "qNZmk",
+                  "name": "Referral Gift Artwork",
+                  "width": 76,
+                  "height": 76,
+                  "layout": "none",
                   "children": [
                     {
-                      "type": "text",
-                      "id": "a0KA4z",
-                      "name": "Brief Eyebrow",
-                      "fill": "$mint",
-                      "content": "AI 行情日报",
-                      "lineHeight": 1.25,
-                      "fontFamily": "$font-sans",
-                      "fontSize": 10,
-                      "fontWeight": "650"
+                      "type": "rectangle",
+                      "cornerRadius": 10,
+                      "id": "LDEVD",
+                      "x": 6,
+                      "y": 18,
+                      "name": "Illustration Sheet",
+                      "fill": "#E1E5E7",
+                      "width": 64,
+                      "height": 48
                     },
                     {
-                      "type": "text",
-                      "id": "q4aZr",
-                      "name": "Brief Title",
-                      "fill": "#FFFFFF",
-                      "content": "三分钟读懂今日市场",
-                      "lineHeight": 1.25,
-                      "fontFamily": "$font-sans",
-                      "fontSize": 14,
-                      "fontWeight": "650"
+                      "type": "ellipse",
+                      "id": "j258uJ",
+                      "x": 27,
+                      "y": 7,
+                      "name": "Reward Coin",
+                      "fill": "#FFB300",
+                      "width": 30,
+                      "height": 30
                     },
                     {
-                      "type": "text",
-                      "id": "eNoqP",
-                      "name": "Brief Detail",
-                      "fill": "#9BA8A1",
-                      "content": "暂无平台公告",
-                      "lineHeight": 1.25,
-                      "fontFamily": "$font-sans",
-                      "fontSize": 10,
-                      "fontWeight": "450"
+                      "type": "icon",
+                      "id": "s5ugT4",
+                      "x": 24,
+                      "y": 32,
+                      "name": "Invite Users",
+                      "width": 28,
+                      "height": 28,
+                      "icon": "user-round",
+                      "library": "lucide",
+                      "fill": "#252A2E"
+                    },
+                    {
+                      "type": "icon",
+                      "id": "frdGk",
+                      "x": 36,
+                      "y": 15,
+                      "name": "Coin Sparkle",
+                      "width": 12,
+                      "height": 12,
+                      "icon": "sparkles",
+                      "library": "lucide",
+                      "fill": "#FFFFFF"
+                    },
+                    {
+                      "type": "icon",
+                      "id": "Z4iok",
+                      "x": 55,
+                      "y": 5,
+                      "name": "Invite Plus",
+                      "width": 13,
+                      "height": 13,
+                      "icon": "plus",
+                      "library": "lucide",
+                      "fill": "#535A5F"
                     }
                   ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "sr1DK",
+              "name": "Carousel Pagination / Slide 1 of 5",
+              "width": "fill_container",
+              "height": 20,
+              "gap": 6,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 3,
+                  "id": "VDYRj",
+                  "name": "Current Slide Indicator",
+                  "fill": "#078454",
+                  "width": 18,
+                  "height": 5
                 },
                 {
-                  "type": "icon",
-                  "id": "fSl2G",
-                  "name": "Brief Arrow",
-                  "width": 18,
-                  "height": 18,
-                  "icon": "chevron-right",
-                  "library": "lucide",
-                  "fill": "#FFFFFF"
+                  "type": "rectangle",
+                  "cornerRadius": 3,
+                  "id": "bfUY8",
+                  "name": "Slide 2 Indicator",
+                  "fill": "#D5D9DC",
+                  "width": 5,
+                  "height": 5
+                },
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 3,
+                  "id": "V5iBg",
+                  "name": "Slide 3 Indicator",
+                  "fill": "#D5D9DC",
+                  "width": 5,
+                  "height": 5
+                },
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 3,
+                  "id": "k3o6M",
+                  "name": "Slide 4 Indicator",
+                  "fill": "#D5D9DC",
+                  "width": 5,
+                  "height": 5
+                },
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 3,
+                  "id": "zGcaW",
+                  "name": "Slide 5 Indicator",
+                  "fill": "#D5D9DC",
+                  "width": 5,
+                  "height": 5
                 }
               ]
             }
@@ -5341,7 +5584,7 @@
                 "type": "image",
                 "enabled": true,
                 "url": "images/hippo-logo.png",
-                "mode": "fit"
+                "mode": "contain"
               },
               "width": 136,
               "height": 34
@@ -5511,184 +5754,321 @@
           "strokeAlignment": "inner",
           "layout": "vertical",
           "gap": 8,
-          "padding": 16,
+          "padding": [
+            8,
+            16
+          ],
           "children": [
             {
               "type": "frame",
-              "id": "gbeyb",
-              "name": "Guest Hero",
+              "id": "Z2oUM8",
+              "name": "Guest Asset Motion Card",
               "clip": true,
               "width": "fill_container",
-              "height": 270,
-              "cornerRadius": "$radius-l",
+              "height": 128,
+              "fill": "$surface-2",
+              "cornerRadius": 10,
               "stroke": "$border",
               "strokeWidth": 1,
               "strokeAlignment": "inner",
-              "layout": "vertical",
-              "gap": 24,
-              "padding": [
-                18,
-                20,
-                16,
-                20
-              ],
-              "justifyContent": "center",
+              "effect": {
+                "type": "shadow",
+                "shadowType": "outer",
+                "color": "#00000066",
+                "offset": {
+                  "x": 0,
+                  "y": 4
+                },
+                "blur": 12
+              },
+              "layout": "none",
               "children": [
                 {
                   "type": "rectangle",
-                  "id": "ZJ7Lj",
+                  "id": "eqtgR",
                   "layoutPosition": "absolute",
-                  "x": 0,
-                  "y": 0,
-                  "name": "Card BG Image",
+                  "x": 1,
+                  "y": 1,
+                  "name": "Guest Motion Background",
                   "fill": {
                     "type": "image",
                     "enabled": true,
                     "url": "images/generated-1785686288395.png",
-                    "mode": "fill"
+                    "mode": "cover"
                   },
-                  "width": 358,
-                  "height": 270
+                  "width": 356,
+                  "height": 126
                 },
                 {
                   "type": "rectangle",
-                  "id": "qlba3",
+                  "id": "q3GoDb",
                   "layoutPosition": "absolute",
-                  "x": 0,
-                  "y": 0,
-                  "name": "Card BG Overlay",
-                  "fill": "#0A100DC0",
-                  "width": 358,
-                  "height": 270
-                },
-                {
-                  "type": "ellipse",
-                  "id": "UL2go",
-                  "layoutPosition": "absolute",
-                  "x": -70,
-                  "y": 150,
-                  "name": "Bloom",
-                  "fill": {
-                    "type": "gradient",
-                    "gradientType": "radial",
-                    "enabled": true,
-                    "rotation": 0,
-                    "size": {
-                      "width": 1,
-                      "height": 1
-                    },
-                    "colors": [
-                      {
-                        "color": "#43EFA92E",
-                        "position": 0
-                      },
-                      {
-                        "color": "#43EFA900",
-                        "position": 1
-                      }
-                    ]
-                  },
-                  "width": 200,
-                  "height": 200
+                  "x": 1,
+                  "y": 1,
+                  "name": "Guest Motion Dark Veil",
+                  "fill": "#06100CB8",
+                  "width": 356,
+                  "height": 126
                 },
                 {
                   "type": "frame",
-                  "id": "fCHT0",
-                  "name": "Guest Mid",
-                  "width": "fill_container",
-                  "layout": "vertical",
-                  "gap": 10,
+                  "id": "P50aKm",
+                  "layoutPosition": "absolute",
+                  "x": 230,
+                  "y": 0,
+                  "name": "Guest Motion Accent",
+                  "width": 124,
+                  "height": 128,
+                  "layout": "none",
                   "children": [
                     {
-                      "type": "frame",
-                      "id": "jqEYT",
-                      "name": "Guest Headline",
-                      "width": "fill_container",
-                      "layout": "vertical",
-                      "gap": 2,
-                      "children": [
-                        {
-                          "type": "text",
-                          "id": "sBR4P",
-                          "name": "Headline Line 1",
-                          "fill": "$text",
-                          "content": "全球市场",
-                          "fontFamily": "$font-sans",
-                          "fontSize": 44,
-                          "fontWeight": "750"
+                      "type": "ellipse",
+                      "id": "kiuAM",
+                      "x": 50,
+                      "y": 22,
+                      "name": "Guest Motion Glow",
+                      "fill": {
+                        "type": "gradient",
+                        "gradientType": "radial",
+                        "enabled": true,
+                        "rotation": 0,
+                        "size": {
+                          "width": 1,
+                          "height": 1
                         },
-                        {
-                          "type": "frame",
-                          "id": "W1aXaI",
-                          "name": "Headline Line 2 Offset",
-                          "width": "fill_container",
-                          "justifyContent": "end",
-                          "children": [
-                            {
-                              "type": "text",
-                              "id": "Voh0c",
-                              "name": "Headline Line 2",
-                              "fill": "$mint-strong",
-                              "content": "一手掌握",
-                              "fontFamily": "$font-sans",
-                              "fontSize": 44,
-                              "fontWeight": "750"
-                            }
-                          ]
-                        }
-                      ]
+                        "colors": [
+                          {
+                            "color": "#43EFA96B",
+                            "position": 0
+                          },
+                          {
+                            "color": "#43EFA900",
+                            "position": 1
+                          }
+                        ]
+                      },
+                      "width": 70,
+                      "height": 70
                     },
                     {
-                      "type": "text",
-                      "id": "zGMKE",
-                      "name": "Guest Sub",
-                      "fill": "$muted",
-                      "content": "登录后同步资产估值、收益走势与持仓",
-                      "fontFamily": "$font-sans",
-                      "fontSize": 11,
-                      "fontWeight": "450"
+                      "type": "ellipse",
+                      "id": "K6BNC",
+                      "x": 42,
+                      "y": 28,
+                      "name": "Guest Motion Orbit Outer",
+                      "fill": "#00000000",
+                      "width": 62,
+                      "height": 62,
+                      "stroke": "#43EFA95C",
+                      "strokeWidth": 1
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "N95vwq",
+                      "x": 58,
+                      "y": 10,
+                      "name": "Guest Motion Orbit Inner",
+                      "fill": "#00000000",
+                      "width": 40,
+                      "height": 40,
+                      "stroke": "#43EFA9A8",
+                      "strokeWidth": 2
+                    },
+                    {
+                      "type": "path",
+                      "id": "rOrBO",
+                      "x": 6,
+                      "y": 34,
+                      "name": "Guest Motion Trail",
+                      "geometry": "M0 62c14-7 22-4 34-14 13-11 20-5 32-16 12-11 22-3 32-14 10-10 16-6 22-14",
+                      "viewBox": [
+                        0,
+                        0,
+                        120,
+                        70
+                      ],
+                      "width": 110,
+                      "height": 60,
+                      "stroke": "$mint",
+                      "strokeWidth": 2,
+                      "strokeLinecap": "round"
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "IwNYp",
+                      "x": 92,
+                      "y": 30,
+                      "name": "Guest Motion Dot One",
+                      "fill": "$mint",
+                      "width": 7,
+                      "height": 7
+                    },
+                    {
+                      "type": "ellipse",
+                      "id": "TOQ5m",
+                      "x": 106,
+                      "y": 12,
+                      "name": "Guest Motion Dot Two",
+                      "fill": "#FFFFFF",
+                      "width": 4,
+                      "height": 4
                     }
                   ]
                 },
                 {
                   "type": "frame",
-                  "id": "nPJhR",
-                  "name": "Guest Bottom",
-                  "width": "fill_container",
-                  "layout": "vertical",
-                  "gap": 10,
+                  "id": "gBLcg",
+                  "layoutPosition": "absolute",
+                  "x": 0,
+                  "y": 0,
+                  "name": "Guest Motion Content",
+                  "width": 358,
+                  "height": 128,
+                  "gap": 12,
+                  "padding": [
+                    18,
+                    16
+                  ],
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
                   "children": [
                     {
                       "type": "frame",
-                      "id": "y6qO9",
-                      "name": "Guest Login CTA",
+                      "id": "q1Rg2",
+                      "name": "Guest Asset Copy",
                       "width": "fill_container",
-                      "height": 48,
-                      "fill": "$mint",
-                      "cornerRadius": 4,
-                      "gap": 8,
-                      "justifyContent": "center",
-                      "alignItems": "center",
+                      "layout": "vertical",
+                      "gap": 4,
                       "children": [
                         {
-                          "type": "text",
-                          "id": "T7Qer0",
-                          "name": "CTA Label",
-                          "fill": "#07110D",
-                          "content": "去登录",
-                          "fontFamily": "$font-sans",
-                          "fontSize": 13,
-                          "fontWeight": "650"
+                          "type": "frame",
+                          "id": "wDMPK",
+                          "name": "Guest Asset Label Row",
+                          "gap": 5,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "RYe7a",
+                              "name": "Guest Asset Label",
+                              "fill": "$muted",
+                              "content": "资产账户",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 12,
+                              "fontWeight": "500"
+                            },
+                            {
+                              "type": "icon",
+                              "id": "bwAdU",
+                              "name": "Guest Asset Lock",
+                              "width": 13,
+                              "height": 13,
+                              "icon": "lock-keyhole",
+                              "library": "lucide",
+                              "fill": "$muted"
+                            }
+                          ]
                         },
                         {
-                          "type": "icon",
-                          "id": "QhKhr",
-                          "name": "CTA Arrow",
-                          "width": 16,
-                          "height": 16,
-                          "icon": "arrow-right",
-                          "library": "lucide",
-                          "fill": "#07110D"
+                          "type": "text",
+                          "id": "l2IeWI",
+                          "name": "Guest Asset Title",
+                          "fill": "$text",
+                          "content": "登录后解锁资产视图",
+                          "fontFamily": "$font-sans",
+                          "fontSize": 16,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "i4siPY",
+                          "name": "Guest Asset Description",
+                          "fill": "$muted",
+                          "content": "查看余额、收益与持仓",
+                          "fontFamily": "$font-sans",
+                          "fontSize": 11,
+                          "fontWeight": "450"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "JwFeB",
+                      "name": "Guest Auth Actions",
+                      "width": 78,
+                      "layout": "vertical",
+                      "gap": 6,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "cGjdy",
+                          "name": "Guest Login Action",
+                          "width": 78,
+                          "height": 30,
+                          "fill": "$mint",
+                          "cornerRadius": 4,
+                          "gap": 4,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "R6zAo",
+                              "name": "Guest Login Icon",
+                              "width": 14,
+                              "height": 14,
+                              "icon": "log-in",
+                              "library": "lucide",
+                              "fill": "#07110D"
+                            },
+                            {
+                              "type": "text",
+                              "id": "Ko3rp",
+                              "name": "Guest Login Label",
+                              "fill": "#07110D",
+                              "content": "登录",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 12,
+                              "fontWeight": "650"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "zRGhH",
+                          "name": "Guest Register Action",
+                          "width": 78,
+                          "height": 30,
+                          "fill": "#111B17",
+                          "cornerRadius": 4,
+                          "stroke": "$border",
+                          "strokeWidth": 1,
+                          "strokeAlignment": "inner",
+                          "gap": 4,
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "icon",
+                              "id": "H8p1Y1",
+                              "name": "Guest Register Icon",
+                              "width": 14,
+                              "height": 14,
+                              "icon": "user-plus",
+                              "library": "lucide",
+                              "fill": "$text"
+                            },
+                            {
+                              "type": "text",
+                              "id": "ISK16",
+                              "name": "Guest Register Label",
+                              "fill": "$text",
+                              "content": "注册",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 12,
+                              "fontWeight": "650"
+                            }
+                          ]
                         }
                       ]
                     }
@@ -5701,21 +6081,24 @@
         {
           "type": "frame",
           "id": "KhrN7",
+          "x": 0,
+          "y": 342,
           "name": "Funding Actions",
-          "width": "fill_container",
+          "enabled": false,
+          "width": "fill_container(390)",
           "height": 64,
           "gap": 8,
           "padding": [
-            12,
+            8,
             16
           ],
           "children": [
             {
               "type": "frame",
               "id": "LjQvF",
-              "name": "Buy Crypto",
+              "name": "Quick Deposit",
               "width": "fill_container",
-              "height": 52,
+              "height": 48,
               "fill": "$mint",
               "cornerRadius": 4,
               "stroke": "$mint",
@@ -5732,19 +6115,19 @@
                 {
                   "type": "icon",
                   "id": "yM7g3",
-                  "name": "Buy Crypto Icon",
+                  "name": "Quick Deposit Icon",
                   "width": 18,
                   "height": 18,
-                  "icon": "credit-card",
+                  "icon": "zap",
                   "library": "lucide",
                   "fill": "#07110D"
                 },
                 {
                   "type": "text",
                   "id": "qKxlL",
-                  "name": "Buy Crypto Label",
+                  "name": "Quick Deposit Label",
                   "fill": "#07110D",
-                  "content": "买币",
+                  "content": "快捷充币",
                   "lineHeight": 1.25,
                   "fontFamily": "$font-sans",
                   "fontSize": 14,
@@ -5755,9 +6138,9 @@
             {
               "type": "frame",
               "id": "FPDNe",
-              "name": "Deposit",
+              "name": "Onchain Deposit",
               "width": "fill_container",
-              "height": 52,
+              "height": 48,
               "fill": "$surface",
               "cornerRadius": 4,
               "stroke": "$border",
@@ -5774,7 +6157,7 @@
                 {
                   "type": "icon",
                   "id": "P1BaFO",
-                  "name": "Deposit Icon",
+                  "name": "Onchain Deposit Icon",
                   "width": 18,
                   "height": 18,
                   "icon": "arrow-down-left",
@@ -5784,9 +6167,9 @@
                 {
                   "type": "text",
                   "id": "txDdy",
-                  "name": "Deposit Label",
+                  "name": "Onchain Deposit Label",
                   "fill": "$text",
-                  "content": "充币",
+                  "content": "链上充币",
                   "lineHeight": 1.25,
                   "fontFamily": "$font-sans",
                   "fontSize": 14,
@@ -6253,15 +6636,17 @@
         {
           "type": "frame",
           "id": "w2hy2C",
-          "name": "Market Brief",
+          "name": "Home Promotion Carousel",
           "width": "fill_container",
-          "height": 80,
           "fill": "#00000000",
           "stroke": "#00000000",
           "strokeAlignment": "inner",
-          "gap": 12,
+          "layout": "vertical",
+          "gap": 8,
           "padding": [
             8,
+            16,
+            0,
             16
           ],
           "alignItems": "center",
@@ -6269,95 +6654,195 @@
             {
               "type": "frame",
               "id": "o9Yfbn",
-              "name": "Brief Card",
+              "name": "Carousel Slide / Invite Friends",
               "width": "fill_container",
-              "height": 64,
-              "fill": "#121714",
-              "cornerRadius": 12,
-              "stroke": "$border",
-              "strokeWidth": 1,
+              "height": 108,
+              "fill": "#1C1F22",
+              "cornerRadius": "$radius-m",
+              "stroke": "#00000000",
               "gap": 12,
               "padding": [
-                12,
-                14
+                14,
+                18
               ],
               "alignItems": "center",
               "children": [
                 {
                   "type": "frame",
-                  "id": "EbzFl",
-                  "name": "Brief Icon Plate",
-                  "width": 36,
-                  "height": 36,
-                  "fill": "$mint-soft",
-                  "cornerRadius": 10,
-                  "justifyContent": "center",
-                  "alignItems": "center",
+                  "id": "aomnL",
+                  "name": "Slide Copy",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 8,
                   "children": [
                     {
-                      "type": "icon",
-                      "id": "KEqlB",
-                      "name": "Brief Icon",
-                      "width": 20,
-                      "height": 20,
-                      "icon": "newspaper",
-                      "library": "lucide",
-                      "fill": "$mint-strong"
+                      "type": "frame",
+                      "id": "UziyR",
+                      "name": "Slide Heading",
+                      "width": "fill_container",
+                      "gap": 6,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "biMOb",
+                          "name": "Slide Title",
+                          "fill": "#F3F5F6",
+                          "content": "邀请好友",
+                          "lineHeight": 1.3,
+                          "fontFamily": "$font-sans",
+                          "fontSize": 17,
+                          "fontWeight": "650"
+                        },
+                        {
+                          "type": "icon",
+                          "id": "JRa7z",
+                          "name": "Open Invitation Details",
+                          "width": 18,
+                          "height": 18,
+                          "icon": "chevron-right",
+                          "library": "lucide",
+                          "fill": "#F3F5F6"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "vPRxI",
+                      "name": "Slide Description",
+                      "fill": "#AEB5BC",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "分享专属邀请码，邀请好友加入。\n查看邀请记录，了解活动规则。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12
                     }
                   ]
                 },
                 {
                   "type": "frame",
-                  "id": "eIcRq",
-                  "name": "Brief Copy",
-                  "width": "fill_container",
-                  "layout": "vertical",
-                  "gap": 3,
+                  "id": "H2hRvF",
+                  "name": "Referral Gift Artwork",
+                  "width": 76,
+                  "height": 76,
+                  "layout": "none",
                   "children": [
                     {
-                      "type": "text",
-                      "id": "QdkoH",
-                      "name": "Brief Eyebrow",
-                      "fill": "$mint",
-                      "content": "AI 行情日报",
-                      "lineHeight": 1.25,
-                      "fontFamily": "$font-sans",
-                      "fontSize": 10,
-                      "fontWeight": "650"
+                      "type": "rectangle",
+                      "cornerRadius": 10,
+                      "id": "wbBfG",
+                      "x": 6,
+                      "y": 18,
+                      "name": "Illustration Sheet",
+                      "fill": "#26302B",
+                      "width": 64,
+                      "height": 48
                     },
                     {
-                      "type": "text",
-                      "id": "IENp0",
-                      "name": "Brief Title",
-                      "fill": "#FFFFFF",
-                      "content": "三分钟读懂今日市场",
-                      "lineHeight": 1.25,
-                      "fontFamily": "$font-sans",
-                      "fontSize": 14,
-                      "fontWeight": "650"
+                      "type": "ellipse",
+                      "id": "DT0nM",
+                      "x": 27,
+                      "y": 7,
+                      "name": "Reward Coin",
+                      "fill": "#FFB300",
+                      "width": 30,
+                      "height": 30
                     },
                     {
-                      "type": "text",
-                      "id": "jcBFr",
-                      "name": "Brief Detail",
-                      "fill": "#9BA8A1",
-                      "content": "暂无平台公告",
-                      "lineHeight": 1.25,
-                      "fontFamily": "$font-sans",
-                      "fontSize": 10,
-                      "fontWeight": "450"
+                      "type": "icon",
+                      "id": "dKm1N",
+                      "x": 24,
+                      "y": 32,
+                      "name": "Invite Users",
+                      "width": 28,
+                      "height": 28,
+                      "icon": "user-round",
+                      "library": "lucide",
+                      "fill": "#F3F5F6"
+                    },
+                    {
+                      "type": "icon",
+                      "id": "Z10qqQ",
+                      "x": 36,
+                      "y": 15,
+                      "name": "Coin Sparkle",
+                      "width": 12,
+                      "height": 12,
+                      "icon": "sparkles",
+                      "library": "lucide",
+                      "fill": "#FFFFFF"
+                    },
+                    {
+                      "type": "icon",
+                      "id": "jPUYv",
+                      "x": 55,
+                      "y": 5,
+                      "name": "Invite Plus",
+                      "width": 13,
+                      "height": 13,
+                      "icon": "plus",
+                      "library": "lucide",
+                      "fill": "#D8E0DC"
                     }
                   ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "blXOm",
+              "name": "Carousel Pagination / Slide 1 of 5",
+              "width": "fill_container",
+              "height": 20,
+              "gap": 6,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 3,
+                  "id": "v0tt1",
+                  "name": "Current Slide Indicator",
+                  "fill": "#43EFA9",
+                  "width": 18,
+                  "height": 5
                 },
                 {
-                  "type": "icon",
-                  "id": "jVq8E",
-                  "name": "Brief Arrow",
-                  "width": 18,
-                  "height": 18,
-                  "icon": "chevron-right",
-                  "library": "lucide",
-                  "fill": "#FFFFFF"
+                  "type": "rectangle",
+                  "cornerRadius": 3,
+                  "id": "daZ9F",
+                  "name": "Slide 2 Indicator",
+                  "fill": "#3C4348",
+                  "width": 5,
+                  "height": 5
+                },
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 3,
+                  "id": "AaRR0",
+                  "name": "Slide 3 Indicator",
+                  "fill": "#3C4348",
+                  "width": 5,
+                  "height": 5
+                },
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 3,
+                  "id": "Jqv9L",
+                  "name": "Slide 4 Indicator",
+                  "fill": "#3C4348",
+                  "width": 5,
+                  "height": 5
+                },
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 3,
+                  "id": "VmtGX",
+                  "name": "Slide 5 Indicator",
+                  "fill": "#3C4348",
+                  "width": 5,
+                  "height": 5
                 }
               ]
             }
@@ -7371,7 +7856,7 @@
                 "type": "image",
                 "enabled": true,
                 "url": "images/hippo-logo.png",
-                "mode": "fit"
+                "mode": "contain"
               },
               "width": 136,
               "height": 34
@@ -7544,7 +8029,7 @@
           "padding": [
             16,
             16,
-            0,
+            8,
             16
           ],
           "children": [
@@ -7553,6 +8038,7 @@
               "id": "N5cisL",
               "name": "Portfolio Head",
               "width": "fill_container",
+              "height": 104,
               "padding": [
                 6,
                 0,
@@ -7566,6 +8052,7 @@
                   "type": "frame",
                   "id": "wuOhh",
                   "name": "Portfolio Value",
+                  "width": "fill_container",
                   "layout": "vertical",
                   "gap": 6,
                   "children": [
@@ -7626,263 +8113,117 @@
                           "fontWeight": "500"
                         }
                       ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "cJcvD",
+                      "name": "Today Return",
+                      "width": "fill_container",
+                      "gap": 4,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "EF1uv",
+                          "name": "Today Label",
+                          "fill": "$muted",
+                          "content": "今日收益",
+                          "fontFamily": "$font-sans",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "l2494q",
+                          "name": "Today Value",
+                          "fill": "$mint-strong",
+                          "content": "+1,204.55",
+                          "fontFamily": "$font-data",
+                          "fontSize": 16,
+                          "fontWeight": "650"
+                        },
+                        {
+                          "type": "text",
+                          "id": "OkHRm",
+                          "name": "Today Percent",
+                          "fill": "$mint-strong",
+                          "content": "+4.85%",
+                          "fontFamily": "$font-data",
+                          "fontSize": 11,
+                          "fontWeight": "550"
+                        }
+                      ]
                     }
                   ]
                 },
                 {
                   "type": "frame",
-                  "id": "cJcvD",
-                  "name": "Today Return",
-                  "layout": "vertical",
-                  "gap": 6,
-                  "alignItems": "end",
+                  "id": "A9Md6",
+                  "name": "Portfolio Signal",
+                  "clip": true,
+                  "width": 120,
+                  "height": 86,
+                  "layout": "none",
                   "children": [
                     {
-                      "type": "text",
-                      "id": "EF1uv",
-                      "name": "Today Label",
-                      "fill": "$muted",
-                      "content": "今日收益",
-                      "fontFamily": "$font-sans",
-                      "fontSize": 11,
-                      "fontWeight": "500"
+                      "type": "path",
+                      "id": "tBHuh",
+                      "x": 0,
+                      "y": 0,
+                      "name": "Signal Stroke",
+                      "geometry": "M0 60c12-8 20-5 31-12 11-7 19-3 30-9 12-7 21-4 33-11 12-7 19-4 26-12",
+                      "viewBox": [
+                        0,
+                        0,
+                        120,
+                        80
+                      ],
+                      "width": 120,
+                      "height": 80,
+                      "stroke": "$mint",
+                      "strokeWidth": 2,
+                      "strokeLinecap": "round"
                     },
                     {
-                      "type": "text",
-                      "id": "l2494q",
-                      "name": "Today Value",
-                      "fill": "$mint-strong",
-                      "content": "+1,204.55",
-                      "fontFamily": "$font-data",
-                      "fontSize": 18,
-                      "fontWeight": "650"
-                    },
-                    {
-                      "type": "text",
-                      "id": "OkHRm",
-                      "name": "Today Percent",
-                      "fill": "$mint-strong",
-                      "content": "+4.85%",
-                      "fontFamily": "$font-data",
-                      "fontSize": 11,
-                      "fontWeight": "550"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "type": "frame",
-              "id": "A9Md6",
-              "name": "Portfolio Signal",
-              "clip": true,
-              "width": "fill_container",
-              "height": 153,
-              "layout": "none",
-              "children": [
-                {
-                  "type": "rectangle",
-                  "id": "VJw4o",
-                  "x": 0,
-                  "y": 30,
-                  "name": "Signal H30",
-                  "fill": "$hairline",
-                  "width": 358,
-                  "height": 1
-                },
-                {
-                  "type": "rectangle",
-                  "id": "fxEOJ",
-                  "x": 0,
-                  "y": 60,
-                  "name": "Signal H60",
-                  "fill": "$hairline",
-                  "width": 358,
-                  "height": 1
-                },
-                {
-                  "type": "rectangle",
-                  "id": "qL3pY",
-                  "x": 0,
-                  "y": 90,
-                  "name": "Signal H90",
-                  "fill": "$hairline",
-                  "width": 358,
-                  "height": 1
-                },
-                {
-                  "type": "rectangle",
-                  "id": "ZTF16",
-                  "x": 0,
-                  "y": 120,
-                  "name": "Signal H120",
-                  "fill": "$hairline",
-                  "width": 358,
-                  "height": 1
-                },
-                {
-                  "type": "path",
-                  "id": "tBHuh",
-                  "x": 0,
-                  "y": 0,
-                  "name": "Signal Stroke",
-                  "geometry": "M0 128c30-4 48-20 78-16 30 4 50-28 84-20 34 8 54-34 90-24 36 10 60-34 88-26 10 3 16-4 18-6",
-                  "viewBox": [
-                    0,
-                    0,
-                    358,
-                    150
-                  ],
-                  "width": 358,
-                  "height": 150,
-                  "stroke": "$mint",
-                  "strokeWidth": 2,
-                  "strokeLinecap": "round"
-                },
-                {
-                  "type": "ellipse",
-                  "id": "a0zGv",
-                  "x": 341,
-                  "y": 19,
-                  "name": "Signal Glow",
-                  "fill": {
-                    "type": "gradient",
-                    "gradientType": "radial",
-                    "enabled": true,
-                    "rotation": 0,
-                    "size": {
-                      "width": 1,
-                      "height": 1
-                    },
-                    "colors": [
-                      {
-                        "color": "#43EFA973",
-                        "position": 0
+                      "type": "ellipse",
+                      "id": "a0zGv",
+                      "x": 92,
+                      "y": 1,
+                      "name": "Signal Glow",
+                      "fill": {
+                        "type": "gradient",
+                        "gradientType": "radial",
+                        "enabled": true,
+                        "rotation": 0,
+                        "size": {
+                          "width": 1,
+                          "height": 1
+                        },
+                        "colors": [
+                          {
+                            "color": "#43EFA973",
+                            "position": 0
+                          },
+                          {
+                            "color": "#43EFA900",
+                            "position": 1
+                          }
+                        ]
                       },
-                      {
-                        "color": "#43EFA900",
-                        "position": 1
-                      }
-                    ]
-                  },
-                  "width": 34,
-                  "height": 34
-                },
-                {
-                  "type": "ellipse",
-                  "id": "ngVO1",
-                  "x": 353,
-                  "y": 31,
-                  "name": "Signal Dot",
-                  "fill": "$mint",
-                  "width": 10,
-                  "height": 10,
-                  "stroke": "$surface",
-                  "strokeWidth": 2
-                }
-              ]
-            },
-            {
-              "type": "frame",
-              "id": "d8Zsm",
-              "name": "Portfolio Periods",
-              "width": "fill_container",
-              "gap": 8,
-              "padding": [
-                4,
-                0,
-                0,
-                0
-              ],
-              "children": [
-                {
-                  "type": "frame",
-                  "id": "H9I3gp",
-                  "name": "Period 1 天",
-                  "width": "fill_container",
-                  "height": 32,
-                  "fill": "#00000000",
-                  "cornerRadius": 4,
-                  "stroke": "#00000000",
-                  "strokeAlignment": "inner",
-                  "justifyContent": "center",
-                  "alignItems": "center",
-                  "children": [
+                      "width": 28,
+                      "height": 28
+                    },
                     {
-                      "type": "text",
-                      "id": "VUC2e",
-                      "name": "Period Label",
-                      "fill": "$mint-strong",
-                      "content": "1 天",
-                      "fontFamily": "$font-data",
-                      "fontSize": 11,
-                      "fontWeight": "700"
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "VEj28",
-                  "name": "Period 7 天",
-                  "width": "fill_container",
-                  "height": 32,
-                  "cornerRadius": 4,
-                  "justifyContent": "center",
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "cTMFU",
-                      "name": "Period Label",
-                      "fill": "$muted",
-                      "content": "7 天",
-                      "fontFamily": "$font-data",
-                      "fontSize": 11,
-                      "fontWeight": "500"
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "c2kc4S",
-                  "name": "Period 30 天",
-                  "width": "fill_container",
-                  "height": 32,
-                  "cornerRadius": 4,
-                  "justifyContent": "center",
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "O7G24",
-                      "name": "Period Label",
-                      "fill": "$muted",
-                      "content": "30 天",
-                      "fontFamily": "$font-data",
-                      "fontSize": 11,
-                      "fontWeight": "500"
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "Bwntq",
-                  "name": "Period 180 天",
-                  "width": "fill_container",
-                  "height": 32,
-                  "cornerRadius": 4,
-                  "justifyContent": "center",
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "sXBXc",
-                      "name": "Period Label",
-                      "fill": "$muted",
-                      "content": "180 天",
-                      "fontFamily": "$font-data",
-                      "fontSize": 11,
-                      "fontWeight": "500"
+                      "type": "ellipse",
+                      "id": "ngVO1",
+                      "x": 111,
+                      "y": 12,
+                      "name": "Signal Dot",
+                      "fill": "$mint",
+                      "width": 8,
+                      "height": 8,
+                      "stroke": "$surface",
+                      "strokeWidth": 2
                     }
                   ]
                 }
@@ -7927,7 +8268,7 @@
                   "name": "Buy Crypto Icon",
                   "width": 18,
                   "height": 18,
-                  "icon": "credit-card",
+                  "icon": "zap",
                   "library": "lucide",
                   "fill": "#07110D"
                 },
@@ -7936,7 +8277,7 @@
                   "id": "l4vYj",
                   "name": "Buy Crypto Label",
                   "fill": "#07110D",
-                  "content": "买币",
+                  "content": "快捷充币",
                   "lineHeight": 1.25,
                   "fontFamily": "$font-sans",
                   "fontSize": 14,
@@ -7978,7 +8319,7 @@
                   "id": "k6cJ4Q",
                   "name": "Deposit Label",
                   "fill": "$canvas",
-                  "content": "充币",
+                  "content": "链上充币",
                   "lineHeight": 1.25,
                   "fontFamily": "$font-sans",
                   "fontSize": 14,
@@ -8445,15 +8786,17 @@
         {
           "type": "frame",
           "id": "r8zcT",
-          "name": "Market Brief",
+          "name": "Home Promotion Carousel",
           "width": "fill_container",
-          "height": 80,
           "fill": "#00000000",
           "stroke": "#00000000",
           "strokeAlignment": "inner",
-          "gap": 12,
+          "layout": "vertical",
+          "gap": 8,
           "padding": [
             8,
+            16,
+            0,
             16
           ],
           "alignItems": "center",
@@ -8461,94 +8804,195 @@
             {
               "type": "frame",
               "id": "nN1ky",
-              "name": "Brief Card",
+              "name": "Carousel Slide / Invite Friends",
               "width": "fill_container",
-              "height": 64,
-              "fill": "#07110D",
-              "cornerRadius": 12,
+              "height": 108,
+              "fill": "#F0F1F2",
+              "cornerRadius": "$radius-m",
               "stroke": "#00000000",
               "gap": 12,
               "padding": [
-                12,
-                14
+                14,
+                18
               ],
               "alignItems": "center",
               "children": [
                 {
                   "type": "frame",
-                  "id": "tPb8c",
-                  "name": "Brief Icon Plate",
-                  "width": 36,
-                  "height": 36,
-                  "fill": "$mint-soft",
-                  "cornerRadius": 10,
-                  "justifyContent": "center",
-                  "alignItems": "center",
+                  "id": "eLmkD",
+                  "name": "Slide Copy",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 8,
                   "children": [
                     {
-                      "type": "icon",
-                      "id": "JBtBz",
-                      "name": "Brief Icon",
-                      "width": 20,
-                      "height": 20,
-                      "icon": "newspaper",
-                      "library": "lucide",
-                      "fill": "$mint-strong"
+                      "type": "frame",
+                      "id": "vQa0w",
+                      "name": "Slide Heading",
+                      "width": "fill_container",
+                      "gap": 6,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "QNWkh",
+                          "name": "Slide Title",
+                          "fill": "#17191B",
+                          "content": "邀请好友",
+                          "lineHeight": 1.3,
+                          "fontFamily": "$font-sans",
+                          "fontSize": 17,
+                          "fontWeight": "650"
+                        },
+                        {
+                          "type": "icon",
+                          "id": "CBVor",
+                          "name": "Open Invitation Details",
+                          "width": 18,
+                          "height": 18,
+                          "icon": "chevron-right",
+                          "library": "lucide",
+                          "fill": "#17191B"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "SuijI",
+                      "name": "Slide Description",
+                      "fill": "#60666C",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "分享专属邀请码，邀请好友加入。\n查看邀请记录，了解活动规则。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12
                     }
                   ]
                 },
                 {
                   "type": "frame",
-                  "id": "H6D6i",
-                  "name": "Brief Copy",
-                  "width": "fill_container",
-                  "layout": "vertical",
-                  "gap": 3,
+                  "id": "n9XHp",
+                  "name": "Referral Gift Artwork",
+                  "width": 76,
+                  "height": 76,
+                  "layout": "none",
                   "children": [
                     {
-                      "type": "text",
-                      "id": "upggR",
-                      "name": "Brief Eyebrow",
-                      "fill": "$mint",
-                      "content": "AI 行情日报",
-                      "lineHeight": 1.25,
-                      "fontFamily": "$font-sans",
-                      "fontSize": 10,
-                      "fontWeight": "650"
+                      "type": "rectangle",
+                      "cornerRadius": 10,
+                      "id": "u8zN6C",
+                      "x": 6,
+                      "y": 18,
+                      "name": "Illustration Sheet",
+                      "fill": "#E1E5E7",
+                      "width": 64,
+                      "height": 48
                     },
                     {
-                      "type": "text",
-                      "id": "qSLQk",
-                      "name": "Brief Title",
-                      "fill": "#FFFFFF",
-                      "content": "三分钟读懂今日市场",
-                      "lineHeight": 1.25,
-                      "fontFamily": "$font-sans",
-                      "fontSize": 14,
-                      "fontWeight": "650"
+                      "type": "ellipse",
+                      "id": "moAlG",
+                      "x": 27,
+                      "y": 7,
+                      "name": "Reward Coin",
+                      "fill": "#FFB300",
+                      "width": 30,
+                      "height": 30
                     },
                     {
-                      "type": "text",
-                      "id": "tllCr",
-                      "name": "Brief Detail",
-                      "fill": "#9BA8A1",
-                      "content": "暂无平台公告",
-                      "lineHeight": 1.25,
-                      "fontFamily": "$font-sans",
-                      "fontSize": 10,
-                      "fontWeight": "450"
+                      "type": "icon",
+                      "id": "tXeYa",
+                      "x": 24,
+                      "y": 32,
+                      "name": "Invite Users",
+                      "width": 28,
+                      "height": 28,
+                      "icon": "user-round",
+                      "library": "lucide",
+                      "fill": "#252A2E"
+                    },
+                    {
+                      "type": "icon",
+                      "id": "A9P8CG",
+                      "x": 36,
+                      "y": 15,
+                      "name": "Coin Sparkle",
+                      "width": 12,
+                      "height": 12,
+                      "icon": "sparkles",
+                      "library": "lucide",
+                      "fill": "#FFFFFF"
+                    },
+                    {
+                      "type": "icon",
+                      "id": "s4am9w",
+                      "x": 55,
+                      "y": 5,
+                      "name": "Invite Plus",
+                      "width": 13,
+                      "height": 13,
+                      "icon": "plus",
+                      "library": "lucide",
+                      "fill": "#535A5F"
                     }
                   ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "gqhmO",
+              "name": "Carousel Pagination / Slide 1 of 5",
+              "width": "fill_container",
+              "height": 20,
+              "gap": 6,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 3,
+                  "id": "z9xO3",
+                  "name": "Current Slide Indicator",
+                  "fill": "#078454",
+                  "width": 18,
+                  "height": 5
                 },
                 {
-                  "type": "icon",
-                  "id": "rgVrw",
-                  "name": "Brief Arrow",
-                  "width": 18,
-                  "height": 18,
-                  "icon": "chevron-right",
-                  "library": "lucide",
-                  "fill": "#FFFFFF"
+                  "type": "rectangle",
+                  "cornerRadius": 3,
+                  "id": "jgVMn",
+                  "name": "Slide 2 Indicator",
+                  "fill": "#D5D9DC",
+                  "width": 5,
+                  "height": 5
+                },
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 3,
+                  "id": "WwpZZ",
+                  "name": "Slide 3 Indicator",
+                  "fill": "#D5D9DC",
+                  "width": 5,
+                  "height": 5
+                },
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 3,
+                  "id": "U0JqIr",
+                  "name": "Slide 4 Indicator",
+                  "fill": "#D5D9DC",
+                  "width": 5,
+                  "height": 5
+                },
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 3,
+                  "id": "L4lh2J",
+                  "name": "Slide 5 Indicator",
+                  "fill": "#D5D9DC",
+                  "width": 5,
+                  "height": 5
                 }
               ]
             }
@@ -9562,7 +10006,7 @@
                 "type": "image",
                 "enabled": true,
                 "url": "images/hippo-logo.png",
-                "mode": "fit"
+                "mode": "contain"
               },
               "width": 136,
               "height": 34
@@ -9735,7 +10179,7 @@
           "padding": [
             16,
             16,
-            0,
+            8,
             16
           ],
           "children": [
@@ -9744,6 +10188,7 @@
               "id": "qTMPM",
               "name": "Portfolio Head",
               "width": "fill_container",
+              "height": 104,
               "padding": [
                 6,
                 0,
@@ -9757,6 +10202,7 @@
                   "type": "frame",
                   "id": "E9qfN",
                   "name": "Portfolio Value",
+                  "width": "fill_container",
                   "layout": "vertical",
                   "gap": 6,
                   "children": [
@@ -9817,263 +10263,116 @@
                           "fontWeight": "500"
                         }
                       ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "B16IpY",
+                      "name": "Today Return",
+                      "gap": 4,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "Io6aZ",
+                          "name": "Today Label",
+                          "fill": "$muted",
+                          "content": "今日收益",
+                          "fontFamily": "$font-sans",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "F3DgBu",
+                          "name": "Today Value",
+                          "fill": "$mint-strong",
+                          "content": "+1,204.55",
+                          "fontFamily": "$font-data",
+                          "fontSize": 16,
+                          "fontWeight": "650"
+                        },
+                        {
+                          "type": "text",
+                          "id": "dAs87",
+                          "name": "Today Percent",
+                          "fill": "$mint-strong",
+                          "content": "+4.85%",
+                          "fontFamily": "$font-data",
+                          "fontSize": 11,
+                          "fontWeight": "550"
+                        }
+                      ]
                     }
                   ]
                 },
                 {
                   "type": "frame",
-                  "id": "B16IpY",
-                  "name": "Today Return",
-                  "layout": "vertical",
-                  "gap": 6,
-                  "alignItems": "end",
+                  "id": "YX8P5",
+                  "name": "Portfolio Signal",
+                  "clip": true,
+                  "width": 120,
+                  "height": 86,
+                  "layout": "none",
                   "children": [
                     {
-                      "type": "text",
-                      "id": "Io6aZ",
-                      "name": "Today Label",
-                      "fill": "$muted",
-                      "content": "今日收益",
-                      "fontFamily": "$font-sans",
-                      "fontSize": 11,
-                      "fontWeight": "500"
+                      "type": "path",
+                      "id": "doGey",
+                      "x": 0,
+                      "y": 0,
+                      "name": "Signal Stroke",
+                      "geometry": "M0 60c12-8 20-5 31-12 11-7 19-3 30-9 12-7 21-4 33-11 12-7 19-4 26-12",
+                      "viewBox": [
+                        0,
+                        0,
+                        120,
+                        80
+                      ],
+                      "width": 120,
+                      "height": 80,
+                      "stroke": "$mint",
+                      "strokeWidth": 2,
+                      "strokeLinecap": "round"
                     },
                     {
-                      "type": "text",
-                      "id": "F3DgBu",
-                      "name": "Today Value",
-                      "fill": "$mint-strong",
-                      "content": "+1,204.55",
-                      "fontFamily": "$font-data",
-                      "fontSize": 18,
-                      "fontWeight": "650"
-                    },
-                    {
-                      "type": "text",
-                      "id": "dAs87",
-                      "name": "Today Percent",
-                      "fill": "$mint-strong",
-                      "content": "+4.85%",
-                      "fontFamily": "$font-data",
-                      "fontSize": 11,
-                      "fontWeight": "550"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "type": "frame",
-              "id": "YX8P5",
-              "name": "Portfolio Signal",
-              "clip": true,
-              "width": "fill_container",
-              "height": 153,
-              "layout": "none",
-              "children": [
-                {
-                  "type": "rectangle",
-                  "id": "Xc2yP",
-                  "x": 0,
-                  "y": 30,
-                  "name": "Signal H30",
-                  "fill": "$hairline",
-                  "width": 358,
-                  "height": 1
-                },
-                {
-                  "type": "rectangle",
-                  "id": "yVEdU",
-                  "x": 0,
-                  "y": 60,
-                  "name": "Signal H60",
-                  "fill": "$hairline",
-                  "width": 358,
-                  "height": 1
-                },
-                {
-                  "type": "rectangle",
-                  "id": "rKgFg",
-                  "x": 0,
-                  "y": 90,
-                  "name": "Signal H90",
-                  "fill": "$hairline",
-                  "width": 358,
-                  "height": 1
-                },
-                {
-                  "type": "rectangle",
-                  "id": "q4PsB",
-                  "x": 0,
-                  "y": 120,
-                  "name": "Signal H120",
-                  "fill": "$hairline",
-                  "width": 358,
-                  "height": 1
-                },
-                {
-                  "type": "path",
-                  "id": "doGey",
-                  "x": 0,
-                  "y": 0,
-                  "name": "Signal Stroke",
-                  "geometry": "M0 128c30-4 48-20 78-16 30 4 50-28 84-20 34 8 54-34 90-24 36 10 60-34 88-26 10 3 16-4 18-6",
-                  "viewBox": [
-                    0,
-                    0,
-                    358,
-                    150
-                  ],
-                  "width": 358,
-                  "height": 150,
-                  "stroke": "$mint",
-                  "strokeWidth": 2,
-                  "strokeLinecap": "round"
-                },
-                {
-                  "type": "ellipse",
-                  "id": "IVixB",
-                  "x": 341,
-                  "y": 19,
-                  "name": "Signal Glow",
-                  "fill": {
-                    "type": "gradient",
-                    "gradientType": "radial",
-                    "enabled": true,
-                    "rotation": 0,
-                    "size": {
-                      "width": 1,
-                      "height": 1
-                    },
-                    "colors": [
-                      {
-                        "color": "#43EFA973",
-                        "position": 0
+                      "type": "ellipse",
+                      "id": "IVixB",
+                      "x": 92,
+                      "y": 1,
+                      "name": "Signal Glow",
+                      "fill": {
+                        "type": "gradient",
+                        "gradientType": "radial",
+                        "enabled": true,
+                        "rotation": 0,
+                        "size": {
+                          "width": 1,
+                          "height": 1
+                        },
+                        "colors": [
+                          {
+                            "color": "#43EFA973",
+                            "position": 0
+                          },
+                          {
+                            "color": "#43EFA900",
+                            "position": 1
+                          }
+                        ]
                       },
-                      {
-                        "color": "#43EFA900",
-                        "position": 1
-                      }
-                    ]
-                  },
-                  "width": 34,
-                  "height": 34
-                },
-                {
-                  "type": "ellipse",
-                  "id": "rat25",
-                  "x": 353,
-                  "y": 31,
-                  "name": "Signal Dot",
-                  "fill": "$mint",
-                  "width": 10,
-                  "height": 10,
-                  "stroke": "$surface",
-                  "strokeWidth": 2
-                }
-              ]
-            },
-            {
-              "type": "frame",
-              "id": "IruMb",
-              "name": "Portfolio Periods",
-              "width": "fill_container",
-              "gap": 8,
-              "padding": [
-                4,
-                0,
-                0,
-                0
-              ],
-              "children": [
-                {
-                  "type": "frame",
-                  "id": "ui1TQ",
-                  "name": "Period 1 天",
-                  "width": "fill_container",
-                  "height": 32,
-                  "fill": "#00000000",
-                  "cornerRadius": 4,
-                  "stroke": "#00000000",
-                  "strokeAlignment": "inner",
-                  "justifyContent": "center",
-                  "alignItems": "center",
-                  "children": [
+                      "width": 28,
+                      "height": 28
+                    },
                     {
-                      "type": "text",
-                      "id": "bshuk",
-                      "name": "Period Label",
-                      "fill": "$mint-strong",
-                      "content": "1 天",
-                      "fontFamily": "$font-data",
-                      "fontSize": 11,
-                      "fontWeight": "700"
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "IGvQC",
-                  "name": "Period 7 天",
-                  "width": "fill_container",
-                  "height": 32,
-                  "cornerRadius": 4,
-                  "justifyContent": "center",
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "aUS0e",
-                      "name": "Period Label",
-                      "fill": "$muted",
-                      "content": "7 天",
-                      "fontFamily": "$font-data",
-                      "fontSize": 11,
-                      "fontWeight": "500"
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "DiKl1",
-                  "name": "Period 30 天",
-                  "width": "fill_container",
-                  "height": 32,
-                  "cornerRadius": 4,
-                  "justifyContent": "center",
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "f6A6v",
-                      "name": "Period Label",
-                      "fill": "$muted",
-                      "content": "30 天",
-                      "fontFamily": "$font-data",
-                      "fontSize": 11,
-                      "fontWeight": "500"
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "Q1O5vF",
-                  "name": "Period 180 天",
-                  "width": "fill_container",
-                  "height": 32,
-                  "cornerRadius": 4,
-                  "justifyContent": "center",
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "L3UUFH",
-                      "name": "Period Label",
-                      "fill": "$muted",
-                      "content": "180 天",
-                      "fontFamily": "$font-data",
-                      "fontSize": 11,
-                      "fontWeight": "500"
+                      "type": "ellipse",
+                      "id": "rat25",
+                      "x": 111,
+                      "y": 12,
+                      "name": "Signal Dot",
+                      "fill": "$mint",
+                      "width": 8,
+                      "height": 8,
+                      "stroke": "$surface",
+                      "strokeWidth": 2
                     }
                   ]
                 }
@@ -10118,7 +10417,7 @@
                   "name": "Buy Crypto Icon",
                   "width": 18,
                   "height": 18,
-                  "icon": "credit-card",
+                  "icon": "zap",
                   "library": "lucide",
                   "fill": "#07110D"
                 },
@@ -10127,7 +10426,7 @@
                   "id": "htagD",
                   "name": "Buy Crypto Label",
                   "fill": "#07110D",
-                  "content": "买币",
+                  "content": "快捷充币",
                   "lineHeight": 1.25,
                   "fontFamily": "$font-sans",
                   "fontSize": 14,
@@ -10169,7 +10468,7 @@
                   "id": "c1iMk",
                   "name": "Deposit Label",
                   "fill": "$text",
-                  "content": "充币",
+                  "content": "链上充币",
                   "lineHeight": 1.25,
                   "fontFamily": "$font-sans",
                   "fontSize": 14,
@@ -10636,15 +10935,17 @@
         {
           "type": "frame",
           "id": "W4ql6",
-          "name": "Market Brief",
+          "name": "Home Promotion Carousel",
           "width": "fill_container",
-          "height": 80,
           "fill": "#00000000",
           "stroke": "#00000000",
           "strokeAlignment": "inner",
-          "gap": 12,
+          "layout": "vertical",
+          "gap": 8,
           "padding": [
             8,
+            16,
+            0,
             16
           ],
           "alignItems": "center",
@@ -10652,95 +10953,195 @@
             {
               "type": "frame",
               "id": "Oo7ic",
-              "name": "Brief Card",
+              "name": "Carousel Slide / Invite Friends",
               "width": "fill_container",
-              "height": 64,
-              "fill": "#121714",
-              "cornerRadius": 12,
-              "stroke": "$border",
-              "strokeWidth": 1,
+              "height": 108,
+              "fill": "#1C1F22",
+              "cornerRadius": "$radius-m",
+              "stroke": "#00000000",
               "gap": 12,
               "padding": [
-                12,
-                14
+                14,
+                18
               ],
               "alignItems": "center",
               "children": [
                 {
                   "type": "frame",
-                  "id": "IW4st",
-                  "name": "Brief Icon Plate",
-                  "width": 36,
-                  "height": 36,
-                  "fill": "$mint-soft",
-                  "cornerRadius": 10,
-                  "justifyContent": "center",
-                  "alignItems": "center",
+                  "id": "j9qko",
+                  "name": "Slide Copy",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 8,
                   "children": [
                     {
-                      "type": "icon",
-                      "id": "l7OhQU",
-                      "name": "Brief Icon",
-                      "width": 20,
-                      "height": 20,
-                      "icon": "newspaper",
-                      "library": "lucide",
-                      "fill": "$mint-strong"
+                      "type": "frame",
+                      "id": "v5aOr",
+                      "name": "Slide Heading",
+                      "width": "fill_container",
+                      "gap": 6,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "tXywk",
+                          "name": "Slide Title",
+                          "fill": "#F3F5F6",
+                          "content": "邀请好友",
+                          "lineHeight": 1.3,
+                          "fontFamily": "$font-sans",
+                          "fontSize": 17,
+                          "fontWeight": "650"
+                        },
+                        {
+                          "type": "icon",
+                          "id": "gR5pG",
+                          "name": "Open Invitation Details",
+                          "width": 18,
+                          "height": 18,
+                          "icon": "chevron-right",
+                          "library": "lucide",
+                          "fill": "#F3F5F6"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "y9WX4",
+                      "name": "Slide Description",
+                      "fill": "#AEB5BC",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "分享专属邀请码，邀请好友加入。\n查看邀请记录，了解活动规则。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12
                     }
                   ]
                 },
                 {
                   "type": "frame",
-                  "id": "myNqw",
-                  "name": "Brief Copy",
-                  "width": "fill_container",
-                  "layout": "vertical",
-                  "gap": 3,
+                  "id": "Zw6L0",
+                  "name": "Referral Gift Artwork",
+                  "width": 76,
+                  "height": 76,
+                  "layout": "none",
                   "children": [
                     {
-                      "type": "text",
-                      "id": "nLbqX",
-                      "name": "Brief Eyebrow",
-                      "fill": "$mint",
-                      "content": "AI 行情日报",
-                      "lineHeight": 1.25,
-                      "fontFamily": "$font-sans",
-                      "fontSize": 10,
-                      "fontWeight": "650"
+                      "type": "rectangle",
+                      "cornerRadius": 10,
+                      "id": "zBJFU",
+                      "x": 6,
+                      "y": 18,
+                      "name": "Illustration Sheet",
+                      "fill": "#26302B",
+                      "width": 64,
+                      "height": 48
                     },
                     {
-                      "type": "text",
-                      "id": "pIo2e",
-                      "name": "Brief Title",
-                      "fill": "#FFFFFF",
-                      "content": "三分钟读懂今日市场",
-                      "lineHeight": 1.25,
-                      "fontFamily": "$font-sans",
-                      "fontSize": 14,
-                      "fontWeight": "650"
+                      "type": "ellipse",
+                      "id": "d7rOtE",
+                      "x": 27,
+                      "y": 7,
+                      "name": "Reward Coin",
+                      "fill": "#FFB300",
+                      "width": 30,
+                      "height": 30
                     },
                     {
-                      "type": "text",
-                      "id": "l6Puc",
-                      "name": "Brief Detail",
-                      "fill": "#9BA8A1",
-                      "content": "暂无平台公告",
-                      "lineHeight": 1.25,
-                      "fontFamily": "$font-sans",
-                      "fontSize": 10,
-                      "fontWeight": "450"
+                      "type": "icon",
+                      "id": "ZJ9wm",
+                      "x": 24,
+                      "y": 32,
+                      "name": "Invite Users",
+                      "width": 28,
+                      "height": 28,
+                      "icon": "user-round",
+                      "library": "lucide",
+                      "fill": "#F3F5F6"
+                    },
+                    {
+                      "type": "icon",
+                      "id": "xoBOn",
+                      "x": 36,
+                      "y": 15,
+                      "name": "Coin Sparkle",
+                      "width": 12,
+                      "height": 12,
+                      "icon": "sparkles",
+                      "library": "lucide",
+                      "fill": "#FFFFFF"
+                    },
+                    {
+                      "type": "icon",
+                      "id": "Aisep",
+                      "x": 55,
+                      "y": 5,
+                      "name": "Invite Plus",
+                      "width": 13,
+                      "height": 13,
+                      "icon": "plus",
+                      "library": "lucide",
+                      "fill": "#D8E0DC"
                     }
                   ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "htPD0",
+              "name": "Carousel Pagination / Slide 1 of 5",
+              "width": "fill_container",
+              "height": 20,
+              "gap": 6,
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 3,
+                  "id": "YJ84R",
+                  "name": "Current Slide Indicator",
+                  "fill": "#43EFA9",
+                  "width": 18,
+                  "height": 5
                 },
                 {
-                  "type": "icon",
-                  "id": "t2Upt",
-                  "name": "Brief Arrow",
-                  "width": 18,
-                  "height": 18,
-                  "icon": "chevron-right",
-                  "library": "lucide",
-                  "fill": "#FFFFFF"
+                  "type": "rectangle",
+                  "cornerRadius": 3,
+                  "id": "PBXs4",
+                  "name": "Slide 2 Indicator",
+                  "fill": "#3C4348",
+                  "width": 5,
+                  "height": 5
+                },
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 3,
+                  "id": "TNa3k",
+                  "name": "Slide 3 Indicator",
+                  "fill": "#3C4348",
+                  "width": 5,
+                  "height": 5
+                },
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 3,
+                  "id": "ZGg2q",
+                  "name": "Slide 4 Indicator",
+                  "fill": "#3C4348",
+                  "width": 5,
+                  "height": 5
+                },
+                {
+                  "type": "rectangle",
+                  "cornerRadius": 3,
+                  "id": "AkCMO",
+                  "name": "Slide 5 Indicator",
+                  "fill": "#3C4348",
+                  "width": 5,
+                  "height": 5
                 }
               ]
             }
@@ -11845,7 +12246,7 @@
                 "type": "image",
                 "enabled": true,
                 "url": "images/hippo-logo.png",
-                "mode": "fit"
+                "mode": "contain"
               },
               "width": 136,
               "height": 34
@@ -17250,7 +17651,7 @@
                 "type": "image",
                 "enabled": true,
                 "url": "images/hippo-logo.png",
-                "mode": "fit"
+                "mode": "contain"
               },
               "width": 136,
               "height": 34
@@ -64909,7 +65310,7 @@
                     "type": "image",
                     "enabled": true,
                     "url": "images/generated-1785687557714.png",
-                    "mode": "fill"
+                    "mode": "cover"
                   },
                   "width": 358,
                   "height": 236
@@ -66019,7 +66420,7 @@
                     "type": "image",
                     "enabled": true,
                     "url": "images/generated-1785685909638.png",
-                    "mode": "fill"
+                    "mode": "cover"
                   },
                   "width": 358,
                   "height": 236
@@ -67430,7 +67831,7 @@
                     "type": "image",
                     "enabled": true,
                     "url": "images/generated-1785687557714.png",
-                    "mode": "fill"
+                    "mode": "cover"
                   },
                   "width": 358,
                   "height": 236
@@ -67973,7 +68374,7 @@
                     "type": "image",
                     "enabled": true,
                     "url": "images/generated-1785685909638.png",
-                    "mode": "fill"
+                    "mode": "cover"
                   },
                   "width": 358,
                   "height": 236
@@ -81992,8 +82393,8 @@
               "fill": {
                 "type": "image",
                 "enabled": true,
-                "url": "./images/generated-1788508119274.png",
-                "mode": "fill"
+                "url": "images/generated-1788508119274.png",
+                "mode": "cover"
               },
               "cornerRadius": 14
             }
@@ -82723,7 +83124,7 @@
                 "type": "image",
                 "enabled": true,
                 "url": "images/generated-1788508119274.png",
-                "mode": "fill"
+                "mode": "cover"
               },
               "cornerRadius": 14
             }
@@ -94191,7 +94592,7 @@
                 "type": "image",
                 "enabled": true,
                 "url": "images/hippo-logo.png",
-                "mode": "fit"
+                "mode": "contain"
               },
               "width": 136,
               "height": 34
@@ -94702,7 +95103,7 @@
                 "type": "image",
                 "enabled": true,
                 "url": "images/hippo-logo.png",
-                "mode": "fit"
+                "mode": "contain"
               },
               "width": 136,
               "height": 34
@@ -95213,7 +95614,7 @@
                 "type": "image",
                 "enabled": true,
                 "url": "images/hippo-logo.png",
-                "mode": "fit"
+                "mode": "contain"
               },
               "width": 136,
               "height": 34
@@ -95860,7 +96261,7 @@
                 "type": "image",
                 "enabled": true,
                 "url": "images/hippo-logo.png",
-                "mode": "fit"
+                "mode": "contain"
               },
               "width": 136,
               "height": 34
@@ -117847,7 +118248,7 @@
                 "type": "image",
                 "enabled": true,
                 "url": "images/hippo-logo.png",
-                "mode": "fit"
+                "mode": "contain"
               },
               "width": 136,
               "height": 34
@@ -118051,7 +118452,7 @@
                     "type": "image",
                     "enabled": true,
                     "url": "images/generated-1785687557714.png",
-                    "mode": "fill"
+                    "mode": "cover"
                   },
                   "width": 358,
                   "height": 270
@@ -119863,7 +120264,7 @@
                         "type": "image",
                         "enabled": true,
                         "url": "images/hippo-logo.png",
-                        "mode": "fit"
+                        "mode": "contain"
                       },
                       "width": 50,
                       "height": 32
@@ -120361,7 +120762,7 @@
                 "type": "image",
                 "enabled": true,
                 "url": "images/hippo-logo.png",
-                "mode": "fit"
+                "mode": "contain"
               },
               "width": 136,
               "height": 34
@@ -120565,7 +120966,7 @@
                     "type": "image",
                     "enabled": true,
                     "url": "images/generated-1785686288395.png",
-                    "mode": "fill"
+                    "mode": "cover"
                   },
                   "width": 358,
                   "height": 270
@@ -122378,7 +122779,7 @@
                         "type": "image",
                         "enabled": true,
                         "url": "images/hippo-logo.png",
-                        "mode": "fit"
+                        "mode": "contain"
                       },
                       "width": 50,
                       "height": 32
@@ -127402,8 +127803,8 @@
               "fill": {
                 "type": "image",
                 "enabled": true,
-                "url": "./images/generated-1788508119274.png",
-                "mode": "fill"
+                "url": "images/generated-1788508119274.png",
+                "mode": "cover"
               },
               "cornerRadius": 14
             }
@@ -128614,7 +129015,7 @@
                 "type": "image",
                 "enabled": true,
                 "url": "images/generated-1788508119274.png",
-                "mode": "fill"
+                "mode": "cover"
               },
               "cornerRadius": 14
             }

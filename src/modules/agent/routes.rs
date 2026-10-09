@@ -32,6 +32,7 @@ use axum::{
 };
 
 mod recharges;
+mod team_orders;
 
 /// 装配代理自助后台的全部端点，由上层挂载到代理专属前缀之下。
 /// 邀请码集合路径同时承载查询与创建两个方法，状态切换单独走子路径的 PATCH，其余均为只读 GET，改密使用 POST。
@@ -39,6 +40,7 @@ mod recharges;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .merge(recharges::routes())
+        .merge(team_orders::routes())
         .route("/me", get(me))
         .route("/dashboard", get(dashboard))
         .route("/users", get(list_users))

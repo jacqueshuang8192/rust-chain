@@ -1,6 +1,6 @@
 import { IconRefresh, IconSearch } from '@douyinfe/semi-icons';
 import { Button, Input, Switch } from '@douyinfe/semi-ui';
-import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useId, useState } from 'react';
 
 import { AdminSelect } from './SemiFormControls';
 
@@ -16,7 +16,7 @@ export type FilterField = {
   options?: FilterOption[];
   optionsFromRows?: boolean;
   placeholder?: string;
-  type?: 'input' | 'select' | 'switch';
+  type?: 'input' | 'select' | 'switch' | 'datetime';
 };
 
 export type FilterValues = Record<string, string>;
@@ -33,6 +33,7 @@ function pruneEmpty(values: FilterValues) {
 }
 
 export function FilterBar({ fields = [], loading, onChange, value }: FilterBarProps) {
+  const labelPrefix = useId();
   const [draftValues, setDraftValues] = useState<FilterValues>(value);
 
   useEffect(() => {
@@ -63,7 +64,7 @@ export function FilterBar({ fields = [], loading, onChange, value }: FilterBarPr
 
     return (
       <label className="admin-filter-control" key={field.key}>
-        <span className="admin-filter-label">{field.label}</span>
+        <span className="admin-filter-label" id={`${labelPrefix}-${field.key}`}>{field.label}</span>
         {field.type === 'switch' ? (
           <Switch
             aria-label={field.label}
@@ -76,6 +77,7 @@ export function FilterBar({ fields = [], loading, onChange, value }: FilterBarPr
         ) : field.type === 'select' ? (
           <AdminSelect
             ariaLabel={field.label}
+            ariaLabelledBy={`${labelPrefix}-${field.key}`}
             disabled={loading}
             onChange={(nextValue) => updateField(field, nextValue)}
             optionList={[{ value: '', label: `全部${field.label}` }, ...selectOptions]}
@@ -88,7 +90,8 @@ export function FilterBar({ fields = [], loading, onChange, value }: FilterBarPr
             disabled={loading}
             onChange={(nextValue) => updateField(field, nextValue)}
             placeholder={field.placeholder ?? field.label}
-            prefix={<IconSearch aria-hidden="true" />}
+            prefix={field.type === 'datetime' ? undefined : <IconSearch aria-hidden="true" />}
+            type={field.type === 'datetime' ? 'datetime-local' : 'text'}
             showClear
             style={{ width: '100%' }}
             value={currentValue}

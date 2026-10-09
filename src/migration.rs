@@ -352,7 +352,8 @@ pub fn safe_sqlx_error(error: &sqlx::Error) -> String {
     }
 }
 
-fn sanitize_log_text(value: &str) -> String {
+/// 单行化诊断文本并隐藏数据库连接串密码，供迁移和统一日志格式化共用。
+pub(crate) fn sanitize_log_text(value: &str) -> String {
     // SQLx 的 MySQL 连接配置错误可能包含完整 URI；对日志中的常见 URI 片段做保守脱敏，
     // 同时折叠换行，避免错误文本伪造额外日志行。配置错误本身在上面已直接折叠。
     let mut sanitized = value

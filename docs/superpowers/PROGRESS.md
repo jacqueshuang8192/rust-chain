@@ -9383,3 +9383,51 @@
 - 修改文件：`src/openapi.rs`、`src/openapi/home_carousel.rs`、`src/modules/home_carousel/{domain,presentation}.rs`、`tests/unit_src/src_modules_home_carousel_domain_tests.rs`、`mobile/src/api/homeCarousel.ts`、`mobile/tests/home-carousel.test.ts`、`mobile/src/views/HomeView.vue`、`mobile/src/styles/prototype-parity.css`、`mobile/src/i18n/messages/{zh-CN,en}.ts`。
 - 验证结果：`cargo check --all-targets` 通过；`cargo test --lib home_carousel -- --nocapture`（2/2）通过；`pnpm --dir mobile run type-check` 通过；Mobile 测试类型检查暂因新增测试仍使用错误的 Vitest 入口而失败，已在本轮修正，待重新执行。`git diff --check` 通过。
 - 后续事项：重新执行 Mobile 测试类型检查与轮播单测；补齐 Web 首页轮播后台编辑页、权限/路由测试和浏览器验证。
+## 2026-10-10 00:29 - 秒合约私有推送与结算调度首轮修复
+
+- 完成内容：Mobile 秒合约接入共享私有 WS，开仓/结算/退款事件与重连触发合并刷新，保留 30 秒到期补偿与 60 秒兜底；PC 私有流补重连回调、心跳和旧连接隔离，移除逐单三秒轮询。结算使用四路有界并发、订单表限定锁及跳锁、公平重试排序，满批有进展时连续处理积压，Redis 读取限定两秒。本地未跟踪 `.env` 扫描配置由 5 秒改为 1 秒，未修改线上配置。
+- 修改文件：`mobile/src/{core/privateUserStreamManager.ts,views/SecondsView.vue}`、`pc/src/{api/stomp.ts,views/SecondOptions.vue}`、`src/{workers/seconds_contract_settlement.rs,modules/seconds_contract/infrastructure.rs}`及对应定向测试；任务 `10-10-realtime-console-quality`。
+- 验证结果：隔离 MySQL 9.3（13316）与 Redis（16379）worker 11/11 实跑通过，含新增失败单公平推进、锁单不阻塞其他订单及既有单次派奖/回滚/人工审核；私有流与秒合约/PC 定向 27/27 通过，Mobile/PC 类型检查通过。新增 PC 回调断言及全量门禁待继续。
+- 后续事项：继续中文日志、代理后台布局和管理员详情，完成全量回归及浏览器验收；进程内消息仍是可丢失提示，不宣称跨实例可靠投递或生产延迟已实测。
+
+## 2026-10-10 00:51 - 中文日志与秒合约生命周期最终回归
+
+- 完成内容：统一 API/迁移程序中文单行日志格式，常用字段中文化、敏感载荷与令牌隐藏、连接串密码脱敏，降低空轮与高频正常行情日志级别；秒合约补齐事件合并刷新模块、登录身份与令牌刷新分离、PC 迟到响应和订阅卸载保护、私有心跳超时回归。自动结算候选 LIMIT 前跳过锁单，保持原资金、取价和退款规则。
+- 修改文件：`src/infra/logging.rs`、`src/{main,migration}.rs`、`src/bin/exchange-migrate.rs`、相关 worker 日志与单测；Mobile/PC 私有流、秒合约页、PC second store 及回归；`.trellis/spec/backend/{logging-guidelines,index,realtime-websockets,seconds-contracts}.md`。详细清单见任务 `10-10-realtime-console-quality/research/delivery.md`。
+- 验证结果：Rust 513/513、架构 11/11、文档 1/1、WS 16/16、严格 Clippy/fmt 通过；隔离 MySQL9.3/Redis worker 11/11，路由含独立退款实库串行夹具 28/28。Mobile 完整 release gate 804/804 与全部构建/预算通过，未提高源码阈值；PC 全量 113/113 和类型通过，新增心跳后定向 13/13。首次路由整组并行出现两项失败（其中一项明确 MySQL1213），串行夹具复跑通过，不宣称生产死锁已全部消除。
+- 后续事项：完成最后后台截图与交付记录；后台已通过全量 1000/1000、类型/lint/build、策略15/15及覆盖率23/23，但包体仍超限2630456>2600000，保持发布阻塞。技术标识及底层英文错误仍保留；未提交、推送、部署或操作真实资金。
+
+## 2026-10-10 01:05 - 后台布局与秒合约单快照对账收口
+
+- 完成内容：代理表单、筛选、表格和统计区尺寸优化，统计数量显示整数并移除继承的装饰圆形；管理员共享详情采用桌面双列、窄屏单列和长值/嵌套证据布局，补充已知字段与枚举中文，保留原值和未知键。PC 进一步移除逐单结果接口背后的整表重复请求，每轮只读一次订单快照同步当前/历史/结果弹窗，保留权威余额查询、事件合并和迟到结果防护，退款/人工审核保持中性。完成任务验收记录，保留发布限制。
+- 修改文件：`web/src/agent/{pages.tsx,pages.test.tsx,UserPortfolioPage.tsx,UserPortfolioPage.css}`、`web/src/layouts/AgentLayout.css`、`web/src/shared/{DetailDrawer.tsx,DetailDrawer.css,DetailDrawer.test.tsx,adminResponseFieldLabels.ts,adminEnumLabels.ts}`及两个详情消费者测试；`pc/src/{api/second.ts,stores/second.ts,views/SecondOptions.vue}`、`pc/tests/seconds-reconciliation.test.ts`；`.trellis/spec/{admin/chinese-presentation.md,backend/realtime-websockets.md}`、任务 `10-10-realtime-console-quality` 与本进度文件。
+- 验证结果：最终 PC `node --experimental-strip-types --test tests/*.test.ts` 118/118、类型与生产构建通过；Web `npm --prefix web run test` 106 文件 1000/1000、typecheck/lint/build 通过，先前策略15/15与覆盖率23/23仍适用。`budget` 最终失败2630506>2600000，未抬阈值。Ego TaskSpace2 只读 mock 实测1728/1280/390/320：代理首页、团队用户、邀请码空态、资产空态/秒合约有数据、闪兑统计和管理员详情均使用 `scrollWidth-clientWidth` 检查，文档/内容区零横向溢出；用户表8个、资产秒合约表14个拖动柄，前轮实际列宽拖动已验证。已查看最终桌面/窄屏截图；任务validate和diff检查通过。期间修复旧整数展示断言及测试查询参数类型错误，未增加跳过项。
+- 后续事项：后台既有包体超限仍阻塞发布；首次整组并行实库出现MySQL1213，串行夹具28/28通过，不宣称消除全部生产死锁。仍需部署环境确认1秒扫描配置与实际到期耗时；私有消息为进程内提示，跨实例保留低频兜底。任务浏览器已关闭，Vite5198保留且HTTP200；未提交、推送、部署、修改生产配置或操作真实资金，既有脏文件保留，任务保持开放跟踪发布事项。
+
+## 2026-10-10 01:30 - 代理团队四类订单只读接口
+
+- 完成内容：增加秒合约、合约、理财、现货团队订单查询，默认覆盖当前代理及全部下级代理归属用户；同一构造器生成受令牌子树限制的列表和总数，支持团队范围、代理分支、用户、状态、交易对/产品、方向、结果和时间筛选。补齐四业务 DTO 与 OpenAPI，保持金额字符串、毫秒时间和只读边界。
+- 修改文件：`src/modules/agent/{application,infrastructure,presentation,routes}/team_orders.rs` 及父模块、`repository.rs`、`src/openapi{.rs,/agent_portal.rs,/agent_team_orders.rs}`、`tests/agent_routes{.rs,/team_orders.rs}`。
+- 验证结果：`cargo check --all-targets` 通过；隔离 MySQL9.3（13316，agent_team_orders_test）`cargo test --test agent_routes team_orders -- --nocapture --test-threads=1` 3/3 实跑通过，包含父/兄弟/其他树拒绝、用户邀请继承归属、列表与 total、分页、金额精度、只读快照、停用祖先、错误令牌、参数边界和 OpenAPI。初轮理财夹具缺必填字段与文档泛型子类型缺失已修复。
+- 后续事项：继续前端全量、浏览器布局与交互验收及最终质量门禁；保留既有未提交改动，不访问生产资金或部署。
+
+## 2026-10-10 01:38 - 代理四类订单页面与筛选
+
+- 完成内容：增加四个独立导航与懒加载页面，展示用户/归属代理、订单状态和业务快照；支持服务端分页、查询/重置、刷新和只读中文详情。常用筛选默认可见，高级筛选可展开并保留条件；秒合约倒计时不轮询或触发结算。补齐会话隔离、迟到响应、严格金额合同及筛选下拉可访问名称。
+- 修改文件：`web/src/agent/{TeamOrdersPage.tsx,TeamOrdersPage.css,TeamOrdersPage.test.tsx,teamOrderModel.ts,teamOrderModel.test.ts,routes.tsx,routes.test.tsx}`、`web/src/api/{agent.ts,agentTeamOrders.ts,agentTeamOrders.test.ts}`、`web/src/layouts/AgentLayout{.tsx,.test.tsx}`、`web/src/shared/{FilterBar.tsx,FilterBar.test.tsx,SemiFormControls.tsx}`、`web/tests/fixtures/agent-team-orders.ts`、代理层级/订单编号规范与任务记录。
+- 验证结果：页面最终定向10/10，API/模型/既有逐用户资产/路由/导航回归通过；typecheck/lint/build通过。Ego只读mock验证1728/390/320px文档与内容区无横向溢出，真实列宽200→248px拖动、用户筛选、理财详情及窄屏抽屉；高级筛选收起后窄屏表格首屏可见。Rust513+11+1通过；代理全组实库42/44，新增3/3全通过，两项旧邀请码测试与固定邀请码规则冲突。首轮Web全量1049/1050，筛选按钮图标名称影响断言已修正并定向通过，正在全量复跑。
+- 后续事项：完成余下浏览器验收、严格Clippy、Web全量/策略/覆盖率及交付记录。最终构建包体2641611>2600000，保留发布阻塞，未抬高阈值；未提交、推送、部署或操作生产数据。
+
+## 2026-10-10 01:47 - 代理团队订单最终验收与提交边界
+
+- 完成内容：完成四类团队订单的筛选与详情验收；现货买卖方向复用共享字段中文映射，增加六种交易方向回归。高级代理分支筛选收起后再次查询仍保留条件，桌面与窄屏表格保持容器内滚动。补齐交付限制及独立提交清单，任务保持开放等待提交确认与发布事项。
+- 修改文件：`web/src/agent/TeamOrdersPage.tsx`、`web/src/agent/TeamOrdersPage.test.tsx`、`.trellis/tasks/10-10-agent-team-orders/{prd.md,task.json,research/delivery.md,research/commit-plan.md}`、`docs/superpowers/PROGRESS.md`。
+- 验证结果：最终Web全量109文件1056/1056（新页面16/16）、typecheck/lint/build通过；生产策略15/15、既有四文件覆盖率门禁23/23通过；严格Clippy/fmt、Rust513+11+1及新增代理实库3/3通过。Ego只读mock最终验证代理分支12条、收起再查仍带agent_id、买入中文标签、1728/320px文档与内容区零横向溢出，无写请求或未处理API；截图已查看，TaskSpace3已关闭一次。任务validate与diff检查通过，本地Vite5198为HTTP200。
+- 后续事项：最终包体2641661>2600000（本任务前2630506），未提高阈值，仍阻塞发布；代理实库全组42/44中的两项旧邀请码测试仍需独立处理。按已列清单取得用户确认后仅提交本任务，不推送；真实前后端联调需要运行包含新接口的后端。本轮未提交、部署、访问生产资金或回滚既有改动。
+
+## 2026-10-10 02:17 - 用户确认全部提交并推送
+
+- 完成内容：用户明确授权将全部当前改动提交并推送，取代之前仅代理订单单独提交、不推送的计划；范围包含秒合约私有推送与结算、中文日志、代理及管理员后台、移动端主题与图表、设计稿、依赖锁文件和相关测试文档，同时包含本地已有的三个待推送提交。仅排除可再生成的 `.vite/` 缓存及 Git 已忽略的本地配置，不部署、不操作资金。
+- 修改文件：当前工作区全部业务、测试、设计和项目文档改动；两个任务的 `task.json`、代理订单 `research/commit-plan.md`、本进度文件。
+- 验证结果：本轮 `git diff --check` 通过；沿用上轮已完成的 Web1056/1056、Rust513+11+1、新增代理实库3/3、Mobile804/804与PC118/118验证记录。本轮仅提交推送，不重复执行全量业务测试；包体超预算及两项旧邀请码测试失败仍如实保留。
+- 后续事项：执行普通提交与推送，并核对远程分支提交哈希；发布限制与真实环境联调继续按两个任务的交付记录跟踪。

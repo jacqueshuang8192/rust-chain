@@ -418,13 +418,14 @@ pub async fn run_loop(state: AppState, interval_seconds: u64, limit: u32) -> App
     loop {
         ticker.tick().await;
         match run_once(&state, Utc::now(), limit).await {
-            Ok(summary) => info!(
+            Ok(summary) if summary.liquidated > 0 || summary.failed > 0 => info!(
                 scanned = summary.scanned,
                 liquidated = summary.liquidated,
                 skipped = summary.skipped,
                 failed = summary.failed,
                 "杠杆强平周期完成"
             ),
+            Ok(_) => {}
             Err(error) => error!(%error, "杠杆强平周期失败"),
         }
     }

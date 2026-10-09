@@ -175,7 +175,7 @@ test('Seconds 使用权威结果追踪器、FIFO 队列和 Pencil 模态结算�
   )
   assert.match(
     secondsSource,
-    /watch\(\(\) => session\.isAuthenticated,[\s\S]*?if \(authenticated\) return[\s\S]*?clearSecondsPrivateState\(\)/,
+    /watch\(\(\) => session\.identityScope[\s\S]*?clearSecondsPrivateState\(\)/,
   )
   assert.match(
     secondsSource,
@@ -201,7 +201,7 @@ test('Seconds 使用权威结果追踪器、FIFO 队列和 Pencil 模态结算�
     secondsSource,
     /async function reconcileOpenedOrder\(mutationSessionGeneration: number\): Promise<void> \{[\s\S]*?await reconcilePrivateState\(\)[\s\S]*?isCurrentSecondsMutationSession\(mutationSessionGeneration\)/,
   )
-  assert.match(secondsSource, /watch\(\(\) => session\.isAuthenticated,[\s\S]*?privateSessionGeneration \+= 1[\s\S]*?\{ flush: 'sync' \}/)
+  assert.match(secondsSource, /watch\(\(\) => session\.identityScope[\s\S]*?privateSessionGeneration \+= 1[\s\S]*?\{ flush: 'sync' \}/)
 
   const settlementTemplate = secondsSource.match(
     /<Teleport to="body">\s*<Transition name="seconds-result-reveal"[\s\S]*?<\/Teleport>/,

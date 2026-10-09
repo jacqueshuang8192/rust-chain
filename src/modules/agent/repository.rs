@@ -6,6 +6,35 @@
 //! 供基础设施层做查询映射、应用层做参数传递，读写两侧因此共享同一套字段口径。
 
 use bigdecimal::BigDecimal;
+use chrono::{DateTime, Utc};
+
+/// 固定业务集合决定只读表和状态口径，不接受外部表名或 SQL 片段。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum AgentOrderKind {
+    Seconds,
+    Margin,
+    Earn,
+    Spot,
+}
+
+/// 已校验的团队订单筛选，代理 ID 只作为子树内进一步收窄的分支标识。
+#[derive(Debug)]
+pub(crate) struct AgentTeamOrderFilter {
+    pub(crate) kind: AgentOrderKind,
+    pub(crate) team_scope: String,
+    pub(crate) agent_id: Option<u64>,
+    pub(crate) user_id: Option<u64>,
+    pub(crate) email: Option<String>,
+    pub(crate) order_id: Option<u64>,
+    pub(crate) product_id: Option<u64>,
+    pub(crate) symbol: Option<String>,
+    pub(crate) status: Option<String>,
+    pub(crate) direction: Option<String>,
+    pub(crate) result: Option<String>,
+    pub(crate) created_from: Option<DateTime<Utc>>,
+    pub(crate) created_to: Option<DateTime<Utc>>,
+    pub(crate) page: AgentListPage,
+}
 
 /// 代理可见范围，由服务端按登录管理员查出，是所有子树查询的边界依据。
 #[derive(Debug, Clone, sqlx::FromRow)]

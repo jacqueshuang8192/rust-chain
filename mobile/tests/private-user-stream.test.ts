@@ -376,6 +376,7 @@ test('shared private manager keeps one generation-scoped socket across independe
     consumerCount: 2,
     marginConsumerCount: 1,
     supportConsumerCount: 1,
+    secondsConsumerCount: 0,
     sessionGeneration: 4,
   })
 
@@ -447,6 +448,52 @@ test('private manager routes only exact supported topic event types', () => {
   assert.equal(eventMatchesTopic({ type: 'margin.position.opened' }, 'margin'), false)
   assert.equal(eventMatchesTopic({ type: 'support.refresh' }, 'support'), true)
   assert.equal(eventMatchesTopic({ type: 'support.refresh.extra' }, 'support'), false)
+  for (const type of ['seconds_contract.order.opened', 'seconds_contract.order.settled', 'seconds_contract.order.refunded']) {
+    assert.equal(eventMatchesTopic({ type }, 'seconds'), true)
+    assert.equal(eventMatchesTopic({ type }, 'margin'), false)
+    assert.equal(eventMatchesTopic({ type }, 'support'), false)
+  }
+  assert.equal(eventMatchesTopic({ type: 'wallet.changed' }, 'seconds'), false)
+  assert.equal(eventMatchesTopic({ type: 'seconds_contract.order.settled.extra' }, 'seconds'), false)
+})
+
+test('seconds shares the authenticated socket and reconciles on events and reconnect only for its lease', () => {
+  const sockets: MockPrivateSocket[] = []
+  const scheduler = new ManualScheduler()
+  let opens = 0
+  const events: string[] = []
+  const manager = createPrivateUserStreamManager({
+    readSession: () => ({ accessToken: 'USER', scope: 'user', generation: 1 }),
+    openTransport: (context) => createPrivateUserStream({
+      getAccessToken: () => context.accessToken,
+      getUrl: () => 'ws://localhost/ws/private',
+      onOpen: context.onOpen,
+      onEvent: context.onEvent,
+      scheduler,
+      reconnectBaseMs: 10,
+      reconnectJitterRatio: 0,
+      createSocket: (url) => { const socket = new MockPrivateSocket(url); sockets.push(socket); return socket },
+    }),
+  })
+  const seconds = manager.acquire({ topic: 'seconds', consumerId: 'seconds', onOpen: () => { opens++ }, onEvent: (event) => events.push(event.type) })
+  const margin = manager.acquire({ topic: 'margin', consumerId: 'margin', onEvent: () => undefined })
+  assert.equal(sockets.length, 1)
+  const first = requiredSocket(sockets, 0)
+  first.open()
+  first.message('{"type":"seconds_contract.order.settled","order_id":1}')
+  first.message('{"type":"margin.position.closed"}')
+  assert.deepEqual(events, ['seconds_contract.order.settled'])
+  first.serverClose()
+  scheduler.runNextTimeout()
+  requiredSocket(sockets, 1).open()
+  assert.equal(opens, 2)
+  seconds.release()
+  requiredSocket(sockets, 1).message('{"type":"seconds_contract.order.refunded","order_id":1}')
+  assert.equal(events.length, 1)
+  assert.equal(manager.snapshot().secondsConsumerCount, 0)
+  margin.release()
+  assert.equal(manager.snapshot().consumerCount, 0)
+  assert.deepEqual(scheduler.pendingTimeoutDelays(), [])
 })
 
 test('TradeView leases the shared margin topic and treats private frames only as REST hints', () => {

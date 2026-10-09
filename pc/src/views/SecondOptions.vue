@@ -13,6 +13,7 @@ import { useSecondStore, type SecondOrder } from '@/stores/second'
 import { useSettingStore } from '@/stores/setting'
 import { useI18n } from 'vue-i18n'
 import { useAuthRequired } from '@/composables/useAuthRequired'
+import { readAuthToken } from '@/utils/authStorage'
 
 const toast = useToast()
 const route = useRoute()
@@ -72,6 +73,16 @@ const orderCountdowns = ref<Record<number, number>>({})
 let intervalId: any
 let tickerSubs: Array<{ unsubscribe: () => void }> = []
 let privateSub: { unsubscribe: () => void } | null = null
+let pageActive = true
+let reconciliationPending = false
+let reconciliationPromise: Promise<void> | null = null
+let lastReconciliationAt = Date.now()
+
+const currentViewGuard = () => {
+    const selected = symbol.value
+    const token = readAuthToken()
+    return () => pageActive && isLoggedIn.value && selected === symbol.value && token === readAuthToken()
+}
 
 const privateEventType = (msg: { body: string }) => {
     try {
@@ -84,12 +95,8 @@ const privateEventType = (msg: { body: string }) => {
 const handlePrivateEvent = async (msg: { body: string }) => {
     if (!isLoggedIn.value) return
     const type = privateEventType(msg)
-    if (type && !type.startsWith('seconds_contract.') && !type.startsWith('wallet.')) return
-    await Promise.all([
-        store.loadBalance(),
-        store.loadCurrentOrders(symbol.value),
-        store.loadHistoryOrders(symbol.value, 0)
-    ])
+    if (!type || (!type.startsWith('seconds_contract.') && !type.startsWith('wallet.'))) return
+    await reconcileOrders()
 }
 
 const changeSymbol = (newSymbol: string) => {
@@ -112,7 +119,7 @@ const clearTickerSubscriptions = () => {
 const subscribeSecondTickers = async () => {
     clearTickerSubscriptions()
     const symbols = [...new Set(store.tickers.map(ticker => ticker.symbol).filter(Boolean))]
-    tickerSubs = await Promise.all(symbols.map(symbol =>
+    const subscriptions = await Promise.all(symbols.map(symbol =>
         stompService.subscribe('seconds', `seconds:ticker:${symbol}`, (msg) => {
             try {
                 store.updateTicker(JSON.parse(msg.body))
@@ -121,6 +128,11 @@ const subscribeSecondTickers = async () => {
             }
         }),
     ))
+    if (!pageActive) {
+        subscriptions.forEach(sub => sub.unsubscribe())
+        return
+    }
+    tickerSubs = subscriptions
 }
 
 const syncSymbolWithSecondsProducts = () => {
@@ -139,9 +151,9 @@ const loadOrders = async () => {
         return
     }
     if (orderTab.value === 'active') {
-        await store.loadCurrentOrders(symbol.value)
+        await store.loadCurrentOrders(symbol.value, currentViewGuard())
     } else {
-        await store.loadHistoryOrders(symbol.value, 0)
+        await store.loadHistoryOrders(symbol.value, 0, 50, currentViewGuard())
     }
 }
 
@@ -150,7 +162,7 @@ const handleHistoryScroll = async (e: Event) => {
     // trigger when within 10px of bottom
     if (target.scrollHeight - target.scrollTop - target.clientHeight < 10) {
         if (!store.loadingHistory && store.historyHasMore) {
-            await store.loadHistoryOrders(symbol.value, store.historyPage + 1)
+            await store.loadHistoryOrders(symbol.value, store.historyPage + 1, 50, currentViewGuard())
         }
     }
 }
@@ -213,70 +225,48 @@ interface SettlementResult {
 }
 const resultData = ref<SettlementResult | null>(null)
 
-const checkingResults = ref<Set<number>>(new Set())
+const reconcileOrders = (): Promise<void> => {
+    if (!pageActive || !isLoggedIn.value) return Promise.resolve()
+    reconciliationPending = true
+    if (reconciliationPromise) return reconciliationPromise
+    reconciliationPromise = (async () => {
+      while (reconciliationPending && pageActive && isLoggedIn.value) {
+        reconciliationPending = false
+        lastReconciliationAt = Date.now()
+        const isCurrent = currentViewGuard()
+        const settled = await store.reconcileOrders(symbol.value, isCurrent)
+        if (!isCurrent()) continue
+        for (const order of settled) {
+            resultData.value = {
+                id: order.id,
+                symbol: order.symbol,
+                direction: order.direction,
+                amount: order.betAmount || order.amount,
+                profit: order.profit,
+                isWin: order.result === 'WIN' || order.result === 1,
+                isLose: order.result === 'LOSE' || order.result === 2
+            }
+            showResultModal.value = true
+        }
+        await store.loadBalance(isCurrent)
+      }
+    })().finally(() => { reconciliationPromise = null })
+    return reconciliationPromise
+}
 
 const tick = () => {
     const now = Date.now()
-    // Update countdowns for active orders
     store.currentOrders.forEach(order => {
-        const remaining = Math.max(0, Math.ceil((order.endTime - now) / 1000))
-        orderCountdowns.value[order.id] = remaining
+        orderCountdowns.value[order.id] = Math.max(0, Math.ceil((order.endTime - now) / 1000))
     })
-
-    // Check for settled orders (remaining <= 0)
-    const pendingSettlement = store.currentOrders.filter(order => {
-        const remaining = orderCountdowns.value[order.id]
-        return remaining !== undefined && remaining <= 0
-    })
-
-    if (pendingSettlement.length > 0) {
-        pendingSettlement.forEach(async order => {
-            if (checkingResults.value.has(order.id)) return
-            checkingResults.value.add(order.id)
-
-            try {
-                const result = await store.checkOrderResult(order.id, order.symbol)
-                if (result && (result.status === 'REFUNDED' || result.status === 'MANUAL_REVIEW')) {
-                    store.currentOrders = store.currentOrders.filter(o => o.id !== order.id)
-                    store.loadBalance()
-                    if (orderTab.value === 'history') store.loadHistoryOrders(symbol.value, 0)
-                    return
-                }
-                // If the backend indicates it's settled (CLOSE status or WIN/LOSE result)
-                if (result && (result.status === 'CLOSE' || result.status === 1 || result.result === 'WIN' || result.result === 'LOSE' || result.result === 1 || result.result === 2)) {
-
-                    const isWin = result.result === 'WIN' || result.result === 1
-                    const isLose = result.result === 'LOSE' || result.result === 2
-                    const profitAmount = result.winAmount ?? result.profit ?? result.rewardAmount ?? 0
-
-                    resultData.value = {
-                        id: order.id,
-                        symbol: order.symbol,
-                        direction: order.direction,
-                        amount: order.betAmount || order.amount,
-                        profit: profitAmount,
-                        isWin,
-                        isLose
-                    }
-                    showResultModal.value = true
-
-                    // Remove the finished order
-                    store.currentOrders = store.currentOrders.filter(o => o.id !== order.id)
-                    store.loadBalance()
-                    if (orderTab.value === 'history') {
-                        store.loadHistoryOrders(symbol.value, 0)
-                    }
-                }
-            } catch (e) {
-                console.error(t('seconds.result_query_failed'), e)
-            } finally {
-                // Cooldown before retrying if it hasn't actually settled yet
-                setTimeout(() => {
-                    checkingResults.value.delete(order.id)
-                }, 3000)
-            }
-        })
+    // WS owns normal updates; the low-frequency read repairs dropped or cross-instance hints.
+    if (document.visibilityState !== 'hidden' && now - lastReconciliationAt >= 30_000) {
+        void reconcileOrders()
     }
+}
+
+const reconcileOnVisibility = () => {
+    if (document.visibilityState === 'visible') void reconcileOrders()
 }
 
 const formatTime = (ts: number) => {
@@ -325,18 +315,23 @@ onMounted(async () => {
         store.loadTickers(),
         store.loadCycles(),
     ])
+    if (!pageActive) return
     await subscribeSecondTickers()
+    if (!pageActive) return
     syncSymbolWithSecondsProducts()
     selectDefaultCycleForSymbol()
 
     if (isLoggedIn.value) {
         await Promise.all([
-            store.loadBalance(),
-            store.loadCurrentOrders(symbol.value)
+            store.loadBalance(currentViewGuard()),
+            store.loadCurrentOrders(symbol.value, currentViewGuard())
         ])
-        privateSub = await stompService.subscribePrivate((msg) => {
+        if (!pageActive || !isLoggedIn.value) return
+        const subscription = await stompService.subscribePrivate((msg) => {
             void handlePrivateEvent(msg)
-        })
+        }, () => { void reconcileOrders() })
+        if (!pageActive) { subscription.unsubscribe(); return }
+        privateSub = subscription
     } else {
         store.currentOrders = []
         store.historyOrders = []
@@ -344,9 +339,13 @@ onMounted(async () => {
     }
 
     intervalId = setInterval(tick, 1000)
+    document.addEventListener('visibilitychange', reconcileOnVisibility)
 })
 
 onUnmounted(() => {
+    pageActive = false
+    reconciliationPending = false
+    document.removeEventListener('visibilitychange', reconcileOnVisibility)
     if (intervalId) clearInterval(intervalId)
     clearTickerSubscriptions()
     privateSub?.unsubscribe()

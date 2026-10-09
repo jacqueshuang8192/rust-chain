@@ -1,5 +1,74 @@
 # Realtime WebSocket Contracts
 
+## Scenario: Seconds Private Refresh
+
+### 1. Scope / Trigger
+
+Mobile seconds trading and PC SecondOptions react to committed private order
+events instead of frequent per-order result polling.
+
+### 2. Signatures
+
+- Existing `/ws/private` user authentication and envelope remain unchanged.
+- Topics: `seconds_contract.order.opened`, `.settled`, `.refunded`.
+- Mobile `useSecondsPrivateReconciliation` leases the shared `seconds` topic.
+- PC `subscribePrivate(callback, onOpen?)` notifies initial open and reconnect.
+
+### 3. Contracts
+
+Frames are process-local, lossy refresh hints, not financial authority. Events
+and reconnect trigger coalesced REST order/wallet reads, retaining one follow-up
+when a hint arrives during a read. Never increment balances from event amounts.
+PC uses one order-list snapshot per reconciliation round to update active and
+history rows and identify newly completed tracked orders. Never request the
+whole list once per expired order. Refunds/manual review do not create win/loss
+dialogs, and unrelated historical results do not replay.
+PC private connections send ping every 25 seconds and check a 65-second inbound
+silence threshold on those ticks; old-socket handlers cannot alter the current connection.
+
+Keep bounded recovery for dropped or cross-instance hints: PC 30-second whole
+page reconciliation, Mobile 30-second expired-order recovery and 60-second
+general recovery. Hidden tabs skip timer-triggered reads and reconcile on
+visibility restoration. Countdown ticks remain local, not HTTP triggers.
+
+Ignore late responses after unmount, login replacement or symbol replacement.
+Mobile login identity scope resets order/result baselines; token refresh alone
+must not erase a just-opened order's result tracking. No cross-instance Redis
+bridge or durable outbox is implied by these consumer changes.
+
+### 4. Validation & Error Matrix
+
+| Condition | Behavior |
+| --- | --- |
+| Relevant committed event / reconnect | Coalesced REST reconciliation |
+| Burst while reading | One retained follow-up |
+| Duplicate event | No event-derived credit or duplicate payment |
+| Lost hint / separate API instance | Bounded REST recovery |
+| Session/symbol replacement or unmount | Old completion ignored |
+| Last subscriber releases | Close socket and all timers |
+
+### 5. Good/Base/Bad Cases
+
+Good: settlement hint refreshes both order and wallet snapshots promptly.
+Base: connection drops and a later reconnect restores authoritative state.
+Bad: delete all REST recovery while using a process-local hub, or add payout
+amounts directly to the current balance.
+
+### 6. Tests Required
+
+Private manager topic routing, reconnect callbacks, stale socket isolation,
+single-flight plus queued refresh, hidden/visible recovery and cleanup.
+PC store/view tests cover late symbols, tokens, unmounted consumers, history
+replacement, one snapshot for multiple orders, queued event bursts, and neutral
+refunds. Retain backend private-user isolation and new-commit-only tests.
+
+### 7. Wrong Vs Correct
+
+```text
+Wrong: every expired order starts a three-second polling timer
+Correct: private hint -> one coalesced authoritative read; bounded recovery
+```
+
 ## Scenario: Business-Scoped Market WebSocket Endpoints
 
 ### 1. Scope / Trigger

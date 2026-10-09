@@ -13,8 +13,8 @@ export function normalizeAppTheme(value: unknown): AppTheme | null {
   return value === 'light' || value === 'dark' ? value : null
 }
 
-export function resolveAppTheme(storedValue: unknown, prefersDark = false): AppTheme {
-  return normalizeAppTheme(storedValue) || (prefersDark ? 'dark' : 'light')
+export function resolveAppTheme(storedValue: unknown): AppTheme {
+  return normalizeAppTheme(storedValue) || 'dark'
 }
 
 function readInitialTheme(): AppTheme {
@@ -25,10 +25,7 @@ function readInitialTheme(): AppTheme {
     storedValue = null
   }
 
-  const prefersDark = typeof globalThis.matchMedia === 'function'
-    && globalThis.matchMedia('(prefers-color-scheme: dark)').matches
-
-  return resolveAppTheme(storedValue, prefersDark)
+  return resolveAppTheme(storedValue)
 }
 
 export function applyAppTheme(theme: AppTheme): void {

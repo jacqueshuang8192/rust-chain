@@ -36,3 +36,23 @@ test('all PC trading pages use the backend-selected market chart wrapper', () =>
   assert.match(wrapperSource, /TradingViewChart/)
   assert.match(wrapperSource, /settingStore\.loadPlatformBrand\(\)/)
 })
+
+test('PC chart omits source summaries without changing chart data, provider or interval bindings', () => {
+  const source = readProjectFile('src/components/chart/MarketChart.vue')
+  assert.doesNotMatch(source, /market-chart-sources|marketProvenance\.chartSources|MarketProvenanceLabel|receiveProvenance/)
+  assert.match(source, /:is="chartComponent"/)
+  assert.match(source, /:key="chartKey"/)
+  for (const [attribute, value] of [
+    ['data-list', 'dataList'],
+    ['fetch-k-line', 'fetchKLine'],
+    ['kline-topic', 'klineTopic'],
+    ['module', 'module'],
+    ['period', 'period'],
+    ['precision', 'precision'],
+    ['symbol', 'symbol'],
+  ]) {
+    assert.ok(source.includes(`:${attribute}="${value}"`))
+  }
+  assert.match(source, /period: '1m'/)
+  assert.match(source, /\.market-chart-canvas\s*\{[^}]*flex: 1/)
+})

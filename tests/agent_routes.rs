@@ -18,6 +18,8 @@ use uuid::Uuid;
 
 #[path = "agent_routes/recharges.rs"]
 mod recharges;
+#[path = "agent_routes/team_orders.rs"]
+mod team_orders;
 
 #[derive(Debug, Clone, Copy)]
 struct AgentFixture {

@@ -23,11 +23,12 @@ use crate::{
 };
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
+use futures_util::{StreamExt, stream};
 use redis::aio::ConnectionManager;
 use serde_json::json;
 use sqlx::{MySql, Pool};
 use std::env;
-use tokio::time::{Duration, interval};
+use tokio::time::{Duration, MissedTickBehavior, interval};
 use tracing::{error, info, warn};
 
 /// 事件时点价格窗口长度；右边界不包含在可选集合中。
@@ -272,7 +273,6 @@ async fn run_once_with_price_source(
     max_snapshot_wait_seconds: u64,
     price_source: SettlementPriceSource<'_>,
 ) -> AppResult<SecondsContractSettlementSummary> {
-    let settlement_limit = seconds_contract_settlement_limit(limit);
     let rows = fetch_due_orders(
         pool,
         now,
@@ -282,48 +282,62 @@ async fn run_once_with_price_source(
     .await?;
     let mut summary = SecondsContractSettlementSummary::default();
 
-    for row in rows {
-        if summary.settled >= settlement_limit {
-            break;
-        }
+    // 限制并发，给请求和其他资金任务保留连接；历史兼容入口保留逐单顺序。
+    let concurrency = match price_source {
+        SettlementPriceSource::Cache(_) => 4,
+        SettlementPriceSource::History => 1,
+    };
+    let mut attempts = stream::iter(rows)
+        .map(|row| async move {
+            let result = settle_order_by_id(
+                pool,
+                row.order_id,
+                now,
+                max_snapshot_wait_seconds,
+                price_source,
+            )
+            .await;
+            (row.order_id, result)
+        })
+        .buffer_unordered(concurrency);
+    let mut retry_error = None;
+    while let Some((order_id, result)) = attempts.next().await {
         summary.scanned += 1;
-        match settle_order_by_id(
-            pool,
-            row.order_id,
-            now,
-            max_snapshot_wait_seconds,
-            price_source,
-        )
-        .await
-        {
+        let retry = match result {
             Ok(SettlementOutcome::Settled(event)) => {
                 summary.settled += 1;
                 publish_settlement_event(hub, &event);
+                false
             }
-            Ok(SettlementOutcome::ManualReview) => summary.manual_review += 1,
+            Ok(SettlementOutcome::ManualReview) => {
+                summary.manual_review += 1;
+                false
+            }
             Ok(SettlementOutcome::Pending) => {
                 summary.skipped += 1;
-                reschedule_settlement_attempt(
-                    pool,
-                    row.order_id,
-                    now,
-                    price_source.retry_seconds(),
-                )
-                .await?;
+                true
             }
-            Ok(SettlementOutcome::Skipped) => summary.skipped += 1,
+            Ok(SettlementOutcome::Skipped) => {
+                summary.skipped += 1;
+                false
+            }
             Err(error) => {
                 summary.failed += 1;
-                reschedule_settlement_attempt(
-                    pool,
-                    row.order_id,
-                    now,
-                    price_source.retry_seconds(),
-                )
-                .await?;
-                warn!(order_id = row.order_id, %error, "秒合约结算失败");
+                warn!(order_id, %error, "秒合约结算失败，将按重试时间重新处理");
+                true
             }
+        };
+        if retry
+            && let Err(error) =
+                reschedule_settlement_attempt(pool, order_id, now, price_source.retry_seconds())
+                    .await
+        {
+            // 必须收完其他在途事务及提交后消息，不能因一笔调度回写失败丢弃整个并发批次。
+            retry_error = Some(error);
         }
+    }
+    if let Some(error) = retry_error {
+        return Err(error);
     }
     Ok(summary)
 }
@@ -331,18 +345,48 @@ async fn run_once_with_price_source(
 /// 按固定周期持续执行结算；单轮错误只记录，下一轮继续恢复。
 pub async fn run_loop(state: AppState, interval_seconds: u64, limit: u32) -> AppResult<()> {
     let mut ticker = interval(Duration::from_secs(interval_seconds.max(1)));
+    ticker.set_missed_tick_behavior(MissedTickBehavior::Delay);
+    info!(
+        interval_seconds = interval_seconds.max(1),
+        batch_limit = seconds_contract_settlement_limit(limit),
+        "秒合约结算任务已启动"
+    );
+    if interval_seconds > 1 {
+        warn!(
+            interval_seconds,
+            "秒合约扫描间隔大于一秒，到期处理可能延迟；请检查环境配置"
+        );
+    }
     loop {
         ticker.tick().await;
-        match run_once(&state, Utc::now(), limit).await {
-            Ok(summary) => info!(
-                scanned = summary.scanned,
-                settled = summary.settled,
-                manual_review = summary.manual_review,
-                skipped = summary.skipped,
-                failed = summary.failed,
-                "秒合约缓存取价结算周期完成"
-            ),
-            Err(error) => error!(%error, "秒合约缓存取价结算周期失败"),
+        // 满批且有进展时连续排空积压，不让每一批额外等待一个扫描周期。
+        for _ in 0..10 {
+            let started = std::time::Instant::now();
+            match run_once(&state, Utc::now(), limit).await {
+                Ok(summary) => {
+                    if summary.scanned > 0 {
+                        info!(
+                            scanned = summary.scanned,
+                            settled = summary.settled,
+                            manual_review = summary.manual_review,
+                            skipped = summary.skipped,
+                            failed = summary.failed,
+                            elapsed_ms = started.elapsed().as_millis() as u64,
+                            "秒合约结算批次完成"
+                        );
+                    }
+                    if summary.scanned < seconds_contract_settlement_limit(limit)
+                        || summary.settled == 0
+                    {
+                        break;
+                    }
+                    tokio::task::yield_now().await;
+                }
+                Err(error) => {
+                    error!(%error, "秒合约结算批次失败");
+                    break;
+                }
+            }
         }
     }
 }
@@ -367,8 +411,9 @@ async fn fetch_due_orders(
            WHERE status = 'opened'
              AND expires_at <= DATE_SUB(?, INTERVAL ? SECOND)
              AND (next_settlement_attempt_at IS NULL OR next_settlement_attempt_at <= ?)
-           ORDER BY expires_at ASC, id ASC
-           LIMIT ?"#,
+           ORDER BY COALESCE(next_settlement_attempt_at, expires_at) ASC, id ASC
+           LIMIT ?
+           FOR UPDATE SKIP LOCKED"#,
     )
     .bind(now.naive_utc())
     .bind(eligibility_delay)
@@ -404,13 +449,12 @@ async fn settle_order_by_id(
     price_source: SettlementPriceSource<'_>,
 ) -> AppResult<SettlementOutcome> {
     let mut tx = pool.begin().await?;
-    let order = match infrastructure::lock_order_by_id(&mut tx, order_id).await {
-        Ok(order) => order,
-        Err(AppError::NotFound) => {
+    let order = match infrastructure::try_lock_settlement_order(&mut tx, order_id).await? {
+        Some(order) => order,
+        None => {
             tx.rollback().await?;
             return Ok(SettlementOutcome::Skipped);
         }
-        Err(error) => return Err(error),
     };
     if order.status == "settled" {
         tx.commit().await?;

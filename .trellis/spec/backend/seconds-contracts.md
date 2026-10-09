@@ -533,6 +533,18 @@ legacy review recovery: market_price_ticks in [expires_at, expires_at + 5s)
   stored result without selecting a new price or paying twice.
 - Repeated scans and worker restart cannot settle an order twice. Redis cache
   availability does not authorize automatic recovery or refund of old reviews.
+- Automatic candidate selection uses `FOR UPDATE SKIP LOCKED` before the
+  bounded LIMIT is exhausted by locked rows. The candidate query is not a
+  durable claim: each settlement transaction re-locks its order with
+  `FOR UPDATE OF orders SKIP LOCKED` and rechecks state/expiry. Do not lock
+  shared display joins (users/pairs/assets) in this automatic projection.
+- Cache-backed batches use at most four concurrent attempts. Sort by
+  `COALESCE(next_settlement_attempt_at, expires_at), id` so retried cache errors
+  move behind untouched due orders. Drain all in-flight attempts and publish
+  their committed hints even if one retry-timestamp write fails.
+- Redis GET has a two-second deadline. A full batch with progress may drain
+  up to ten batches before yielding to the delayed interval tick. Startup logs
+  the actual interval and warns above one second; no empty-scan INFO flood.
 - Explicit pool-only historical worker entry points remain for legacy evidence
   regressions, not the production scheduler. Principal-refund rules below remain
   unchanged.
@@ -564,6 +576,9 @@ legacy review recovery: market_price_ticks in [expires_at, expires_at + 5s)
   decimals, concurrent single payment/event, restart replay and transaction
   rollback. Preserve legacy history recovery/refund tests and evidence.
 - Market feed tests preserve successful cache-write-before-event sequencing.
+- With a batch limit of one, hold the first due order lock and assert another
+  user's order on the same pair settles. Assert failed-cache orders rotate
+  behind untouched due orders, with no duplicate payout on concurrent replay.
 
 ### 7. Wrong Vs Correct
 

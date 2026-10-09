@@ -1,11 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import { readAuthToken } from '../utils/authStorage'
 import {
     fetchSecondSnapshot,
     fetchSecondCycles,
     fetchSecondCurrentOrders,
     fetchSecondHistoryOrders,
-    fetchSecondOrderResult,
+    fetchSecondOrders,
     fetchSecondBalance,
     submitSecondOrder,
     type SecondOrderParams
@@ -65,6 +66,9 @@ export const useSecondStore = defineStore('second', () => {
     const balance = ref<number>(0)
     const loading = ref(false)
     const orderRefreshKey = ref<number>(0)
+    let currentRequest = 0
+    let historyRequest = 0
+    let balanceRequest = 0
 
     // ========== Ticker ==========
 
@@ -173,9 +177,12 @@ export const useSecondStore = defineStore('second', () => {
 
     // ========== Orders ==========
 
-    async function loadCurrentOrders(symbol: string) {
+    async function loadCurrentOrders(symbol: string, isCurrent = () => true) {
+        const request = ++currentRequest
+        const token = readAuthToken()
         try {
             const res = await fetchSecondCurrentOrders(symbol)
+            if (request !== currentRequest || token !== readAuthToken() || !isCurrent()) return
             const body = res.data
             const list = body?.data || (Array.isArray(body) ? body : [])
             currentOrders.value = mapOrders(list)
@@ -184,8 +191,8 @@ export const useSecondStore = defineStore('second', () => {
         }
     }
 
-    async function loadHistoryOrders(symbol?: string, page: number = 0, pageSize: number = 50) {
-        if (loadingHistory.value) return
+    async function loadHistoryOrders(symbol?: string, page: number = 0, pageSize: number = 50, isCurrent = () => true) {
+        if (loadingHistory.value && page !== 0) return
         if (page === 0) {
             historyHasMore.value = true
         } else if (!historyHasMore.value) {
@@ -193,12 +200,15 @@ export const useSecondStore = defineStore('second', () => {
         }
 
         loadingHistory.value = true
+        const request = ++historyRequest
+        const token = readAuthToken()
         try {
             const res = await fetchSecondHistoryOrders({
                 symbol,
                 pageNo: page,
                 pageSize
             })
+            if (request !== historyRequest || token !== readAuthToken() || !isCurrent()) return
             const body = res.data
             let list: any[] = []
             if (Array.isArray(body)) {
@@ -227,19 +237,34 @@ export const useSecondStore = defineStore('second', () => {
         } catch (e) {
             console.error('loadHistoryOrders error', e)
         } finally {
-            loadingHistory.value = false
+            if (request === historyRequest) loadingHistory.value = false
         }
     }
 
-    async function checkOrderResult(id: number, symbol: string) {
+    async function reconcileOrders(symbol: string, isCurrent = () => true): Promise<SecondOrder[]> {
+        const request = ++currentRequest
+        const history = ++historyRequest
+        const token = readAuthToken()
+        const tracked = new Set(currentOrders.value.map(order => order.id))
+        loadingHistory.value = true
         try {
-            const res = await fetchSecondOrderResult(id, symbol)
-            const body = res.data
-            const order = body?.data || body
-            return order
+            const res = await fetchSecondOrders({ symbol })
+            if (request !== currentRequest || token !== readAuthToken() || !isCurrent()) return []
+            const orders = mapOrders(res.data.data)
+            currentOrders.value = orders.filter(order => order.status === 'OPEN' || order.status === 'ENTRUST')
+            const closed = orders.filter(order => order.status !== 'OPEN' && order.status !== 'ENTRUST')
+            if (history === historyRequest) {
+                historyOrders.value = closed
+                historyPage.value = 0
+                historyHasMore.value = closed.length >= 50
+            }
+            // Only newly completed tracked orders produce a result, never refunds or review.
+            return closed.filter(order => tracked.has(order.id) && order.status === 'CLOSE')
         } catch (e) {
-            console.error('checkOrderResult error', e)
-            return null
+            console.error('reconcileOrders error', e)
+            return []
+        } finally {
+            if (history === historyRequest) loadingHistory.value = false
         }
     }
 
@@ -283,9 +308,12 @@ export const useSecondStore = defineStore('second', () => {
 
     // ========== Balance ==========
 
-    async function loadBalance() {
+    async function loadBalance(isCurrent = () => true) {
+        const request = ++balanceRequest
+        const token = readAuthToken()
         try {
             const res = await fetchSecondBalance('USDT-ERC20')
+            if (request !== balanceRequest || token !== readAuthToken() || !isCurrent()) return
             const body = res.data
             balance.value = Number(body?.data ?? body) || 0
         } catch (e) {
@@ -326,7 +354,7 @@ export const useSecondStore = defineStore('second', () => {
         loadCycles,
         loadCurrentOrders,
         loadHistoryOrders,
-        checkOrderResult,
+        reconcileOrders,
         placeOrder,
         loadBalance
     }

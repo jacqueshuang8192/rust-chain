@@ -43,6 +43,8 @@ type PrivateWsClientState = {
   callbacks: Map<number, MessageCallback>
   nextCallbackId: number
   token: string | null
+  openCallbacks: Map<number, () => void>
+  heartbeatTimer: ReturnType<typeof setInterval> | null
 }
 
 type IncomingMarketPayload = {
@@ -129,20 +131,43 @@ export class StompService {
     this.clearPrivateReconnect(client)
     client.manualClose = false
     client.token = token
-    client.socket = new WebSocket(privateWsUrl(token))
-    client.socket.onopen = () => {
+    const socket = new WebSocket(privateWsUrl(token))
+    client.socket = socket
+    let lastInboundAt = Date.now()
+    socket.onopen = () => {
+      if (client.socket !== socket) return
       client.connected = true
+      lastInboundAt = Date.now()
+      client.heartbeatTimer = setInterval(() => {
+        if (client.socket !== socket) return
+        if (Date.now() - lastInboundAt >= 65_000) {
+          this.closePrivateSocket(client, false)
+          this.schedulePrivateReconnect(client)
+          return
+        }
+        if (socket.readyState === WebSocket.OPEN) socket.send('ping')
+      }, 25_000)
+      client.openCallbacks.forEach((callback) => { try { callback() } catch { /* isolate consumers */ } })
     }
-    client.socket.onmessage = (event) => this.handlePrivateMessage(client, String(event.data))
-    client.socket.onclose = () => {
+    socket.onmessage = (event) => {
+      if (client.socket !== socket) return
+      lastInboundAt = Date.now()
+      this.handlePrivateMessage(client, String(event.data))
+    }
+    socket.onclose = () => {
+      if (client.socket !== socket) return
+      if (client.heartbeatTimer) clearInterval(client.heartbeatTimer)
+      client.heartbeatTimer = null
       client.connected = false
       client.socket = null
       if (!client.manualClose && client.callbacks.size > 0 && storedAuthToken()) {
         this.schedulePrivateReconnect(client)
       }
     }
-    client.socket.onerror = (event) => {
-      console.error('[private] WebSocket error:', event)
+    socket.onerror = () => {
+      if (client.socket !== socket) return
+      this.closePrivateSocket(client, false)
+      this.schedulePrivateReconnect(client)
     }
   }
 
@@ -173,7 +198,7 @@ export class StompService {
     })
   }
 
-  subscribePrivate(callback: MessageCallback): Promise<Subscription> {
+  subscribePrivate(callback: MessageCallback, onOpen?: () => void): Promise<Subscription> {
     const token = storedAuthToken()
     if (!token) {
       return Promise.resolve({ unsubscribe: () => undefined })
@@ -182,7 +207,10 @@ export class StompService {
     const client = this.getPrivateClient()
     const callbackId = client.nextCallbackId++
     client.callbacks.set(callbackId, callback)
+    if (onOpen) client.openCallbacks.set(callbackId, onOpen)
+    const alreadyConnected = client.connected && client.token === token
     this.connectPrivate()
+    if (alreadyConnected) onOpen?.()
 
     return Promise.resolve({
       unsubscribe: () => this.removePrivateCallback(client, callbackId),
@@ -237,6 +265,7 @@ export class StompService {
   private disconnectPrivateClient(client: PrivateWsClientState, clearCallbacks: boolean) {
     if (clearCallbacks) {
       client.callbacks.clear()
+      client.openCallbacks.clear()
     }
     this.closePrivateSocket(client, true)
   }
@@ -244,6 +273,8 @@ export class StompService {
   private closePrivateSocket(client: PrivateWsClientState, manualClose: boolean) {
     client.manualClose = manualClose
     this.clearPrivateReconnect(client)
+    if (client.heartbeatTimer) clearInterval(client.heartbeatTimer)
+    client.heartbeatTimer = null
     const socket = client.socket
     client.socket = null
     client.connected = false
@@ -365,10 +396,11 @@ export class StompService {
       payload = null
     }
 
-    if (payload?.type === 'subscribed' || payload?.type === 'unsubscribed' || payload?.type === 'error') return
+    if (!payload || typeof payload !== 'object' || typeof payload.type !== 'string') return
+    if (['subscribed', 'unsubscribed', 'error', 'pong'].includes(payload.type)) return
 
     client.callbacks.forEach((callback) => {
-      callback({ body })
+      try { callback({ body }) } catch { /* isolate consumers */ }
     })
   }
 
@@ -411,6 +443,8 @@ export class StompService {
         callbacks: new Map(),
         nextCallbackId: 1,
         token: null,
+        openCallbacks: new Map(),
+        heartbeatTimer: null,
       }
     }
     return this.privateClient
@@ -418,6 +452,7 @@ export class StompService {
 
   private removePrivateCallback(client: PrivateWsClientState, callbackId: number) {
     client.callbacks.delete(callbackId)
+    client.openCallbacks.delete(callbackId)
     if (client.callbacks.size === 0) {
       this.disconnectPrivateClient(client, false)
     }

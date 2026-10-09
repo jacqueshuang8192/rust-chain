@@ -434,3 +434,95 @@ rotate the key on timeout, or lock ancestors through a full-table path scan.
 
 Correct: server-derived scope, bounded primary-key locks, explicit per-agent
 policy, immutable request/review identity and one atomic money transaction.
+
+## Scenario: Read-Only Team Orders
+
+### 1. Scope / Trigger
+
+The agent portal lists seconds, margin-contract, earn and spot orders across
+the authenticated agent's subtree without iterating individual user portfolios.
+
+### 2. Signatures
+
+- GET `/agent/api/v1/orders/{kind}`, `kind=seconds|margin|earn|spot`.
+- UI `/agent/orders/{kind}` has four separate Chinese navigation entries.
+- Response `{orders, total}` flattens the original business row with nullable
+  `email`, positive `owner_agent_id`, and nonempty `owner_agent_code`.
+- Common queries: `team_scope`, `agent_id`, `user_id`, `email`, `order_id`,
+  `status`, `created_from`, `created_to`, `limit`, `offset`.
+- Business queries: `product_id` except spot; `symbol` and `direction` except
+  earn; seconds-only `result=win|loss`.
+
+### 3. Contracts
+
+- The authenticated `AgentAccessScope.path` always constrains both rows and
+  COUNT through `user_referrals.root_agent_id -> agents.path`. A shared query
+  builder applies identical membership and filter predicates to both queries.
+- `team_scope=all` (default) includes all owned users, including user-invited
+  descendants that inherit their inviter's owner. `own` selects this agent's
+  ownership; `descendants` excludes this agent's direct ownership.
+- `agent_id` selects a branch including its descendants, but the selected
+  agent itself must belong to the authenticated subtree. Parent, sibling,
+  unrelated, unassigned and missing identities cannot broaden visibility.
+- ID inputs are positive safe integers. `limit` defaults to 20 and accepts
+  1..100; `offset` defaults to 0 and accepts 0..100000. Reject, do not clamp.
+- Time inputs are Unix milliseconds in 0..253402300799999. The interval is
+  left-inclusive/right-exclusive; end must exceed start. Ordering is creation
+  time DESC, ID DESC. Earn uses `subscribed_at` as `created_at`.
+- Missing status means all states, including opened and refunded seconds.
+  Margin pending/opened interpretation is identical to the portfolio contract.
+  Spot status spelling remains `cancelled`; margin uses `canceled`.
+- Email uses literal substring matching, not wildcard patterns. Trading-pair
+  matching ignores case and `-`, `/`, `_` separators. All values are bound;
+  kind selects static SQL projections, never a supplied table name.
+- Financial amounts remain Decimal strings and nullable snapshots remain null.
+  Earn reads persisted subscriptions only; these routes never load market
+  prices, initialize wallets, accrue interest, redeem, settle or append events.
+- The page uses server pagination, draft-submit/reset filters, refresh,
+  display-only seconds countdown and a read-only detail drawer. Common filters
+  are shown initially; expanding/collapsing advanced filters preserves their
+  drafts and applied values. Applied advanced filter count remains visible.
+- New request contexts immediately hide old rows; late responses cannot replace
+  the current query. Kind/session generation changes reset filters, pages and
+  details. No row polling or client-generated settled state.
+- `FilterBar` datetime inputs retain local drafts until query serialization.
+  Selects link visible labels using `aria-labelledby` because Semi's default
+  selection label can replace `aria-label`.
+
+### 4. Validation & Error Matrix
+
+| Condition | Result |
+| --- | --- |
+| Unknown fields, invalid enums/IDs/time/pagination, unsupported business filter | 400 before database access |
+| Unknown kind | 404 |
+| Out-of-scope target/filter | Empty orders and zero total |
+| Missing agent auth / inactive ancestor | 401 |
+| Wrong token scope | 403 |
+| Missing ownership metadata or numeric JSON money | Frontend contract error |
+
+### 5. Good / Base / Bad Cases
+
+Good: root filters one level-2 branch and sees its level-3 user orders.
+Base: no orders returns an empty page without creating data.
+Bad: treating `user_referrals.root_agent_id` as the top-level agent, or letting
+`agent_id` replace the token-derived path.
+
+### 6. Tests Required
+
+- Real MySQL: four businesses, three levels, sibling/other/unassigned users,
+  user-invited ownership, branch/own/descendant filters, consistent totals,
+  stable equal-time paging, milliseconds, nullable values, Decimal precision,
+  inactive ancestors, and unchanged order/wallet/ledger/event snapshots.
+- API/component: agent Bearer, strict DTOs, numeric bounds, real filter controls,
+  reset/page/refresh, details, null-entry margin labels, refunded seconds,
+  empty/error/retry, session/business late responses and countdown cleanup.
+- OpenAPI must register each concrete generic instantiation and its flattened
+  children explicitly; deriving the outer enum alone can leave unresolved refs.
+- Browser: desktop and 390/320px, advanced filters, table containment and real
+  resize interaction, all four navigation entries and detail drawers.
+
+### 7. Wrong vs Correct
+
+Wrong: authorize a requested agent once, then query rows by its root ID.
+Correct: bind the current identity path in every rows/COUNT query; intersect a
+requested branch with that scope, and show the exact directly owning agent.

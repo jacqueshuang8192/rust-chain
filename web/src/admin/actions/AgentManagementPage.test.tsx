@@ -175,8 +175,8 @@ describe('AgentManagementPage', () => {
 
     await user.click(screen.getByText('原始数据'));
 
-    expect(await screen.findByText('字段')).toBeInTheDocument();
-    expect(screen.getByText('内容')).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: '详情字段' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: '详情字段' }).querySelector('dl')).toHaveClass('admin-detail-fields');
   });
 
   it('opens agent detail drawer and reassigns a user to another agent', async () => {

@@ -233,6 +233,83 @@ async fn mysql_pool_or_skip() -> Result<Option<MySqlPool>, Box<dyn Error>> {
     Ok(Some(pool))
 }
 
+#[tokio::test]
+async fn cache_failures_rotate_behind_untouched_due_orders() -> Result<(), Box<dyn Error>> {
+    let _guard = TEST_LOCK.lock().await;
+    let (Some(pool), Some(redis)) = (mysql_pool_or_skip().await?, cached_test_redis().await?)
+    else {
+        return Ok(());
+    };
+    sqlx::query("UPDATE seconds_contract_orders SET status='settled' WHERE status='opened' AND idempotency_key LIKE 'event-price-%'")
+        .execute(&pool).await?;
+    let broken = seed_fixture(&pool).await?;
+    let healthy = seed_fixture(&pool).await?;
+    let expires_at = Utc.with_ymd_and_hms(2020, 4, 1, 0, 0, 0).unwrap();
+    let bad_order = seed_order(&pool, &broken, expires_at, "up").await?;
+    let good_order = seed_order(&pool, &healthy, expires_at + TimeDelta::seconds(1), "up").await?;
+    seed_cached_price(&redis, &healthy.pair_symbol, "101", expires_at).await?;
+    let now = expires_at + TimeDelta::seconds(10);
+    assert_eq!(
+        run_once_with_cached_prices(&pool, &redis, None, now, 1)
+            .await?
+            .failed,
+        1
+    );
+    // The failed retry is eligible again, but must not occupy LIMIT 1 forever.
+    let next =
+        run_once_with_cached_prices(&pool, &redis, None, now + TimeDelta::seconds(1), 1).await?;
+    assert_eq!(next.settled, 1);
+    assert_eq!(order_snapshot(&pool, good_order).await?.0, "settled");
+    assert_eq!(order_snapshot(&pool, bad_order).await?.0, "opened");
+    seed_cached_price(&redis, &broken.pair_symbol, "101", now).await?;
+    assert_eq!(
+        run_once_with_cached_prices(&pool, &redis, None, now + TimeDelta::seconds(2), 1)
+            .await?
+            .settled,
+        1
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn locked_order_does_not_hold_up_other_users_on_the_same_pair() -> Result<(), Box<dyn Error>>
+{
+    let _guard = TEST_LOCK.lock().await;
+    let (Some(pool), Some(redis)) = (mysql_pool_or_skip().await?, cached_test_redis().await?)
+    else {
+        return Ok(());
+    };
+    sqlx::query("UPDATE seconds_contract_orders SET status='settled' WHERE status='opened' AND idempotency_key LIKE 'event-price-%'")
+        .execute(&pool).await?;
+    let fixture = seed_fixture(&pool).await?;
+    let expires_at = Utc.with_ymd_and_hms(2020, 5, 1, 0, 0, 0).unwrap();
+    let held_order = seed_order(&pool, &fixture, expires_at, "up").await?;
+    let free_order = seed_order(&pool, &fixture, expires_at, "up").await?;
+    seed_cached_price(&redis, &fixture.pair_symbol, "101", expires_at).await?;
+    let mut held = pool.begin().await?;
+    sqlx::query("SELECT id FROM seconds_contract_orders WHERE id=? FOR UPDATE")
+        .bind(held_order)
+        .fetch_one(&mut *held)
+        .await?;
+    let result = tokio::time::timeout(
+        std::time::Duration::from_secs(2),
+        run_once_with_cached_prices(&pool, &redis, None, expires_at, 1),
+    )
+    .await;
+    held.rollback().await?;
+    let summary = result??;
+    assert_eq!(summary.settled, 1);
+    assert_eq!(summary.skipped, 0);
+    assert_eq!(order_snapshot(&pool, free_order).await?.0, "settled");
+    assert_eq!(
+        run_once_with_cached_prices(&pool, &redis, None, expires_at, 10)
+            .await?
+            .settled,
+        1
+    );
+    Ok(())
+}
+
 async fn create_user(tx: &mut Transaction<'_, MySql>) -> Result<u64, Box<dyn Error>> {
     Ok(
         sqlx::query("INSERT INTO users (email, password_hash) VALUES (?, 'test')")

@@ -1,0 +1,11 @@
+.agent-team-orders .admin-filter-bar { margin-bottom: 20px; }
+.agent-team-orders .admin-filter-fields { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.agent-team-orders .admin-filter-control { min-width: 0; }
+.agent-team-orders .agent-order-identity { display: grid; gap: 4px; min-width: 0; }
+.agent-team-orders .agent-order-identity small { color: var(--semi-color-text-2); }
+.agent-team-orders .agent-order-identity a,
+.agent-team-orders .agent-order-identity span { overflow-wrap: anywhere; white-space: normal; }
+@media (max-width: 720px) {
+  .agent-team-orders .admin-filter-fields { grid-template-columns: minmax(0, 1fr); }
+  .agent-team-orders .admin-filter-actions { flex-wrap: wrap; }
+}

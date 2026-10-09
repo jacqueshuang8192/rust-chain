@@ -262,7 +262,7 @@ function validateAgentNumbers(value: unknown, path: string): void {
   }
 }
 
-type AgentFinancialRowContract = {
+export type AgentFinancialRowContract = {
   decimalFields: readonly string[];
   nullableDecimalFields?: readonly string[];
   integerFields?: readonly string[];
@@ -289,7 +289,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
-async function listAgentFinancialRows<T extends Record<string, unknown>>(
+export async function listAgentFinancialRows<T extends Record<string, unknown>>(
   endpoint: string,
   responseKey: string,
   contract: AgentFinancialRowContract
@@ -412,7 +412,10 @@ export async function getAgentUserMarginOrders(
 }
 
 function listAgentMarginRows(endpoint: string, responseKey: 'positions' | 'orders') {
-  return listAgentFinancialRows<AgentUserMarginPosition>(endpoint, responseKey, {
+  return listAgentFinancialRows<AgentUserMarginPosition>(endpoint, responseKey, agentMarginOrderContract);
+}
+
+export const agentMarginOrderContract: AgentFinancialRowContract = {
     requiredFields: [
       'id', 'user_id', 'product_id', 'pair_id', 'symbol', 'margin_asset', 'margin_asset_symbol', 'wallet_scope', 'margin_mode',
       'direction', 'order_type', 'margin_amount', 'leverage', 'notional_amount', 'borrowed_amount', 'interest_amount', 'entry_price',
@@ -431,8 +434,7 @@ function listAgentMarginRows(endpoint: string, responseKey: 'positions' | 'order
       order_type: ['market', 'limit'],
       status: ['opened', 'closed', 'canceled', 'liquidated']
     }
-  });
-}
+};
 
 export async function getAgentUserSpotOrders(
   userId: number,
@@ -440,7 +442,11 @@ export async function getAgentUserSpotOrders(
 ): Promise<{ orders: AgentUserSpotOrder[]; total: number }> {
   requiredSafeInteger(userId, '用户ID', 1);
   const endpoint = appendAgentFinancialQuery(`/agent/api/v1/users/${encodeURIComponent(String(userId))}/spot-orders`, query);
-  const response = await listAgentFinancialRows<AgentUserSpotOrder>(endpoint, 'orders', {
+  const response = await listAgentFinancialRows<AgentUserSpotOrder>(endpoint, 'orders', agentSpotOrderContract);
+  return { orders: response.rows, total: response.total };
+}
+
+export const agentSpotOrderContract: AgentFinancialRowContract = {
     requiredFields: ['id', 'user_id', 'pair_id', 'symbol', 'side', 'order_type', 'price', 'trigger_price', 'quantity', 'filled_quantity', 'status', 'created_at', 'updated_at'],
     decimalFields: ['quantity', 'filled_quantity'],
     nullableDecimalFields: ['price', 'trigger_price'],
@@ -452,9 +458,7 @@ export async function getAgentUserSpotOrders(
       order_type: ['market', 'limit', 'stop_limit'],
       status: ['pending', 'open', 'partially_filled', 'filled', 'cancelled', 'rejected']
     }
-  });
-  return { orders: response.rows, total: response.total };
-}
+};
 
 export async function getAgentUserSecondsContractOrders(
   userId: number,
@@ -462,7 +466,11 @@ export async function getAgentUserSecondsContractOrders(
 ): Promise<AgentUserSecondsContractOrdersResponse> {
   requiredSafeInteger(userId, '用户ID', 1);
   const endpoint = appendAgentFinancialQuery(`/agent/api/v1/users/${encodeURIComponent(String(userId))}/seconds-contract-orders`, query);
-  const response = await listAgentFinancialRows<AgentUserSecondsContractOrder>(endpoint, 'orders', {
+  const response = await listAgentFinancialRows<AgentUserSecondsContractOrder>(endpoint, 'orders', agentSecondsOrderContract);
+  return { orders: response.rows, total: response.total };
+}
+
+export const agentSecondsOrderContract: AgentFinancialRowContract = {
     requiredFields: [
       'id', 'user_id', 'product_id', 'pair_id', 'symbol', 'stake_asset', 'stake_asset_symbol', 'direction', 'stake_amount',
       'duration_seconds', 'payout_rate', 'entry_price', 'settlement_price', 'status', 'result', 'expires_at', 'created_at', 'settled_at'
@@ -479,9 +487,7 @@ export async function getAgentUserSecondsContractOrders(
       status: ['opened', 'settled', 'manual_review', 'refunded']
     },
     nullableEnumFields: { result: ['win', 'loss'] }
-  });
-  return { orders: response.rows, total: response.total };
-}
+};
 
 export function getAgentInviteCodes(): Promise<AgentInviteCodesResponse> {
   return agentRequest<AgentInviteCodesResponse>('/agent/api/v1/invite-codes');

@@ -110,6 +110,8 @@ describe('Agent portal pages', () => {
 
     expect(await screen.findByText('代理编号：AGT-001')).toBeInTheDocument();
     expect(screen.getByText('团队人数')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '12' })).toBeInTheDocument();
+    expect(screen.getByText('活跃邀请码 3', { exact: true })).toBeInTheDocument();
     expect(screen.getByText('待结算佣金')).toBeInTheDocument();
     expect(screen.getByText('闪兑订单')).toBeInTheDocument();
   });
@@ -223,7 +225,7 @@ describe('Agent portal pages', () => {
 
     expect(await screen.findByText('闪兑统计')).toBeInTheDocument();
     expect(screen.getByText('待处理订单')).toBeInTheDocument();
-    expect(screen.getByText('15.00')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '15' })).toBeInTheDocument();
   });
 
   it('renders team tree sub agents and nodes', async () => {

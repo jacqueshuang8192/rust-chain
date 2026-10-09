@@ -15,6 +15,7 @@ function renderAgentLayout(initialEntry = '/agent/dashboard') {
           { path: 'dashboard', element: <div>代理总览内容</div> },
           { path: 'support', element: <div>在线客服内容</div> },
           { path: 'users', element: <div>团队用户内容</div> },
+          { path: 'orders/:kind', element: <div>团队订单内容</div> },
           { path: 'users/:userId/portfolio', element: <div>用户资产内容</div> },
           { path: 'users/:userId/recharge', element: <div>用户充值内容</div> },
           { path: 'recharges', element: <div>我的充值申请内容</div> }
@@ -42,11 +43,18 @@ describe('AgentLayout', () => {
   it('renders the agent navigation labels and subject', () => {
     renderAgentLayout();
 
-    ['总览', '在线客服', '团队用户', '邀请码', '佣金记录', '闪兑统计', '团队树', '下级代理'].forEach((label) => {
+    ['总览', '在线客服', '团队用户', '秒合约订单', '合约订单', '理财订单', '现货订单', '邀请码', '佣金记录', '闪兑统计', '团队树', '下级代理'].forEach((label) => {
       expect(screen.getByRole('menuitem', { name: label })).toBeInTheDocument();
     });
     expect(screen.getByText('agent:9')).toBeInTheDocument();
     expect(screen.getByText('代理总览内容')).toBeInTheDocument();
+  });
+
+  it.each(['秒合约订单', '合约订单', '理财订单', '现货订单'])('opens %s from navigation', async (label) => {
+    renderAgentLayout();
+    fireEvent.click(screen.getByRole('menuitem', { name: label }));
+    expect(await screen.findByText('团队订单内容')).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: label })).toHaveClass('semi-navigation-item-selected');
   });
 
   it('navigates between agent menu items', async () => {

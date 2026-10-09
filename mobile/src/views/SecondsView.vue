@@ -20,6 +20,7 @@ import {
 } from 'lucide-vue-next'
 import AssetMark from '@/components/AssetMark.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import { useSecondsPrivateReconciliation, type SecondsPrivateReconciliationResult } from '@/composables/useSecondsPrivateReconciliation'
 import { apiErrorMessage } from '@/api/client'
 import { fetchKlines } from '@/api/market'
 import { createMarketDetailStreamSession } from '@/api/marketDetailStream'
@@ -156,7 +157,13 @@ const expiryRetryAtByOrderId = new Map<number, number>()
 const queuedExpiryOrderIds = new Set<number>()
 const reconcilingExpiryOrderIds = new Set<number>()
 const resultTracker = createSecondsSettlementResultTracker()
-const EXPIRY_RECONCILIATION_RETRY_MS = 5_000
+const EXPIRY_RECONCILIATION_RETRY_MS = 30_000
+const privateStream = useSecondsPrivateReconciliation({
+  enabled: () => session.isAuthenticated,
+  sessionKey: () => `${session.generation}:${session.token}`,
+  reconcile: reconcilePrivateState,
+  onResult: (loaded) => { refreshWarning.value = loaded ? '' : t('seconds.refreshAfterOrderFailed') },
+})
 const cycle = computed<SecondsCycle | undefined>(() => (
   selected.value?.cycles.find((item) => item.id === selectedCycleId.value)
   || selected.value?.cycles[0]
@@ -650,21 +657,18 @@ async function load(): Promise<void> {
   }
 }
 
-interface PrivateReconciliationResult {
-  ordersLoaded: boolean
-  accountsLoaded: boolean
-}
-
-async function reconcilePrivateState(): Promise<PrivateReconciliationResult> {
+async function reconcilePrivateState(): Promise<SecondsPrivateReconciliationResult> {
   if (!session.isAuthenticated || !componentActive) {
     return { ordersLoaded: true, accountsLoaded: true }
   }
   const generation = ++privateReconciliationGeneration
+  const token = session.token
+  const sessionGeneration = session.generation
   const [ordersResult, accountsResult] = await Promise.allSettled([
     fetchSecondsOrders(100),
     fetchWalletAccounts(),
   ])
-  if (!componentActive) {
+  if (!componentActive || token !== session.token || sessionGeneration !== session.generation) {
     return { ordersLoaded: false, accountsLoaded: false }
   }
   if (generation !== privateReconciliationGeneration) {
@@ -697,10 +701,12 @@ function applyReconciledOrders(nextOrders: readonly SecondsOrder[]): void {
 }
 
 function queueExpiredOrderReconciliation(now = Date.now()): void {
-  if (!session.isAuthenticated || !componentActive) return
+  if (!session.isAuthenticated || !componentActive || document.visibilityState === 'hidden') return
   for (const order of activeOrders.value) {
     if (secondsOrderRemainingMs(order, now) > 0) continue
-    if (!expiryRetryAtByOrderId.has(order.id)) expiryRetryAtByOrderId.set(order.id, 0)
+    if (!expiryRetryAtByOrderId.has(order.id)) {
+      expiryRetryAtByOrderId.set(order.id, privateStream.live.value ? now + EXPIRY_RECONCILIATION_RETRY_MS : now)
+    }
   }
   for (const [orderId, retryAt] of expiryRetryAtByOrderId) {
     if (retryAt <= now && !reconcilingExpiryOrderIds.has(orderId)) queuedExpiryOrderIds.add(orderId)
@@ -933,9 +939,8 @@ watch([filteredPairProductIds, () => selected.value?.id ?? null], ([optionIds, s
   )
 }, { flush: 'sync' })
 
-watch(() => session.isAuthenticated, (authenticated) => {
+watch(() => session.identityScope, () => {
   privateSessionGeneration += 1
-  if (authenticated) return
   privateReconciliationGeneration += 1
   clearSecondsPrivateState()
   refreshWarning.value = ''
@@ -943,6 +948,7 @@ watch(() => session.isAuthenticated, (authenticated) => {
   confirmOpen.value = false
   orderReview.value = null
   replaceTickerSubscription()
+  if (session.isAuthenticated) void privateStream.refresh()
 }, { flush: 'sync' })
 
 watch(confirmOpen, async (open) => {
@@ -980,6 +986,7 @@ watch(sparklinePoints, async () => {
 
 onMounted(async () => {
   await nextTick()
+  if (!componentActive) return
   initializeSparkline()
   clockTimer = setInterval(() => {
     currentTime.value = Date.now()

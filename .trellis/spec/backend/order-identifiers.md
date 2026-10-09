@@ -24,6 +24,7 @@
   - `LN`: loan orders
   - `SP`: spot orders and spot trade buy/sell order references
   - `SC`: seconds contract orders
+  - `MG`: margin-contract orders in the agent team-order view
   - `CV`: convert orders
   - `EA`: earn subscriptions
   - `NC`: new-coin subscriptions

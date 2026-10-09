@@ -20,7 +20,7 @@ the feature contract for the business context being modified.
 | [Database Guidelines](./database-guidelines.md) | Immutable migrations and MySQL text-metadata repair; general query guidance remains incomplete | Partial |
 | [Error Handling](./error-handling.md) | External-provider error mapping; general error taxonomy remains incomplete | Partial |
 | [Quality Guidelines](./quality-guidelines.md) | Executable architecture/documentation guards, adapter-independent services, hotspot limits, and validation | Active |
-| [Logging Guidelines](./logging-guidelines.md) | Structured logging and log-level guidance | Draft |
+| [Logging Guidelines](./logging-guidelines.md) | Chinese single-line diagnostics, field masking and worker log levels | Active |
 | [Public News Contract](./public-news-contract.md) | Public news API locale, response, and rich-text rendering contract | Active |
 | [Home Carousel Contract](./home-carousel.md) | Public filtering, versioned Admin configuration, transactional audit, and Mobile lifecycle | Active |
 | [Spot Order Contracts](./spot-orders.md) | Spot market order reference-price protection, Redis ticker execution, and wallet reservation contract | Active |

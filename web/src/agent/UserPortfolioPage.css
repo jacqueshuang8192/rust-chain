@@ -21,7 +21,24 @@
   white-space: nowrap;
 }
 
+.agent-portfolio-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 16px 0;
+}
+.agent-portfolio-filters > label {
+  display: grid;
+  gap: 6px;
+  width: 240px;
+  max-width: 100%;
+  min-width: 0;
+  font-size: 13px;
+}
+.agent-user-portfolio .admin-action-tabs { overflow-x: auto; max-width: 100%; }
+
 @media (max-width: 640px) {
+  .agent-portfolio-filters > label { width: 100%; }
   .agent-user-portfolio .page-header h2 {
     font-size: 22px;
   }

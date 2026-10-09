@@ -692,18 +692,26 @@ pub async fn run_loop(state: AppState, config: WalletChainWorkerConfig) -> AppRe
     loop {
         ticker.tick().await;
         match run_once(&state, config).await {
-            Ok(summary) => info!(
-                withdrawal_scanned = summary.withdrawal_scanned,
-                withdrawal_broadcasted = summary.withdrawal_broadcasted,
-                withdrawal_retried = summary.withdrawal_retried,
-                withdrawal_failed = summary.withdrawal_failed,
-                withdrawal_confirmed = summary.withdrawal_confirmed,
-                withdrawal_manual_review = summary.withdrawal_manual_review,
-                deposit_observed = summary.deposit_observed,
-                gateway_failed = summary.gateway_failed,
-                event_dead_lettered = summary.event_dead_lettered,
-                "钱包链任务周期完成"
-            ),
+            Ok(summary)
+                if summary.withdrawal_scanned > 0
+                    || summary.deposit_observed > 0
+                    || summary.gateway_failed > 0
+                    || summary.event_dead_lettered > 0 =>
+            {
+                info!(
+                    withdrawal_scanned = summary.withdrawal_scanned,
+                    withdrawal_broadcasted = summary.withdrawal_broadcasted,
+                    withdrawal_retried = summary.withdrawal_retried,
+                    withdrawal_failed = summary.withdrawal_failed,
+                    withdrawal_confirmed = summary.withdrawal_confirmed,
+                    withdrawal_manual_review = summary.withdrawal_manual_review,
+                    deposit_observed = summary.deposit_observed,
+                    gateway_failed = summary.gateway_failed,
+                    event_dead_lettered = summary.event_dead_lettered,
+                    "钱包链任务周期完成"
+                )
+            }
+            Ok(_) => {}
             Err(error) => error!(%error, "钱包链任务周期失败"),
         }
     }
