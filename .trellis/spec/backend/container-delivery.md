@@ -23,6 +23,15 @@
 - Health endpoint: `GET /health` returns HTTP 200 with `{"status":"ok"}`.
 - Published image: `ghcr.io/jacqueshuang-fresnostate/rust-chain:<tag>`.
 - Build workflow: native GitHub Actions matrix plus digest-based manifest finalization.
+- Container-driver bootstrap image:
+  `mirror.gcr.io/moby/buildkit:buildx-stable-1`. Build jobs also configure
+  `[registry."docker.io"] mirrors = ["mirror.gcr.io"]` inside BuildKit.
+  These are separate network paths: daemon image pull precedes BuildKit startup,
+  so the internal mirror alone cannot fix a bootstrap authentication timeout.
+- Manifest-only jobs use `driver: docker`; `imagetools` does not need a separate
+  BuildKit container. Keep container drivers for builds and GHA cache exports.
+- Verify mirror availability for both amd64 and arm64 when changing the image.
+  Mirror access is still a network dependency, not a guarantee of CI success.
 - Runtime Turnstile policy endpoint:
   `GET /api/v1/auth/login/config -> { cf_turnstile_enabled, cf_turnstile_site_key }`.
 

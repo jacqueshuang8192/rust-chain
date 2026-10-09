@@ -321,6 +321,31 @@ export default {
         ):
             self.assertIn(command, workflow)
 
+    def test_build_jobs_use_mirrored_bootstrap_and_manifest_needs_no_container(self) -> None:
+        repository_root = Path(gate.__file__).resolve().parent.parent
+        workflow = (repository_root / ".github/workflows/docker-image.yml").read_text(
+            encoding="utf-8"
+        )
+        for job_name, next_job in (
+            ("pull-request-build", "publish-platform"),
+            ("publish-platform", "publish-manifest"),
+        ):
+            job = workflow.split(f"  {job_name}:", 1)[1].split(f"  {next_job}:", 1)[0]
+            self.assertIn(
+                "driver-opts: image=mirror.gcr.io/moby/buildkit:buildx-stable-1", job
+            )
+            self.assertIn('[registry."docker.io"]', job)
+            self.assertIn('mirrors = ["mirror.gcr.io"]', job)
+            self.assertIn("cache-to: type=gha,", job)
+            self.assertIn("platform: linux/amd64", job)
+            self.assertIn("platform: linux/arm64", job)
+        manifest = workflow.split("  publish-manifest:", 1)[1]
+        self.assertIn("driver: docker", manifest)
+        self.assertNotIn("driver-opts:", manifest)
+        self.assertNotIn("buildkitd-config-inline:", manifest)
+        self.assertIn("docker buildx imagetools create", manifest)
+        self.assertIn("docker buildx imagetools inspect", manifest)
+
     def test_local_release_gate_runs_integrity_checks_before_toolchains(self) -> None:
         repository_root = Path(gate.__file__).resolve().parent.parent
         release_gate = (repository_root / "scripts/p0-release-gate.sh").read_text(
