@@ -71,3 +71,36 @@
 ### Next Steps
 
 - None - task complete
+
+
+## Session 61: Seconds contract Redis pricing and settlement
+
+**Date**: 2026-10-09
+**Task**: Seconds contract Redis pricing and settlement
+**Branch**: `main`
+
+### Summary
+
+Removed seconds-contract opening ticker age rejection, switched ordinary expiry settlement to Redis cached prices with one-second retry and atomic evidence/funding commits, preserved historical manual-review recovery/refunds, and passed focused isolated MySQL/Redis plus full Rust checks.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `140b55c` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
