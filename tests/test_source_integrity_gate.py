@@ -292,6 +292,35 @@ export default {
             self.assertLess(checkout, scan, job_name)
             self.assertLess(scan, min(protected), job_name)
 
+    def test_docker_workflow_keeps_checks_without_automated_tests(self) -> None:
+        repository_root = Path(gate.__file__).resolve().parent.parent
+        workflow = (repository_root / ".github/workflows/docker-image.yml").read_text(
+            encoding="utf-8"
+        )
+        for command in (
+            "cargo test",
+            "npm --prefix web test",
+            "run test:",
+            "run release:gate",
+            "-m unittest",
+            "run: ./scripts/p0-release-gate.sh",
+            "integration-smoke:",
+            "- integration-smoke",
+        ):
+            self.assertNotIn(command, workflow)
+        for command in (
+            "cargo fmt --all -- --check",
+            "cargo clippy --lib --bins -- -D warnings",
+            "npm --prefix web run lint",
+            "npm --prefix web run typecheck",
+            "npm --prefix web run build",
+            "npm --prefix pc run type-check",
+            "npm --prefix pc run build",
+            "npm --prefix mobile run build:pwa",
+            "npm --prefix mobile run build:tauri",
+        ):
+            self.assertIn(command, workflow)
+
     def test_local_release_gate_runs_integrity_checks_before_toolchains(self) -> None:
         repository_root = Path(gate.__file__).resolve().parent.parent
         release_gate = (repository_root / "scripts/p0-release-gate.sh").read_text(

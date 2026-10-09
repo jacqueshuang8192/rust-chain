@@ -14,7 +14,7 @@ env:
 
 jobs:
   quality-gate:
-    name: P0 release quality gate
+    name: Static checks and builds
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     permissions:
@@ -27,9 +27,7 @@ jobs:
           persist-credentials: false
 
       - name: Verify source integrity
-        run: |
-          python3 scripts/source_integrity_gate.py
-          python3 -B -m unittest tests.test_source_integrity_gate
+        run: python3 scripts/source_integrity_gate.py
 
       - name: Install Rust quality components
         run: |
@@ -57,8 +55,31 @@ jobs:
           npm --prefix pc ci
           npm --prefix mobile ci
 
-      - name: Run P0 release gate
-        run: ./scripts/p0-release-gate.sh
+      # The full test gate remains available locally in scripts/p0-release-gate.sh.
+      - name: Check Rust formatting and lint
+        run: |
+          cargo fmt --all -- --check
+          cargo clippy --lib --bins -- -D warnings
+
+      - name: Check admin frontend
+        run: |
+          npm --prefix web run lint
+          npm --prefix web run typecheck
+          npm --prefix web run build
+
+      - name: Check PC frontend
+        run: |
+          npm --prefix pc run type-check
+          npm --prefix pc run build
+
+      - name: Check mobile frontend
+        run: |
+          npm --prefix mobile run build:pwa
+          npm --prefix mobile run check:artifacts:pwa
+          npm --prefix mobile run check:bundle
+          npm --prefix mobile run build:tauri
+          npm --prefix mobile run check:artifacts:tauri
+          npm --prefix mobile run check:bundle
 
   pull-request-build:
     name: Build pull request
@@ -100,76 +121,11 @@ jobs:
           cache-from: type=gha,scope=backend-image-${{ matrix.arch }}
           cache-to: type=gha,mode=max,scope=backend-image-${{ matrix.arch }}
 
-  integration-smoke:
-    name: Real dependency integration smoke
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
-    needs:
-      - quality-gate
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    permissions:
-      contents: read
-    services:
-      mysql:
-        image: mysql:8.4
-        env:
-          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
-          MYSQL_DATABASE: exchange_ci
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot"
-          --health-interval=5s --health-timeout=5s --health-retries=30
-      redis:
-        image: redis:7.4
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd="redis-cli ping"
-          --health-interval=5s --health-timeout=5s --health-retries=30
-      mongo:
-        image: mongo:8.0
-        ports:
-          - 27017:27017
-        options: >-
-          --health-cmd="mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok'"
-          --health-interval=5s --health-timeout=5s --health-retries=30
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - name: Install Rust
-        run: rustup toolchain install stable --profile minimal
-      - name: Run migrations against MySQL service
-        env:
-          DATABASE_URL: mysql://root@127.0.0.1:3306/exchange_ci
-          REDIS_URL: redis://127.0.0.1:6379
-          MONGODB_URI: mongodb://127.0.0.1:27017/exchange_ci
-        run: |
-          cargo run --bin exchange-migrate
-      - name: Verify migrated schema and dependency read-write paths
-        env:
-          DATABASE_URL: mysql://root@127.0.0.1:3306/exchange_ci
-          REDIS_URL: redis://127.0.0.1:6379
-          MONGODB_URI: mongodb://127.0.0.1:27017
-          MONGODB_DATABASE: exchange_ci
-          RUN_REAL_DEPENDENCY_SMOKE: '1'
-        run: cargo test --test real_dependency_smoke -- --nocapture
-      - name: Verify governance queries against migrated schema
-        env:
-          DATABASE_URL: mysql://root@127.0.0.1:3306/exchange_ci
-          RUN_REAL_DEPENDENCY_SMOKE: '1'
-        run: >-
-          cargo test --lib
-          query_runs_against_migrated_mysql
-          -- --nocapture
   publish-platform:
     name: Build and publish ${{ matrix.platform }}
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     needs:
       - quality-gate
-      - integration-smoke
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read

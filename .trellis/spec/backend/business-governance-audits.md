@@ -102,10 +102,11 @@ field/status labels, and preserve raw Decimal/timestamp values for requests
 and exports. `GET /admin/api/v1/audit-logs` remains the read-only source for
 operator actions and reasons.
 
-The Docker publication workflow must run an `integration-smoke` job with real
-MySQL, Redis, and Mongo services, apply migrations, and run the real-dependency
-smoke tests before publish jobs or the manifest job. Publish jobs depend on
-that gate; pull requests remain read-only. The Dockerfile uses the bundled
+By user decision on 2026-10-10, the Docker workflow runs static checks and builds
+without automated tests or an `integration-smoke` job. Real-dependency tests
+remain available for explicit local validation; successful CI does not establish
+migration or service compatibility. Publish jobs depend on the static quality
+gate; pull requests remain read-only. The Dockerfile uses the bundled
 BuildKit frontend and does not resolve a remote Docker Hub syntax image.
 
 ## 3. Contracts
@@ -145,9 +146,9 @@ BuildKit frontend and does not resolve a remote Docker Hub syntax image.
    healthy/balanced state. Chinese labels are presentation-only; submitted
    enum values, raw reasons, IDs, symbols, Decimal text, and API error codes
    remain unchanged.
-7. **Release dependency gate.** A migration or service smoke failure is a
-   release failure. The API image is not published or promoted when the
-   integration-smoke job is red. Tests that need real services opt in through
+7. **Explicit dependency verification.** CI publication no longer runs migration
+   or service smoke tests. Do not report CI success as real-dependency validation.
+   Tests that need real services opt in through
    `RUN_REAL_DEPENDENCY_SMOKE=1`; ordinary unit tests remain deterministic and
    do not accidentally connect to a developer's local database.
 
@@ -267,15 +268,16 @@ let health = load_admin_market_feed_health_data(&pool, &symbols, &providers, now
 
 ```yaml
 jobs:
-  integration-smoke:
-    services: [mysql, redis, mongo]
+  quality-gate:
+    # Static checks and builds only; tests run explicitly outside this workflow.
+    runs-on: ubuntu-24.04
   publish:
-    needs: [integration-smoke, build]
+    needs: [quality-gate]
   manifest:
     needs: [publish-amd64, publish-arm64]
 ```
 
 The correct implementation keeps diagnostic reads side-effect free, keeps
 ordinary business data authoritative, makes every Decimal/identity/permission
-boundary explicit, and prevents a release from bypassing real dependency
-verification.
+boundary explicit, and reports real dependency verification separately from
+static CI checks.
