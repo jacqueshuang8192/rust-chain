@@ -251,11 +251,11 @@ test('本地 Lightweight Charts 单引擎保留真实数据、指标、成交量
   }
 })
 
-test('手机端仅隐藏蜡烛上下影线，保留真实高低价与其他图表系列', () => {
+test('手机端默认隐藏影线，检查模式启用影线并保留真实高低价与其他系列', () => {
   const candleOptions = lightweightChartSource.match(/candles = chart\.addSeries\(CandlestickSeries, \{([\s\S]*?)\n  \}\)/)?.[1]
   assert.ok(candleOptions, 'CandlestickSeries creation options must exist')
-  assert.match(candleOptions, /wickVisible: false/)
-  assert.doesNotMatch(lightweightChartSource, /wickVisible: true/)
+  assert.match(candleOptions, /wickVisible: props\.inspection/)
+  assert.match(lightweightChartSource, /inspection: false/)
   assert.doesNotMatch(candleOptions, /(?:priceLineVisible|lastValueVisible|visible): false/)
   assert.match(lightweightChartSource, /high: point\.high/)
   assert.match(lightweightChartSource, /low: point\.low/)

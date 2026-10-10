@@ -589,6 +589,49 @@ test('方向与日期筛选、兼容分类以及全部已知变动类型均有�
   assert.equal(testI18n.global.t('ledger.groupCount', 2), '2 records')
 })
 
+test('账单标记和悬浮标题翻译所有已知类型，仅未知类型显示来源', () => {
+  const sourceFile = ts.createSourceFile(
+    'WalletLedgerView.script.ts', viewScriptSource, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS,
+  )
+  const names = ['entryLabel', 'entryExecutionMeta']
+  const declarations = sourceFile.statements.filter((statement) => (
+    ts.isFunctionDeclaration(statement) && names.includes(statement.name?.text ?? '')
+  ))
+  assert.equal(declarations.length, names.length)
+  const transpiled = ts.transpileModule(
+    declarations.map((statement) => statement.getText(sourceFile)).join('\n'),
+    { compilerOptions: { module: ts.ModuleKind.None, target: ts.ScriptTarget.ES2022 } },
+  )
+  const createMeta = new Function(
+    'walletLedgerTypePresentation', 't',
+    `${transpiled.outputText}\nreturn entryExecutionMeta;`,
+  ) as (
+    present: typeof walletLedgerTypePresentation,
+    translate: (key: string) => string,
+  ) => (entry: WalletLedgerEntry) => string
+  const i18n = createI18n({ legacy: false, locale: 'zh-CN', messages: { 'zh-CN': zhCN, en } })
+  const meta = createMeta(walletLedgerTypePresentation, (key) => i18n.global.t(key))
+  const entry = ledgerEntry(1, Date.parse('2026-10-10T00:00:00Z'))
+
+  for (const locale of ['zh-CN', 'en'] as const) {
+    i18n.global.locale.value = locale
+    for (const changeType of WALLET_LEDGER_KNOWN_CHANGE_TYPES) {
+      const expected = i18n.global.t(walletLedgerTypePresentation(changeType).translationKey)
+      assert.equal(meta({ ...entry, changeType }), expected)
+      assert.notEqual(expected, changeType)
+    }
+    assert.equal(
+      meta({ ...entry, changeType: 'seconds_contract_settle_win' }),
+      locale === 'zh-CN' ? '秒合约盈利结算' : 'Seconds win settled',
+    )
+    assert.equal(meta({ ...entry, changeType: ' future_bonus_v2 ' }), 'future_bonus_v2')
+    assert.equal(meta({ ...entry, changeType: '' }), i18n.global.t('ledger.typeOther'))
+  }
+  assert.ok(viewTemplateSource.includes(
+    '<small :title="entryExecutionMeta(entry)">{{ entryExecutionMeta(entry) }}</small>',
+  ))
+})
+
 // ---------------------------------------------------------------------------
 // 合同 4：金额符号、方向推导与手续费
 // ---------------------------------------------------------------------------

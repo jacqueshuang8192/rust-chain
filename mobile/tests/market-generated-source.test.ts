@@ -30,27 +30,28 @@ test('authoritative metadata replacement clears a former generated-source marker
   assert.equal(merged.lastPrice, 2)
 })
 
-test('actual shared chart renders localized source notice only for generated markets without demanding history', async () => {
+test('actual shared chart omits generated-market notices without changing data or demanding history', async () => {
   let requests = 0
   const wrapper = mountMobileMarketChart(async () => { requests += 1; return [] }, chartPoints(10))
   assert.ok(!wrapper.text().includes('平台生成行情'))
-  for (const marketType of ['strategy', 'internal'] as const) {
-    await wrapper.update({ marketType })
-    assert.ok(wrapper.text().includes('平台生成行情 · 盘口与成交为模拟数据'))
-    assert.equal((wrapper.chart().props.points as unknown[]).length, 10)
-  }
-  wrapper.i18n.global.locale.value = 'en'
-  await wrapper.flush()
-  assert.ok(wrapper.text().includes('Platform-generated market · Order book and trades are simulated'))
-  for (const marketType of ['external', undefined] as const) {
-    await wrapper.update({ marketType })
-    assert.ok(!wrapper.text().includes('Platform-generated market'))
+  for (const locale of ['zh-CN', 'en'] as const) {
+    wrapper.i18n.global.locale.value = locale
+    await wrapper.flush()
+    for (const marketType of ['strategy', 'internal', 'external', undefined] as const) {
+      await wrapper.update({ marketType })
+      assert.ok(!wrapper.text().includes('平台生成行情'))
+      assert.ok(!wrapper.text().includes('Platform-generated market'))
+      assert.ok(!wrapper.all().some(node => String(node.props.class).includes('mobile-market-chart__source')))
+      assert.ok(!wrapper.all().some(node => String(node.props.class).includes('has-generated-source')))
+      assert.equal((wrapper.chart().props.points as unknown[]).length, 10)
+      assert.equal(wrapper.props.marketType, marketType)
+    }
   }
   assert.equal(requests, 0)
   wrapper.unmount()
 })
 
-test('both production chart hosts pass their current ticker metadata to the shared notice', () => {
+test('both production chart hosts retain their current ticker metadata', () => {
   for (const name of ['TradeView', 'MarketDetailView']) {
     const source = readFileSync(new URL(`../src/views/${name}.vue`, import.meta.url), 'utf8')
     const chart = source.match(/<MobileMarketChart\b[\s\S]*?\/>/)?.[0]

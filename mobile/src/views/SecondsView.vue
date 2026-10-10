@@ -20,6 +20,7 @@ import {
 } from 'lucide-vue-next'
 import AssetMark from '@/components/AssetMark.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import SecondsChartWorkspace from '@/components/SecondsChartWorkspace.vue'
 import { useSecondsPrivateReconciliation, type SecondsPrivateReconciliationResult } from '@/composables/useSecondsPrivateReconciliation'
 import { useSecondsProductSelection } from '@/composables/useSecondsProductSelection'
 import { apiErrorMessage } from '@/api/client'
@@ -1102,6 +1103,7 @@ onBeforeUnmount(() => {
             </span>
           </div>
 
+          <SecondsChartWorkspace :symbol="selected?.symbol || ''">
           <div class="seconds-micro-chart" :data-chart-state="sparklinePoints.length ? 'ready' : 'empty'">
             <canvas ref="sparklineCanvas" role="img" :aria-label="t('seconds.referencePrice')" />
             <span v-if="!sparklinePoints.length" role="status">
@@ -1109,6 +1111,7 @@ onBeforeUnmount(() => {
             </span>
           </div>
 
+          </SecondsChartWorkspace>
           <section
             class="instrument-plate seconds-order-console"
             data-instrument-plate="market-and-order"
@@ -2019,7 +2022,7 @@ onBeforeUnmount(() => {
   background: var(--seconds-page);
   box-sizing: border-box;
   display: grid;
-  grid-template-rows: 22px 53px 112px auto;
+  grid-template-rows: 22px 53px auto auto;
   height: auto;
   padding: 2px 20px 10px;
   row-gap: 6px;

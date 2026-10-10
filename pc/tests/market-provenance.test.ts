@@ -87,3 +87,13 @@ test('ticker updates replace old source and historical/realtime candles retain i
   assert.equal(history.observedAt, candle.observed_at)
   assert.deepEqual(live, history)
 })
+
+test('PC label hides default and external text without removing independent freshness', () => {
+  const label = readFileSync(new URL('../src/components/trade/MarketProvenanceLabel.vue', import.meta.url), 'utf8')
+  assert.ok(label.includes("source.value !== 'default' && source.value !== 'external'"))
+  assert.ok(label.includes('v-if="showSource || live || observedAt !== undefined"'))
+  assert.ok(label.includes('<template v-if="showSource">{{ $t(`marketProvenance.${source}`) }}</template>'))
+  assert.ok(label.includes('<template v-if="showSource"> · </template>'))
+  assert.ok(label.includes("timeText || $t('marketProvenance.timeUnknown')"))
+  assert.ok(label.includes('<span v-if="stale">'))
+})

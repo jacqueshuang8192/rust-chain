@@ -55,6 +55,7 @@ const MARKET_FEED_CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 const MARKET_FEED_WRITE_TIMEOUT: Duration = Duration::from_secs(10);
 
 mod side_effects;
+mod source_progress;
 
 /// 行情 generation 围栏；实时缓存与入队前必须确认代次，已入队的历史副作用独立完成。
 #[derive(Debug, Clone, Default)]
@@ -1538,6 +1539,26 @@ async fn run_provider_socket<S>(
 where
     S: MarketIngestionSink,
 {
+    run_provider_socket_with_progress(
+        worker,
+        config,
+        write_fence,
+        cancellation,
+        source_progress::SourceProgress::default(),
+    )
+    .await
+}
+
+async fn run_provider_socket_with_progress<S>(
+    worker: MarketFeedWorker<S>,
+    config: MarketFeedConfig,
+    write_fence: MarketFeedWriteFence,
+    cancellation: CancellationToken,
+    mut progress: source_progress::SourceProgress,
+) -> AppResult<()>
+where
+    S: MarketIngestionSink,
+{
     let connection = timeout(MARKET_FEED_CONNECT_TIMEOUT, connect_async(config.url()))
         .await
         .map_err(|_| {
@@ -1589,7 +1610,10 @@ where
                 }
                 .await;
                 match result {
-                    Ok(()) => summary.ingested += 1,
+                    Ok(()) => {
+                        summary.ingested += 1;
+                        progress.check(&frame, chrono::Utc::now(), Instant::now())?;
+                    }
                     Err(error) => {
                         summary.failed += 1;
                         warn!(

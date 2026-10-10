@@ -8,6 +8,7 @@ import en from '../../src/i18n/messages/en.ts'
 import zhCN from '../../src/i18n/messages/zh-CN.ts'
 import { createMarketChartHistorySession } from '../../src/core/marketChartHistory.ts'
 import { calculateMarketMovingAverages } from '../../src/core/marketIndicators.ts'
+import { resolveMarketChartPriceFormat } from '../../src/core/marketChart.ts'
 import { marketSource } from '../../src/core/marketProvenance.ts'
 import type { KlinePoint, MarketTicker } from '../../src/core/types.ts'
 
@@ -47,19 +48,24 @@ export function mountMobileMarketChart(loadOlder: (symbol: string, interval: str
     },
   })
   const icon = Vue.defineComponent({ setup: () => () => Vue.h('icon') })
+  const controls: Array<number | 'latest'> = []
   const chartStub = Vue.defineComponent({
-    props: ['points', 'movingAverages', 'symbol', 'interval', 'historyLoading', 'locale', 'label'],
-    emits: ['load-history'],
-    setup: (props, { emit }) => () => Vue.h('chart-engine', { ...props, onDemand: () => emit('load-history') }),
+    props: ['points', 'movingAverages', 'symbol', 'interval', 'historyLoading', 'locale', 'label', 'inspection', 'showAverages', 'showVolume'],
+    emits: ['load-history', 'inspect'],
+    setup: (props, { emit, expose }) => {
+      expose({ zoom: (factor: number) => controls.push(factor), latest: () => controls.push('latest') })
+      return () => Vue.h('chart-engine', { ...props, onDemand: () => emit('load-history'), onInspect: (time: number | null) => emit('inspect', time) })
+    },
   })
   const modules: Record<string, Record<string, unknown>> = {
     vue: Vue,
     'vue-i18n': { useI18n },
-    'lucide-vue-next': { ChartNoAxesCombined: icon, LoaderCircle: icon },
+    'lucide-vue-next': { ChartNoAxesCombined: icon, LoaderCircle: icon, ZoomIn: icon, ZoomOut: icon, ArrowRightToLine: icon },
     '@/components/LightweightMarketChart.vue': { default: chartStub },
     '@/api/market': { fetchOlderKlines: loadOlder },
     '@/core/marketChartHistory': { createMarketChartHistorySession },
     '@/core/marketIndicators': { calculateMarketMovingAverages },
+    '@/core/marketChart': { resolveMarketChartPriceFormat },
     '@/core/marketProvenance': { marketSource },
   }
   function compileComponent(name: string): Vue.Component {
@@ -88,8 +94,9 @@ export function mountMobileMarketChart(loadOlder: (symbol: string, interval: str
     return new Function(...Object.keys(bindings), output)(...Object.values(bindings)) as Vue.Component
   }
   modules['@/components/MarketProvenanceLabel.vue'] = { default: compileComponent('MarketProvenanceLabel') }
+  modules['@/components/MarketChartInspector.vue'] = { default: compileComponent('MarketChartInspector') }
   const component = compileComponent('MobileMarketChart')
-  const props = Vue.reactive({ ticker: undefined as MarketTicker | undefined, marketType: undefined as MarketTicker['marketType'], symbol: 'BTCUSDT', interval: '1m', points, loading: false })
+  const props = Vue.reactive({ ticker: undefined as MarketTicker | undefined, marketType: undefined as MarketTicker['marketType'], symbol: 'BTCUSDT', interval: '1m', points, loading: false, inspection: false })
   const i18n = createI18n({ legacy: false, locale: 'zh-CN', messages: { en, 'zh-CN': zhCN } })
   const root = hostNode('root')
   const app = renderer.createApp({ render: () => Vue.h(component, props) })
@@ -102,6 +109,7 @@ export function mountMobileMarketChart(loadOlder: (symbol: string, interval: str
   return {
     root,
     props,
+    controls,
     i18n,
     all,
     find: (type: string) => all().find((node) => node.type === type)!,

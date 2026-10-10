@@ -9446,6 +9446,76 @@
 - 验证结果：`cargo test --test openapi_routes` 14/14通过，`cargo fmt --all -- --check` 与 `git diff --check` 通过。本轮未新增实库或生产环境验证；上一轮遗漏该测试目标属于验证范围不足，已记录。
 - 后续事项：用户已明确确认提交并推送，本次断言和验证文档单独提交为 `test: include refunded in agent portal OpenAPI contract`，普通推送至 `origin/main` 并核对远程哈希；原有发布限制不变，`.vite/`缓存保留且不纳入。
 
+## 2026-10-10 04:09 - 隐藏指定行情来源提示
+
+- 完成内容：按用户连续补充的要求，在Mobile/PC共用来源组件隐藏“默认生成（模拟）”及“外部参考”，没有时间信息时不保留空标签；移除Mobile共用K线图“平台生成行情 · 盘口与成交为模拟数据”提示及44px占位。保留时间、陈旧提示、其他来源标签、来源字段和中英文词典，不修改行情生成、下单或结算逻辑。
+- 修改文件：`mobile/src/components/{MarketProvenanceLabel,MobileMarketChart}.vue`、`mobile/tests/{market-generated-source,market-provenance-label}.test.ts`、`pc/src/components/trade/MarketProvenanceLabel.vue`、`pc/tests/market-provenance.test.ts`、`.trellis/spec/backend/market-provenance.md`、任务`10-10-hide-default-market-label`与本进度文件。
+- 验证结果：Mobile定向12/12及完整`npm --prefix mobile run release:gate`通过，含类型、全量测试、PWA/Tauri构建、产物、包体及治理检查；PC全量119/119、type-check/build通过，`git diff --check`通过。Ego实际组件配合本地夹具验证中英文及来源切换、Mobile390/320与PC1280/320均无横向溢出，默认/外部来源无空标签，时间仍显示；K线ready且画布采样27种颜色，截图已查看，TaskSpace4已关闭。
+- 后续事项：本轮尚未提交推送，提交范围已记录，等待确认；已有`.vite/`缓存排除。开发服务Mobile5186、PC5187保留供预览；浏览器组件夹具检查不代表生产行情联调或部署验收。
+
+## 2026-10-10 04:17 - 修复手机端交易记录类型标记国际化
+
+- 完成内容：定位到账单小字标记在已知类型没有source时错误回退原始changeType，中英文词条本身已存在；改为复用本地化类型文案，包含可见标记及title，未知类型继续保留诊断来源。增加全部已知类型、中英文切换、秒合约盈利结算、未知及空值回归，不改金额、筛选、分类或接口。
+- 修改文件：`mobile/src/views/WalletLedgerView.vue`、`mobile/tests/wallet-ledger-classification.test.ts`、`.trellis/spec/mobile/navigation-and-localization.md`、`.trellis/tasks/10-10-mobile-ledger-localization/`及本进度文件。
+- 验证结果：账单定向18/18通过；完整`npm --prefix mobile run release:gate`通过，全量809/809无跳过，类型检查、PWA/Tauri构建、产物、包体与治理检查均通过；任务上下文校验及`git diff --check`通过。本轮未执行新增浏览器或生产环境验收。
+- 后续事项：尚未提交推送，保留上一项隐藏行情提示改动及`.vite/`缓存；任务交付范围已记录。
+
+## 2026-10-10 04:34 - GitHub Workflow 取消自动化测试
+
+- 完成内容：按用户要求移除Workflow中的Rust、前端、扫描器单测与独立真实依赖集成测试；保留源码完整性检查、格式、生产目标Clippy、前端lint/类型/构建及镜像发布依赖。本地完整测试脚本不变，同步规范说明CI不再提供业务与数据库行为验证。
+- 修改文件：`.github/workflows/docker-image.yml`、`tests/test_source_integrity_gate.py`、`.trellis/spec/backend/business-governance-audits.md`、任务`10-10-workflow-no-tests`及本进度文件。
+- 验证结果：源码扫描16项通过；本地回归17/17通过；Ruby YAML解析及任务依赖校验通过。未安装actionlint，未运行远程Actions或容器构建。
+- 后续事项：单独提交本次Workflow、回归与规范/任务文档，不推送；本进度文件含前两项未提交记录，保留本地不纳入此次隔离提交；此前手机端及行情提示改动保持原状。
+
+## 2026-10-10 04:34 - Workflow 提交推送完成
+
+- 完成内容：用户确认后，将`1e593ab`（`ci: skip automated tests in GitHub workflow`）普通推送至`origin/main`。
+- 修改文件：本轮仅推送既有Workflow提交并补充本地进度记录，未修改业务源码。
+- 验证结果：推送成功，远程`refs/heads/main`核对为`1e593ab30d6ee6194a7122561381f8ffbcb13f44`；未执行远程Workflow验收。
+- 后续事项：手机端国际化、行情提示隐藏及共享进度文件仍未提交；`.vite/`缓存未纳入。
+
+## 2026-10-10 05:50 - PWA 部署后启动检查并应用新版
+
+- 完成内容：定位到缓存应用壳与等待用户确认的Worker使普通刷新仍可能停留旧版；已受控且在线的PWA在Vue挂载前执行注册、更新检查和激活，共用4秒期限，确认controller切换后仅刷新一次。超时、离线或失败正常进入应用，迟到更新不自动刷新已交互页面；保留首次访问、Tauri隔离与页面内手动更新。补充Nginx/CDN缓存、原子部署、保留旧哈希资源及首次旧客户端迁移说明。
+- 修改文件：`mobile/src/main.ts`、`mobile/src/pwa/{index,startup}.ts`、`mobile/tests/pwa-startup.test.ts`、`mobile/README.md`、`.trellis/spec/mobile/pwa-and-shell.md`、任务`10-10-pwa-startup-update`及本进度文件。
+- 验证结果：PWA定向22/22，全量release:gate 817/817无跳过，类型、PWA/Tauri构建、产物、包体与治理均通过。真实浏览器配合生成的Workbox及生产startup函数验证/mobile/子路径v1刷新至v2、后台下载v3不打断v2、重开至v3及离线缓存v3；TaskSpace6与临时服务器已关闭。任务校验及diff检查通过。
+- 后续事项：单独提交本次PWA修复，不推送或部署；首次旧缓存需用户接受一次更新，线上缓存头未核对。未构建Android/iOS原生包，浏览器验证为隔离静态夹具；共享进度文件与此前手机端/行情提示改动保留本地。
+
+## 2026-10-10 05:58 - 避开 Buildx 初始化时 Docker Hub 认证超时
+
+- 完成内容：根据日志定位到构建前拉取BuildKit镜像时auth.docker.io超时；PR及发布构建改从已验证的Google Docker Hub缓存拉取BuildKit，并配置BuildKit内部基础镜像缓存。清单合并任务改用docker driver，不再启动额外BuildKit容器；保留双架构、GHA缓存、GHCR发布及CI不跑测试策略。
+- 修改文件：`.github/workflows/docker-image.yml`、`tests/test_source_integrity_gate.py`、`.trellis/spec/backend/container-delivery.md`、任务`10-10-buildx-registry-timeout`及本进度文件。
+- 验证结果：缓存仓库HEAD 200；`docker buildx imagetools inspect`成功读取镜像及amd64/arm64清单；本地回归18/18、源码扫描16项、YAML解析与任务依赖校验通过。本机Docker daemon不可用，未执行容器初始化、完整构建或GitHub远程验收。
+- 后续事项：单独提交本次Workflow修复，不自动推送；缓存可用性仍是网络依赖，不能保证全部构建无网络错误。共享进度及先前界面改动保持原状。
+
+## 2026-10-10 06:16 - PWA 与 Buildx 修复推送完成
+
+- 完成内容：按用户确认普通推送`9417fe6`（PWA启动更新）与`6530773`（BuildKit镜像缓存）至`origin/main`，未修改未提交的界面改动。
+- 修改文件：本轮仅推送两个既有提交并补记本地进度。
+- 验证结果：推送成功，远程`refs/heads/main`核对为`6530773d808c7cb4e977eee2397bbbf4fa3180ac`；沿用各提交已记录验证，未确认远程Workflow构建或生产部署结果。
+- 后续事项：手机端国际化、行情提示隐藏与共享进度文件仍未提交，`.vite/`缓存未纳入。
+
+## 2026-10-10 11:13 - 秒合约行情延迟只读诊断
+
+- 完成内容：匿名同步采样Bitget与平台BTC/ETH ticker、盘口和1分钟K线，确认多频道共同落后且积压增长；定位当前源码的逐帧串行等待、ticker归档与现货4次/杠杆1次候选查询、盘口重复现货查询、逐K线Mongo索引命令，以及只检测入站静默而不检测源时间滞后的活性检查。保存诊断报告与可复现只读探针，未使用用户曾提供的密钥。
+- 修改文件：`.trellis/tasks/10-10-market-feed-lag-diagnosis/{prd.md,probe.mjs,public-probe.json,second-probe.json,diagnosis.md,task.json,implement.jsonl,check.jsonl}`及本进度文件；未修改业务源码。
+- 验证结果：两轮30秒公开采样完成，第一轮BTC行情年龄中位397594ms，第二轮453826ms，同轮直连Bitget中位197ms；第二轮平台REST约832ms返回462289ms前快照，BTC ticker源时间14279ms/接收时间27911ms，积压增加13632ms。第二轮socket error发生于主动关闭后，已保留标记；探针语法、JSON结构、任务与diff校验通过。
+- 后续事项：需要服务端分段耗时、数据库慢查询/连接池指标和部署版本核对，才能确认MySQL、Mongo、Redis或网络等待各自占比；本轮未重启、部署、修改生产配置或执行资金操作，未宣称已修复。诊断材料暂未提交推送，此前改动保持原状。
+
+## 2026-10-10 19:45 - 外部行情实时路径与持久后台队列拆分
+
+- 完成内容：按用户确认将外部行情接收改为Redis原子缓存/有界任务入队后公开推送；独立监督归档、现货、杠杆、K线历史四条FIFO，归档批量写入，失败保留队头、重启续做，使用数据库作用域的会话锁协调实例。保留历史旧ticker归档、源时间微秒精度、合成行情原有租约事务、秒合约当前取价规则；队列触发排除观察时尚未创建的订单，Mongo索引成功初始化共享缓存，多实例相同缓存快照仍可本地广播。
+- 修改文件：`src/workers/market_feed{.rs,/side_effects.rs}`、`src/modules/market/infrastructure{.rs,/cache.rs,/cache/external.rs,/adapters/feed.rs,/adapters/ingestion.rs}`、现货/杠杆触发及候选查询模块、`src/infra/logging.rs`、行情worker测试、`.trellis/spec/backend/{index,external-market-pipeline}.md`及任务记录。
+- 验证结果：第一轮隔离MySQL13316/Redis16482定向14/14通过，含现货通道阻塞时500条报价写入、其他通道推进及消费者重启续做；阶段性all-targets编译和严格Clippy通过。正在扩展公开推送、创建时间边界、Mongo故障、缓存时序与最终完整门禁，尚未宣称最终验证完成。
+- 后续事项：完成最终回归、记录部署约束并隔离提交本任务；不推送或部署，不修改线上Redis/MySQL配置，保留先前界面改动。
+
+## 2026-10-10 20:11 - 外部行情解耦最终验证
+
+- 完成内容：完成实时Redis入队与推送、四通道独立消费、原始观察时间限制、微秒归档身份及重试恢复验证；整理运行约束和交付说明。未改变秒合约取价公式，未将MySQL认定为唯一线上瓶颈。
+- 修改文件：本任务行情/现货/杠杆源码与测试、`.trellis/spec/backend/external-market-pipeline.md`、后端规范索引、`.trellis/tasks/10-10-market-feed-lag-diagnosis/`及本进度文件。
+- 验证结果：最终库测试516/516、架构11/11、文档1/1、行情worker33/33通过；隔离MySQL/Redis实跑现货65/65、杠杆44/44、Redis缓存5/5通过；500帧慢通道隔离、重启续做及Mongo故障保留回归通过。格式化、all-targets严格Clippy、源码完整性16项、任务上下文及diff检查通过。部分既有库测试内部跳过可选数据库分支；未验证真实Mongo成功写入或生产延迟改善。
+- 后续事项：隔离提交本任务，不推送部署；上线须确认Redis持久化/noeviction、队列容量和额外4条MySQL连接，部署后复测源时间延迟。保留无关界面改动及共享进度历史记录。
+
 ## 2026-10-11 02:03 - 秒合约币种选择刷新恢复
 
 - 完成内容：定位秒合约选中产品仅存组件内存、刷新默认首项及请求前捕获旧选择问题；新增独立秒合约产品ID持久化，接口返回后匹配当前选择，支持下架回退、空列表/失败保留偏好与存储失败内存降级，不持久化金额、方向、价格或确认状态。
@@ -9466,3 +9536,38 @@
 - 修改文件：`mobile/src/composables/useSecondsProductSelection.ts`、`mobile/tests/seconds-pair-persistence.test.ts`、手机端导航规范、`.trellis/tasks/10-11-seconds-default-btc/`及本进度文件。
 - 验证结果：完整mobile release:gate通过，825/825无跳过，类型检查、PWA/Tauri构建、产物及预算通过；Ego TaskSpace11先打开ETH再进入裸入口并强刷，确认地址和标题均为BTC，未登录或下单，空间已关闭。
 - 后续事项：仅本地提交本任务，不推送部署；保留其他未提交修改，未执行安装态PWA真机验证。
+
+## 2026-10-11 04:15 - 秒合约展开K线与图内交互
+
+- 完成内容：新增页内展开K线工作区，展开时隐藏小走势图，保留下单组件；实现蜡烛影线、MA5/10/20、成交量、十字光标及UTC时间/OHLC读数、均线和成交量开关、缩放与回到最新行情，支持后端已有五种周期。复用平台REST/WS，隔离旧请求并在收起/卸载时停止展开图订阅；修正原112px固定轨道导致的图表与下单控件重叠，不改下单或结算逻辑。
+- 修改文件：`mobile/src/components/{SecondsChartWorkspace,MarketChartInspector,LightweightMarketChart,MobileMarketChart}.vue`、`mobile/src/core/secondsChartSession.ts`、`mobile/src/views/SecondsView.vue`、中英locale、图表测试及helpers、三份既有布局测试、手机端图表规范及索引、`.trellis/tasks/10-11-seconds-chart-workspace/`和本进度文件。保留共享图表文件已有隐藏来源提示改动。
+- 验证结果：最终`npm --prefix mobile run release:gate`通过，831/831无跳过，生产/测试类型检查、PWA/Tauri Web构建、产物、包体/源码/测试预算全部通过。Ego匿名浏览器亮暗主题320/390/448/1280宽度均无横向溢出、图表与下单区无重叠；实际canvas非空，验证十字光标、拖动、缩放、回最新、5分切换和指标开关，收起/重开保留金额600且无body滚动锁。未登录或下单。
+- 后续事项：待确认仅提交本任务，不推送部署；不纳入此前账单国际化、来源提示隐藏及PC修改。未验证安装态PWA、实体手机双指/长按或原生包。
+
+## 2026-10-11 07:24 - 重新启动手机端预览服务
+
+- 完成内容：确认5186端口无监听后重新启动mobile Vite开发服务，沿用5186端口供用户查看秒合约图表。
+- 修改文件：仅本进度记录，未修改业务代码。
+- 验证结果：首页及`/src/components/SecondsChartWorkspace.vue`均HTTP 200，组件响应包含新增图表入口；Vite启动成功。
+- 后续事项：开发服务保持运行；未提交、推送或部署生产环境。
+
+## 2026-10-11 07:37 - 外部行情同步延迟复诊
+
+- 完成内容：两轮匿名REST/WS采样确认BTC/ETH行情、盘口和K线共同落后，ticker中位延迟由465秒增至556秒；本地Vite代理返回的后端快照也陈旧。核对远程main为6530773，先前解耦修复8d07a73仍只在本地，不能假定线上已使用该修复；定位现有活性检查只看入站静默，持续旧消息不会触发恢复。
+- 修改文件：`.trellis/tasks/10-11-external-market-sync/{prd.md,diagnosis.md,public-probe.json,second-probe.json}`及本进度文件；开始补充源时间积压检测和测试。
+- 验证结果：两轮30秒采样完成；第一轮BTC源时间14200ms/接收时间27794ms，第二轮19926ms/28550ms；REST同样落后约551秒。当前机器直连Bitget WS/REST失败，未宣称获得本轮同源直连对照；未拿到生产版本、慢查询或队列长度，无法认定MySQL单独占比。
+- 后续事项：完成积压自动重连回归与Rust门禁，单独提交本任务；不推送部署，不改变开仓/结算取价或清理未消费任务。
+
+## 2026-10-11 07:42 - 外部行情积压连接恢复与后端验收
+
+- 完成内容：新增逐连接源时间观察窗，推送信封落后超过30秒、持续至少10秒且累计3个成功摄取帧时，在当前摄取和广播完成后交回既有REST兜底及重连流程；不以蜡烛开盘或历史成交时间判断，不改变开仓/结算价格规则，不清理持久队列。补充中文告警、确定性时钟边界与真实本地WS重连/推送回归，并记录上线前提。
+- 修改文件：`src/workers/market_feed{.rs,/source_progress.rs}`、`src/infra/logging.rs`、`tests/unit_src/src_workers_market_feed_source_progress_tests.rs`、`.trellis/spec/backend/external-market-pipeline.md`、`.trellis/tasks/10-11-external-market-sync/`和本进度文件。
+- 验证结果：定向7/7、库测试523/523、架构11/11、文档1/1、行情worker33/33通过；严格all-targets Clippy、fmt、源码完整性16项、任务与diff校验通过。真实loopback测试验证旧连接失败、第二次订阅、4帧全部进入记录sink与公开hub；既有库测试可选实库分支可能内部跳过，本轮未重跑Redis/MySQL/Mongo实库或生产恢复验收。
+- 后续事项：用户明确要求全部提交，取代仅本次后端隔离提交计划；将当前秒合约图表、来源提示隐藏、账单国际化及相关测试文档一起提交，排除`.vite/`缓存，不推送部署。合并工作区前端门禁复跑中；上线仍需包含8d07a73与本次修复的后端构建，并复测源时间延迟。
+
+## 2026-10-11 07:44 - 用户确认全部提交与最终门禁
+
+- 完成内容：按“全部都提交”的明确授权，将本次行情持续积压自动重连和此前未提交的秒合约展开图表、手机账单国际化、Mobile/PC行情来源提示隐藏及全部关联测试/规范/任务记录纳入一次本地提交；仅排除可再生成的`.vite/`缓存与Git忽略的本地配置和产物，不推送、不部署。
+- 修改文件：当前`src/`、`tests/unit_src/`、`mobile/`、`pc/`、`.trellis/spec/`、四个待提交任务目录及`docs/superpowers/PROGRESS.md`中的全部业务、测试和文档改动。
+- 验证结果：合并工作区Mobile完整`release:gate`复跑通过，831/831无跳过，生产/测试类型检查、PWA/Tauri Web构建、产物及全部预算通过；PC全量119/119无跳过、type-check/build通过。后端523+11+1+33、严格all-targets Clippy、fmt、源码完整性16项及diff/任务校验通过；5186预览HTTP200。未新增生产或实库验收。
+- 后续事项：以`fix: repair market stream recovery and mobile trading UI`执行普通本地提交并核对状态；远程main仍为6530773，需后续明确授权推送及部署包含8d07a73和本次修复的后端后再测行情延迟，不能将本地验证认定为线上恢复。

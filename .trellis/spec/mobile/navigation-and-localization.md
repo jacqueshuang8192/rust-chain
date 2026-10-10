@@ -272,6 +272,10 @@ lastTradePath: ComputedRef<string>
   symmetric `ledger.*` keys in `zh-CN` and `en`. An unknown `change_type`
   renders localized `ledger.typeOther` as its primary label and keeps the raw
   enum visible as secondary technical information.
+- Known wallet ledger types must also use localized copy in secondary metadata
+  and `title` attributes. A missing presentation `source` means the type is
+  recognized, not that the view should fall back to the raw `change_type`.
+  Test the actual view formatter in both locales, including locale switching.
 - The `/orders` and `/assets/ledger` routes form one transaction-records
   workspace and use the symmetric title `交易记录` / `Transaction Records`.
   Internally the workspace keeps seven canonical route keys: current orders,

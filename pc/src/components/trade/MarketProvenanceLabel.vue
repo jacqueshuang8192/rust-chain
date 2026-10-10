@@ -2,6 +2,8 @@
 import { marketSource, type MarketProvenance } from '@/api/marketProvenance'
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 const props = defineProps<{ provenance?: MarketProvenance; observedAt?: number; live?: boolean }>()
+const source = computed(() => marketSource(props.provenance))
+const showSource = computed(() => source.value !== 'default' && source.value !== 'external')
 const now = ref(Date.now())
 let timer: ReturnType<typeof setInterval> | undefined
 onMounted(() => { if (props.live) timer = setInterval(() => { now.value = Date.now() }, 1000) })
@@ -13,9 +15,10 @@ const timeText = computed(() => validTime.value ? new Date(Number(props.observed
 
 <template>
   <small
+    v-if="showSource || live || observedAt !== undefined"
     class="block text-[10px] font-normal text-muted-foreground whitespace-normal break-words leading-tight"
     :title="[provenance?.source, provenance?.provider].filter(Boolean).join(' / ')"
-  >{{ $t(`marketProvenance.${marketSource(provenance)}`) }}<template v-if="live || observedAt !== undefined">
-    · {{ timeText || $t('marketProvenance.timeUnknown') }}<span v-if="stale"> · {{ $t('marketProvenance.stale') }}</span>
+  ><template v-if="showSource">{{ $t(`marketProvenance.${source}`) }}</template><template v-if="live || observedAt !== undefined">
+    <template v-if="showSource"> · </template>{{ timeText || $t('marketProvenance.timeUnknown') }}<span v-if="stale"> · {{ $t('marketProvenance.stale') }}</span>
   </template></small>
 </template>

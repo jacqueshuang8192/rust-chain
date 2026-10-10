@@ -20,6 +20,9 @@ deadline-price selection.
 - Consumers use one dedicated MySQL connection per lane and a database-scoped
   `GET_LOCK(SHA2(CONCAT(DATABASE(), ':', lane_key),256),0)` session lock.
   These connections are additional to the application pool.
+- Each socket owns `SourceProgress::check(frame, wall_now, monotonic_now)`;
+  it returns a cycle error when push-envelope time remains over 30 seconds old
+  across at least three valid ingested frames and 10 monotonic seconds.
 
 ## 3. Contracts
 
@@ -28,6 +31,19 @@ publishes an accepted snapshot immediately. It never awaits SQL archive,
 candidate queries, order transactions, Mongo index commands or candle writes.
 Ticker/cache and accepted trigger work are written together. Check all queue
 types/capacities before writes: Lua runtime errors do not roll back prior writes.
+
+Inbound activity is not freshness. After a frame's ingestion/publication scope
+finishes, independently check the provider's top-level push envelope (`ts` for
+Bitget/HTX, RFC3339 `timestamp` for Coinbase). Never fall back to candle open time,
+trade time or a nested historical ticker timestamp. Missing/invalid envelope
+time is ignored without resetting an existing lag window; a fresh envelope resets
+the window. Future timestamps do not trigger a reconnect. Grace uses monotonic
+time, while source age needs a correctly synchronized server wall clock.
+Sustained lag ends the socket cycle through existing REST fallback/backoff and
+resubscription. Do not cancel in-flight admission or delete queued side effects.
+Unreceived frames on the abandoned socket have the same gap risk as any provider
+disconnect; this guard is not a complete exchange-event replay guarantee.
+It does not change order-entry or settlement price-age policy.
 
 Ticker and depth order by observation time; candle order is
 `(open_time, observed_at)`, retaining the existing sequence key even if the
@@ -86,6 +102,8 @@ supersedes the queued one; a first-insert race won by an older document must ret
 | Competing API instances | One normal-operation consumer per lane via session lock |
 | Lost lock/uncertain ACK | Leave/replay work; existing financial idempotency remains required |
 | Feed disabled or API down | Work remains; consumption resumes when feed runtime is enabled |
+| Busy socket with sustained stale push timestamps | Finish current admission, warn and return to supervised reconnect |
+| Old candle/trade row in a fresh envelope | No backlog recovery; row timestamps are not the transport clock |
 | Redis persistence loss/eviction | Not protected by the SQL archive until consumption; operational incident |
 
 ## 5. Operations And Cases
@@ -112,6 +130,12 @@ WARN reports consumer failures and queues >= 1,000; DEBUG reports
 storage now converge asynchronously. Drain all v1 lists before downgrading to
 a binary that does not understand them.
 
+When diagnosing an old deployment, compare anonymous REST/WS source timestamps
+with receipt time and check the remote/deployed revision before changing clients.
+Restarting Vite does not deploy the Rust ingestion worker. Source backlog warnings
+are Chinese and include `source_age_ms` and `lag_duration_ms`; repeated warnings
+require investigation of admission latency, queues and clock synchronization.
+
 ## 6. Verification
 
 `tests/unit_src/src_workers_market_feed_side_effects_tests.rs` uses explicit
@@ -123,6 +147,12 @@ batch archive idempotency, source-time precision, slow lane independence,
 Mongo failure retention, consumer restart and creation-time cutoffs.
 Also run library, market feed, architecture, existing spot/margin fill tests,
 format, all-target compilation and strict Clippy.
+
+Source-progress unit tests inject wall/monotonic clocks for sustained lag, grace,
+fresh reset, missing/invalid/future timestamps and historical row exclusion. The
+loopback socket test runs the real ingestion, supervisor and publication path,
+asserts lag failure followed by a second subscription/fresh event, and confirms
+every admitted pre-reconnect frame reached its sink and public hub.
 
 ## 7. Wrong Vs Correct
 

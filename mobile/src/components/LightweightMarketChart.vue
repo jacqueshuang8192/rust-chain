@@ -12,6 +12,7 @@ import {
   type ISeriesApi,
   type LineData,
   type LogicalRange,
+  type MouseEventParams,
   type UTCTimestamp,
 } from 'lightweight-charts'
 import { resolveMarketChartPriceFormat, type NormalizedMarketChartPoint } from '@/core/marketChart'
@@ -40,11 +41,17 @@ const props = withDefaults(defineProps<{
   historyLoading?: boolean
   locale: string
   label: string
+  inspection?: boolean
+  showAverages?: boolean
+  showVolume?: boolean
 }>(), {
   interval: '',
   historyLoading: false,
+  inspection: false,
+  showAverages: true,
+  showVolume: true,
 })
-const emit = defineEmits<{ 'load-history': [] }>()
+const emit = defineEmits<{ 'load-history': []; inspect: [time: number | null] }>()
 
 const container = ref<HTMLElement | null>(null)
 let chart: IChartApi | null = null
@@ -69,6 +76,29 @@ let renderedPricePrecision: number | null = null
 let historyDemandFrame = 0
 let historyGestureRange: LogicalRange | null = null
 const viewportIntentEvents = ['wheel', 'pointermove', 'touchmove', 'dblclick'] as const
+
+function inspectCrosshair(event: MouseEventParams): void {
+  emit('inspect', event.point && typeof event.time === 'number' ? event.time : null)
+}
+
+function zoom(factor: number): void {
+  const range = chart?.timeScale().getVisibleLogicalRange()
+  if (!range || !Number.isFinite(factor) || factor <= 0) return
+  recordViewportIntent(new Event('dblclick'))
+  const width = Math.max(8, Math.min(1000, (range.to - range.from) * factor))
+  const center = (range.from + range.to) / 2
+  chart?.timeScale().setVisibleLogicalRange({ from: center - width / 2, to: center + width / 2 } as LogicalRange)
+}
+
+function latest(): void {
+  recordViewportIntent(new Event('dblclick'))
+  chart?.priceScale('right').applyOptions({ autoScale: true })
+  chart?.timeScale().scrollToRealTime()
+  chart?.clearCrosshairPosition()
+  emit('inspect', null)
+}
+
+defineExpose({ zoom, latest })
 
 function cancelHistoryDemand(): void {
   if (historyDemandFrame) cancelAnimationFrame(historyDemandFrame)
@@ -306,7 +336,7 @@ onMounted(() => {
     upColor: theme.positive,
     downColor: theme.negative,
     borderVisible: false,
-    wickVisible: false,
+    wickVisible: props.inspection,
     wickUpColor: theme.positive,
     wickDownColor: theme.negative,
   })
@@ -338,6 +368,10 @@ onMounted(() => {
     priceLineVisible: false,
   })
   volume.priceScale().applyOptions({ scaleMargins: { top: .76, bottom: 0 } })
+  if (props.inspection) {
+    candles.priceScale().applyOptions({ scaleMargins: { top: .08, bottom: .27 } })
+    chart.subscribeCrosshairMove(inspectCrosshair)
+  }
   chart.timeScale().subscribeVisibleLogicalRangeChange(onVisibleLogicalRangeChange)
   resizeObserver = new ResizeObserver(resize)
   resizeObserver.observe(container.value)
@@ -393,6 +427,14 @@ watch(() => props.locale, (locale) => {
   chart?.applyOptions({ localization: { locale } })
 })
 
+watch(() => props.showAverages, (visible) => {
+  for (const series of [ma5Series, ma10Series, ma20Series]) series?.applyOptions({ visible })
+})
+watch(() => props.showVolume, (visible) => {
+  volume?.applyOptions({ visible })
+  if (props.inspection) candles?.priceScale().applyOptions({ scaleMargins: { top: .08, bottom: visible ? .27 : .08 } })
+})
+
 onUnmounted(() => {
   cancelHistoryDemand()
   scheduleViewportRestore(null)
@@ -402,6 +444,7 @@ onUnmounted(() => {
   stopObservingTheme?.()
   stopObservingTheme = null
   chart?.timeScale().unsubscribeVisibleLogicalRangeChange(onVisibleLogicalRangeChange)
+  if (props.inspection) chart?.unsubscribeCrosshairMove(inspectCrosshair)
   chart?.remove()
   chart = null
   candles = null

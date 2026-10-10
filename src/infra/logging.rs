@@ -121,6 +121,7 @@ fn field_label(name: &str) -> &str {
         "manual_review" => "转人工数",
         "elapsed_ms" => "耗时毫秒",
         "source_age_ms" => "行情距今毫秒",
+        "lag_duration_ms" => "行情持续落后毫秒",
         "queued" => "待处理事件数",
         "accepted" => "已接受",
         "error" | "join_error" | "error_chain" => "错误详情",

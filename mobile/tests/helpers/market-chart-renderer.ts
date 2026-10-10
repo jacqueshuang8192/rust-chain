@@ -21,6 +21,7 @@ export function chartPoints(count: number, start = 1_700_000_000): NormalizedMar
 export function mountMarketChart(initial: {
   points?: NormalizedMarketChartPoint[]
   historyLoading?: boolean
+  inspection?: boolean
 } = {}) {
   const component = readFileSync(new URL('../../src/components/LightweightMarketChart.vue', import.meta.url), 'utf8')
   const script = component.match(/<script setup lang="ts">([\s\S]*?)<\/script>/)?.[1]
@@ -40,6 +41,7 @@ export function mountMarketChart(initial: {
     movingAverages: calculateMarketMovingAverages(points),
     symbol: 'BTCUSDT', interval: '1m', locale: 'en-US', label: 'Market',
     historyLoading: initial.historyLoading ?? false,
+    inspection: initial.inspection ?? false, showAverages: true, showVolume: true,
   })
   let visibleRange: Range | null = null
   let fitCount = 0
@@ -55,6 +57,10 @@ export function mountMarketChart(initial: {
   const listeners = new Map<string, Set<EventListener>>()
   const rangeListeners = new Set<(range: Range | null) => void>()
   const emitted: string[] = []
+  const inspections: Array<number | null> = []
+  const crosshairListeners = new Set<(event: Record<string, unknown>) => void>()
+  let controls: { zoom(factor: number): void; latest(): void } | undefined
+  let latestCalls = 0
   const container = {
     clientWidth: 350, clientHeight: 300,
     addEventListener(name: string, listener: EventListener) {
@@ -72,6 +78,7 @@ export function mountMarketChart(initial: {
     priceScale: () => { applyOptions: (options: Options) => void },
   }> = []
   const timeScale = {
+    scrollToRealTime() { latestCalls += 1 },
     getVisibleLogicalRange: () => visibleRange && { ...visibleRange },
     subscribeVisibleLogicalRangeChange(callback: (range: Range | null) => void) { rangeListeners.add(callback) },
     unsubscribeVisibleLogicalRangeChange(callback: (range: Range | null) => void) { rangeListeners.delete(callback) },
@@ -99,6 +106,10 @@ export function mountMarketChart(initial: {
     }
   }
   const chart = {
+    subscribeCrosshairMove(callback: (event: Record<string, unknown>) => void) { crosshairListeners.add(callback) },
+    unsubscribeCrosshairMove(callback: (event: Record<string, unknown>) => void) { crosshairListeners.delete(callback) },
+    clearCrosshairPosition() {},
+    priceScale: () => ({ applyOptions: (_options: Options) => {} }),
     timeScale: () => timeScale,
     addSeries(kind: string, options: Options) {
       const result = {
@@ -137,7 +148,11 @@ export function mountMarketChart(initial: {
     ...runtime,
     ref, watch,
     defineProps: () => props,
-    defineEmits: () => (event: string) => emitted.push(event),
+    defineEmits: () => (event: string, time?: number | null) => {
+      emitted.push(event)
+      if (event === 'inspect') inspections.push(time ?? null)
+    },
+    defineExpose: (value: typeof controls) => { controls = value },
     withDefaults: (value: typeof props) => value,
     onMounted: (callback: () => void) => mounts.push(callback),
     onUnmounted: (callback: () => void) => unmounts.push(callback),
@@ -178,6 +193,11 @@ export function mountMarketChart(initial: {
 
   return {
     props, series, chartOptions, restoredRanges, resizeCalls, container, emitted,
+    inspections,
+    get controls() { return controls! },
+    get latestCalls() { return latestCalls },
+    get crosshairListenerCount() { return crosshairListeners.size },
+    crosshair(event: Record<string, unknown>) { crosshairListeners.forEach((callback) => callback(event)) },
     get range() { return visibleRange && { ...visibleRange } },
     get fits() { return fitCount },
     get pendingFrames() { return frames.size },

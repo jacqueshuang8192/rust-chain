@@ -34,8 +34,12 @@ Semantic sources: `platform`, `external`, `strategy`, `default`, `generated`,
   Mobile and PC chart wrappers do not render a candle-source summary row.
   Removing that presentation must not strip per-candle evidence or affect
   history loading, live updates, provider selection or the 1m default.
-  Existing ticker/book/trade labels outside the chart and the Mobile
-  generated-market notice remain unchanged.
+  The Mobile generated-market notice is also omitted, with no reserved strip.
+  Shared Mobile/PC ticker/book/trade labels omit the `default` and `external`
+  source text; label-only rows for those sources render no empty element.
+  Observation time, unknown-time and stale indicators remain independent of
+  source-text visibility. Other source labels remain unchanged. Presentation
+  suppression never rewrites provenance or relabels it as a platform trade.
 - Ticker presentation uses real observation time and marks older-than-60s or
   future-dated evidence stale. Historical closed candles are not labelled as
   stale realtime tickers. Local receipt time is never source observation.
@@ -68,6 +72,8 @@ Cover producer-to-cache/REST/WS provenance, legacy absence, contradictory
 metadata, mixed chart history, ticker source switching, late REST, numeric
 price preservation, timer cleanup and narrow-screen labels. A mocked browser
 render test is not a live provider/database integration test.
+Cover hidden default/external labels in both locales, preserved unknown and
+other labels, source switching and freshness without an orphan separator.
 
 ## 7. Wrong Vs Correct
 

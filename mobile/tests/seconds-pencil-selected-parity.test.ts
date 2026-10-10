@@ -35,7 +35,7 @@ test('Seconds 生产根只声明当前 Pencil 选稿并按 Header、自适应操
 
   const operationRule = blockOf(secondsStyle, '.seconds-trading-operation {')
   assert.match(operationRule, /height:\s*auto;/)
-  assert.match(operationRule, /grid-template-rows:\s*22px 53px 112px auto;/)
+  assert.match(operationRule, /grid-template-rows:\s*22px 53px auto auto;/)
   assert.match(operationRule, /padding:\s*2px 20px 10px;/)
   assert.match(operationRule, /row-gap:\s*6px;/)
 

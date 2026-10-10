@@ -345,10 +345,10 @@ function entryLabel(entry: WalletLedgerEntry): string {
   return t(walletLedgerTypePresentation(entry.changeType).translationKey)
 }
 
-// 条目来源小字：展示层给的来源描述；缺失时退回原始变动类型串
+// 已知类型使用本地化文案，仅未知类型保留原始来源。
 function entryExecutionMeta(entry: WalletLedgerEntry): string {
   const source = walletLedgerTypePresentation(entry.changeType).source
-  return source || entry.changeType
+  return source || entryLabel(entry)
 }
 
 // 交易对位置文案：账单没有交易对语义，展示与条目类型一致（保住 Pencil 版式字段）
