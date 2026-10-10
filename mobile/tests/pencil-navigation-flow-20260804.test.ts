@@ -54,7 +54,7 @@ test('Pencil 壳层在消息、现货、合约和秒合约路由上保持独立'
   )
   assert.match(
     routerSource,
-    /path:\s*'\/seconds'[\s\S]*?meta:\s*\{\s*showBottomNav:\s*false,\s*depth:\s*1,\s*backFallback:\s*'\/'\s*\}/,
+    /path:\s*'\/seconds\/:symbol\?'[\s\S]*?meta:\s*\{\s*showBottomNav:\s*false,\s*depth:\s*1,\s*backFallback:\s*'\/'\s*\}/,
   )
 })
 

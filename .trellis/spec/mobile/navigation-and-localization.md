@@ -98,7 +98,7 @@ lastTradePath: ComputedRef<string>
 - Spot, contract, seconds, and convert remain independent operational routes;
   visual dock consolidation must not merge their business behavior.
 - Spot resolves to `/trade/:symbol`; contract resolves to
-  `/trade/:symbol?mode=contract`; seconds resolves to `/seconds`. Do not merge
+  `/trade/:symbol?mode=contract`; seconds resolves to `/seconds/:symbol?`. Do not merge
   these three operational surfaces into one root destination.
 - The selected Home shortcut grid links its seventh product cell to the named
   `seconds` route and labels it with the localized `home.secondsShortcut` copy.
@@ -115,8 +115,8 @@ lastTradePath: ComputedRef<string>
   pushes `{ name: 'seconds-history' }`. Close, Escape, and backdrop selection
   remove only the current FIFO item and leave the user on the trading page.
 - The Seconds Header pair control is an in-page dialog, not a route. Opening,
-  searching, closing, or choosing a product keeps `/seconds`; choosing a row
-  runs the existing product switch before the picker closes. History navigation
+  searching or closing preserves the URL; choosing a row switches the product
+  and replaces the URL with `/seconds/BASE_QUOTE` before the picker closes. History navigation
   first closes this picker, clears settlement results, and then pushes the named
   history route so no Teleported surface survives navigation.
 - Message Center is one of those detail routes. The Home Bell pushes the named
@@ -153,6 +153,23 @@ lastTradePath: ComputedRef<string>
 
 ### Trade picker
 
+- Seconds independently persists the positive safe-integer product ID in
+  `hippo_mobile_last_seconds_product_id` through the navigation store. Restore
+  only from the latest API product list, never a stored product/price object.
+  Read the current selection after the product request resolves so a user's
+  intervening choice wins. Missing products fall back to the first available;
+  empty/error responses retain the preference. Storage errors keep in-memory
+  selection usable. Stake, direction and confirmation state are not persisted.
+- A nonempty Seconds route symbol overrides saved/current identity and matches
+  normalized API symbols; unavailable symbols fall back to the first product.
+  Bare `/seconds` and legacy `/products/seconds` restore the last product.
+  Canonicalization uses router replace and preserves query/hash and entry state.
+  `/seconds/history` remains a distinct static route, never a product symbol.
+  Pending user selection wins over an old route until its replace commits.
+- Seconds symbol-only changes reuse one route component key, keeping private
+  orders/result trackers mounted. The selection composable watches symbol changes,
+  while the accessibility coordinator completes reused-page navigation after
+  nextTick without waiting for a nonexistent enter transition.
 - Pair picker route: `/markets?purpose=trade&mode=spot|contract`.
 - Picker selection replaces the route with `/trade/:BASE_QUOTE` and keeps `mode=contract` when applicable.
 - Storage keys are `hippo_mobile_last_trade_symbol` and `hippo_mobile_last_trade_mode`.
@@ -302,9 +319,9 @@ lastTradePath: ComputedRef<string>
 | Convert selected from the root chooser | Push named `swap`; Back returns to the source root page |
 | Root trade chooser is dismissed | Preserve route and selection; unlock body and restore exact Trade-trigger focus |
 | Home seventh product shortcut selected | Push the named `seconds` route; do not open Prediction |
-| Seconds Header pair trigger selected | Keep `/seconds`, open the labelled picker, and focus its search input |
+| Seconds Header pair trigger selected | Keep the current URL, open the labelled picker, and focus its search input |
 | Seconds pair picker closes by Close, Escape, or backdrop | Keep the selected pair and route; restore Header trigger focus |
-| Seconds pair row selected | Switch the current product in place, close the picker, and keep `/seconds` plus all active orders |
+| Seconds pair row selected | Switch in place, replace `/seconds/BASE_QUOTE`, close the picker, and keep active orders |
 | Seconds Header history action selected | Push `/seconds/history`, hide the Dock, and preserve `/seconds` in history |
 | Seconds history is opened directly | Back replaces with `/seconds` |
 | Seconds history result is win/loss/unknown | Render the matching localized profit/loss/generic label without translating an unknown source result incorrectly |
@@ -377,7 +394,7 @@ lastTradePath: ComputedRef<string>
 - Unit: dynamic prediction text preserves English and localizes supported Chinese patterns.
 - Browser: pair picker returns to the selected trade pair and preserves futures mode.
 - Source/browser: the Seconds pair trigger opens the `vONcc`/`kLXCs` Teleported
-  dialog without route mutation; search starts focused, filters API products,
+  dialog without route mutation on open/dismiss; selection replaces the symbol URL, search starts focused, filters API products,
   Tab cycles, Escape/backdrop/Close restore the exact trigger, selection updates
   the Header in place, and all pair-picker locale keys exist in `zh-CN` and
   `en` with no fixed template copy.

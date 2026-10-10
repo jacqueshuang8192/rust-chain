@@ -31,7 +31,7 @@ test('根导航保持五个有序目的地并由中央入口打开真实交易�
 test('秒合约保留旧深链但作为无根导航的二级面', () => {
   assert.match(
     routerSource,
-    /\{\s*path:\s*'\/seconds',\s*alias:\s*'\/products\/seconds',\s*name:\s*'seconds',[\s\S]*?meta:\s*\{\s*showBottomNav:\s*false,\s*depth:\s*1,\s*backFallback:\s*'\/'\s*\}\s*\}/,
+    /\{\s*path:\s*'\/seconds\/:symbol\?',\s*alias:\s*'\/products\/seconds',\s*name:\s*'seconds',[\s\S]*?meta:\s*\{\s*showBottomNav:\s*false,\s*depth:\s*1,\s*backFallback:\s*'\/'\s*\}\s*\}/,
   )
   assert.match(
     routerSource,

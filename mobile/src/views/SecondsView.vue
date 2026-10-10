@@ -21,6 +21,7 @@ import {
 import AssetMark from '@/components/AssetMark.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { useSecondsPrivateReconciliation, type SecondsPrivateReconciliationResult } from '@/composables/useSecondsPrivateReconciliation'
+import { useSecondsProductSelection } from '@/composables/useSecondsProductSelection'
 import { apiErrorMessage } from '@/api/client'
 import { fetchKlines } from '@/api/market'
 import { createMarketDetailStreamSession } from '@/api/marketDetailStream'
@@ -82,7 +83,7 @@ const orders = ref<SecondsOrder[]>([])
 const accounts = ref<WalletAccount[]>([])
 const sparklinePoints = ref<KlinePoint[]>([])
 const liveTickerSnapshots = ref<Record<string, TickerUpdate>>({})
-const selected = ref<SecondsProduct | null>(null)
+const { selected, restoreProducts, rememberProduct } = useSecondsProductSelection({ router, products, onSelect: selectProduct })
 const selectedCycleId = ref(0)
 const direction = ref<'up' | 'down'>('up')
 const activeOrderFilter = ref<'all' | 'up' | 'down'>('all')
@@ -613,18 +614,13 @@ async function load(): Promise<void> {
     ? Promise.allSettled([fetchSecondsOrders(100), fetchWalletAccounts()])
     : Promise.resolve(null)
   try {
-    const currentProductId = selected.value?.id
     const nextProducts = await fetchSecondsProducts()
     if (!componentActive || requestVersion !== loadRequestVersion) return
-    products.value = nextProducts
-    selected.value = nextProducts.find((product) => product.id === currentProductId) || nextProducts[0] || null
+    restoreProducts(nextProducts)
     if (selected.value) {
-      const stillAvailable = selected.value.cycles.some((item) => item.id === selectedCycleId.value)
-      if (!stillAvailable) selectedCycleId.value = selected.value.cycles[0]?.id || 0
-      void loadSparkline(selected.value.symbol)
-    } else {
-      void loadSparkline('')
+      if (!selected.value.cycles.some((item) => item.id === selectedCycleId.value)) selectedCycleId.value = selected.value.cycles[0]?.id || 0
     }
+    void loadSparkline(selected.value?.symbol || '')
     replaceTickerSubscription()
 
     const privateResults = await privateStatePromise
@@ -747,6 +743,7 @@ async function reconcileExpiredOrders(): Promise<void> {
 
 function selectProduct(product: SecondsProduct): void {
   selected.value = product
+  rememberProduct(product)
   selectedCycleId.value = product.cycles[0]?.id || 0
   direction.value = 'up'
   amount.value = ''

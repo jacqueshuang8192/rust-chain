@@ -58,7 +58,7 @@ const router = createRouter({
     { path: '/products/new-coins/records', name: 'new-coin-records', component: NewCoinRecordsView, meta: { showBottomNav: false, depth: 3, backFallback: '/products/new-coins' } },
     { path: '/products/new-coins/:symbol', name: 'new-coin-detail', component: NewCoinDetailView, props: true, meta: { showBottomNav: false, depth: 3, backFallback: '/products/new-coins' } },
     { path: '/products/prediction', name: 'prediction', component: PredictionView, meta: { showBottomNav: false, depth: 2, backFallback: '/products' } },
-    { path: '/seconds', alias: '/products/seconds', name: 'seconds', component: SecondsView, meta: { showBottomNav: false, depth: 1, backFallback: '/' } },
+    { path: '/seconds/:symbol?', alias: '/products/seconds', name: 'seconds', component: SecondsView, meta: { showBottomNav: false, depth: 1, backFallback: '/' } },
     { path: '/seconds/history', name: 'seconds-history', component: SecondsHistoryView, meta: { showBottomNav: false, depth: 2, backFallback: '/seconds' } },
     { path: '/orders', name: 'orders', component: OrdersView, meta: { showBottomNav: false, depth: 1, backFallback: '/' } },
     { path: '/orders/positions/:id/associated', name: 'position-associated-orders', component: PositionAssociatedOrdersView, props: true, meta: { showBottomNav: false, depth: 2, backFallback: { name: 'orders', query: { tab: 'position-history' } } } },

@@ -12,7 +12,7 @@ const secondsCss = styleOf(secondsSource)
 
 test('现货、合约与秒合约保持三个独立路由和真实业务语义', () => {
   assert.match(routerSource, /path: '\/trade\/:symbol\?', name: 'trade'/)
-  assert.match(routerSource, /path: '\/seconds', alias: '\/products\/seconds', name: 'seconds'/)
+  assert.match(routerSource, /path: '\/seconds\/:symbol\?', alias: '\/products\/seconds', name: 'seconds'/)
   assert.match(tradeSource, /const mode = ref<'spot' \| 'contract'>\(route\.query\.mode === 'contract' \? 'contract' : 'spot'\)/)
   assert.match(tradeSource, /watch\(\(\) => route\.query\.mode/)
   assert.match(tradeSource, /navigation\.rememberTradeMode\(mode\.value\)/)

@@ -166,7 +166,7 @@ onUnmounted(() => {
           >
             <component
               :is="Component"
-              :key="currentRoute.fullPath"
+              :key="currentRoute.name === 'seconds' ? 'seconds' : currentRoute.fullPath"
               :data-route-accessibility-key="routeAccessibility.renderKeyFor(currentRoute)"
               :class="[
                 'app-route-layer',

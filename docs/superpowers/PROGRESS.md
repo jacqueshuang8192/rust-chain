@@ -9445,3 +9445,17 @@
 - 修改文件：`tests/openapi_routes.rs`、`.trellis/spec/backend/agent-hierarchy.md`、`.trellis/tasks/10-10-agent-team-orders/research/delivery.md`、`docs/superpowers/PROGRESS.md`。
 - 验证结果：`cargo test --test openapi_routes` 14/14通过，`cargo fmt --all -- --check` 与 `git diff --check` 通过。本轮未新增实库或生产环境验证；上一轮遗漏该测试目标属于验证范围不足，已记录。
 - 后续事项：用户已明确确认提交并推送，本次断言和验证文档单独提交为 `test: include refunded in agent portal OpenAPI contract`，普通推送至 `origin/main` 并核对远程哈希；原有发布限制不变，`.vite/`缓存保留且不纳入。
+
+## 2026-10-11 02:03 - 秒合约币种选择刷新恢复
+
+- 完成内容：定位秒合约选中产品仅存组件内存、刷新默认首项及请求前捕获旧选择问题；新增独立秒合约产品ID持久化，接口返回后匹配当前选择，支持下架回退、空列表/失败保留偏好与存储失败内存降级，不持久化金额、方向、价格或确认状态。
+- 修改文件：`mobile/src/stores/navigation.ts`、`mobile/src/views/SecondsView.vue`、`mobile/tests/seconds-pair-persistence.test.ts`、`.trellis/spec/mobile/navigation-and-localization.md`、`.trellis/tasks/10-11-seconds-pair-persistence/`及本进度文件。
+- 验证结果：新增行为4/4通过；完整`npm --prefix mobile run release:gate`通过，821/821无跳过，类型、PWA/Tauri构建、产物及预算通过。首次门禁发现页面超3行，合并重复图表刷新分支后重跑通过，未提高预算。Ego浏览器匿名本地页面从ETH选BTC，强制刷新后仍为BTC且存储ID为1；TaskSpace9已关闭，未登录/下单。
+- 后续事项：待用户确认仅提交本任务；不推送或部署，保留此前界面及共享文档改动。既有5186开发服务保留；未执行安装态PWA真机或原生包验证。
+
+## 2026-10-11 02:15 - 秒合约地址携带币种
+
+- 完成内容：按用户确认新增`/seconds/:symbol?`，币种链接优先于本地记忆，选币replace地址，裸入口和旧入口恢复上次币种，不可用币种回退；独立选择composable处理路由与在途请求竞态，币种切换复用秒合约页面并完成无过渡的可访问性收尾，历史订单静态路由不变。
+- 修改文件：`mobile/src/{App.vue,router/index.ts,stores/navigation.ts,views/SecondsView.vue,composables/useSecondsProductSelection.ts,core/navigation/useRouteAccessibility.ts}`、币种持久化与5份既有路由契约测试、手机端导航规范、本任务及进度记录。
+- 验证结果：完整release:gate通过，824/824无跳过、类型检查、PWA/Tauri构建、产物、源码与包体预算全部通过。Ego真实浏览器验证ETH链接覆盖已存BTC、选币改变地址但history长度与DOM根实例不变、强刷保留BTC、历史页返回BTC、裸入口恢复BTC；TaskSpace10已关闭，未登录或下单。
+- 后续事项：仅本地提交本任务，不推送部署；此前账单国际化、行情提示隐藏、PC与缓存改动不纳入。未做安装态PWA真机、原生包或生产部署验收。

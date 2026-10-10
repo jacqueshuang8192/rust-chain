@@ -65,8 +65,10 @@ export function useRouteAccessibility(input: {
     () => input.route.fullPath,
     () => {
       const current = routeSnapshot(input.route)
+      const reusedSeconds = current.name === 'seconds' && previousRoute?.name === 'seconds'
       coordinator?.beginNavigation(current, previousRoute, input.translate)
       previousRoute = current
+      if (reusedSeconds) void nextTick(() => coordinator?.completeTransition(findCurrentRouteLayer()))
     },
     { immediate: true },
   )

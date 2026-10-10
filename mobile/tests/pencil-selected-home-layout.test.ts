@@ -113,7 +113,7 @@ test('根 Dock 只保留五入口与 56px 中央交易，独立产品路由仍�
   assert.match(detailSource, /openTrade\('contract'\)/)
   assert.match(productSource, /name: 'prediction'/)
   assert.match(productSource, /name: 'news'/)
-  assert.match(routerSource, /path: '\/seconds',[\s\S]*name: 'seconds'/)
+  assert.match(routerSource, /path: '\/seconds\/:symbol\?',[\s\S]*name: 'seconds'/)
   assert.doesNotMatch(navSource, /\p{Extended_Pictographic}/u)
 })
 
