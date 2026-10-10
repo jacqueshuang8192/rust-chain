@@ -21,6 +21,7 @@ pub(crate) use queries::{
 };
 pub(crate) use settlement::fill_spot_orders_with_events_with_request;
 pub use triggering::execute_triggered_spot_limit_orders_with_hub;
+pub(crate) use triggering::execute_triggered_spot_limit_orders_with_hub_at;
 
 #[cfg(test)]
 pub(crate) use order_creation::build_create_spot_order;

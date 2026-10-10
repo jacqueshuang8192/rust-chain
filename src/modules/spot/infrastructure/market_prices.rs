@@ -63,6 +63,7 @@ pub(crate) async fn triggered_limit_buy_order_ids(
     pair_symbol: &str,
     market_price: &BigDecimal,
     limit: u32,
+    observed_at: Option<chrono::NaiveDateTime>,
 ) -> AppResult<Vec<u64>> {
     let rows = sqlx::query_as::<_, (u64,)>(
         r#"SELECT orders.id
@@ -74,11 +75,14 @@ pub(crate) async fn triggered_limit_buy_order_ids(
              AND orders.order_type = 'limit'
              AND orders.status IN ('pending', 'open', 'partially_filled')
              AND orders.price >= ?
+             AND (? IS NULL OR orders.created_at < ?)
            ORDER BY orders.price DESC, orders.id ASC
            LIMIT ?"#,
     )
     .bind(pair_symbol)
     .bind(market_price)
+    .bind(observed_at)
+    .bind(observed_at)
     .bind(i64::from(limit))
     .fetch_all(pool)
     .await?;
@@ -92,6 +96,7 @@ pub(crate) async fn triggered_limit_sell_order_ids(
     pair_symbol: &str,
     market_price: &BigDecimal,
     limit: u32,
+    observed_at: Option<chrono::NaiveDateTime>,
 ) -> AppResult<Vec<u64>> {
     let rows = sqlx::query_as::<_, (u64,)>(
         r#"SELECT orders.id
@@ -103,11 +108,14 @@ pub(crate) async fn triggered_limit_sell_order_ids(
              AND orders.order_type = 'limit'
              AND orders.status IN ('pending', 'open', 'partially_filled')
              AND orders.price <= ?
+             AND (? IS NULL OR orders.created_at < ?)
            ORDER BY orders.price ASC, orders.id ASC
            LIMIT ?"#,
     )
     .bind(pair_symbol)
     .bind(market_price)
+    .bind(observed_at)
+    .bind(observed_at)
     .bind(i64::from(limit))
     .fetch_all(pool)
     .await?;
@@ -121,6 +129,7 @@ pub(crate) async fn triggered_stop_limit_buy_order_ids(
     pair_symbol: &str,
     market_price: &BigDecimal,
     limit: u32,
+    observed_at: Option<chrono::NaiveDateTime>,
 ) -> AppResult<Vec<u64>> {
     let rows = sqlx::query_as::<_, (u64,)>(
         r#"SELECT orders.id
@@ -141,6 +150,7 @@ pub(crate) async fn triggered_stop_limit_buy_order_ids(
                      ))
                  ))
              )
+             AND (? IS NULL OR orders.created_at < ?)
            ORDER BY orders.trigger_price DESC, orders.price DESC, orders.id ASC
            LIMIT ?"#,
     )
@@ -150,6 +160,8 @@ pub(crate) async fn triggered_stop_limit_buy_order_ids(
     .bind(market_price)
     .bind(market_price)
     .bind(market_price)
+    .bind(observed_at)
+    .bind(observed_at)
     .bind(i64::from(limit))
     .fetch_all(pool)
     .await?;
@@ -163,6 +175,7 @@ pub(crate) async fn triggered_stop_limit_sell_order_ids(
     pair_symbol: &str,
     market_price: &BigDecimal,
     limit: u32,
+    observed_at: Option<chrono::NaiveDateTime>,
 ) -> AppResult<Vec<u64>> {
     let rows = sqlx::query_as::<_, (u64,)>(
         r#"SELECT orders.id
@@ -183,6 +196,7 @@ pub(crate) async fn triggered_stop_limit_sell_order_ids(
                      ))
                  ))
              )
+             AND (? IS NULL OR orders.created_at < ?)
            ORDER BY orders.trigger_price ASC, orders.price ASC, orders.id ASC
            LIMIT ?"#,
     )
@@ -192,6 +206,8 @@ pub(crate) async fn triggered_stop_limit_sell_order_ids(
     .bind(market_price)
     .bind(market_price)
     .bind(market_price)
+    .bind(observed_at)
+    .bind(observed_at)
     .bind(i64::from(limit))
     .fetch_all(pool)
     .await?;

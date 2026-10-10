@@ -40,6 +40,18 @@ pub async fn execute_triggered_margin_limit_orders_with_hub(
     market_price: &BigDecimal,
     hub: Option<&EventBroadcastHub>,
 ) -> AppResult<u32> {
+    execute_triggered_margin_limit_orders_with_hub_at(pool, pair_symbol, market_price, hub, None)
+        .await
+}
+
+/// 持久队列回放带原始观察时间，排除后来创建的挂单；保留既有批次上限及逐单失败隔离，不让坏单堵住行情。
+pub(crate) async fn execute_triggered_margin_limit_orders_with_hub_at(
+    pool: &Pool<MySql>,
+    pair_symbol: &str,
+    market_price: &BigDecimal,
+    hub: Option<&EventBroadcastHub>,
+    observed_at: Option<chrono::NaiveDateTime>,
+) -> AppResult<u32> {
     crate::numeric::ensure_amount_storage(market_price, "margin market price")?;
     if market_price <= &BigDecimal::from(0) {
         return Err(AppError::Validation(
@@ -48,7 +60,8 @@ pub async fn execute_triggered_margin_limit_orders_with_hub(
     }
 
     let position_ids =
-        triggered_margin_limit_position_ids(pool, pair_symbol, market_price, 500).await?;
+        triggered_margin_limit_position_ids(pool, pair_symbol, market_price, 500, observed_at)
+            .await?;
     let mut filled_count = 0_u32;
     for position_id in position_ids {
         match execute_one_triggered_margin_limit_order(pool, position_id, market_price).await {

@@ -41,6 +41,15 @@ pub(crate) async fn execute_triggered_spot_limit_orders(
     pair_symbol: &str,
     market_price: &BigDecimal,
 ) -> AppResult<Vec<(SpotOrder, SpotOrder, SpotTrade, &'static str)>> {
+    execute_triggered_spot_limit_orders_at(pool, pair_symbol, market_price, None).await
+}
+
+async fn execute_triggered_spot_limit_orders_at(
+    pool: &Pool<MySql>,
+    pair_symbol: &str,
+    market_price: &BigDecimal,
+    observed_at: Option<chrono::NaiveDateTime>,
+) -> AppResult<Vec<(SpotOrder, SpotOrder, SpotTrade, &'static str)>> {
     crate::numeric::ensure_amount_storage(market_price, "market price")?;
     if market_price <= &BigDecimal::from(0) {
         return Err(AppError::Validation(
@@ -50,26 +59,31 @@ pub(crate) async fn execute_triggered_spot_limit_orders(
 
     let mut fills = Vec::new();
 
-    let order_ids = triggered_limit_buy_order_ids(pool, pair_symbol, market_price, 20).await?;
+    let (buy_ids, sell_ids, stop_buy_ids, stop_sell_ids) = tokio::try_join!(
+        triggered_limit_buy_order_ids(pool, pair_symbol, market_price, 20, observed_at),
+        triggered_limit_sell_order_ids(pool, pair_symbol, market_price, 20, observed_at),
+        triggered_stop_limit_buy_order_ids(pool, pair_symbol, market_price, 20, observed_at),
+        triggered_stop_limit_sell_order_ids(pool, pair_symbol, market_price, 20, observed_at),
+    )?;
+    let order_ids = buy_ids;
     for order_id in order_ids {
         let result = execute_triggered_limit_buy_order(pool, order_id, market_price).await;
         collect_triggered_spot_fill(&mut fills, result, "buy", order_id, pair_symbol);
     }
 
-    let order_ids = triggered_limit_sell_order_ids(pool, pair_symbol, market_price, 20).await?;
+    let order_ids = sell_ids;
     for order_id in order_ids {
         let result = execute_triggered_limit_sell_order(pool, order_id, market_price).await;
         collect_triggered_spot_fill(&mut fills, result, "sell", order_id, pair_symbol);
     }
 
-    let order_ids = triggered_stop_limit_buy_order_ids(pool, pair_symbol, market_price, 20).await?;
+    let order_ids = stop_buy_ids;
     for order_id in order_ids {
         let result = execute_triggered_stop_limit_buy_order(pool, order_id, market_price).await;
         collect_triggered_spot_fill(&mut fills, result, "buy", order_id, pair_symbol);
     }
 
-    let order_ids =
-        triggered_stop_limit_sell_order_ids(pool, pair_symbol, market_price, 20).await?;
+    let order_ids = stop_sell_ids;
     for order_id in order_ids {
         let result = execute_triggered_stop_limit_sell_order(pool, order_id, market_price).await;
         collect_triggered_spot_fill(&mut fills, result, "sell", order_id, pair_symbol);
@@ -106,7 +120,23 @@ pub async fn execute_triggered_spot_limit_orders_with_hub(
     market_price: &BigDecimal,
     hub: Option<&crate::modules::events::EventBroadcastHub>,
 ) -> AppResult<u32> {
-    let fills = execute_triggered_spot_limit_orders(pool, pair_symbol, market_price).await?;
+    execute_triggered_spot_limit_orders_with_hub_at(pool, pair_symbol, market_price, hub, None)
+        .await
+}
+
+/// 排队价格只作用于观察时已经存在的订单；保留原有逐单失败隔离和批次上限，成功成交仍仅在提交后推送。
+pub(crate) async fn execute_triggered_spot_limit_orders_with_hub_at(
+    pool: &Pool<MySql>,
+    pair_symbol: &str,
+    market_price: &BigDecimal,
+    hub: Option<&crate::modules::events::EventBroadcastHub>,
+    observed_at: Option<chrono::NaiveDateTime>,
+) -> AppResult<u32> {
+    let fills = if observed_at.is_some() {
+        execute_triggered_spot_limit_orders_at(pool, pair_symbol, market_price, observed_at).await?
+    } else {
+        execute_triggered_spot_limit_orders(pool, pair_symbol, market_price).await?
+    };
     let mut filled_count = 0_u32;
 
     for (order, counterparty_order, trade, side) in fills {

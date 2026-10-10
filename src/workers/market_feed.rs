@@ -11,7 +11,7 @@ use crate::{
     config::Settings,
     error::{AppError, AppResult},
     modules::market::{
-        MarketDataProvider, MarketDepthSnapshot, MarketKlineSnapshot, MarketTickerSnapshot,
+        MarketDepthSnapshot, MarketKlineSnapshot, MarketTickerSnapshot,
         adapters::{
             MarketFeedChannel, MarketFeedConfig, MarketFeedFrame, MarketFeedProvider,
             MarketFeedRestFallbackConfig, MarketFeedRestFallbackHttpClient, MarketFeedSummary,
@@ -26,7 +26,6 @@ use flate2::read::GzDecoder;
 use futures_util::{FutureExt, Sink, SinkExt, Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use sha2::Digest;
 use std::{
     future::{Future, pending},
     io::Read,
@@ -55,7 +54,9 @@ const MARKET_FEED_INBOUND_IDLE_TIMEOUT: Duration = Duration::from_secs(75);
 const MARKET_FEED_CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 const MARKET_FEED_WRITE_TIMEOUT: Duration = Duration::from_secs(10);
 
-/// 行情 generation 围栏；所有外部写入前必须确认绑定 generation 仍是当前值。
+mod side_effects;
+
+/// 行情 generation 围栏；实时缓存与入队前必须确认代次，已入队的历史副作用独立完成。
 #[derive(Debug, Clone, Default)]
 struct MarketFeedGenerationFence {
     active: Arc<RwLock<u64>>,
@@ -67,8 +68,8 @@ impl MarketFeedGenerationFence {
         *self.active.write().await = generation;
     }
 
-    /// 取当前 generation 的共享写许可；调用方必须持有 guard 跨越整个外部副作用。
-    /// 这使“检查围栏”与“写 MySQL/Redis/Mongo”不再存在 reload 可插入的空档。
+    /// 取当前 generation 的共享写许可；实时路径持有 guard 跨越缓存、入队与广播。
+    /// 历史队列不重新校验 generation，不允许改写最新快照；reload 不能抹去已接收的观察。
     async fn enter(&self, generation: u64) -> AppResult<tokio::sync::OwnedRwLockReadGuard<u64>> {
         let guard = self.active.clone().read_owned().await;
         if *guard == generation {
@@ -100,11 +101,10 @@ impl MarketFeedWriteFence {
     }
 }
 
-/// 为一个 generation 包装真实摄取器：ticker 先归档 MySQL 历史，再写 Redis/Mongo/事件链。
+/// 外部行情只等待 Redis 原子缓存与可靠队列写入，慢存储和订单触发由独立消费者处理。
 #[derive(Clone)]
 struct GenerationBoundMarketIngestionSink {
-    inner: MarketIngestionService,
-    mysql: sqlx::Pool<sqlx::MySql>,
+    cache: crate::modules::market::infrastructure::RedisMarketCache,
     generation: u64,
     fence: MarketFeedGenerationFence,
 }
@@ -115,93 +115,71 @@ impl GenerationBoundMarketIngestionSink {
         generation: u64,
         fence: MarketFeedGenerationFence,
     ) -> AppResult<Self> {
-        let mysql = state.mysql.clone().ok_or_else(|| {
-            AppError::Internal("mysql is required for replayable market feed history".to_owned())
+        let redis = state.redis.clone().ok_or_else(|| {
+            AppError::Internal("redis is required for durable market feed work".to_owned())
         })?;
         Ok(Self {
-            inner: MarketIngestionService::from_state(state)?,
-            mysql,
+            cache: crate::modules::market::infrastructure::RedisMarketCache::new(redis),
             generation,
             fence,
         })
     }
 
-    fn source(provider: MarketDataProvider) -> &'static str {
-        match provider {
-            MarketDataProvider::Bitget => "bitget",
-            MarketDataProvider::Htx => "htx",
-            MarketDataProvider::Coinbase => "coinbase",
-            MarketDataProvider::Strategy => "strategy",
-        }
-    }
-
-    async fn archive_ticker(&self, snapshot: &MarketTickerSnapshot) -> AppResult<()> {
-        if self.generation == 0 {
-            return Err(AppError::Validation(
-                "market feed history generation must be positive".to_owned(),
-            ));
-        }
-        if snapshot.last_price() <= &bigdecimal::BigDecimal::from(0) {
-            return Err(AppError::Validation(
-                "market feed history price must be positive".to_owned(),
-            ));
-        }
-        let source = Self::source(snapshot.provider());
-        let symbol = snapshot
-            .symbol()
-            .trim()
-            .chars()
-            .filter(|character| !matches!(character, '-' | '/' | '_'))
-            .flat_map(char::to_uppercase)
-            .collect::<String>();
-        if symbol.is_empty() {
-            return Err(AppError::Validation(
-                "market feed history symbol is required".to_owned(),
-            ));
-        }
-        let canonical = format!(
-            "{}|{}|{}|{}",
-            source,
-            symbol,
-            snapshot.observed_at().timestamp_micros(),
-            snapshot.last_price().normalized()
+    async fn accept(
+        &self,
+        event: crate::modules::market::infrastructure::cache::external::ExternalMarketEvent,
+    ) -> AppResult<bool> {
+        let _permit = self.fence.enter(self.generation).await?;
+        let started = Instant::now();
+        let result = self.cache.admit_external(&event).await?;
+        tracing::debug!(
+            symbol = event.symbol(),
+            source_age_ms = chrono::Utc::now()
+                .signed_duration_since(event.observed_at())
+                .num_milliseconds(),
+            elapsed_ms = started.elapsed().as_millis() as u64,
+            accepted = result.is_accepted(),
+            "外部行情缓存与任务入队完成"
         );
-        let event_key = hex::encode(sha2::Sha256::digest(canonical.as_bytes()));
-        sqlx::query(
-            r#"INSERT INTO market_price_ticks
-               (event_key, symbol, price, source, observed_at, generation, source_version)
-               VALUES (?, ?, ?, ?, ?, ?, ?)
-               ON DUPLICATE KEY UPDATE event_key = VALUES(event_key)"#,
-        )
-        .bind(&event_key)
-        .bind(&symbol)
-        .bind(snapshot.last_price())
-        .bind(source)
-        .bind(snapshot.observed_at().naive_utc())
-        .bind(self.generation)
-        .bind(&event_key)
-        .execute(&self.mysql)
-        .await?;
-        Ok(())
+        // Redis 跨实例共享而广播中心仅在本进程；同载荷回放仍需向本实例的订阅者推送。
+        // 回放不重复入队，陈旧/冲突快照则绝不能重新广播。
+        Ok(result.is_accepted() || result.is_identical_replay())
     }
 }
 
 #[async_trait]
 impl MarketIngestionSink for GenerationBoundMarketIngestionSink {
     async fn ingest_ticker(&self, snapshot: &MarketTickerSnapshot) -> AppResult<()> {
-        let _permit = self.fence.enter(self.generation).await?;
-        self.archive_ticker(snapshot).await?;
-        self.inner.ingest_ticker(snapshot).await
+        self.accept_ticker(snapshot).await.map(|_| ())
     }
 
     async fn ingest_depth(&self, snapshot: &MarketDepthSnapshot) -> AppResult<()> {
-        let _permit = self.fence.enter(self.generation).await?;
-        self.inner.ingest_depth(snapshot).await
+        self.accept_depth(snapshot).await.map(|_| ())
     }
 
     async fn ingest_kline(&self, snapshot: &MarketKlineSnapshot) -> AppResult<()> {
-        let _permit = self.fence.enter(self.generation).await?;
-        self.inner.ingest_kline(snapshot).await
+        self.accept_kline(snapshot).await.map(|_| ())
+    }
+
+    async fn accept_ticker(&self, snapshot: &MarketTickerSnapshot) -> AppResult<bool> {
+        use crate::modules::market::infrastructure::cache::external::ExternalMarketEvent;
+        self.accept(ExternalMarketEvent::Ticker {
+            snapshot: snapshot.clone(),
+            generation: self.generation,
+        })
+        .await
+    }
+
+    async fn accept_depth(&self, snapshot: &MarketDepthSnapshot) -> AppResult<bool> {
+        use crate::modules::market::infrastructure::cache::external::ExternalMarketEvent;
+        self.accept(ExternalMarketEvent::Depth(snapshot.clone()))
+            .await
+    }
+
+    async fn accept_kline(&self, snapshot: &MarketKlineSnapshot) -> AppResult<bool> {
+        use crate::modules::market::infrastructure::cache::external::ExternalMarketEvent;
+        self.accept(ExternalMarketEvent::Kline(snapshot.clone()))
+            .await
     }
 }
 
@@ -978,6 +956,18 @@ async fn run_config_loop_with_generation(
         )?;
     let reconnect_delay = Duration::from_secs(config.reconnect_seconds());
     let mut tasks = JoinSet::new();
+    let consumer_state = state.clone();
+    let consumer_cancellation = cancellation.clone();
+    let consumer_provider = provider_configs
+        .first()
+        .ok_or_else(|| AppError::Internal("market feed generation has no provider configs".into()))?
+        .provider();
+    tasks.spawn(async move {
+        (
+            consumer_provider,
+            side_effects::run(consumer_state, consumer_cancellation).await,
+        )
+    });
     for (provider_config, rest_fallback_config) in
         provider_configs.into_iter().zip(rest_fallback_configs)
     {
@@ -1086,13 +1076,37 @@ async fn run_once_with_providers(
     symbols: &[&str],
     intervals: &[&str],
 ) -> AppResult<()> {
+    let cancellation = CancellationToken::new();
+    let producer = async {
+        let result =
+            run_once_provider_tasks(state, providers, symbols, intervals, cancellation.clone())
+                .await;
+        cancellation.cancel();
+        result
+    };
+    let consumer = async {
+        let result = side_effects::run(state.clone(), cancellation.clone()).await;
+        cancellation.cancel();
+        result
+    };
+    let (producer, consumer) = tokio::join!(producer, consumer);
+    producer?;
+    consumer
+}
+
+async fn run_once_provider_tasks(
+    state: &AppState,
+    providers: &[MarketFeedProvider],
+    symbols: &[&str],
+    intervals: &[&str],
+    cancellation: CancellationToken,
+) -> AppResult<()> {
     let configs = MarketFeedWorker::<MarketIngestionService>::provider_configs_for(
         &state.settings,
         providers,
         symbols,
         intervals,
     )?;
-    let cancellation = CancellationToken::new();
     let fence = MarketFeedGenerationFence::default();
     fence.activate(1).await;
     let mut tasks = JoinSet::new();
@@ -1101,16 +1115,7 @@ async fn run_once_with_providers(
         let cancellation = cancellation.clone();
         let fence = fence.clone();
         tasks.spawn(async move {
-            tokio::select! {
-                _ = cancellation.cancelled() => Ok(()),
-                result = run_provider_once_with_generation(
-                    state,
-                    config,
-                    1,
-                    fence,
-                    cancellation.clone(),
-                ) => result,
-            }
+            run_provider_once_with_generation(state, config, 1, fence, cancellation).await
         });
     }
 

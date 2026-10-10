@@ -13,6 +13,7 @@
 //! 被判定为陈旧的写入不是错误，调用方必须据此中止广播、撮合和检查点推进等派生副作用。
 //! 普通 depth 直接覆盖；策略 depth/逐笔通过独立 Lua 核对本轮已接受 ticker 后原子更新。
 
+pub(crate) mod external;
 mod synthetic;
 pub use synthetic::market_synthetic_trades_redis_key;
 

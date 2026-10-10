@@ -163,6 +163,7 @@ pub(crate) async fn triggered_margin_limit_position_ids(
     pair_symbol: &str,
     market_price: &BigDecimal,
     limit: u32,
+    observed_at: Option<chrono::NaiveDateTime>,
 ) -> AppResult<Vec<u64>> {
     let rows = sqlx::query_as::<_, (u64,)>(
         r#"SELECT positions.id
@@ -176,12 +177,15 @@ pub(crate) async fn triggered_margin_limit_position_ids(
              AND positions.limit_price IS NOT NULL
              AND ((positions.direction = 'long' AND positions.limit_price >= ?)
                OR (positions.direction = 'short' AND positions.limit_price <= ?))
+             AND (? IS NULL OR positions.created_at < ?)
            ORDER BY positions.id ASC
            LIMIT ?"#,
     )
     .bind(pair_symbol)
     .bind(market_price)
     .bind(market_price)
+    .bind(observed_at)
+    .bind(observed_at)
     .bind(i64::from(limit.clamp(1, 500)))
     .fetch_all(pool)
     .await?;

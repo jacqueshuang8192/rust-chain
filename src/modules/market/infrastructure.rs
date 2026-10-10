@@ -3,7 +3,7 @@
 //! 基础设施实现按职责拆分：缓存模块维护权威行情快照，持久化模块读取 MySQL/Mongo，
 //! `adapters` 负责第三方 provider 归一化与 ingestion。此文件仅保留稳定路径与可见性。
 
-mod cache;
+pub(crate) mod cache;
 pub mod default_runtime;
 mod persistence;
 

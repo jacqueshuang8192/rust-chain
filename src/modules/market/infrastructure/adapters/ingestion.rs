@@ -38,6 +38,8 @@ use chrono::{DateTime, Utc};
 use mongodb::bson::{DateTime as BsonDateTime, Document, doc};
 use sha2::Digest;
 use sqlx::{MySql, Pool, Transaction};
+use std::{collections::HashMap, sync::Arc};
+use tokio::sync::{Mutex, OnceCell};
 
 mod default_generator;
 pub use default_generator::{DefaultTickerProvenance, PairTickerFence};
@@ -53,6 +55,24 @@ pub trait MarketIngestionSink: Clone + Send + Sync + 'static {
     /// 持久化标准 K 线快照；实现必须保持交易对+周期+开盘时间的幂等写入。
     /// 同一根形成中的蜡烛会被反复投递，实现要保证重放只更新那一条记录而不是追加历史。
     async fn ingest_kline(&self, snapshot: &MarketKlineSnapshot) -> AppResult<()>;
+
+    /// 返回是否允许公开广播；外部队列拒绝旧观察，但同载荷可供共享缓存的其他 API 实例推送。
+    async fn accept_ticker(&self, snapshot: &MarketTickerSnapshot) -> AppResult<bool> {
+        self.ingest_ticker(snapshot).await?;
+        Ok(true)
+    }
+
+    /// 盘口缓存接受后才允许广播；默认实现保留既有同步 sink 行为。
+    async fn accept_depth(&self, snapshot: &MarketDepthSnapshot) -> AppResult<bool> {
+        self.ingest_depth(snapshot).await?;
+        Ok(true)
+    }
+
+    /// 蜡烛缓存及可靠历史任务接受后才允许广播，不要求历史任务已经处理完成。
+    async fn accept_kline(&self, snapshot: &MarketKlineSnapshot) -> AppResult<bool> {
+        self.ingest_kline(snapshot).await?;
+        Ok(true)
+    }
 }
 
 /// synthetic 行情摄取的时序结果；拒绝表示 Redis 已有更新快照，调用方不得继续任何派生副作用。
@@ -171,6 +191,7 @@ pub struct MarketIngestionService {
     database: mongodb::Database,
     mysql: Option<Pool<MySql>>,
     broadcast_hub: Option<EventBroadcastHub>,
+    kline_indexes: Arc<Mutex<HashMap<String, Arc<OnceCell<()>>>>>,
 }
 
 impl MarketIngestionService {
@@ -182,6 +203,7 @@ impl MarketIngestionService {
             database,
             mysql: None,
             broadcast_hub: None,
+            kline_indexes: Arc::default(),
         }
     }
 
@@ -433,7 +455,7 @@ impl MarketIngestionService {
     }
 
     /// 把一根 K 线幂等写入 `market_klines_<SYMBOL>` 集合，并在 Mongo 侧再做一次基于 `updated_at` 的时序判定。
-    /// 每次写入前先确保 `interval + open_time` 唯一索引存在，该索引既保证同槽只有一条记录，也是并发去重的依据。
+    /// 每个摄取实例仅在首次成功写入前确保索引；失败允许重试，克隆实例共用初始化状态。
     /// 随后按同槽查一次现有文档，分三条路径处理：已有文档更新则返回 `Conflict` 拒绝倒退；
     /// 已有文档不更新则带时序条件 `update_one`，匹配数为 0 说明输给了并发写者，同样返回 `Conflict`；
     /// 完全不存在则走唯一键插入，捕获重复键错误判定为首写竞争失败。
@@ -441,7 +463,16 @@ impl MarketIngestionService {
     /// 本方法只写 Mongo，不碰 Redis，因此返回 `Conflict` 时缓存中的新值依然保留。
     async fn upsert_kline_mongo(&self, snapshot: &MarketKlineSnapshot) -> AppResult<()> {
         let mongo_write = MarketKlineMongoWrite::from_snapshot(snapshot)?;
-        ensure_kline_indexes(&self.database, mongo_write.symbol()).await?;
+        let index = self
+            .kline_indexes
+            .lock()
+            .await
+            .entry(snapshot.symbol().to_owned())
+            .or_default()
+            .clone();
+        index
+            .get_or_try_init(|| ensure_kline_indexes(&self.database, mongo_write.symbol()))
+            .await?;
         let collection = self
             .database
             .collection::<Document>(&mongo_write.collection_name());
@@ -473,6 +504,33 @@ impl MarketIngestionService {
             None => {}
         }
         Ok(())
+    }
+
+    /// 外部队列只在确认 Mongo 已有更新版本时跳过旧蜡烛；并发首次插入冲突必须重读，不可直接确认丢弃。
+    /// 确认失败、文档缺失或赢家仍较旧时保留错误供队列重试；本入口不写 Redis、不广播。
+    pub(crate) async fn persist_external_kline(
+        &self,
+        snapshot: &MarketKlineSnapshot,
+    ) -> AppResult<()> {
+        match self.upsert_kline_mongo(snapshot).await {
+            Err(error @ AppError::Conflict(_)) => {
+                let write = MarketKlineMongoWrite::from_snapshot(snapshot)?;
+                let existing = self
+                    .database
+                    .collection::<Document>(&write.collection_name())
+                    .find_one(write.upsert_filter())
+                    .await?;
+                if existing
+                    .as_ref()
+                    .is_some_and(|document| write.existing_is_newer(document))
+                {
+                    Ok(())
+                } else {
+                    Err(error)
+                }
+            }
+            result => result,
+        }
     }
 
     /// 把已构造好的行情事件投递到进程内广播中心，供公开 WebSocket 订阅端消费。

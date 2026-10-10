@@ -5,9 +5,10 @@
 //!
 //! 本文件处在 provider 适配与 ingestion 之间：向上游拿到「provider + 频道 + 原始文本」三元组，
 //! 向下游交出已落地的领域快照和统一格式的公开事件，自身不直接读写 Redis 或 Mongo。
-//! 单帧处理顺序固定为解析、构造事件、按频道分派 sink 持久化、最后广播，
+//! 单帧处理顺序固定为解析、构造事件、按频道分派 sink 接受快照、最后广播，
 //! 其中 trade 帧只广播不落地，因为逐笔成交没有权威缓存需求。
-//! 广播排在持久化之后是硬约束，避免客户端看到尚未落库的行情；
+//! 外部生产 sink 在 Redis 缓存与可靠任务队列原子写入后返回，历史落库不阻塞广播；
+//! 同步 sink 仍等待自身存储完成。旧快照不发布，同载荷回放可供其他实例的本地订阅者同步。
 //! 但事件转换失败发生在写入之后，此时会返回错误而不会回滚已经完成的 Redis/Mongo 写入。
 //! 失败隔离贯穿两条入口：WebSocket 有限流逐帧计数，任一帧解析或摄取失败只累加 `failed` 并继续；
 //! REST 兜底则会连同 provider、频道、交易对、URL 与错误文本一起记录明细，供断线恢复时定位是哪个请求失败。
@@ -884,13 +885,13 @@ where
     pub async fn ingest_frame(&self, frame: &MarketFeedFrame) -> AppResult<()> {
         let parsed = parse_feed_frame(frame)?;
         let event = MarketFeedEvent::from_parsed(&parsed)?;
-        match &parsed {
-            ParsedMarketFeed::Ticker(snapshot) => self.sink.ingest_ticker(snapshot).await?,
-            ParsedMarketFeed::Depth(snapshot) => self.sink.ingest_depth(snapshot).await?,
-            ParsedMarketFeed::Kline(snapshot) => self.sink.ingest_kline(snapshot).await?,
-            ParsedMarketFeed::Trade(_) => {}
-        }
-        if let Some(hub) = &self.broadcast_hub {
+        let accepted = match &parsed {
+            ParsedMarketFeed::Ticker(snapshot) => self.sink.accept_ticker(snapshot).await?,
+            ParsedMarketFeed::Depth(snapshot) => self.sink.accept_depth(snapshot).await?,
+            ParsedMarketFeed::Kline(snapshot) => self.sink.accept_kline(snapshot).await?,
+            ParsedMarketFeed::Trade(_) => true,
+        };
+        if accepted && let Some(hub) = &self.broadcast_hub {
             hub.publish(EventBroadcastMessage::from_market_feed_event(&event)?);
         }
         Ok(())

@@ -1,0 +1,223 @@
+{
+  "startedAt": "2026-10-10T03:08:40.980Z",
+  "completedAt": "2026-10-10T03:09:14.114Z",
+  "authenticated": false,
+  "durationMs": 30000,
+  "errors": [
+    "hippo: socket error"
+  ],
+  "before": [
+    {
+      "symbol": "BTCUSDT",
+      "status": 200,
+      "elapsedMs": 2357,
+      "serverDate": "Sat, 10 Oct 2026 03:08:43 GMT",
+      "sampledAt": "2026-10-10T03:08:43.339Z",
+      "price": "82612.09",
+      "source": "external",
+      "provider": "bitget",
+      "observedAt": 1791601331382,
+      "ageMs": 391957
+    },
+    {
+      "symbol": "ETHUSDT",
+      "status": 200,
+      "elapsedMs": 2311,
+      "serverDate": "Sat, 10 Oct 2026 03:08:43 GMT",
+      "sampledAt": "2026-10-10T03:08:43.338Z",
+      "price": "2492.82",
+      "source": "external",
+      "provider": "bitget",
+      "observedAt": 1791601331382,
+      "ageMs": 391956
+    }
+  ],
+  "after": [
+    {
+      "symbol": "BTCUSDT",
+      "status": 200,
+      "elapsedMs": 770,
+      "serverDate": "Sat, 10 Oct 2026 03:09:14 GMT",
+      "sampledAt": "2026-10-10T03:09:14.112Z",
+      "price": "82624.44",
+      "source": "external",
+      "provider": "bitget",
+      "observedAt": 1791601354955,
+      "ageMs": 399157
+    },
+    {
+      "symbol": "ETHUSDT",
+      "status": 200,
+      "elapsedMs": 751,
+      "serverDate": "Sat, 10 Oct 2026 03:09:14 GMT",
+      "sampledAt": "2026-10-10T03:09:14.094Z",
+      "price": "2493.44",
+      "source": "external",
+      "provider": "bitget",
+      "observedAt": 1791601354955,
+      "ageMs": 399139
+    }
+  ],
+  "streams": {
+    "hippo:ETHUSDT:ticker": {
+      "count": 76,
+      "minAgeMs": 392702,
+      "medianAgeMs": 397685,
+      "maxAgeMs": 402060,
+      "sourceAdvanceMs": 22669,
+      "receiveAdvanceMs": 28359,
+      "lagGrowthMs": 5690,
+      "first": {
+        "received": 1791601724389,
+        "sourceTime": 1791601331687,
+        "ageMs": 392702,
+        "price": "2492.82"
+      },
+      "last": {
+        "received": 1791601752748,
+        "sourceTime": 1791601354356,
+        "ageMs": 398392,
+        "price": "2493.44"
+      }
+    },
+    "hippo:BTCUSDT:ticker": {
+      "count": 77,
+      "minAgeMs": 392739,
+      "medianAgeMs": 397594,
+      "maxAgeMs": 401881,
+      "sourceAdvanceMs": 22962,
+      "receiveAdvanceMs": 28690,
+      "lagGrowthMs": 5728,
+      "first": {
+        "received": 1791601724426,
+        "sourceTime": 1791601331687,
+        "ageMs": 392739,
+        "price": "82612.09"
+      },
+      "last": {
+        "received": 1791601753116,
+        "sourceTime": 1791601354649,
+        "ageMs": 398467,
+        "price": "82624.44"
+      }
+    },
+    "hippo:BTCUSDT:depth": {
+      "count": 154,
+      "minAgeMs": 392730,
+      "medianAgeMs": 397303,
+      "maxAgeMs": 401957,
+      "sourceAdvanceMs": 22950,
+      "receiveAdvanceMs": 28686,
+      "lagGrowthMs": 5736,
+      "first": {
+        "received": 1791601724430,
+        "sourceTime": 1791601331700,
+        "ageMs": 392730
+      },
+      "last": {
+        "received": 1791601753116,
+        "sourceTime": 1791601354650,
+        "ageMs": 398466
+      }
+    },
+    "hippo:ETHUSDT:depth": {
+      "count": 174,
+      "minAgeMs": 392800,
+      "medianAgeMs": 397250,
+      "maxAgeMs": 402076,
+      "sourceAdvanceMs": 22811,
+      "receiveAdvanceMs": 28160,
+      "lagGrowthMs": 5349,
+      "first": {
+        "received": 1791601724593,
+        "sourceTime": 1791601331712,
+        "ageMs": 392881
+      },
+      "last": {
+        "received": 1791601752753,
+        "sourceTime": 1791601354523,
+        "ageMs": 398230
+      }
+    },
+    "bitget:ETHUSDT:depth": {
+      "count": 179,
+      "minAgeMs": 200,
+      "medianAgeMs": 207,
+      "maxAgeMs": 438,
+      "sourceAdvanceMs": 25734,
+      "receiveAdvanceMs": 25779,
+      "lagGrowthMs": 45,
+      "first": {
+        "received": 1791601727562,
+        "sourceTime": 1791601727349,
+        "ageMs": 213
+      },
+      "last": {
+        "received": 1791601753341,
+        "sourceTime": 1791601753083,
+        "ageMs": 258
+      }
+    },
+    "bitget:BTCUSDT:depth": {
+      "count": 174,
+      "minAgeMs": 200,
+      "medianAgeMs": 203,
+      "maxAgeMs": 324,
+      "sourceAdvanceMs": 25699,
+      "receiveAdvanceMs": 25700,
+      "lagGrowthMs": 1,
+      "first": {
+        "received": 1791601727602,
+        "sourceTime": 1791601727401,
+        "ageMs": 201
+      },
+      "last": {
+        "received": 1791601753302,
+        "sourceTime": 1791601753100,
+        "ageMs": 202
+      }
+    },
+    "bitget:ETHUSDT:ticker": {
+      "count": 85,
+      "minAgeMs": 201,
+      "medianAgeMs": 208,
+      "maxAgeMs": 313,
+      "sourceAdvanceMs": 25451,
+      "receiveAdvanceMs": 25365,
+      "lagGrowthMs": -86,
+      "first": {
+        "received": 1791601727873,
+        "sourceTime": 1791601727584,
+        "ageMs": 289,
+        "price": "2493.24"
+      },
+      "last": {
+        "received": 1791601753238,
+        "sourceTime": 1791601753035,
+        "ageMs": 203,
+        "price": "2493.1"
+      }
+    },
+    "bitget:BTCUSDT:ticker": {
+      "count": 85,
+      "minAgeMs": 201,
+      "medianAgeMs": 208,
+      "maxAgeMs": 409,
+      "sourceAdvanceMs": 25451,
+      "receiveAdvanceMs": 25366,
+      "lagGrowthMs": -85,
+      "first": {
+        "received": 1791601727873,
+        "sourceTime": 1791601727584,
+        "ageMs": 289,
+        "price": "82600"
+      },
+      "last": {
+        "received": 1791601753239,
+        "sourceTime": 1791601753035,
+        "ageMs": 204,
+        "price": "82600"
+      }
+    }
+  }
+}

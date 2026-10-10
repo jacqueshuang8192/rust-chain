@@ -8,7 +8,7 @@ use std::sync::{
 use tokio::sync::{Notify, oneshot};
 use tokio::time::Instant;
 
-fn test_settings() -> Settings {
+pub(super) fn test_settings() -> Settings {
     Settings {
         app_env: "test".to_owned(),
         app_host: "127.0.0.1".parse().unwrap(),
