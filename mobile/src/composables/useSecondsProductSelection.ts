@@ -23,11 +23,10 @@ export function useSecondsProductSelection(options: {
         || options.products.value[0] || null
     }
     const symbol = route.value.params.symbol
-    const requested = typeof symbol === 'string' ? normalizeMarketSocketSymbol(symbol) : ''
-    const id = selected.value?.id ?? navigation.lastSecondsProductId
-    return options.products.value.find((product) => requested
-      ? normalizeMarketSocketSymbol(product.symbol) === requested
-      : product.id === id) || options.products.value[0] || null
+    const requested = (typeof symbol === 'string' ? normalizeMarketSocketSymbol(symbol) : '') || 'BTCUSDT'
+    return options.products.value.find((product) => (
+      normalizeMarketSocketSymbol(product.symbol) === requested
+    )) || options.products.value[0] || null
   }
 
   function rememberProduct(product: SecondsProduct): void {

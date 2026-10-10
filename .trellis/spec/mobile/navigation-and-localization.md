@@ -162,7 +162,8 @@ lastTradePath: ComputedRef<string>
   selection usable. Stake, direction and confirmation state are not persisted.
 - A nonempty Seconds route symbol overrides saved/current identity and matches
   normalized API symbols; unavailable symbols fall back to the first product.
-  Bare `/seconds` and legacy `/products/seconds` restore the last product.
+  Bare `/seconds` and legacy `/products/seconds` default to BTC/USDT regardless
+  of stored choice or list ordering; when unavailable, use the first product.
   Canonicalization uses router replace and preserves query/hash and entry state.
   `/seconds/history` remains a distinct static route, never a product symbol.
   Pending user selection wins over an old route until its replace commits.

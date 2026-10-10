@@ -9459,3 +9459,10 @@
 - 修改文件：`mobile/src/{App.vue,router/index.ts,stores/navigation.ts,views/SecondsView.vue,composables/useSecondsProductSelection.ts,core/navigation/useRouteAccessibility.ts}`、币种持久化与5份既有路由契约测试、手机端导航规范、本任务及进度记录。
 - 验证结果：完整release:gate通过，824/824无跳过、类型检查、PWA/Tauri构建、产物、源码与包体预算全部通过。Ego真实浏览器验证ETH链接覆盖已存BTC、选币改变地址但history长度与DOM根实例不变、强刷保留BTC、历史页返回BTC、裸入口恢复BTC；TaskSpace10已关闭，未登录或下单。
 - 后续事项：仅本地提交本任务，不推送部署；此前账单国际化、行情提示隐藏、PC与缓存改动不纳入。未做安装态PWA真机、原生包或生产部署验收。
+
+## 2026-10-11 02:59 - 秒合约入口默认BTC
+
+- 完成内容：裸`/seconds`及旧`/products/seconds`默认选择BTC/USDT，忽略上次选择和接口顺序；保留显式币种链接、刷新保持币种、在途选择保护，BTC不可用时回退首个可用产品。
+- 修改文件：`mobile/src/composables/useSecondsProductSelection.ts`、`mobile/tests/seconds-pair-persistence.test.ts`、手机端导航规范、`.trellis/tasks/10-11-seconds-default-btc/`及本进度文件。
+- 验证结果：完整mobile release:gate通过，825/825无跳过，类型检查、PWA/Tauri构建、产物及预算通过；Ego TaskSpace11先打开ETH再进入裸入口并强刷，确认地址和标题均为BTC，未登录或下单，空间已关闭。
+- 后续事项：仅本地提交本任务，不推送部署；保留其他未提交修改，未执行安装态PWA真机验证。
