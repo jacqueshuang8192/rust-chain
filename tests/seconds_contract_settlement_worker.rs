@@ -475,6 +475,143 @@ fn settlement_result_uses_direction_and_exact_prices() {
 }
 
 #[tokio::test]
+async fn window_pricing_and_retention_preserve_order_evidence() -> Result<(), Box<dyn Error>> {
+    let _guard = TEST_LOCK.lock().await;
+    let (Some(pool), Some(redis)) = (mysql_pool_or_skip().await?, cached_test_redis().await?)
+    else {
+        return Ok(());
+    };
+    let fixture = seed_fixture(&pool).await?;
+    let expiry = Utc::now() - TimeDelta::seconds(60);
+    let order = seed_order(&pool, &fixture, expiry, "up").await?;
+    sqlx::query("INSERT INTO seconds_contract_price_evidence(order_id,entry_json) VALUES (?, JSON_OBJECT('price','100','source','bitget'))")
+        .bind(order).execute(&pool).await?;
+    use exchange_api::modules::market::{
+        MarketDataProvider, MarketTickerCacheEntry, MarketTickerSnapshot, RedisMarketCache,
+    };
+    let cache = RedisMarketCache::new(redis.clone());
+    for (at, price) in [
+        (
+            expiry + TimeDelta::milliseconds(10),
+            "101.123456789012345678",
+        ),
+        (expiry + TimeDelta::seconds(10), "1"),
+    ] {
+        let snapshot = MarketTickerSnapshot::new(
+            MarketDataProvider::Bitget,
+            &fixture.pair_symbol,
+            decimal(price),
+            decimal("1"),
+            at,
+        )?;
+        cache
+            .save_ticker(MarketTickerCacheEntry::from_snapshot(&snapshot)?)
+            .await?;
+    }
+    run_once_with_cached_prices(&pool, &redis, None, expiry + TimeDelta::seconds(4), 500).await?;
+    assert_eq!(order_snapshot(&pool, order).await?.0, "opened");
+    run_once_with_cached_prices(&pool, &redis, None, expiry + TimeDelta::seconds(30), 500).await?;
+    let result = order_snapshot(&pool, order).await?;
+    assert_eq!(result.0, "settled");
+    assert_eq!(result.1, Some(decimal("101.123456789012345678")));
+    assert_eq!(result.3.as_deref(), Some("bitget"));
+    use redis::AsyncCommands;
+    let _: usize = redis
+        .clone()
+        .del(format!(
+            "market:price-history:v1:{}",
+            fixture.pair_symbol.replace('-', "")
+        ))
+        .await?;
+    run_once_with_cached_prices(&pool, &redis, None, expiry + TimeDelta::hours(1), 500).await?;
+    assert_eq!(order_snapshot(&pool, order).await?, result);
+    let evidence: String = sqlx::query_scalar("SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(entry_json,'$.price')) AS CHAR) FROM seconds_contract_price_evidence WHERE order_id=?").bind(order).fetch_one(&pool).await?;
+    assert_eq!(evidence, "100");
+
+    // 最新价存在也不能替代缺失的窗口；超时只转人工审核，不提前出款。
+    let missing = seed_order(&pool, &fixture, expiry, "up").await?;
+    sqlx::query("INSERT INTO seconds_contract_price_evidence(order_id,entry_json) VALUES (?, JSON_OBJECT('price','100'))")
+        .bind(missing).execute(&pool).await?;
+    run_once_with_cached_prices(&pool, &redis, None, expiry + TimeDelta::seconds(30), 500).await?;
+    assert_eq!(order_snapshot(&pool, missing).await?.0, "opened");
+    run_once_with_cached_prices(&pool, &redis, None, expiry + TimeDelta::seconds(306), 500).await?;
+    let missing_snapshot = order_snapshot(&pool, missing).await?;
+    assert_eq!(missing_snapshot.0, "manual_review");
+    assert!(missing_snapshot.1.is_none());
+
+    let old = Utc::now() - TimeDelta::days(3);
+    let remove = insert_tick(&pool, &fixture.pair_symbol, "90", "bitget", old, 1).await?;
+    let linked = insert_tick(
+        &pool,
+        &fixture.pair_symbol,
+        "91",
+        "bitget",
+        old + TimeDelta::seconds(1),
+        1,
+    )
+    .await?;
+    let pending_tick = insert_tick(
+        &pool,
+        &fixture.pair_symbol,
+        "92",
+        "bitget",
+        old + TimeDelta::seconds(10),
+        1,
+    )
+    .await?;
+    let head = insert_tick(
+        &pool,
+        &fixture.pair_symbol,
+        "93",
+        "bitget",
+        old + TimeDelta::seconds(20),
+        1,
+    )
+    .await?;
+    sqlx::query("UPDATE market_price_ticks SET ingested_at=? WHERE id IN (?,?,?,?)")
+        .bind(old.naive_utc())
+        .bind(remove)
+        .bind(linked)
+        .bind(pending_tick)
+        .bind(head)
+        .execute(&pool)
+        .await?;
+    sqlx::query("UPDATE seconds_contract_orders SET settlement_price_tick_id=? WHERE id=?")
+        .bind(linked)
+        .bind(order)
+        .execute(&pool)
+        .await?;
+    let pending = seed_order(&pool, &fixture, old + TimeDelta::seconds(10), "up").await?;
+    let mut cursor = 0;
+    loop {
+        let (next, _) =
+            exchange_api::workers::market_retention::prune_price_batch(&pool, cursor).await?;
+        cursor = next;
+        if next == 0 {
+            break;
+        }
+    }
+    for (id, expected) in [
+        (remove, false),
+        (linked, true),
+        (pending_tick, true),
+        (head, true),
+    ] {
+        let exists: bool =
+            sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM market_price_ticks WHERE id=?)")
+                .bind(id)
+                .fetch_one(&pool)
+                .await?;
+        assert_eq!(exists, expected, "tick {id}");
+    }
+    sqlx::query("UPDATE seconds_contract_orders SET status='settled' WHERE id=?")
+        .bind(pending)
+        .execute(&pool)
+        .await?;
+    Ok(())
+}
+
+#[tokio::test]
 async fn timely_delayed_and_replay_use_the_same_event_price_snapshot() -> Result<(), Box<dyn Error>>
 {
     let _guard = TEST_LOCK.lock().await;

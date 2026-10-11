@@ -13,7 +13,7 @@ pub struct SaveMarketFeedConfigRequest {
 
 impl PresentationLayer for SaveMarketFeedConfigRequest {}
 
-#[derive(Debug, Serialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct MarketFeedConfigResponse {
     pub id: u64,
     pub name: String,
@@ -36,7 +36,7 @@ impl PresentationLayer for MarketFeedConfigResponse {}
 pub struct MarketFeedStatusResponse {
     pub saved_config: Option<MarketFeedConfigResponse>,
     pub runtime: MarketFeedRuntimeStatus,
-    /// 数据库权威摄取记录与策略检查点组成的健康快照。
+    /// Redis 实时快照与后台缓存的策略检查点组成的健康状态。
     /// 该字段随状态接口一起返回，避免前端只看到 supervisor 已启动却不知道实际行情是否已经断流。
     pub health: MarketFeedHealthResponse,
 }
@@ -59,7 +59,7 @@ pub struct MarketFeedHealthResponse {
     /// 上游行情事件本身最近发生的时间；断流判定以此字段为准。
     #[serde(default, with = "option_unix_millis")]
     pub last_observed_at: Option<DateTime<Utc>>,
-    /// 本服务最近把行情写入数据库的时间，仅用于区分上游断流和本地摄取阻塞。
+    /// 本服务最近接受行情到 Redis 的时间，不再表示 MySQL 归档进度。
     #[serde(default, with = "option_unix_millis")]
     pub last_ingested_at: Option<DateTime<Utc>>,
     /// 尚未闭合的策略 K 线缺口数量（按策略计数，而非按蜡烛根数计数）。

@@ -4,9 +4,10 @@
 
 External Bitget/HTX/Coinbase WebSocket and REST fallback ingestion in
 `workers/market_feed.rs`. Synthetic/default generation keeps its synchronous
-provenance, lease, archive and checkpoint contracts. Seconds opening/settlement
-continues using the existing Redis price policy; this change does not introduce
-deadline-price selection.
+provenance, lease, archive and checkpoint contracts. Seconds pricing now follows
+[Market Price Retention](./market-price-retention.md): new orders use Redis
+deadline-window prices, legacy orders retain their policy. SQL ticker archives
+are short-lived rather than retained indefinitely.
 
 ## 2. Signatures
 

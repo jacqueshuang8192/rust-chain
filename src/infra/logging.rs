@@ -115,6 +115,7 @@ impl Visit for LogFields {
 fn field_label(name: &str) -> &str {
     match name {
         "scanned" => "扫描数",
+        "deleted" => "清理数",
         "settled" => "结算数",
         "failed" => "失败数",
         "skipped" => "跳过数",

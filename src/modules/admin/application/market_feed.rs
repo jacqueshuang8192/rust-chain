@@ -6,6 +6,9 @@
 //! 重载因此采用「先切换运行时、再持久化结果、最后写审计」的顺序，失败路径同样落库并留痕后再上抛原错误。
 
 use super::*;
+use crate::modules::admin::infrastructure::{
+    CachedMarketStatus, load_live_market_observations, load_market_status, store_market_status,
+};
 
 /// 读取启动阶段可用的已启用行情订阅配置，并转换为监督器消费的后台响应。
 /// 查询使用必选连接池、不加行锁也不触发重载；没有启用配置返回 None，SQL 或配置映射失败返回错误。
@@ -82,49 +85,70 @@ pub(crate) async fn save_admin_market_feed_config(
     Ok(market_feed_config_response(after))
 }
 
-/// 聚合数据库中保存的行情配置和监督器运行快照，返回版本差异、订阅及最近重载状态。
-/// 数据库配置以无锁连接池查询取得，调用方提供的运行快照原样嵌入；本函数不触发、跳过或记录重载，连接池/SQL 失败返回错误。
+/// 状态请求只读取 Redis 与调用方内存运行态，整个缓存读取有两秒上限，不回源 MySQL。
 pub(crate) async fn get_admin_market_feed_status(
-    pool: Option<Pool<MySql>>,
+    redis: Option<redis::aio::ConnectionManager>,
     runtime: MarketFeedRuntimeStatus,
 ) -> AppResult<MarketFeedStatusResponse> {
-    let pool = admin_mysql_pool(pool)?;
-    let saved_config = load_admin_market_feed_config_from_store(&pool)
+    let redis =
+        redis.ok_or_else(|| AppError::Internal("Redis is required for market status".into()))?;
+    tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        let context = load_market_status(&redis).await?;
+        let saved_config = context.saved_config;
+        let configured_symbols = match saved_config.as_ref() {
+            Some(config) if config.enabled => config.symbols.clone(),
+            Some(_) => Vec::new(),
+            None => runtime.symbols.clone(),
+        };
+        let configured_providers = match saved_config.as_ref() {
+            Some(config) if config.enabled => config.providers.clone(),
+            Some(_) => Vec::new(),
+            None => runtime.providers.clone(),
+        };
+        let checked_at = Utc::now();
+        let observations =
+            load_live_market_observations(&redis, &configured_symbols, &configured_providers)
+                .await?;
+        let health = build_market_feed_health(MarketFeedHealthInput {
+            configured_symbols: &configured_symbols,
+            latest_observations: &observations,
+            runtime_ready: runtime.ready,
+            runtime_status: runtime.last_reload_status.as_deref(),
+            now: checked_at,
+            stale_after: std::time::Duration::from_secs(MARKET_FEED_STALE_AFTER_SECONDS),
+            kline_gap_count: context.kline_gap_count,
+            kline_recovery_failed_count: context.kline_recovery_failed_count,
+        });
+        Ok(MarketFeedStatusResponse {
+            saved_config,
+            runtime,
+            health,
+        })
+    })
+    .await
+    .map_err(|_| AppError::Internal("读取行情状态 Redis 快照超时".into()))?
+}
+
+/// 后台更新配置与 K 线诊断的短期缓存；失败保留旧值直到 TTL 失效，绝不写入虚假的健康状态。
+pub async fn refresh_market_status_cache(
+    pool: &Pool<MySql>,
+    redis: &redis::aio::ConnectionManager,
+) -> AppResult<()> {
+    let checked_at = Utc::now();
+    let saved_config = load_admin_market_feed_config_from_store(pool)
         .await?
         .map(market_feed_config_response);
-    let configured_symbols = match saved_config.as_ref() {
-        Some(config) if config.enabled => config.symbols.clone(),
-        Some(_) => Vec::new(),
-        None => runtime.symbols.clone(),
-    };
-    let configured_providers = match saved_config.as_ref() {
-        Some(config) if config.enabled => config.providers.clone(),
-        Some(_) => Vec::new(),
-        None => runtime.providers.clone(),
-    };
-    let checked_at = Utc::now();
-    let health_data = load_admin_market_feed_health_data(
-        &pool,
-        &configured_symbols,
-        &configured_providers,
-        checked_at,
+    let diagnostics = load_admin_market_feed_health_data(pool, checked_at).await?;
+    store_market_status(
+        redis,
+        &CachedMarketStatus {
+            saved_config,
+            checked_at,
+            kline_gap_count: diagnostics.kline_gap_count,
+            kline_recovery_failed_count: diagnostics.kline_recovery_failed_count,
+        },
     )
-    .await?;
-    let health = build_market_feed_health(MarketFeedHealthInput {
-        configured_symbols: &configured_symbols,
-        latest_observations: &health_data.latest_observations,
-        runtime_ready: runtime.ready,
-        runtime_status: runtime.last_reload_status.as_deref(),
-        now: checked_at,
-        stale_after: std::time::Duration::from_secs(MARKET_FEED_STALE_AFTER_SECONDS),
-        kline_gap_count: health_data.kline_gap_count,
-        kline_recovery_failed_count: health_data.kline_recovery_failed_count,
-    });
-    Ok(MarketFeedStatusResponse {
-        saved_config,
-        runtime,
-        health,
-    })
+    .await
 }
 
 /// 读取全部行情源凭据并映射为仅含认证类型、密钥掩码和启用状态的后台列表。

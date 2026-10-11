@@ -54,6 +54,22 @@ async fn main() -> anyhow::Result<()> {
         .with_email_sender(Arc::new(SmtpEmailSender));
 
     if let Some(pool) = state.mysql.clone() {
+        let status_state = state.clone();
+        tokio::spawn(async move {
+            if let Err(error) =
+                exchange_api::workers::market_retention::run_status_loop(status_state).await
+            {
+                tracing::error!(%error, "行情状态缓存任务已停止");
+            }
+        });
+        let retention_state = state.clone();
+        tokio::spawn(async move {
+            if let Err(error) =
+                exchange_api::workers::market_retention::run_retention_loop(retention_state).await
+            {
+                tracing::error!(%error, "短期行情清理任务已停止");
+            }
+        });
         let market_feed_state = state.clone();
         tokio::spawn(async move {
             let db_config = match load_enabled_admin_market_feed_config(&pool).await {

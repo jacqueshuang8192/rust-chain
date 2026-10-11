@@ -155,6 +155,27 @@ async fn make_order_due_with_event_price(pool: &MySqlPool, order_id: u64, price:
         "SELECT pairs.symbol FROM seconds_contract_orders orders JOIN trading_pairs pairs ON pairs.id = orders.pair_id WHERE orders.id = ?",
     ).bind(order_id).fetch_one(pool).await.unwrap();
     seed_ticker(&redis_manager().await, &symbol, price).await;
+    if let Some(mut redis) = redis_manager().await {
+        let expires_at: chrono::DateTime<chrono::Utc> =
+            sqlx::query_scalar("SELECT expires_at FROM seconds_contract_orders WHERE id=?")
+                .bind(order_id)
+                .fetch_one(pool)
+                .await
+                .unwrap();
+        let symbol = exchange_api::modules::market::ValidatedMarketSymbol::from_raw(&symbol)
+            .unwrap()
+            .as_str()
+            .to_owned();
+        let payload = serde_json::json!({"symbol":symbol,"price":price,"source":"bitget","observed_at":expires_at,"source_version":"redis:test-window"}).to_string();
+        let _: usize = redis
+            .zadd(
+                format!("market:price-history:v1:{symbol}"),
+                payload,
+                expires_at.timestamp_micros(),
+            )
+            .await
+            .unwrap();
+    }
 }
 
 async fn seed_order_event_price(pool: &MySqlPool, order_id: u64, price: &str) {
@@ -1129,6 +1150,10 @@ async fn seconds_contract_stake_and_manual_payout_respect_asset_precision()
     assert_eq!(opened_status, StatusCode::OK, "payload: {opened_payload}");
     let order_id = opened_payload["order"]["id"].as_u64().unwrap();
     make_order_due_with_event_price(&pool, order_id, "105.000000000000000000").await;
+    let (policy, price): (String, String) = sqlx::query_as("SELECT policy, CAST(JSON_UNQUOTE(JSON_EXTRACT(entry_json, '$.price')) AS CHAR) FROM seconds_contract_price_evidence WHERE order_id=?")
+        .bind(order_id).fetch_one(&pool).await?;
+    assert_eq!(policy, "redis_window_v1");
+    assert_eq!(decimal(&price), decimal("100"));
 
     let settled = admin_routes()
         .with_state(state_with_mysql_and_redis(

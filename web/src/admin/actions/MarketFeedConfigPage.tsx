@@ -274,7 +274,7 @@ export function MarketFeedConfigPage() {
       { key: '行情健康状态', value: <StatusTag value={health?.status ?? 'not_configured'} /> },
       { key: '健康交易对', value: health ? `${health.healthy_symbols} / ${health.configured_symbols}` : '-' },
       { key: '最近行情事件', value: <TimestampText value={health?.last_observed_at ?? null} /> },
-      { key: '最近数据库摄取', value: <TimestampText value={health?.last_ingested_at ?? null} /> },
+      { key: '最近实时接收', value: <TimestampText value={health?.last_ingested_at ?? null} /> },
       { key: '断流判定阈值', value: health ? `${health.stale_after_seconds} 秒` : '-' },
       { key: '待补 1m K线策略', value: health?.kline_gap_count ?? '-' },
       { key: 'K线补偿失败任务', value: health?.kline_recovery_failed_count ?? '-' },

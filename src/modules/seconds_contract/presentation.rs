@@ -263,6 +263,10 @@ pub(crate) struct SecondsContractProductResponse {
 /// 该结构对应 Redis 里由行情模块写入的 JSON，字段缺失或类型不符会被判定为数据契约破损。
 #[derive(Debug, Deserialize)]
 pub(crate) struct CachedTickerPayload {
+    #[serde(default)]
+    pub(crate) provider: Option<String>,
+    #[serde(default)]
+    pub(crate) source: Option<String>,
     /// 载荷中的交易对身份；旧载荷缺失时仍由服务端缓存键确定，存在时必须一致。
     #[serde(default)]
     pub(crate) symbol: Option<String>,

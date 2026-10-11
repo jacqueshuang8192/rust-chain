@@ -73,6 +73,12 @@ static ADMIT: LazyLock<Script> = LazyLock::new(|| {
     Script::new(
         r#"
 local current = redis.call('GET', KEYS[1])
+if ARGV[6] == '1' then
+    local history_type = redis.call('TYPE', KEYS[3]).ok
+    if history_type ~= 'none' and history_type ~= 'zset' then
+        return redis.error_reply('invalid price history type')
+    end
+end
 local observed = tonumber(ARGV[1])
 local incoming_open = tonumber(ARGV[2])
 local current_open = nil
@@ -97,23 +103,33 @@ end
 if current_open and (current_open > incoming_open or
    (current_open == incoming_open and current_observed and current_observed >= observed)) then
     if ARGV[6] == '1' then
-        if redis.call('LLEN', KEYS[3]) >= tonumber(ARGV[5]) then
+        if redis.call('LLEN', KEYS[5]) >= tonumber(ARGV[5]) then
             return redis.error_reply('external market archive queue is full')
         end
-        redis.call('RPUSH', KEYS[3], ARGV[4])
+        redis.call('RPUSH', KEYS[5], ARGV[4])
     end
     if current_open == incoming_open and current_observed == observed and current == ARGV[3] then
         return 2
     end
     return 0
 end
-for i = 3, #KEYS do
+for i = 5, #KEYS do
     if redis.call('LLEN', KEYS[i]) >= tonumber(ARGV[5]) then
         return redis.error_reply('external market work queue is full')
     end
 end
-for i = 3, #KEYS do redis.call('RPUSH', KEYS[i], ARGV[4]) end
+for i = 5, #KEYS do redis.call('RPUSH', KEYS[i], ARGV[4]) end
 redis.call('SET', KEYS[1], ARGV[3])
+if ARGV[6] == '1' then
+    local now = redis.call('TIME')
+    local cutoff = (tonumber(now[1]) - tonumber(ARGV[9])) * 1000000
+    if tonumber(ARGV[7]) >= cutoff then
+        redis.call('ZADD', KEYS[3], ARGV[7], ARGV[8])
+    end
+    redis.call('ZREMRANGEBYSCORE', KEYS[3], '-inf', '(' .. string.format('%.0f', cutoff))
+    redis.call('EXPIRE', KEYS[3], ARGV[9])
+    redis.call('SET', KEYS[4], tostring(tonumber(now[1]) * 1000 + math.floor(tonumber(now[2]) / 1000)))
+end
 if incoming_open > 0 then
     redis.call('SET', KEYS[2], ARGV[2] .. ':' .. ARGV[1])
 end
@@ -212,13 +228,28 @@ impl RedisMarketCache {
         };
         let payload = payload.map_err(|e| AppError::Internal(e.to_string()))?;
         let payload = encode(&payload)?;
+        let history = match event {
+            ExternalMarketEvent::Ticker { snapshot, .. } => {
+                let entry = MarketTickerCacheEntry::from_snapshot(snapshot)
+                    .map_err(|e| AppError::Validation(e.to_string()))?;
+                serde_json::to_string(&super::history::PriceObservation::from_entry(
+                    &entry, &payload,
+                ))
+                .map_err(|e| AppError::Internal(e.to_string()))?
+            }
+            _ => String::new(),
+        };
         let job = serde_json::to_string(&QueuedMarketEvent {
             event: event.clone(),
             observed_at: event.observed_at(),
         })
         .map_err(|e| AppError::Internal(e.to_string()))?;
         let mut invocation = ADMIT.prepare_invoke();
-        invocation.key(key).key(sequence);
+        invocation
+            .key(key)
+            .key(sequence)
+            .key(super::history::price_history_key(event.symbol()))
+            .key(format!("market:received:v1:{}", event.symbol()));
         for lane in lanes {
             invocation.key(lane.key());
         }
@@ -233,6 +264,9 @@ impl RedisMarketCache {
             } else {
                 0
             })
+            .arg(event.observed_at().timestamp_micros())
+            .arg(history)
+            .arg(super::history::PRICE_RETENTION_SECONDS)
             .invoke_async(&mut self.manager.clone())
             .await?;
         Ok(cache_write_outcome(result))

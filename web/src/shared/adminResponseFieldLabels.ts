@@ -297,7 +297,7 @@ export const ADMIN_RESPONSE_FIELD_LABELS: Record<string, string> = {
   stale_after_seconds: '断流判定阈值（秒）',
   stale_symbols: '已断流行情交易对',
   last_observed_at: '最近上游行情事件',
-  last_ingested_at: '最近数据库摄取',
+  last_ingested_at: '最近实时接收',
   kline_gap_count: '待补 1m K线策略数',
   kline_recovery_failed_count: 'K线补偿失败任务数',
   issuance_editable: '发行参数可编辑',

@@ -76,6 +76,8 @@ mod financial_retries;
 mod margin;
 mod market;
 mod market_feed;
+mod market_status_cache;
+pub(crate) use market_status_cache::*;
 mod market_settings;
 mod new_coin;
 mod new_coin_market;

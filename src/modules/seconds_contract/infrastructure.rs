@@ -778,20 +778,8 @@ pub(crate) async fn existing_order_for_idempotency_key_readonly(
     .map_err(AppError::from)
 }
 
-/// 从 `market:ticker:{symbol}` 的 Redis 缓存读取 `last_price` 作为服务端认定的开仓价。
-/// 开仓价只取自服务端缓存，绝不接受客户端上送，避免用户挑选对自己有利的价格开仓。
-/// 未配置 Redis 连接时直接返回校验错误而不是回落到数据库或默认价，宁可拒绝下单也不用不可信价格锁定盈亏。
-/// 价格必须为正数且可无损存储；按秒合约缓存取价规则，不因 observed_at 较旧而拒绝。
-/// 缓存缺失、身份冲突或 JSON 解析失败仍报错，不会用客户端价格或零价格补位。
-pub(crate) async fn cached_entry_price(
-    redis: Option<&ConnectionManager>,
-    _pair_id: u64,
-    symbol: &str,
-) -> AppResult<BigDecimal> {
-    Ok(cached_settlement_price(redis, symbol).await?.price)
-}
-
-/// 从服务端 Redis 读取秒合约实际取价证据；不检查报价年龄，不查询或伪造历史行情。
+/// 从服务端 Redis 读取开仓或旧策略结算的实际取价证据；不检查报价年龄，不查询或伪造历史行情。
+/// 不接受客户端价格；缺失、身份冲突、非正数、超精度或坏 JSON 都拒绝，不回落到零或数据库。
 /// 保留原始 observed_at 和完整缓存 SHA-256 摘要，历史 tick ID/代际为空；
 /// 调用方在订单锁之后读取，并把这些证据与钱包、流水、订单终态同事务提交。
 pub(crate) async fn cached_settlement_price(
@@ -833,11 +821,64 @@ pub(crate) async fn cached_settlement_price(
         id: None,
         symbol: symbol.as_str().to_owned(),
         price: ticker.last_price,
-        source: "redis".to_owned(),
+        source: if ticker.source.as_deref() == Some("default") {
+            "default".into()
+        } else {
+            ticker.provider.unwrap_or_else(|| "redis".into())
+        },
         observed_at: ticker.observed_at,
         generation: None,
         source_version: format!("redis:{}", hex::encode(Sha256::digest(payload.as_bytes()))),
     })
+}
+
+/// 新订单与开仓扣款同事务保存不可变证据；不存在证据行的存量订单不追溯改变定价策略。
+pub(crate) async fn save_entry_evidence(
+    tx: &mut Transaction<'_, MySql>,
+    order_id: u64,
+    price: &SecondsContractSettlementPriceRow,
+) -> AppResult<()> {
+    sqlx::query("INSERT INTO seconds_contract_price_evidence(order_id, entry_json) VALUES (?, ?)")
+        .bind(order_id)
+        .bind(SqlxJson(price))
+        .execute(&mut **tx)
+        .await?;
+    Ok(())
+}
+
+/// 从订单不可变证据识别到期窗口策略；不根据当前配置重解释旧订单。
+pub(crate) async fn uses_window_price(
+    tx: &mut Transaction<'_, MySql>,
+    order_id: u64,
+) -> AppResult<bool> {
+    Ok(sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM seconds_contract_price_evidence WHERE order_id = ? AND policy = 'redis_window_v1')")
+        .bind(order_id).fetch_one(&mut **tx).await?)
+}
+
+/// 选择 Redis 到期后五秒内首条已接受行情；没有窗口记录时保持缺失，不回落到执行时最新价。
+pub(crate) async fn cached_window_price(
+    redis: Option<&ConnectionManager>,
+    symbol: &str,
+    expires_at: DateTime<Utc>,
+) -> AppResult<Option<SecondsContractSettlementPriceRow>> {
+    let redis =
+        redis.ok_or_else(|| AppError::Internal("Redis is required for window pricing".into()))?;
+    let end = expires_at + chrono::TimeDelta::seconds(5);
+    Ok(
+        crate::modules::market::infrastructure::cache::history::load_price_window(
+            redis, symbol, expires_at, end,
+        )
+        .await?
+        .map(|tick| SecondsContractSettlementPriceRow {
+            id: None,
+            symbol: tick.symbol,
+            price: tick.price,
+            source: tick.source,
+            observed_at: tick.observed_at,
+            generation: None,
+            source_version: tick.source_version,
+        }),
+    )
 }
 
 /// 下单路径上锁定可交易的秒合约产品，并解析出本次下单实际适用的那条周期规则。

@@ -5506,6 +5506,12 @@ async fn admin_market_feed_config_credentials_reload_and_status() -> Result<(), 
         return Ok(());
     };
     let _market_feed_lock = MARKET_FEED_CONFIG_TEST_LOCK.lock().await;
+    let Ok(redis_url) = std::env::var("REDIS_URL") else {
+        return Ok(());
+    };
+    let redis = redis::Client::open(redis_url)?
+        .get_connection_manager()
+        .await?;
     let settings = test_settings();
     let (role_id, admin_id) = create_admin_user(&pool).await;
     let admin_token = issue_token(
@@ -5519,6 +5525,7 @@ async fn admin_market_feed_config_credentials_reload_and_status() -> Result<(), 
     let app = build_router(
         AppState::new(settings)
             .with_mysql(pool.clone())
+            .with_redis(redis.clone())
             .with_market_feed_supervisor(supervisor.clone()),
     );
 
@@ -5638,6 +5645,8 @@ async fn admin_market_feed_config_credentials_reload_and_status() -> Result<(), 
     );
     assert_eq!(reload_payload["runtime"]["providers"], json!(["bitget"]));
     supervisor.stop().await;
+
+    exchange_api::modules::admin::application::refresh_market_status_cache(&pool, &redis).await?;
 
     let status = app
         .clone()

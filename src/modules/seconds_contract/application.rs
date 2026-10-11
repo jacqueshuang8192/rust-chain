@@ -422,8 +422,9 @@ pub(crate) async fn open_order(
     validate_product_stake(&request.stake_amount, &product)?;
     infrastructure::exposure::ensure_open_capacity(&mut tx, &product, &request.stake_amount)
         .await?;
-    let entry_price =
-        infrastructure::cached_entry_price(redis, product.pair_id, product.symbol.as_str()).await?;
+    let entry_snapshot =
+        infrastructure::cached_settlement_price(redis, product.symbol.as_str()).await?;
+    let entry_price = entry_snapshot.price.clone();
     crate::numeric::ensure_amount_storage(&entry_price, "seconds entry_price")?;
     let expires_at = infrastructure::database_now(&mut tx)
         .await?
@@ -466,6 +467,7 @@ pub(crate) async fn open_order(
         Err(error) => return Err(AppError::Database(error)),
     };
 
+    infrastructure::save_entry_evidence(&mut tx, order_id, &entry_snapshot).await?;
     infrastructure::refund::snapshot_refund_policy_in_tx(&mut tx, product.id, order_id).await?;
     let wallet = infrastructure::lock_wallet_row(&mut tx, user_id, product.stake_asset).await?;
     if wallet.available < request.stake_amount {
@@ -587,7 +589,8 @@ pub(crate) async fn settle_order(
         ));
     }
     let database_now = infrastructure::database_now(&mut tx).await?;
-    let settlement_window_closes_at = if order.status == "manual_review" {
+    let window_pricing = infrastructure::uses_window_price(&mut tx, order.id).await?;
+    let settlement_window_closes_at = if order.status == "manual_review" || window_pricing {
         order.expires_at + chrono::TimeDelta::seconds(SETTLEMENT_PRICE_WINDOW_SECONDS)
     } else {
         order.expires_at
@@ -597,7 +600,13 @@ pub(crate) async fn settle_order(
             "seconds contract order is not yet eligible for settlement".to_owned(),
         ));
     }
-    let snapshot = if order.status == "manual_review" {
+    let snapshot = if window_pricing {
+        infrastructure::cached_window_price(redis, &order.symbol, order.expires_at)
+            .await?
+            .ok_or_else(|| {
+                AppError::Conflict("秒合约到期窗口报价缺失，不能使用当前价格结算".into())
+            })?
+    } else if order.status == "manual_review" {
         infrastructure::select_settlement_price_snapshot(&mut tx, &order.symbol, order.expires_at)
             .await?
             .ok_or_else(|| {

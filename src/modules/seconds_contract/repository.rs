@@ -30,7 +30,7 @@ pub(crate) struct SecondsContractMarketFeedCoverage {
 }
 
 /// 秒合约结算选中的价格证据；历史恢复引用归档行，Redis 定价保留缓存摘要且不伪造历史主键或代际。
-#[derive(Debug, Clone, sqlx::FromRow)]
+#[derive(Debug, Clone, sqlx::FromRow, serde::Serialize)]
 pub(crate) struct SecondsContractSettlementPriceRow {
     /// 历史恢复的行情主键；直接读取 Redis 时为 None。
     pub(crate) id: Option<u64>,

@@ -118,7 +118,7 @@ async fn get_market_feed_status(
 ) -> AppResult<Json<MarketFeedStatusResponse>> {
     let runtime = load_market_feed_runtime(&state).await;
     Ok(Json(
-        get_market_feed_status_use_case(state.mysql.clone(), runtime).await?,
+        get_market_feed_status_use_case(state.redis.clone(), runtime).await?,
     ))
 }
 

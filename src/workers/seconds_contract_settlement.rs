@@ -72,7 +72,7 @@ impl SecondsContractSettlementWorkerConfig {
 }
 
 impl SecondsContractSettlementWorker {
-    /// 执行一轮结算；订单到期由 MySQL 时钟确认，普通 opened 单的价格从 Redis 缓存读取。
+    /// 执行一轮结算；MySQL 时钟确认到期，按不可变订单策略读取 Redis 窗口或旧版最新价。
     pub async fn run_once(
         &self,
         state: &AppState,
@@ -215,8 +215,8 @@ pub async fn run_once_with_dependencies(
     run_once_with_cached_prices(pool, redis, None, now, limit).await
 }
 
-/// 读取当前 Redis 报价完成到期订单，提交后只向原用户发布一次事件；错误一秒后重试。
-/// 报价年龄不影响取价，但缓存缺失、损坏、身份冲突或非正价格仍不能触发资金写入。
+/// 按订单策略读取 Redis 到期窗口或旧版最新价，提交后只向原用户发布一次事件。
+/// 新策略必须等五秒窗口关闭；缺失历史按上限转人工审核，损坏和依赖错误一秒后重试。
 pub async fn run_once_with_cached_prices(
     pool: &Pool<MySql>,
     redis: &ConnectionManager,
@@ -464,17 +464,32 @@ async fn settle_order_by_id(
         tx.rollback().await?;
         return Ok(SettlementOutcome::Skipped);
     }
-    let window_closes_at =
-        order.expires_at + chrono::TimeDelta::seconds(price_source.eligibility_delay());
+    let window_pricing = infrastructure::uses_window_price(&mut tx, order.id).await?;
+    let window_closes_at = order.expires_at
+        + chrono::TimeDelta::seconds(if window_pricing {
+            SETTLEMENT_PRICE_WINDOW_SECONDS
+        } else {
+            price_source.eligibility_delay()
+        });
     if processing_time < window_closes_at {
         tx.rollback().await?;
         return Ok(SettlementOutcome::Pending);
     }
     let selected_snapshot = match price_source {
         SettlementPriceSource::Cache(redis) => {
-            Some(infrastructure::cached_settlement_price(Some(redis), &order.symbol).await?)
+            if window_pricing {
+                infrastructure::cached_window_price(Some(redis), &order.symbol, order.expires_at)
+                    .await?
+            } else {
+                Some(infrastructure::cached_settlement_price(Some(redis), &order.symbol).await?)
+            }
         }
         SettlementPriceSource::History => {
+            if window_pricing {
+                return Err(AppError::Internal(
+                    "Redis history is required by this order's pricing policy".into(),
+                ));
+            }
             infrastructure::select_settlement_price_snapshot(
                 &mut tx,
                 &order.symbol,

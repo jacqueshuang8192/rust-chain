@@ -19,6 +19,7 @@ pub mod margin_interest;
 pub mod margin_liquidation;
 pub mod market_feed;
 pub mod market_health;
+pub mod market_retention;
 pub mod prediction_market_close;
 pub mod seconds_contract_settlement;
 pub mod synthetic_market;
