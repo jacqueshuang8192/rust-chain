@@ -29,15 +29,17 @@ import { AdminSelect } from '../shared/SemiFormControls';
 import { StatusTag } from '../shared/StatusTag';
 import { TimestampText } from '../shared/TimestampText';
 import { SecondsOrderCountdown } from '../shared/SecondsOrderCountdown';
+import { UserWalletRecords } from '../shared/UserWalletRecords';
 import './UserPortfolioPage.css';
 
 const { Text } = Typography;
 
-type PortfolioTab = 'assets' | 'margin' | 'seconds' | 'margin-orders' | 'spot';
+type PortfolioTab = 'assets' | 'margin' | 'seconds' | 'margin-orders' | 'spot' | 'wallet-records';
 type PageState<T> = { data: T | null; error: Error | null; loading: boolean };
 
 const portfolioTabs = [
   { itemKey: 'assets', tab: '钱包账户' },
+  { itemKey: 'wallet-records', tab: '资金记录' },
   { itemKey: 'seconds', tab: '秒合约订单' },
   { itemKey: 'margin-orders', tab: '杠杆订单' },
   { itemKey: 'margin', tab: '杠杆持仓' },
@@ -220,7 +222,7 @@ function UserPortfolio() {
   const { userId: rawUserId = '' } = useParams();
   const userId = parseSafeInteger(rawUserId, 1) ?? Number.NaN;
   const locationState = isLocationState(location.state) ? location.state : null;
-  const [activeTab, setActiveTab] = useState<PortfolioTab>('assets');
+  const [activeTab, setActiveTab] = useState<PortfolioTab>(new URLSearchParams(location.search).get('tab') === 'wallet-records' ? 'wallet-records' : 'assets');
   const [assetPage, setAssetPage] = useState(1);
   const [assetPageSize, setAssetPageSize] = useState(20);
   const [marginPage, setMarginPage] = useState(1);
@@ -262,7 +264,7 @@ function UserPortfolio() {
   const seconds = useCachedPage(activeTab === 'seconds' && Number.isSafeInteger(userId) && userId > 0, `seconds:${userId}:${secondsStatus}:${secondsPageSize}:${secondsPage}`, loadSeconds);
   const marginOrders = useCachedPage(activeTab === 'margin-orders' && Number.isSafeInteger(userId) && userId > 0, `margin-orders:${userId}:${marginOrderStatus}:${marginOrderPageSize}:${marginOrderPage}`, loadMarginOrders);
   const spot = useCachedPage(activeTab === 'spot' && Number.isSafeInteger(userId) && userId > 0, `spot:${userId}:${spotStatus}:${spotPageSize}:${spotPage}`, loadSpot);
-  const current = { assets, margin, seconds, 'margin-orders': marginOrders, spot }[activeTab];
+  const current = { assets, margin, seconds, 'margin-orders': marginOrders, spot, 'wallet-records': assets }[activeTab];
 
   if (!Number.isSafeInteger(userId) || userId <= 0) {
     return (
@@ -276,7 +278,7 @@ function UserPortfolio() {
   return (
     <main className="exchange-page agent-user-portfolio">
       <PageHeader actions={<Space>
-        <Tooltip content="刷新当前列表"><Button aria-label="刷新当前列表" disabled={current.loading} icon={<IconRefresh />} onClick={current.refresh} /></Tooltip>
+        {activeTab !== 'wallet-records' ? <Tooltip content="刷新当前列表"><Button aria-label="刷新当前列表" disabled={current.loading} icon={<IconRefresh />} onClick={current.refresh} /></Tooltip> : null}
         <Button onClick={() => navigate('/agent/users')}>返回团队用户</Button>
       </Space>} title="用户资产与订单" />
       <div style={{ marginBottom: 16 }}>
@@ -286,6 +288,8 @@ function UserPortfolio() {
         </Space>
       </div>
       <Tabs activeKey={activeTab} className="admin-action-tabs" onChange={(key) => setActiveTab(key as PortfolioTab)} tabList={portfolioTabs} type="button" />
+
+      {activeTab === 'wallet-records' ? <UserWalletRecords scope="agent" userId={userId} /> : null}
 
       {activeTab === 'assets' ? (
         <div aria-labelledby="semiTabassets" id="semiTabPanelassets" role="tabpanel" tabIndex={0}>

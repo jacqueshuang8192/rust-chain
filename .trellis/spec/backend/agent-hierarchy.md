@@ -112,6 +112,48 @@ direct_inviter_type = "user";
 direct_inviter_id = inviter.user_id;
 ```
 
+## Scenario: User Wallet Records In Both Consoles
+
+### 1. Scope
+Read-only user wallet changes and business fund-flow views, both backed by
+immutable user wallet ledger rows, not platform-only accounting counterlegs.
+
+### 2. Signatures
+- Agent: `GET /agent/api/v1/users/{user_id}/wallet-ledger` -> `{ ledger, total }`.
+- Admin: existing `GET /admin/api/v1/wallet/ledger`, retaining RBAC.
+- `account_type=spot|margin` selects one physical ledger; omitted means spot.
+- Both support asset/change/balance/ref-type/ref-id filters and limit/offset.
+
+### 3. Contracts
+Agent scope comes from the token and active ancestry. Membership is checked
+first, then rows and COUNT repeat the same user/subtree predicate. Admin keeps
+its existing `wallet.ledger.read` permission and internal-user policy.
+Rows expose account identity, signed amount, balance bucket/after value,
+available/frozen/locked snapshots, business reference and Unix-millisecond time.
+Amounts remain decimal strings. Table names are static whitelist choices.
+There are no writes, lazy account creation, settlement calls or cross-currency
+sums. Funds view does not claim freeze/transfer legs are net income.
+
+### 4. Error Matrix
+- Invalid account/balance type -> validation error.
+- Wrong auth scope -> forbidden; disabled agent ancestry -> unauthorized.
+- Agent target missing, unassigned or outside subtree -> not found.
+- Failed query -> error, never an invented zero balance.
+
+### 5. Cases
+Good: parent reads a descendant's spot or margin ledger. Base: empty ledger
+returns an empty page without creating a wallet. Bad: child reads a sibling by
+supplying another agent ID, or snapshots are inferred from today's balances.
+
+### 6. Tests
+Real DB tests cover root/child allow, sibling/other/ancestor deny, disabled
+ancestry, filters, paging/count parity, exact decimals and unchanged wallet/ledger
+counts. Compare Admin/Agent results for both accounts and assert OpenAPI types.
+
+### 7. Wrong Vs Correct
+Wrong: only precheck membership, then query unscoped ledger/count. Correct:
+repeat the server-derived scope predicate in both SELECTs.
+
 ## Scenario: Multi-Business Tiered Differential Commission
 
 ### 1. Scope / Trigger

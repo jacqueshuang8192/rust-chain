@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 
 pub(crate) mod recharges;
 pub(crate) mod team_orders;
+pub(crate) mod wallet_records;
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub(crate) struct AgentMeResponse {

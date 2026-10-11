@@ -40,6 +40,7 @@ use sqlx::{MySql, Pool};
 
 pub(crate) mod recharges;
 pub(crate) mod team_orders;
+pub(crate) mod wallet_records;
 
 /// 返回当前登录代理的账号与节点档案，含代理编码、父级、根节点、层级、物化路径及双侧状态。
 /// 校验链要求管理员账号、自身代理节点以及路径上每一级祖先都处于启用状态，任一环节停用即整条线视为失效。

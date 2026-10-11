@@ -20,6 +20,8 @@ use uuid::Uuid;
 mod recharges;
 #[path = "agent_routes/team_orders.rs"]
 mod team_orders;
+#[path = "agent_routes/wallet_records.rs"]
+mod wallet_records;
 
 #[derive(Debug, Clone, Copy)]
 struct AgentFixture {

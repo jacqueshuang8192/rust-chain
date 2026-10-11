@@ -14,6 +14,8 @@ import {
 } from '../../../shared/idempotency';
 import { authStore } from '../../../auth/authStore';
 import { AdminRequestActionBoundary } from '../../access';
+import { UserWalletRecords } from '../../../shared/UserWalletRecords';
+import { parseSafeInteger } from '../../../shared/integer';
 import {
   AssetSelect,
   AssetStatusSelect,
@@ -285,12 +287,24 @@ export function UserRowActions({ helpers, record }: { helpers: RowActionHelpers;
       <Button disabled={!userId} onClick={() => openUserAssets(userId, helpers)} size="small" theme="borderless">
         查看资产
       </Button>
+      <AdminRequestActionBoundary endpoint="/admin/api/v1/wallet/ledger" method="GET"><UserWalletRecordsAction userId={userId} /></AdminRequestActionBoundary>
       <AdminRequestActionBoundary endpoint={`/admin/api/v1/users/${userId}/recharge`} method="POST"><UserRechargeAction helpers={helpers} userId={userId} /></AdminRequestActionBoundary>
       <AdminRequestActionBoundary endpoint={`/admin/api/v1/users/${userId}/agent`} method="PATCH"><AssignAgentAction helpers={helpers} userId={userId} /></AdminRequestActionBoundary>
       <AdminRequestActionBoundary endpoint={`/admin/api/v1/users/${userId}/2fa/reset`} method="POST"><ResetUserTwoFactorAction helpers={helpers} userId={userId} /></AdminRequestActionBoundary>
       <AdminRequestActionBoundary endpoint={`/admin/api/v1/users/${userId}/status`} method="PATCH"><UserStatusActions helpers={helpers} status={recordString(record, 'status')} userId={userId} /></AdminRequestActionBoundary>
     </>
   );
+}
+
+function UserWalletRecordsAction({ userId }: { userId: string }) {
+  const [visible, setVisible] = useState(false);
+  const parsedUserId = parseSafeInteger(userId, 1);
+  return <>
+    <Button disabled={parsedUserId === null} onClick={() => setVisible(true)} size="small" theme="borderless">资金记录</Button>
+    <SideSheet title={`用户 ${userId} 资金记录`} visible={visible} onCancel={() => setVisible(false)} {...createModalProps('wide')}>
+      {visible && parsedUserId !== null ? <UserWalletRecords scope="admin" userId={parsedUserId} /> : null}
+    </SideSheet>
+  </>;
 }
 
 export function CreateUserAction({ onCreated }: CreateActionProps = {}) {

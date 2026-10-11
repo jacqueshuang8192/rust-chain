@@ -854,6 +854,22 @@ async fn openapi_json_documents_agent_portal_contract() {
 
     let asset_properties =
         &openapi["components"]["schemas"]["AgentUserAssetResponse"]["properties"];
+    let ledger_path = &openapi["paths"]["/agent/api/v1/users/{user_id}/wallet-ledger"];
+    assert!(ledger_path.get("get").is_some());
+    assert!(ledger_path.get("post").is_none());
+    assert!(ledger_path["get"]["security"].is_array());
+    let ledger_properties = &openapi["components"]["schemas"]["AgentWalletRecord"]["properties"];
+    for field in [
+        "amount",
+        "balance_after",
+        "available_after",
+        "frozen_after",
+        "locked_after",
+        "ref_id",
+    ] {
+        assert!(schema_has_type(&ledger_properties[field], "string"));
+    }
+    assert!(schema_is_unix_millis(&ledger_properties["created_at"]));
     for field in [
         "account_type",
         "asset_symbol",

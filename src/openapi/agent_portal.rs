@@ -405,6 +405,61 @@ fn list_agent_users() {}
 )]
 fn list_agent_user_assets() {}
 
+#[derive(ToSchema)]
+pub(super) struct AgentWalletRecord {
+    id: u64,
+    #[schema(pattern = "^(spot|margin)$")]
+    account_type: String,
+    user_id: u64,
+    user_email: Option<String>,
+    asset_id: u64,
+    asset_symbol: String,
+    change_type: String,
+    amount: String,
+    balance_type: String,
+    balance_after: String,
+    available_after: String,
+    frozen_after: String,
+    locked_after: String,
+    ref_type: String,
+    ref_id: String,
+    #[schema(format = Int64)]
+    created_at: i64,
+}
+
+#[derive(ToSchema)]
+pub(super) struct AgentWalletRecordsResponse {
+    ledger: Vec<AgentWalletRecord>,
+    #[schema(minimum = 0)]
+    total: i64,
+}
+
+/// 子树用户原始账变和资金流水；现货和杠杆分账展示，不暴露平台对手分录。
+#[utoipa::path(
+    get, path = "/agent/api/v1/users/{user_id}/wallet-ledger", tag = "agent-portal",
+    summary = "查询团队用户钱包变化和资金流水",
+    params(
+        ("user_id" = u64, Path, description = "团队用户 ID"),
+        ("account_type" = Option<String>, Query, description = "spot 或 margin，默认 spot", pattern = "^(spot|margin)$"),
+        ("asset_id" = Option<u64>, Query),
+        ("change_type" = Option<String>, Query),
+        ("balance_type" = Option<String>, Query, pattern = "^(available|frozen|locked)$"),
+        ("ref_type" = Option<String>, Query),
+        ("ref_id" = Option<String>, Query),
+        ("limit" = Option<u32>, Query, description = "默认20，最大100"),
+        ("offset" = Option<u32>, Query, description = "默认0，最大100000")
+    ),
+    security(("bearerAuth" = [])),
+    responses(
+        (status = 200, description = "查询成功", body = AgentWalletRecordsResponse),
+        (status = 400, description = "筛选无效", body = ErrorResponse),
+        (status = 401, description = "未登录或代理已停用", body = ErrorResponse),
+        (status = 403, description = "鉴权 scope 不匹配", body = ErrorResponse),
+        (status = 404, description = "用户不存在或不在可见子树", body = ErrorResponse)
+    )
+)]
+fn list_agent_user_wallet_records() {}
+
 /// 分页查询团队用户的已成交杠杆仓位快照，只返回 entry_price 非空的记录。
 /// 行集与 total 共用筛选和子树谓词；路径不包含 agent ID，越权与不存在均返回 404。
 /// 接口不读行情、不计息、不平仓或强平，也不写账务流水。

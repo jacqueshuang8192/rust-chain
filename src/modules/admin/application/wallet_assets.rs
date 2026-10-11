@@ -271,10 +271,28 @@ pub(crate) async fn list_admin_wallet_ledger(
     pool: Option<Pool<MySql>>,
     query: AdminWalletLedgerQuery,
 ) -> AppResult<AdminWalletLedgerResponseList> {
+    let account_type = query.account_type.unwrap_or_else(|| "spot".to_owned());
+    if !matches!(account_type.as_str(), "spot" | "margin") {
+        return Err(AppError::Validation(
+            "account_type must be spot or margin".to_owned(),
+        ));
+    }
+    if query
+        .balance_type
+        .as_deref()
+        .is_some_and(|value| !matches!(value, "available" | "frozen" | "locked"))
+    {
+        return Err(AppError::Validation(
+            "unsupported wallet balance_type".to_owned(),
+        ));
+    }
     let pool = admin_mysql_pool(pool)?;
     let (ledger, total) = list_admin_wallet_ledger_from_store(
         &pool,
         AdminWalletLedgerListFilter {
+            account_type,
+            balance_type: query.balance_type,
+            ref_id: query.ref_id,
             user_id: query.user_id,
             email: query.email,
             asset_id: query.asset_id,

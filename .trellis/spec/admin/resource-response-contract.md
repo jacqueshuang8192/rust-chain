@@ -124,6 +124,25 @@ const rowContract = buildAdminResourceRowContract(columns);
 The presentation fallback can run while genuine response fields retain strict
 validation.
 
+## User Wallet Records
+
+`UserWalletRecords({ scope, userId })` is shared by the administrator's user
+SideSheet and the agent's portfolio funds tab. Admin entry requires
+`wallet.ledger.read`; agents use the scoped per-user endpoint. Wallet changes
+display persisted bucket snapshots, while funds view displays the same rows'
+business references. Neither is an economic net-flow aggregation.
+
+Validate the requested user/account against every returned row, preserve decimal
+strings and reject unsafe identifiers/time. Allow known or future business-type
+strings through the shared Chinese presentation boundary. Identity changes
+remount state by session generation; query changes suppress stale rows before
+effects run. Both successful and rejected stale requests are ignored.
+
+Filter submission resets server pagination. Row identity includes account type.
+Tests must cover both auth scopes, wrong-user rows, exact amounts, filtering,
+late responses, error retry and read-only tab switching. Keep tables horizontally
+contained on narrow screens; do not turn the record list into editable forms.
+
 ## Active Trading Views
 
 - Existing seconds-order and margin-position routes default to active scopes;

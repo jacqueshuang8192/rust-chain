@@ -260,10 +260,11 @@ export function AgentUsersPage() {
             资产与订单
           </Button>
           <Button size="small" onClick={() => navigate(`/agent/users/${record.user_id}/recharge`)}>充值申请</Button>
+          <Button size="small" onClick={() => navigate(`/agent/users/${record.user_id}/portfolio?tab=wallet-records`, { state: { email: record.email ?? null } })}>资金记录</Button>
           </Space>
         ),
         title: '操作',
-        width: 288
+        width: 368
       }
     ],
     [navigate]

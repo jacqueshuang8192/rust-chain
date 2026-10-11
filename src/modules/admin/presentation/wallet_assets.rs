@@ -129,6 +129,9 @@ impl PresentationLayer for AdminWalletAccountQuery {}
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct AdminWalletLedgerQuery {
+    pub(crate) account_type: Option<String>,
+    pub(crate) balance_type: Option<String>,
+    pub(crate) ref_id: Option<String>,
     pub(crate) user_id: Option<u64>,
     pub(crate) email: Option<String>,
     pub(crate) asset_id: Option<u64>,
@@ -163,6 +166,7 @@ impl PresentationLayer for AdminWalletAccountResponse {}
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub(crate) struct AdminWalletLedgerResponse {
+    pub(crate) account_type: String,
     pub(crate) id: u64,
     pub(crate) user_id: u64,
     pub(crate) user_email: String,

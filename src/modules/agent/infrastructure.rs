@@ -7,6 +7,7 @@
 
 pub(crate) mod recharges;
 pub(crate) mod team_orders;
+pub(crate) mod wallet_records;
 
 use crate::{
     error::{AppError, AppResult},

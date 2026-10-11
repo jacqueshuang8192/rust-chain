@@ -62,6 +62,9 @@ pub(crate) struct AdminWalletAccountListFilter {
 
 #[derive(Debug)]
 pub(crate) struct AdminWalletLedgerListFilter {
+    pub(crate) account_type: String,
+    pub(crate) balance_type: Option<String>,
+    pub(crate) ref_id: Option<String>,
     pub(crate) user_id: Option<u64>,
     pub(crate) email: Option<String>,
     pub(crate) asset_id: Option<u64>,
@@ -507,22 +510,27 @@ pub(crate) async fn list_admin_wallet_ledger(
     pool: &Pool<MySql>,
     filter: AdminWalletLedgerListFilter,
 ) -> AppResult<(Vec<AdminWalletLedgerResponse>, i64)> {
-    let mut rows = QueryBuilder::<MySql>::new(
-        r#"SELECT ledger.id, ledger.user_id, ledger_users.email AS user_email,
+    let (table, account_type) = if filter.account_type == "margin" {
+        ("margin_wallet_ledger", "margin")
+    } else {
+        ("wallet_ledger", "spot")
+    };
+    let mut rows = QueryBuilder::<MySql>::new(format!(
+        r#"SELECT '{account_type}' AS account_type, ledger.id, ledger.user_id, ledger_users.email AS user_email,
                   ledger.asset_id, assets.symbol AS asset_symbol,
                   ledger.change_type, ledger.amount, ledger.balance_type, ledger.balance_after,
                   ledger.available_after, ledger.frozen_after, ledger.locked_after,
                   ledger.ref_type, ledger.ref_id, ledger.created_at
-           FROM wallet_ledger ledger
+           FROM {table} ledger
            INNER JOIN users ledger_users ON ledger_users.id = ledger.user_id
            INNER JOIN assets ON assets.id = ledger.asset_id"#,
-    );
-    let mut total = QueryBuilder::<MySql>::new(
+    ));
+    let mut total = QueryBuilder::<MySql>::new(format!(
         r#"SELECT COUNT(*)
-           FROM wallet_ledger ledger
+           FROM {table} ledger
            INNER JOIN users ledger_users ON ledger_users.id = ledger.user_id
            INNER JOIN assets ON assets.id = ledger.asset_id"#,
-    );
+    ));
     for builder in [&mut rows, &mut total] {
         builder.push(" WHERE 1 = 1");
         if !filter.include_internal {
@@ -543,6 +551,14 @@ pub(crate) async fn list_admin_wallet_ledger(
         if let Some(ref_type) = optional_string(filter.ref_type.clone()) {
             builder.push(" AND ledger.ref_type = ");
             builder.push_bind(ref_type);
+        }
+        if let Some(balance_type) = optional_string(filter.balance_type.clone()) {
+            builder
+                .push(" AND ledger.balance_type = ")
+                .push_bind(balance_type);
+        }
+        if let Some(ref_id) = optional_string(filter.ref_id.clone()) {
+            builder.push(" AND ledger.ref_id = ").push_bind(ref_id);
         }
     }
 
