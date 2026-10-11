@@ -160,6 +160,14 @@ test('现货 yzOPc/bo8k5 模板仅定向调整订单类型入口与持仓归属�
     "depthLoading ? t('common.loading') : t('trade.noRecentTrades')",
     'independent recent-trades loading',
   )
+  // Normalize only the upgraded chart; retain the order form/account fingerprint.
+  const chartStart = normalizedSpotTemplate.indexOf('        <div class="spot-chart-canvas"')
+  const chartEnd = normalizedSpotTemplate.indexOf('        <div class="spot-market-data__tabs"', chartStart)
+  assert.ok(chartStart >= 0 && chartEnd > chartStart)
+  const upgradedChart = normalizedSpotTemplate.slice(chartStart, chartEnd)
+  assert.match(upgradedChart, /<MarketChartFrame[\s\S]*@interval="chooseInterval"/)
+  assert.match(upgradedChart, /<MobileMarketChart[^>]*inspection/)
+  normalizedSpotTemplate = normalizedSpotTemplate.slice(0, chartStart) + "        <div class=\"chart-tools\">\n          <div class=\"interval-rail\" role=\"group\" :aria-label=\"t('marketDetail.chart')\">\n            <button\n              v-for=\"time in ['1m', '5m', '15m', '1h', '1d']\"\n              :key=\"time\"\n              type=\"button\"\n              :class=\"{ active: interval === time }\"\n              :aria-pressed=\"interval === time\"\n              @click=\"chooseInterval(time)\"\n            >\n              {{ time }}\n            </button>\n          </div>\n          <div class=\"chart-action-rail\" role=\"group\" :aria-label=\"t('marketDetail.actions')\">\n            <button type=\"button\" :aria-label=\"t('markets.refresh')\" @click=\"retryMarket\">\n              <RefreshCcw :size=\"17\" aria-hidden=\"true\" />\n            </button>\n            <button type=\"button\" :aria-label=\"t('trade.viewOpenOrders')\" @click=\"openOrders('spot')\">\n              <List :size=\"17\" aria-hidden=\"true\" />\n            </button>\n          </div>\n        </div>\n        <div class=\"spot-chart-canvas\" :aria-busy=\"chartLoading\">\n          <MobileMarketChart :ticker=\"ticker\" :market-type=\"ticker?.marketType\" :points=\"points\" :loading=\"chartLoading\" :interval=\"interval\" :symbol=\"pairSymbol\" />\n        </div>\n" + normalizedSpotTemplate.slice(chartEnd)
   // Source provenance is the only new chart input; retain the original
   // fingerprint for every other byte of the approved spot template.
   assert.match(spotTemplate, /<MobileMarketChart :ticker="ticker" :market-type="ticker\?\.marketType"/)

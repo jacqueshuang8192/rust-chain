@@ -11,7 +11,7 @@
 | [Navigation and Localization](./navigation-and-localization.md) | Router history, trade context, safe back behavior, and `vue-i18n` contracts | Active |
 | [PWA, Theme, and Application Shell](./pwa-and-shell.md) | Web/Tauri build isolation, shell-only caching, persisted themes, root navigation, private margin stream lifecycle, route motion, and message truthfulness | Active |
 | [Backend Integration](./backend-integration.md) | Runtime URL selection, auth refresh, public/private WebSocket, authoritative account reconciliation, and DTO adapter contracts | Active |
-| [Seconds Chart Workspace](./seconds-chart-workspace.md) | Expandable K-lines, opt-in inspection, viewport controls and stream ownership | Active |
+| [Trading Chart Workspaces](./seconds-chart-workspace.md) | Shared inspection, landscape expansion, input rotation and stream ownership | Active |
 
 ## Quality Check
 

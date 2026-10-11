@@ -322,7 +322,7 @@ onMounted(() => {
     },
     localization: { locale: props.locale },
     rightPriceScale: { borderColor: theme.grid },
-    timeScale: { borderColor: theme.grid, timeVisible: true, secondsVisible: false },
+    timeScale: { borderColor: theme.grid, timeVisible: true, secondsVisible: false, lockVisibleTimeRangeOnResize: props.inspection },
     handleScroll: {
       mouseWheel: true,
       pressedMouseMove: true,

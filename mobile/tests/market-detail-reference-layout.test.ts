@@ -20,7 +20,7 @@ const chartSource = source('../src/components/MobileMarketChart.vue')
 const lightweightChartSource = source('../src/components/LightweightMarketChart.vue')
 const orderBookSource = source('../src/components/OrderBookPanel.vue')
 const tradeSource = source('../src/views/TradeView.vue')
-const prototypeParityCss = source('../src/styles/prototype-parity.css')
+const chartFrameSource = source('../src/components/MarketChartFrame.vue')
 const packageJson = JSON.parse(source('../package.json')) as {
   dependencies: Record<string, string>
 }
@@ -30,87 +30,6 @@ const packageLock = JSON.parse(source('../package-lock.json')) as {
 const marketTemplate = marketDetailSource.match(/<template>[\s\S]*?<\/template>/)?.[0] ?? ''
 const marketStyle = marketDetailSource.match(/<style scoped>[\s\S]*?<\/style>/)?.[0] ?? ''
 const marketScopedCss = marketDetailSource.match(/<style scoped>([\s\S]*?)<\/style>/)?.[1] ?? ''
-
-type CssBlock = { header: string, body: string }
-
-function cssBlocks(css: string): CssBlock[] {
-  const blocks: CssBlock[] = []
-  let cursor = 0
-
-  while (cursor < css.length) {
-    const openingBrace = css.indexOf('{', cursor)
-    if (openingBrace < 0) break
-
-    let depth = 1
-    let closingBrace = -1
-    for (let index = openingBrace + 1; index < css.length; index += 1) {
-      if (css[index] === '{') depth += 1
-      if (css[index] !== '}') continue
-      depth -= 1
-      if (depth !== 0) continue
-      closingBrace = index
-      break
-    }
-
-    assert.notEqual(closingBrace, -1, 'CSS block is not closed')
-    const header = css
-      .slice(cursor, openingBrace)
-      .replace(/\/\*[\s\S]*?\*\//g, '')
-      .trim()
-    if (header) {
-      blocks.push({
-        header,
-        body: css.slice(openingBrace + 1, closingBrace),
-      })
-    }
-    cursor = closingBrace + 1
-  }
-
-  return blocks
-}
-
-function cssBlockBody(css: string, header: string): string {
-  const block = cssBlocks(css).find((candidate) => candidate.header === header)
-  assert.ok(block, `CSS block not found: ${header}`)
-  return block.body
-}
-
-function cssRuleBody(css: string, selector: string): string {
-  const block = cssBlocks(css).find((candidate) => (
-    !candidate.header.startsWith('@')
-    && candidate.header.split(',').some((part) => part.trim() === selector)
-  ))
-  assert.ok(block, `CSS rule not found: ${selector}`)
-  return block.body
-}
-
-function cssDeclarationValue(body: string, property: string): string {
-  const escapedProperty = property.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const match = new RegExp(`(?:^|\\n)\\s*${escapedProperty}\\s*:\\s*([^;]+);`).exec(body)
-  assert.ok(match, `CSS declaration not found: ${property}`)
-  return match[1].trim()
-}
-
-function cssSpecificity(selector: string): [number, number, number] {
-  const idCount = selector.match(/#[\w-]+/g)?.length ?? 0
-  const classLikeCount = selector.match(/\.[\w-]+|\[[^\]]+\]|:(?!:)[\w-]+/g)?.length ?? 0
-  const elementCount = selector
-    .replace(/#[\w-]+|\.[\w-]+|\[[^\]]+\]|::?[\w-]+/g, ' ')
-    .split(/[\s>+~]+/)
-    .filter((part) => /^[a-z][\w-]*$/i.test(part))
-    .length
-  return [idCount, classLikeCount, elementCount]
-}
-
-function compareSpecificity(
-  left: [number, number, number],
-  right: [number, number, number],
-): number {
-  for (let index = 0; index < left.length; index += 1) {
-    if (left[index] !== right[index]) return left[index] - right[index]
-  }
-  return 0
-}
 
 test('行情详情按参考层级组成真实紧凑工作台', () => {
   const hierarchy = [
@@ -242,7 +161,7 @@ test('本地 Lightweight Charts 单引擎保留真实数据、指标、成交量
   assert.match(lightweightChartSource, /role="region"/)
   assert.doesNotMatch(lightweightChartSource, /role="img"/)
   assert.match(lightweightChartSource, /\.market-chart-engine\s*\{[\s\S]*height: 100%;[\s\S]*min-height: 0;/)
-  assert.match(tradeSource, /<MobileMarketChart :ticker="ticker" :market-type="ticker\?\.marketType" :points="points" :loading="chartLoading" :interval="interval" :symbol="pairSymbol" \/>/)
+  assert.match(tradeSource, /<MobileMarketChart :ticker="ticker" :market-type="ticker\?\.marketType" :points="points" :loading="chartLoading" :interval="interval" :symbol="pairSymbol" inspection \/>/)
 
   const chartRuntimeSources = [chartSource, lightweightChartSource]
   for (const runtimeSource of chartRuntimeSources) {
@@ -267,7 +186,8 @@ test('手机端默认隐藏影线，检查模式启用影线并保留真实高�
 })
 
 test('行情详情继续展示真实均线与成交量并传递交易对数据集键', () => {
-  assert.match(marketTemplate, /market-detail__indicator-legend[\s\S]*MA5[\s\S]*MA10[\s\S]*MA20[\s\S]*candleVolume/)
+  assert.match(marketTemplate, /<MarketChartFrame[\s\S]*<MobileMarketChart[\s\S]*inspection/)
+  assert.match(chartSource, /<MarketChartInspector[\s\S]*:averages="movingAverages"/)
   assert.match(marketTemplate, /<MobileMarketChart[\s\S]*:points="points"[\s\S]*:interval="interval"[\s\S]*\/>/)
   assert.match(marketTemplate, /:symbol="pairSymbol"/)
   assert.doesNotMatch(marketTemplate, /show-engine-switch|compact-engine-switch/)
@@ -315,138 +235,30 @@ test('形成中蜡烛分类和 timestamp 锚定视口可独立验证', () => {
   assert.equal(captureMarketChartLogicalViewport([], { from: 0, to: 1 }), null)
 })
 
-test('图表沉浸展开使用 CSS fixed、安全区、Escape 和可还原滚动锁', () => {
-  assert.match(marketDetailSource, /Maximize2/)
-  assert.match(marketDetailSource, /Minimize2/)
-  assert.match(marketTemplate, /:data-chart-mode="chartExpanded \? 'expanded' : 'inline'"/)
-  assert.match(marketTemplate, /:role="chartExpanded \? 'dialog' : 'region'"/)
-  assert.match(marketTemplate, /:aria-modal="chartExpanded \? 'true' : undefined"/)
-  assert.match(marketTemplate, /:aria-label="chartExpanded \? t\('marketDetail\.collapseChart'\) : t\('marketDetail\.expandChart'\)"/)
-  assert.match(marketDetailSource, /event\.key === 'Escape'/)
-  assert.match(marketDetailSource, /event\.key !== 'Tab'[\s\S]*querySelectorAll<HTMLElement>[\s\S]*last\?\.focus\(\)/)
-  assert.match(marketDetailSource, /document\.body\.style\.overflow = 'hidden'/)
-  assert.match(marketDetailSource, /document\.body\.style\.position = 'fixed'/)
-  assert.match(marketDetailSource, /window\.addEventListener\('keydown', handleChartKeydown\)/)
-  assert.match(marketDetailSource, /window\.removeEventListener\('keydown', handleChartKeydown\)/)
-  assert.match(marketDetailSource, /function restoreChartScroll[\s\S]*document\.documentElement\.style\.scrollBehavior = 'auto'[\s\S]*window\.scrollTo\(0, lock\.scrollY\)[\s\S]*lock\.rootScrollBehavior/)
-  assert.match(marketDetailSource, /window\.scrollTo\(0, lock\.scrollY\)/)
-  assert.equal(marketDetailSource.match(/focus\(\{ preventScroll: true \}\)/g)?.length, 2)
-  assert.match(marketDetailSource, /chartExpanded\.value = false[\s\S]*const lock = releaseChartScroll\(\)[\s\S]*nextTick\(\(\) => \{[\s\S]*restoreChartScroll\(lock\)/)
-  assert.match(marketDetailSource, /onBeforeUnmount\(\(\) => \{[\s\S]*const lock = releaseChartScroll\(\)[\s\S]*restoreChartScroll\(lock\)/)
-  assert.match(marketStyle, /\.market-detail\.view-stack\s*\{[\s\S]*will-change: opacity/)
-  assert.match(marketStyle, /\.market-detail__chart-panel\.is-expanded[\s\S]*position: fixed/)
-  assert.match(marketStyle, /\.market-detail__chart-panel\.is-expanded[\s\S]*height: 100dvh/)
-  assert.match(marketStyle, /env\(safe-area-inset-top\)/)
-  assert.match(marketStyle, /env\(safe-area-inset-bottom\)/)
-  assert.match(marketStyle, /padding: 0 env\(safe-area-inset-right\) 0 env\(safe-area-inset-left\)/)
-  assert.doesNotMatch(marketDetailSource, /requestFullscreen|exitFullscreen|fullscreenElement/)
+test('共用横屏框架接管展开、键盘退出、滚动与原生生命周期', () => {
+  assert.match(marketTemplate, /<MarketChartFrame :symbol="pairSymbol" :interval="interval" @interval="chooseInterval">/)
+  assert.match(chartFrameSource, /<Teleport to="body" :disabled="!expanded">/)
+  assert.match(chartFrameSource, /useModalDialog\(expanded, panel\)/)
+  assert.match(chartFrameSource, /trapFocus\(event, close\)/)
+  assert.match(chartFrameSource, /orientation\?\.dispose\(\)/)
+  assert.match(chartFrameSource, /window\.scrollTo\(scroll\.x, scroll\.y\)/)
+  assert.match(chartFrameSource, /transform: rotate\(90deg\)/)
+  assert.match(chartFrameSource, /bindRotatedChartInput/)
+  assert.doesNotMatch(marketDetailSource, /lockChartScroll|chartExpanded/)
 })
 
-test('图表切换按钮使用无边框双主题毛玻璃正方形并保持左上角定位', () => {
-  const toggleSelector = '.market-detail .market-detail__chart > button.market-detail__chart-toggle'
-  const expandedToggleSelector = '.market-detail__chart-panel.is-expanded .market-detail__chart > button.market-detail__chart-toggle'
-  const legacyDarkSelector = '.app-stage.theme-dark .mobile-canvas .market-detail__chart-toggle'
-  const inlineRule = cssRuleBody(marketScopedCss, toggleSelector)
-  const activeRule = cssRuleBody(marketScopedCss, `${toggleSelector}:active`)
-  const focusRule = cssRuleBody(marketScopedCss, `${toggleSelector}:focus-visible`)
-  const expandedRule = cssRuleBody(marketScopedCss, expandedToggleSelector)
-  const reducedMotionRule = cssBlockBody(
-    marketScopedCss,
-    '@media (prefers-reduced-motion: reduce)',
-  )
-  const reducedToggleRule = cssRuleBody(reducedMotionRule, toggleSelector)
-  const reducedActiveRule = cssRuleBody(
-    reducedMotionRule,
-    `${toggleSelector}:active`,
-  )
-  const standardBackdrop = cssDeclarationValue(inlineRule, 'backdrop-filter')
-  const webkitBackdrop = cssDeclarationValue(inlineRule, '-webkit-backdrop-filter')
-  const blurStrength = standardBackdrop.match(/\bblur\(([\d.]+)px\)/)?.[1]
-  const saturationStrength = standardBackdrop.match(/\bsaturate\(([\d.]+)%\)/)?.[1]
-
-  assert.match(inlineRule, /\bwidth\s*:\s*44px\s*;/)
-  assert.match(inlineRule, /\bheight\s*:\s*44px\s*;/)
-  assert.match(inlineRule, /\bborder-radius\s*:\s*12px\s*;/)
-  assert.match(inlineRule, /\bdisplay\s*:\s*flex\s*;/)
-  assert.match(inlineRule, /\balign-items\s*:\s*center\s*;/)
-  assert.match(inlineRule, /\bjustify-content\s*:\s*center\s*;/)
-  assert.match(
-    inlineRule,
-    /\bbackground\s*:\s*linear-gradient\([^;]*var\(--detail-surface\)[^;]*transparent[^;]*var\(--detail-background\)[^;]*transparent[^;]*\)\s*;/,
-  )
-  assert.equal(webkitBackdrop, standardBackdrop)
-  assert.ok(blurStrength && Number(blurStrength) > 0)
-  assert.ok(saturationStrength && Number(saturationStrength) > 100)
-  assert.equal(cssDeclarationValue(inlineRule, 'border'), '0')
-  assert.equal(cssDeclarationValue(inlineRule, 'box-shadow'), 'none')
-  assert.equal(cssDeclarationValue(inlineRule, 'color'), 'var(--detail-ink)')
-  assert.match(cssDeclarationValue(inlineRule, 'transition'), /\btransform\b/)
-  assert.doesNotMatch(cssDeclarationValue(inlineRule, 'transition'), /\bbox-shadow\b/)
-  assert.match(inlineRule, /\bleft\s*:\s*16px\s*;/)
-  assert.match(inlineRule, /\btop\s*:\s*12px\s*;/)
-  assert.doesNotMatch(inlineRule, /\bright\s*:/)
-
-  assert.match(activeRule, /\btransform\s*:\s*translateY\(1px\)\s*;/)
-  assert.match(cssDeclarationValue(activeRule, 'background'), /var\(--detail-surface\)/)
-  assert.notEqual(cssDeclarationValue(activeRule, 'background'), cssDeclarationValue(inlineRule, 'background'))
-  assert.equal(cssDeclarationValue(activeRule, 'box-shadow'), 'none')
-  assert.match(focusRule, /\boutline\s*:\s*2px solid var\(--focus\)\s*;/)
-  assert.match(focusRule, /\boutline-offset\s*:\s*3px\s*;/)
-  assert.equal(cssDeclarationValue(focusRule, 'box-shadow'), 'none')
-  assert.match(reducedToggleRule, /\btransition\s*:\s*none\s*;/)
-  assert.match(reducedActiveRule, /\btransform\s*:\s*none\s*;/)
-
-  assert.match(expandedRule, /\bleft\s*:\s*10px\s*;/)
-  assert.match(expandedRule, /\btop\s*:\s*8px\s*;/)
-  assert.doesNotMatch(expandedRule, /\bright\s*:/)
-  assert.doesNotMatch(expandedRule, /\b(?:border|box-shadow)\s*:/)
-
-  assert.doesNotMatch(
-    [inlineRule, activeRule, focusRule].join('\n'),
-    /#0b1811|rgba\(\s*11\s*,\s*24\s*,\s*17\s*,/i,
-  )
-
-  const legacyDarkRule = cssRuleBody(prototypeParityCss, legacyDarkSelector)
-  assert.match(legacyDarkRule, /\bbox-shadow\s*:/)
-
-  const compiled = compileStyle({
-    source: marketScopedCss,
-    filename: 'MarketDetailView.vue',
-    id: 'data-v-market-detail',
-    scoped: true,
-  })
+test('横屏框架保留44px目标、双主题和无边框图标按钮', () => {
+  assert.match(chartFrameSource, /theme-\$\{theme.theme\}/)
+  assert.match(chartFrameSource, /Maximize2/)
+  assert.match(chartFrameSource, /Minimize2/)
+  assert.match(chartFrameSource, /height: 44px; min-width: 44px; border: 0; box-shadow: none/)
+  assert.match(chartFrameSource, /display: grid; place-items: center; padding: 0; width: 44px/)
+  assert.match(chartFrameSource, /outline: 2px solid var\(--focus\)/)
+  const css = chartFrameSource.match(/<style scoped>([\s\S]*?)<\/style>/)?.[1] || ''
+  const compiled = compileStyle({ source: css, filename: 'MarketChartFrame.vue', id: 'data-v-frame', scoped: true })
   assert.deepEqual(compiled.errors, [])
-  const compiledToggleRules = cssBlocks(compiled.code).filter((block) => (
-    block.header.includes('.market-detail__chart-toggle[data-v-market-detail]')
-    && (block.body.includes('backdrop-filter')
-      || block.header.endsWith(':active')
-      || block.header.endsWith(':focus-visible'))
-  ))
-  assert.equal(compiledToggleRules.length, 3)
-  const compiledBaseRule = compiledToggleRules.find((block) => block.body.includes('backdrop-filter'))
-  const compiledExpandedRule = cssBlocks(compiled.code).find((block) => (
-    block.header.includes('.market-detail__chart-toggle[data-v-market-detail]')
-    && block.body.includes('left: 10px')
-    && block.body.includes('top: 8px')
-  ))
-  assert.ok(compiledBaseRule)
-  assert.ok(compiledExpandedRule)
-  assert.equal(cssDeclarationValue(compiledBaseRule.body, 'border'), '0')
-  assert.match(marketTemplate, /class="market-detail__chart-toggle"[\s\S]*?type="button"[\s\S]*?:aria-label=[\s\S]*?:aria-pressed="chartExpanded"/)
-  assert.ok(
-    compareSpecificity(
-      cssSpecificity(compiledExpandedRule.header),
-      cssSpecificity(compiledBaseRule.header),
-    ) > 0,
-    `${compiledExpandedRule.header} must outrank ${compiledBaseRule.header}`,
-  )
-  for (const block of compiledToggleRules) {
-    assert.equal(cssDeclarationValue(block.body, 'box-shadow'), 'none')
-    assert.ok(
-      compareSpecificity(cssSpecificity(block.header), cssSpecificity(legacyDarkSelector)) > 0,
-      `${block.header} must outrank the legacy dark-theme shadow rule`,
-    )
-  }
+  assert.match(compiled.code, /is-expanded/)
+  assert.match(compiled.code, /safe-area-inset/)
 })
 
 test('订单簿保持 stacked/split 兼容并为选中详情提供七行 paired 布局', () => {
@@ -485,24 +297,20 @@ test('页面不暴露伪造控件，并具备 320px、横屏、触控和减弱�
   assert.match(marketStyle, /overflow-x: clip/)
   assert.match(marketStyle, /min-height: 44px/)
   assert.match(marketStyle, /@media \(max-width: 340px\)/)
-  assert.match(marketStyle, /@media \(orientation: landscape\) and \(max-height: 600px\)/)
+  assert.match(chartFrameSource, /size\.value\.width < size\.value\.height/)
   assert.match(marketStyle, /@media \(prefers-reduced-motion: reduce\)/)
   assert.match(marketStyle, /padding: 0 0 calc\(67px \+ env\(safe-area-inset-bottom\)\)/)
   assert.match(marketStyle, /\.market-detail__header\s*\{[\s\S]*height: calc\(64px \+ env\(safe-area-inset-top\)\)/)
   assert.match(marketStyle, /\.market-detail__rail\s*\{[\s\S]*height: 42px/)
   assert.match(marketStyle, /\.market-detail__summary\s*\{[\s\S]*height: 112px/)
-  assert.match(marketStyle, /\.market-detail__intervals\s*\{[\s\S]*height: 48px/)
-  assert.match(marketStyle, /\.market-detail__chart\s*\{[\s\S]*height: 204px/)
-  assert.match(marketStyle, /\.market-detail__chart-panel\.is-expanded\s*\{[\s\S]*grid-template-rows: calc\(48px \+ env\(safe-area-inset-top\)\) minmax\(0, 1fr\)/)
-  assert.match(marketStyle, /\.market-detail__chart-panel\.is-expanded \.market-detail__chart\s*\{[\s\S]*height: auto;[\s\S]*min-height: 0;/)
-  assert.match(marketStyle, /\.market-detail__indicator-legend\s*\{[\s\S]*height: 28px/)
   assert.match(marketStyle, /\.market-detail__data-tabs\s*\{[\s\S]*height: 48px/)
   assert.match(marketStyle, /\.market-detail__data-panel\s*\{[\s\S]*height: 272px/)
   assert.match(marketStyle, /\.market-detail__actions\s*\{[\s\S]*grid-template-columns: 40px 40px minmax\(0, 1fr\)[\s\S]*height: calc\(67px \+ env\(safe-area-inset-bottom\)\)/)
   assert.match(marketStyle, /\.market-detail__actions \.is-primary\s*\{[\s\S]*background: var\(--detail-action\)[\s\S]*height: 52px/)
-  assert.match(marketStyle, /\.is-ma5\s*\{[\s\S]*color: var\(--detail-positive\)/)
-  assert.match(marketStyle, /\.is-ma10\s*\{[\s\S]*color: var\(--detail-negative\)/)
-  assert.match(marketStyle, /\.is-ma20\s*\{[\s\S]*color: var\(--market-detail-ma20\)/)
+  const inspector = source('../src/components/MarketChartInspector.vue')
+  assert.match(inspector, /\.ma-5\s*\{[^}]*var\(--yellow/)
+  assert.match(inspector, /\.ma-10\s*\{[^}]*var\(--coral/)
+  assert.match(inspector, /\.ma-20\s*\{[^}]*var\(--cyan/)
 
   for (const key of [
     'orderBook.buySide',

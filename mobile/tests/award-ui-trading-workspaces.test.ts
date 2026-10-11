@@ -43,12 +43,12 @@ test('交易工作台保留行情、K 线、盘口、余额、委托与下单处
   assert.match(tradeSource, /await closeAllMarginPositions\(currentPairOnly\.value \? selectedProduct\.value\?\.id : undefined\)/)
   assert.doesNotMatch(tradeSource, /await closeAllMarginPositions\(selectedProduct\.value\??\.id\)/)
   assert.match(tradeSource, /fetchMarginPositionRisk\(position\.id\)/)
-  assert.match(tradeSource, /v-for="time in \['1m', '5m', '15m', '1h', '1d'\]"/)
+  assert.match(tradeSource, /<MarketChartFrame :symbol="pairSymbol" :interval="interval" @interval="chooseInterval">/)
   assert.doesNotMatch(tradeSource, /\['1m', '15m', '1h', '4h', '1d'\]/)
   assert.match(tradeSource, /<OrderBookPanel[\s\S]*?class="trade-order-book"[\s\S]*?layout="split"/)
   assert.match(tradeSource, /data-market-data-panel="marketDataPanel"/)
   assert.match(tradeSource, /class="spot-recent-trades"/)
-  assert.match(tradeSource, /<MobileMarketChart :ticker="ticker" :market-type="ticker\?\.marketType" :points="points" :loading="chartLoading" :interval="interval" :symbol="pairSymbol" \/>/)
+  assert.match(tradeSource, /<MobileMarketChart :ticker="ticker" :market-type="ticker\?\.marketType" :points="points" :loading="chartLoading" :interval="interval" :symbol="pairSymbol" inspection \/>/)
 })
 
 test('秒合约继续直用现货钱包、后台产品周期与真实下单接口且没有划转入口', () => {

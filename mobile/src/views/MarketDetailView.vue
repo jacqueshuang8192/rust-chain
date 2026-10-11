@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
@@ -9,14 +9,13 @@ import {
   ChevronDown,
   CircleAlert,
   ClipboardList,
-  Maximize2,
-  Minimize2,
   RefreshCw,
   Share2,
   Star,
 } from 'lucide-vue-next'
 import AssetMark from '@/components/AssetMark.vue'
 import MobileMarketChart from '@/components/MobileMarketChart.vue'
+import MarketChartFrame from '@/components/MarketChartFrame.vue'
 import OrderBookPanel from '@/components/OrderBookPanel.vue'
 import MarketProvenanceLabel from '@/components/MarketProvenanceLabel.vue'
 import { marketTradeIdentity, type MarketProvenance } from '@/core/marketProvenance'
@@ -27,7 +26,6 @@ import {
   type MarketDetailStreamContext,
 } from '@/api/marketDetailStream'
 import {
-  MARKET_KLINE_INTERVALS,
   DEFAULT_MARKET_KLINE_INTERVAL,
   mergeMarketTradeHistory,
   mergeMarketTrades,
@@ -36,11 +34,6 @@ import {
 } from '@/api/marketSocketProtocol'
 import { publicMarketWebSocketUrl } from '@/config/app'
 import { formatAmount, formatPercent, formatPrice } from '@/core/format'
-import { normalizeMarketChartPoints } from '@/core/marketChart'
-import {
-  calculateMarketMovingAverages,
-  latestMarketMovingAverages,
-} from '@/core/marketIndicators'
 import { currentIntlLocale } from '@/i18n'
 import { goBackOr } from '@/core/navigation'
 import { useMarketStore } from '@/stores/market'
@@ -74,25 +67,12 @@ const liveDetailUpdatedAt = ref(0)
 type MarketDataPanel = 'orderBook' | 'trades'
 type MarketSection = 'chart' | 'overview'
 
-interface ChartScrollLock {
-  bodyOverflow: string
-  bodyPosition: string
-  bodyTop: string
-  bodyWidth: string
-  rootOverflow: string
-  rootScrollBehavior: string
-  scrollY: number
-}
-
 const marketDataPanel = ref<MarketDataPanel>('orderBook')
 const activeSection = ref<MarketSection>('chart')
-const chartExpanded = ref(false)
 const summarySection = ref<HTMLElement | null>(null)
 const chartSection = ref<HTMLElement | null>(null)
 const orderBookTabButton = ref<HTMLButtonElement | null>(null)
 const tradesTabButton = ref<HTMLButtonElement | null>(null)
-const chartToggleButton = ref<HTMLButtonElement | null>(null)
-let chartScrollLock: ChartScrollLock | null = null
 let requestVersion = 0
 let viewActive = true
 
@@ -103,10 +83,6 @@ const quoteAsset = computed(() => pairSymbol.value.split('/')[1] || 'USDT')
 const isFavorite = computed(() => marketFavorites.isFavorite(pairSymbol.value))
 const favoriteSaving = computed(() => marketFavorites.isPending(pairSymbol.value))
 const dataError = computed(() => klineError.value || depthError.value || tradesError.value)
-const normalizedChartPoints = computed(() => normalizeMarketChartPoints(points.value))
-const movingAverages = computed(() => calculateMarketMovingAverages(normalizedChartPoints.value))
-const latestAverages = computed(() => latestMarketMovingAverages(movingAverages.value))
-const latestCandle = computed(() => normalizedChartPoints.value.at(-1))
 const latestPrice = computed(() => ticker.value?.lastPrice ?? 0)
 const hasLatestPrice = computed(() => Number.isFinite(latestPrice.value) && latestPrice.value > 0)
 const latestChangePercent = computed(() => {
@@ -341,98 +317,6 @@ function formatObservedTime(value: number): string {
   }).format(new Date(timestamp))
 }
 
-function formatMovingAverage(value: number | null): string {
-  return value === null ? '--' : formatPrice(value)
-}
-
-function handleChartKeydown(event: KeyboardEvent): void {
-  if (!chartExpanded.value) return
-  if (event.key === 'Escape') {
-    event.preventDefault()
-    closeExpandedChart()
-    return
-  }
-  if (event.key !== 'Tab' || !chartSection.value) return
-  const focusable = [...chartSection.value.querySelectorAll<HTMLElement>(
-    'button:not(:disabled), a[href], [tabindex]:not([tabindex="-1"])',
-  )]
-  if (!focusable.length) {
-    event.preventDefault()
-    return
-  }
-  const first = focusable[0]
-  const last = focusable.at(-1)
-  const focusInside = chartSection.value.contains(document.activeElement)
-  if (event.shiftKey && (!focusInside || document.activeElement === first)) {
-    event.preventDefault()
-    last?.focus()
-  } else if (!event.shiftKey && (!focusInside || document.activeElement === last)) {
-    event.preventDefault()
-    first?.focus()
-  }
-}
-
-function lockChartScroll(): void {
-  if (chartScrollLock) return
-  chartScrollLock = {
-    bodyOverflow: document.body.style.overflow,
-    bodyPosition: document.body.style.position,
-    bodyTop: document.body.style.top,
-    bodyWidth: document.body.style.width,
-    rootOverflow: document.documentElement.style.overflow,
-    rootScrollBehavior: document.documentElement.style.scrollBehavior,
-    scrollY: window.scrollY,
-  }
-  document.body.style.overflow = 'hidden'
-  document.body.style.position = 'fixed'
-  document.body.style.top = `-${chartScrollLock.scrollY}px`
-  document.body.style.width = '100%'
-  document.documentElement.style.overflow = 'hidden'
-  window.addEventListener('keydown', handleChartKeydown)
-}
-
-function releaseChartScroll(): ChartScrollLock | null {
-  const lock = chartScrollLock
-  window.removeEventListener('keydown', handleChartKeydown)
-  if (!lock) return null
-  document.body.style.overflow = lock.bodyOverflow
-  document.body.style.position = lock.bodyPosition
-  document.body.style.top = lock.bodyTop
-  document.body.style.width = lock.bodyWidth
-  document.documentElement.style.overflow = lock.rootOverflow
-  chartScrollLock = null
-  return lock
-}
-
-function restoreChartScroll(lock: ChartScrollLock): void {
-  document.documentElement.style.scrollBehavior = 'auto'
-  window.scrollTo(0, lock.scrollY)
-  document.documentElement.style.scrollBehavior = lock.rootScrollBehavior
-}
-
-function openExpandedChart(): void {
-  if (chartExpanded.value) return
-  lockChartScroll()
-  chartExpanded.value = true
-  void nextTick(() => chartToggleButton.value?.focus({ preventScroll: true }))
-}
-
-function closeExpandedChart(): void {
-  if (!chartExpanded.value) return
-  chartExpanded.value = false
-  const lock = releaseChartScroll()
-  void nextTick(() => {
-    if (!chartSection.value) return
-    if (lock) restoreChartScroll(lock)
-    chartToggleButton.value?.focus({ preventScroll: true })
-  })
-}
-
-function toggleChartExpanded(): void {
-  if (chartExpanded.value) closeExpandedChart()
-  else openExpandedChart()
-}
-
 async function shareMarket(): Promise<void> {
   const url = window.location.href
   try {
@@ -457,11 +341,6 @@ onMounted(async () => {
   if (viewActive) marketStore.startLiveUpdates('market-detail')
 })
 
-onBeforeUnmount(() => {
-  const lock = releaseChartScroll()
-  if (lock) restoreChartScroll(lock)
-})
-
 onUnmounted(() => {
   viewActive = false
   marketStore.stopLiveUpdates('market-detail')
@@ -473,7 +352,6 @@ onUnmounted(() => {
 <template>
   <main
     class="market-detail"
-    :class="{ 'is-chart-expanded': chartExpanded }"
     data-market-workspace="live"
   >
     <header class="market-detail__header">
@@ -595,56 +473,20 @@ onUnmounted(() => {
       id="market-chart"
       ref="chartSection"
       class="market-detail__chart-panel"
-      :class="{ 'is-expanded': chartExpanded }"
-      :data-chart-mode="chartExpanded ? 'expanded' : 'inline'"
-      :role="chartExpanded ? 'dialog' : 'region'"
-      :aria-modal="chartExpanded ? 'true' : undefined"
       aria-labelledby="market-chart-heading"
     >
       <h1 id="market-chart-heading" class="sr-only">
         {{ t('marketDetail.chartWorkstation') }} · {{ pairSymbol }} · {{ interval }}
       </h1>
-      <nav class="market-detail__intervals" :aria-label="t('marketDetail.indicators')">
-        <button
-          v-for="item in MARKET_KLINE_INTERVALS"
-          :key="item"
-          type="button"
-          :class="{ 'is-active': interval === item }"
-          :aria-pressed="interval === item"
-          @click="chooseInterval(item)"
-        >
-          {{ item }}
-        </button>
-      </nav>
-      <div class="market-detail__chart">
-        <button
-          ref="chartToggleButton"
-          class="market-detail__chart-toggle"
-          type="button"
-          :aria-label="chartExpanded ? t('marketDetail.collapseChart') : t('marketDetail.expandChart')"
-          :aria-pressed="chartExpanded"
-          :title="chartExpanded ? t('marketDetail.collapseChart') : t('marketDetail.expandChart')"
-          @click="toggleChartExpanded"
-        >
-          <Minimize2 v-if="chartExpanded" :size="18" />
-          <Maximize2 v-else :size="18" />
-        </button>
+      <MarketChartFrame :symbol="pairSymbol" :interval="interval" @interval="chooseInterval">
         <MobileMarketChart :market-type="ticker?.marketType"
           :points="points"
           :loading="chartLoading"
           :interval="interval"
           :symbol="pairSymbol"
+          inspection
         />
-      </div>
-      <div class="market-detail__indicator-legend" :aria-label="t('marketDetail.realIndicators')">
-        <span class="is-ma5 numeric"><b>MA5</b> {{ formatMovingAverage(latestAverages.ma5) }}</span>
-        <span class="is-ma10 numeric"><b>MA10</b> {{ formatMovingAverage(latestAverages.ma10) }}</span>
-        <span class="is-ma20 numeric"><b>MA20</b> {{ formatMovingAverage(latestAverages.ma20) }}</span>
-        <span class="is-volume numeric">
-          <b>{{ t('marketDetail.candleVolume') }}</b>
-          {{ latestCandle ? formatAmount(latestCandle.volume) : '--' }}
-        </span>
-      </div>
+      </MarketChartFrame>
     </section>
 
     <section class="market-detail__microstructure" :aria-label="t('marketDetail.marketData')">
@@ -1041,155 +883,10 @@ onUnmounted(() => {
 
 .market-detail__chart-panel {
   background: var(--detail-surface);
-  height: 280px;
+  height: 440px;
   min-width: 0;
   overflow: visible;
   scroll-margin-top: calc(106px + env(safe-area-inset-top));
-}
-
-.market-detail__intervals {
-  align-items: center;
-  background: var(--detail-surface);
-  display: grid;
-  grid-template-columns: repeat(5, minmax(44px, 54px)) minmax(0, 1fr);
-  height: 48px;
-  min-width: 0;
-  padding-left: 10px;
-}
-
-.market-detail__intervals button {
-  background: transparent;
-  border: 0;
-  color: var(--detail-muted);
-  font-family: var(--data-font);
-  font-size: 10px;
-  height: 44px;
-  min-height: 44px;
-  min-width: 44px;
-  padding: 0;
-}
-
-.market-detail__intervals button.is-active {
-  color: var(--detail-positive);
-  font-weight: 750;
-}
-
-.market-detail__chart {
-  height: 204px;
-  min-height: 0;
-  min-width: 0;
-  position: relative;
-}
-
-/* Outrank the legacy dark-theme box-shadow bridge in prototype-parity.css. */
-.market-detail .market-detail__chart > button.market-detail__chart-toggle {
-  align-items: center;
-  -webkit-backdrop-filter: blur(14px) saturate(145%);
-  backdrop-filter: blur(14px) saturate(145%);
-  background: linear-gradient(
-    145deg,
-    color-mix(in srgb, var(--detail-surface) 82%, transparent) 0%,
-    color-mix(in srgb, var(--detail-background) 58%, transparent) 100%
-  );
-  border: 0;
-  border-radius: 12px;
-  box-shadow: none;
-  color: var(--detail-ink);
-  display: flex;
-  height: 44px;
-  justify-content: center;
-  left: 16px;
-  padding: 0;
-  position: absolute;
-  top: 12px;
-  transition: background 140ms ease, transform 100ms ease;
-  width: 44px;
-  z-index: 4;
-}
-
-.market-detail .market-detail__chart > button.market-detail__chart-toggle:active {
-  background: color-mix(in srgb, var(--detail-surface) 94%, transparent);
-  box-shadow: none;
-  transform: translateY(1px);
-}
-
-.market-detail .market-detail__chart > button.market-detail__chart-toggle:focus-visible {
-  box-shadow: none;
-  outline: 2px solid var(--focus);
-  outline-offset: 3px;
-}
-
-.market-detail__indicator-legend {
-  align-items: center;
-  background: var(--detail-surface);
-  display: grid;
-  gap: 6px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  height: 28px;
-  min-width: 0;
-  padding: 0 16px;
-}
-
-.market-detail__indicator-legend span {
-  font-family: var(--data-font);
-  font-size: 9px;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.market-detail__indicator-legend b {
-  font-weight: 750;
-}
-
-.market-detail__indicator-legend .is-ma5 {
-  color: var(--detail-positive);
-}
-
-.market-detail__indicator-legend .is-ma10 {
-  color: var(--detail-negative);
-}
-
-.market-detail__indicator-legend .is-ma20 {
-  color: var(--market-detail-ma20);
-}
-
-.market-detail__indicator-legend .is-volume {
-  color: var(--detail-muted);
-}
-
-.market-detail__chart-panel.is-expanded {
-  background: var(--detail-surface);
-  display: grid;
-  grid-template-rows: calc(48px + env(safe-area-inset-top)) minmax(0, 1fr) calc(34px + env(safe-area-inset-bottom));
-  height: 100dvh;
-  inset: 0;
-  margin: 0;
-  padding: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left);
-  position: fixed;
-  width: 100%;
-  z-index: var(--layer-overlay);
-}
-
-.market-detail__chart-panel.is-expanded .market-detail__intervals {
-  height: calc(48px + env(safe-area-inset-top));
-  padding-top: env(safe-area-inset-top);
-}
-
-.market-detail__chart-panel.is-expanded .market-detail__chart {
-  height: auto;
-  min-height: 0;
-}
-
-.market-detail__chart-panel.is-expanded .market-detail__indicator-legend {
-  height: calc(34px + env(safe-area-inset-bottom));
-  padding-bottom: env(safe-area-inset-bottom);
-}
-
-.market-detail__chart-panel.is-expanded .market-detail__chart > button.market-detail__chart-toggle {
-  left: 10px;
-  top: 8px;
 }
 
 .market-detail__microstructure {
@@ -1460,34 +1157,12 @@ onUnmounted(() => {
   }
 }
 
-@media (orientation: landscape) and (max-height: 600px) {
-  .market-detail__chart-panel.is-expanded {
-    grid-template-rows: calc(44px + env(safe-area-inset-top)) minmax(0, 1fr) calc(30px + env(safe-area-inset-bottom));
-  }
-
-  .market-detail__chart-panel.is-expanded .market-detail__intervals {
-    height: calc(44px + env(safe-area-inset-top));
-  }
-
-  .market-detail__chart-panel.is-expanded .market-detail__indicator-legend {
-    height: calc(30px + env(safe-area-inset-bottom));
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .market-detail *,
   .market-detail *::before,
   .market-detail *::after {
     scroll-behavior: auto;
     transition: none;
-  }
-
-  .market-detail .market-detail__chart > button.market-detail__chart-toggle {
-    transition: none;
-  }
-
-  .market-detail .market-detail__chart > button.market-detail__chart-toggle:active {
-    transform: none;
   }
 
   .spin {

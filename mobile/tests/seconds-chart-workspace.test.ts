@@ -81,6 +81,7 @@ test('seconds chart failed history is retryable and retains any live data', asyn
 test('inspection enables candle wicks and manages crosshair readout lifecycle', () => {
   const chart = mountMarketChart({ points: chartPoints(100), inspection: true })
   assert.equal(chart.series[0]!.options[0]!.wickVisible, true)
+  assert.equal((chart.chartOptions[0]!.timeScale as { lockVisibleTimeRangeOnResize: boolean }).lockVisibleTimeRangeOnResize, true)
   assert.equal(chart.crosshairListenerCount, 1)
   chart.crosshair({ point: { x: 20, y: 30 }, time: 1700000000 })
   chart.crosshair({})
@@ -89,6 +90,7 @@ test('inspection enables candle wicks and manages crosshair readout lifecycle', 
   assert.equal(chart.crosshairListenerCount, 0)
   const normal = mountMarketChart({ points: chartPoints(100) })
   assert.equal(normal.series[0]!.options[0]!.wickVisible, false)
+  assert.equal((normal.chartOptions[0]!.timeScale as { lockVisibleTimeRangeOnResize: boolean }).lockVisibleTimeRangeOnResize, false)
   assert.equal(normal.crosshairListenerCount, 0)
   normal.unmount()
 })

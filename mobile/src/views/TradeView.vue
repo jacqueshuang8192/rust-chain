@@ -26,6 +26,7 @@ import AssetMark from '@/components/AssetMark.vue'
 import ContractTradeSheets from '@/components/ContractTradeSheets.vue'
 import MarginCloseSheet from '@/components/MarginCloseSheet.vue'
 import MobileMarketChart from '@/components/MobileMarketChart.vue'
+import MarketChartFrame from '@/components/MarketChartFrame.vue'
 import OrderBookPanel from '@/components/OrderBookPanel.vue'
 import MarketTradeRow from '@/components/MarketTradeRow.vue'
 import { marketTradeIdentity, type MarketProvenance } from '@/core/marketProvenance'
@@ -1826,19 +1827,9 @@ onBeforeUnmount(() => {
       </button>
 
       <section v-if="spotChartOpen" id="spot-local-chart" class="spot-chart-drawer">
-        <div class="chart-tools">
-          <div class="interval-rail" role="group" :aria-label="t('marketDetail.chart')">
-            <button
-              v-for="time in ['1m', '5m', '15m', '1h', '1d']"
-              :key="time"
-              type="button"
-              :class="{ active: interval === time }"
-              :aria-pressed="interval === time"
-              @click="chooseInterval(time)"
-            >
-              {{ time }}
-            </button>
-          </div>
+        <div class="spot-chart-canvas" :aria-busy="chartLoading">
+        <MarketChartFrame :symbol="pairSymbol" :interval="interval" @interval="chooseInterval">
+          <template #tools>
           <div class="chart-action-rail" role="group" :aria-label="t('marketDetail.actions')">
             <button type="button" :aria-label="t('markets.refresh')" @click="retryMarket">
               <RefreshCcw :size="17" aria-hidden="true" />
@@ -1847,9 +1838,9 @@ onBeforeUnmount(() => {
               <List :size="17" aria-hidden="true" />
             </button>
           </div>
-        </div>
-        <div class="spot-chart-canvas" :aria-busy="chartLoading">
-          <MobileMarketChart :ticker="ticker" :market-type="ticker?.marketType" :points="points" :loading="chartLoading" :interval="interval" :symbol="pairSymbol" />
+          </template>
+          <MobileMarketChart :ticker="ticker" :market-type="ticker?.marketType" :points="points" :loading="chartLoading" :interval="interval" :symbol="pairSymbol" inspection />
+        </MarketChartFrame>
         </div>
         <div class="spot-market-data__tabs" role="tablist" :aria-label="t('marketDetail.marketData')">
           <button
@@ -3573,8 +3564,8 @@ onBeforeUnmount(() => {
 }
 
 .spot-chart-canvas {
-  height: 252px;
-  min-height: 252px;
+  height: 440px;
+  min-height: 440px;
   min-width: 0;
   position: relative;
 }

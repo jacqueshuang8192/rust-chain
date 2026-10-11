@@ -261,18 +261,13 @@ createTurnstileLifecycle(options?: TurnstileLifecycleOptions): {
   cover growing live history, gestures, bounded tail replacement and RAF races.
 - The chart container is an accessible `region` or `group`, not an image. The
   built-in attribution link must retain its own interactive semantics.
-- The market-detail chart-toggle is frameless in normal, pressed, expanded and
-  dark states: `border: 0` and no inset/outer box shadow. Keep the existing 44px
-  hit area, centered icon, theme contrast and visible keyboard-only focus outline.
-  Its scoped selector must still outrank legacy dark-theme shadow rules. Press
-  feedback may change the surface fill; reduced motion must not reintroduce a
-  frame. History loading/error/end notices reserve the left-side toggle area and
-  never block chart gestures or the attribution link; only retry is interactive.
-- Mobile candles hide upper/lower wicks with `wickVisible: false` on the shared
-  `CandlestickSeries`. This is rendering-only: keep the original open/high/low/
-  close data, candle bodies, MA curves, volume, current-price line, autoscale and
-  viewport behavior. Never clamp high/low to the body to hide a visual element.
-  Theme, price-format and dataset updates must not re-enable the wicks.
+- Spot, market detail and Seconds share `MarketChartFrame` for interval controls
+  and a frameless 44px expand icon in the toolbar. Fullscreen uses the same
+  renderer, preserves theme tokens after Teleport, and restores focus/scroll.
+  See `seconds-chart-workspace.md` for native locking and rotated-input fallback.
+  History notices and the official attribution must remain usable.
+- Candle wicks follow the renderer's `inspection` opt-in; the three trading
+  chart surfaces enable it. Keep the original OHLC values in either mode.
 - Shared text uses stable pixel sizes and `letter-spacing: 0`; do not scale
   font size with viewport width.
 - The selected visual bottom navigation has exactly five entries in this order:
