@@ -1,5 +1,17 @@
 # Redis Market Snapshots And Bounded Retention
 
+## Superseding User Decision
+
+The user explicitly rejected all ticker history: use Redis latest prices only.
+This supersedes the 24-hour/window design below (retained as historical context).
+Stop Redis history writes and external SQL ticker archival. Seconds opening and
+all operational settlement use current Redis prices with no five-second wait.
+Keep order evidence, K-line history, money queues, and bounded generator restart
+checkpoints (one overwritten row per symbol, not event history). Move live convert
+and follow references off tick archives. Preserve existing historical order FKs;
+do not delete production data or rewrite applied migrations. Legacy archive work
+is retired explicitly without new tick writes; spot/margin jobs still run.
+
 ## Goal
 
 Serve realtime prices and feed status from Redis, replace unlimited tick retention

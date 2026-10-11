@@ -303,22 +303,21 @@ async fn seed_trading_pair(pool: &MySqlPool, base_asset: u64, quote_asset: u64) 
 }
 
 async fn seed_market_ticker_history(
-    pool: &MySqlPool,
+    _pool: &MySqlPool,
     symbol: &str,
     last_price: &str,
-) -> Result<(), sqlx::Error> {
-    let version = Uuid::now_v7().simple().to_string();
-    sqlx::query(
-        r#"INSERT INTO market_price_ticks
-           (event_key, symbol, price, source, observed_at, generation, source_version)
-           VALUES (?, REPLACE(UPPER(?), '-', ''), ?, 'bitget', CURRENT_TIMESTAMP(6), 1, ?)"#,
-    )
-    .bind(format!("{version}{version}"))
-    .bind(symbol)
-    .bind(decimal(last_price))
-    .bind(version)
-    .execute(pool)
-    .await?;
+) -> Result<(), Box<dyn Error>> {
+    seed_latest_at(symbol, last_price, chrono::Utc::now()).await
+}
+async fn seed_latest_at(
+    symbol: &str,
+    price: &str,
+    observed: chrono::DateTime<chrono::Utc>,
+) -> Result<(), Box<dyn Error>> {
+    let mut redis = redis_manager().await.ok_or("isolated Redis is required")?;
+    let symbol = exchange_api::modules::market::sanitize_symbol(symbol);
+    let _: () = redis.set(exchange_api::modules::market::market_ticker_redis_key(&symbol),
+        serde_json::json!({"symbol":symbol,"last_price":price,"provider":"bitget","source":"external","observed_at":observed.timestamp_millis()}).to_string()).await?;
     Ok(())
 }
 
@@ -960,9 +959,12 @@ async fn convert_quote_uses_target_asset_limits_for_reverse_direction() -> Resul
 }
 
 #[tokio::test]
-async fn convert_quote_uses_mysql_market_history_without_redis() -> Result<(), Box<dyn Error>> {
+async fn convert_quote_uses_redis_latest_price() -> Result<(), Box<dyn Error>> {
     let _guard = TEST_LOCK.lock().await;
     let Some(pool) = mysql_pool().await else {
+        return Ok(());
+    };
+    let Some(redis) = redis_manager().await else {
         return Ok(());
     };
     let settings = test_settings();
@@ -980,7 +982,11 @@ async fn convert_quote_uses_mysql_market_history_without_redis() -> Result<(), B
         .await?;
 
     let token = issue_token(&settings, format!("user:{user_id}"), TokenScope::User, 900).unwrap();
-    let app = user_routes().with_state(AppState::new(settings).with_mysql(pool.clone()));
+    let app = user_routes().with_state(
+        AppState::new(settings)
+            .with_mysql(pool.clone())
+            .with_redis(redis),
+    );
 
     let response = app
         .oneshot(
@@ -1041,10 +1047,13 @@ async fn convert_quote_uses_mysql_market_history_without_redis() -> Result<(), B
 }
 
 #[tokio::test]
-async fn convert_market_quote_fails_closed_for_missing_future_or_stale_history()
+async fn convert_market_quote_fails_closed_for_missing_future_or_stale_cache()
 -> Result<(), Box<dyn Error>> {
     let _guard = TEST_LOCK.lock().await;
     let Some(pool) = mysql_pool().await else {
+        return Ok(());
+    };
+    let Some(redis) = redis_manager().await else {
         return Ok(());
     };
     let settings = test_settings();
@@ -1059,7 +1068,11 @@ async fn convert_market_quote_fails_closed_for_missing_future_or_stale_history()
         .execute(&pool)
         .await?;
     let token = issue_token(&settings, format!("user:{user_id}"), TokenScope::User, 900)?;
-    let app = user_routes().with_state(AppState::new(settings).with_mysql(pool.clone()));
+    let app = user_routes().with_state(
+        AppState::new(settings)
+            .with_mysql(pool.clone())
+            .with_redis(redis),
+    );
 
     assert_eq!(
         request_convert_quote_status(&app, &token, base_asset, quote_asset).await?,
@@ -1068,27 +1081,22 @@ async fn convert_market_quote_fails_closed_for_missing_future_or_stale_history()
 
     let version = Uuid::now_v7().simple().to_string();
     let event_key = format!("{version}{version}");
-    sqlx::query(
-        r#"INSERT INTO market_price_ticks
-           (event_key, symbol, price, source, observed_at, generation, source_version)
-           VALUES (?, REPLACE(UPPER(?), '-', ''), 2, 'bitget',
-                   DATE_ADD(CURRENT_TIMESTAMP(6), INTERVAL 1 HOUR), 1, ?)"#,
+    seed_latest_at(
+        &market_symbol,
+        "2",
+        chrono::Utc::now() + chrono::TimeDelta::hours(1),
     )
-    .bind(&event_key)
-    .bind(&market_symbol)
-    .bind(&version)
-    .execute(&pool)
     .await?;
     assert_eq!(
         request_convert_quote_status(&app, &token, base_asset, quote_asset).await?,
         StatusCode::BAD_REQUEST
     );
 
-    sqlx::query(
-        "UPDATE market_price_ticks SET observed_at = DATE_SUB(CURRENT_TIMESTAMP(6), INTERVAL 61 SECOND) WHERE event_key = ?",
+    seed_latest_at(
+        &market_symbol,
+        "2",
+        chrono::Utc::now() - chrono::TimeDelta::seconds(61),
     )
-    .bind(&event_key)
-    .execute(&pool)
     .await?;
     assert_eq!(
         request_convert_quote_status(&app, &token, base_asset, quote_asset).await?,

@@ -80,7 +80,7 @@ impl Fixture {
             .bind(self.pair).bind(self.pair).bind(self.admin).fetch_one(&self.pool).await.unwrap()
     }
     async fn cleanup(self) {
-        sqlx::query("DELETE FROM market_price_ticks WHERE symbol = REPLACE((SELECT symbol FROM trading_pairs WHERE id=?), '-', '')")
+        sqlx::query("DELETE FROM market_generation_price_checkpoints WHERE symbol = REPLACE((SELECT symbol FROM trading_pairs WHERE id=?), '-', '')")
             .bind(self.pair).execute(&self.pool).await.unwrap();
 
         for table in [
@@ -454,16 +454,28 @@ async fn default_market_pause_waits_for_inflight_owner_before_mutating_state()
 }
 
 #[tokio::test]
-async fn default_market_bootstrap_uses_normalized_committed_history_and_ignores_future_ticks()
+async fn default_market_bootstrap_uses_current_checkpoint_and_ignores_future_price()
 -> Result<(), Box<dyn Error>> {
     let Some(f) = Fixture::new().await? else {
         return Ok(());
     };
-    for (price, seconds) in [("1.1111", -60), ("1.2345", -5), ("9.9999", 3600)] {
-        let event_key = Uuid::now_v7().simple().to_string().repeat(2);
-        sqlx::query("INSERT INTO market_price_ticks (event_key,symbol,price,source,observed_at,generation,source_version) SELECT ?,REPLACE(symbol,'-',''),?,'default',TIMESTAMPADD(SECOND,?,UTC_TIMESTAMP(6)),1,'default:fixture' FROM trading_pairs WHERE id=?")
-            .bind(event_key).bind(decimal(price)).bind(seconds).bind(f.pair).execute(&f.pool).await?;
-    }
+    let event_key = Uuid::now_v7().simple().to_string().repeat(2);
+    sqlx::query("INSERT INTO market_generation_price_checkpoints (event_key,symbol,price,source,observed_at,generation,source_version) SELECT ?,REPLACE(symbol,'-',''),9.9999,'default',DATE_ADD(UTC_TIMESTAMP(6),INTERVAL 1 HOUR),1,'default:fixture' FROM trading_pairs WHERE id=?")
+        .bind(event_key).bind(f.pair).execute(&f.pool).await?;
+    let (future_status, future) = f
+        .call(
+            "POST",
+            "/preview",
+            json!({"expected_version":0,"initial_price":"8","config":{}}),
+        )
+        .await;
+    assert_eq!(future_status, StatusCode::OK, "{future}");
+    assert_eq!(
+        decimal(future["start_price"].as_str().unwrap()),
+        decimal("8")
+    );
+    sqlx::query("UPDATE market_generation_price_checkpoints SET price=1.2345,observed_at=DATE_SUB(UTC_TIMESTAMP(6),INTERVAL 5 SECOND) WHERE symbol=REPLACE((SELECT symbol FROM trading_pairs WHERE id=?),'-','')")
+        .bind(f.pair).execute(&f.pool).await?;
     let (status, preview) = f
         .call(
             "POST",
@@ -495,7 +507,7 @@ async fn default_market_seconds_capability_requires_current_owned_archived_gener
     sqlx::query("INSERT INTO market_pair_generation_runs (pair_id,generation,active_source,default_version,lease_owner,lease_expires_at,last_price,last_tick_at) VALUES (?,5,'default',1,'fixture-owner',DATE_ADD(CURRENT_TIMESTAMP(6),INTERVAL 1 HOUR),1,CURRENT_TIMESTAMP(6))")
         .bind(f.pair).execute(&f.pool).await?;
     let source_version = format!("default:{}:g5:v1", f.pair);
-    let tick=sqlx::query("INSERT INTO market_price_ticks (event_key,symbol,price,source,observed_at,generation,source_version) SELECT ?,REPLACE(UPPER(symbol),'-',''),1,'default',CURRENT_TIMESTAMP(6),5,? FROM trading_pairs WHERE id=?")
+    let tick=sqlx::query("INSERT INTO market_generation_price_checkpoints (event_key,symbol,price,source,observed_at,generation,source_version) SELECT ?,REPLACE(UPPER(symbol),'-',''),1,'default',CURRENT_TIMESTAMP(6),5,? FROM trading_pairs WHERE id=?")
         .bind(Uuid::now_v7().simple().to_string().repeat(2)).bind(&source_version).bind(f.pair).execute(&f.pool).await?.last_insert_id();
     let product=sqlx::query("INSERT INTO seconds_contract_products (pair_id,stake_asset,duration_seconds,payout_rate,min_stake,max_stake,status) VALUES (?,?,60,0.8,5,100,'disabled')")
         .bind(f.pair).bind(f.quote).execute(&f.pool).await?.last_insert_id();
@@ -546,19 +558,19 @@ async fn default_market_seconds_capability_requires_current_owned_archived_gener
             "last_tick_at=DATE_ADD(CURRENT_TIMESTAMP(6),INTERVAL 60 SECOND)",
             f.pair,
         ),
-        ("market_price_ticks", "generation=6", tick),
+        ("market_generation_price_checkpoints", "generation=6", tick),
         (
-            "market_price_ticks",
+            "market_generation_price_checkpoints",
             "source_version='default:wrong-version'",
             tick,
         ),
         (
-            "market_price_ticks",
+            "market_generation_price_checkpoints",
             "observed_at=DATE_SUB(CURRENT_TIMESTAMP(6),INTERVAL 61 SECOND)",
             tick,
         ),
         (
-            "market_price_ticks",
+            "market_generation_price_checkpoints",
             "observed_at=DATE_ADD(CURRENT_TIMESTAMP(6),INTERVAL 60 SECOND)",
             tick,
         ),
@@ -569,8 +581,8 @@ async fn default_market_seconds_capability_requires_current_owned_archived_gener
             .await?;
         sqlx::query("UPDATE market_default_generators SET enabled=TRUE,all_market_paused=FALSE WHERE pair_id=?").bind(f.pair).execute(&f.pool).await?;
         sqlx::query("UPDATE market_pair_generation_runs SET active_source='default',error_message=NULL,lease_owner='fixture-owner',lease_expires_at=DATE_ADD(CURRENT_TIMESTAMP(6),INTERVAL 1 HOUR),default_version=1,last_tick_at=CURRENT_TIMESTAMP(6) WHERE pair_id=?").bind(f.pair).execute(&f.pool).await?;
-        sqlx::query("UPDATE market_price_ticks SET generation=5,source_version=?,observed_at=CURRENT_TIMESTAMP(6) WHERE id=?").bind(&source_version).bind(tick).execute(&f.pool).await?;
-        let key_column = if table == "market_price_ticks" {
+        sqlx::query("UPDATE market_generation_price_checkpoints SET generation=5,source_version=?,observed_at=CURRENT_TIMESTAMP(6) WHERE id=?").bind(&source_version).bind(tick).execute(&f.pool).await?;
+        let key_column = if table == "market_generation_price_checkpoints" {
             "id"
         } else {
             "pair_id"
@@ -649,7 +661,7 @@ async fn default_market_preview_and_enable_prefer_newer_archive_to_older_checkpo
     };
     sqlx::query("INSERT INTO market_pair_generation_runs(pair_id,generation,active_source,last_price,last_tick_at) VALUES(?,1,'default',1,DATE_SUB(CURRENT_TIMESTAMP(6),INTERVAL 30 SECOND))")
         .bind(f.pair).execute(&f.pool).await?;
-    sqlx::query("INSERT INTO market_price_ticks(event_key,symbol,price,source,observed_at,generation,source_version) SELECT ?,REPLACE(UPPER(symbol),'-',''),2,'default',DATE_SUB(CURRENT_TIMESTAMP(6),INTERVAL 5 SECOND),1,'default:preview-current' FROM trading_pairs WHERE id=?")
+    sqlx::query("INSERT INTO market_generation_price_checkpoints(event_key,symbol,price,source,observed_at,generation,source_version) SELECT ?,REPLACE(UPPER(symbol),'-',''),2,'default',DATE_SUB(CURRENT_TIMESTAMP(6),INTERVAL 5 SECOND),1,'default:preview-current' FROM trading_pairs WHERE id=?")
         .bind(Uuid::now_v7().simple().to_string().repeat(2)).bind(f.pair).execute(&f.pool).await?;
     let parameters = json!({"price_min":"1.5","price_max":"2.5"});
     let (status, preview) = f

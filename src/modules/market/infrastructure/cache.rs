@@ -12,10 +12,10 @@
 //! 仅用于修复先写 Redis 后写 MySQL 失败的归档；同时间不同载荷和更旧载荷仍返回 `RejectedStale`。
 //! 被判定为陈旧的写入不是错误，调用方必须据此中止广播、撮合和检查点推进等派生副作用。
 //! 普通 depth 直接覆盖；策略 depth/逐笔通过独立 Lua 核对本轮已接受 ticker 后原子更新。
-//! 最新 ticker 另原子写入带 TTL 的短期历史；它不改变上述最新快照键不设 TTL 的合同。
+//! ticker 只保留最新快照，不写逐笔价格历史。
 
 pub(crate) mod external;
-pub(crate) mod history;
+pub(crate) mod latest;
 mod synthetic;
 pub use synthetic::market_synthetic_trades_redis_key;
 
@@ -459,11 +459,7 @@ impl MarketCacheWriteOutcome {
 /// ticker 的时间戳保存在既有 JSON 中；Lua 在单条 Redis 命令内比较并覆盖，消除租约检查到 `SET` 之间的竞态。
 static SAVE_TICKER_IF_FRESH_SCRIPT: LazyLock<Script> = LazyLock::new(|| {
     Script::new(
-        r#"local history_type = redis.call('TYPE', KEYS[2]).ok
-if history_type ~= 'none' and history_type ~= 'zset' then
-    return redis.error_reply('invalid price history type')
-end
-local current = redis.call('GET', KEYS[1])
+        r#"local current = redis.call('GET', KEYS[1])
 if current then
     local ok, decoded = pcall(cjson.decode, current)
     if not ok or type(decoded.observed_at) ~= 'number' then
@@ -481,13 +477,6 @@ if current then
     end
 end
 redis.call('SET', KEYS[1], ARGV[2])
-local now = redis.call('TIME')
-local cutoff = (tonumber(now[1]) - tonumber(ARGV[5])) * 1000000
-if tonumber(ARGV[3]) >= cutoff then
-    redis.call('ZADD', KEYS[2], ARGV[3], ARGV[4])
-end
-redis.call('ZREMRANGEBYSCORE', KEYS[2], '-inf', '(' .. string.format('%.0f', cutoff))
-redis.call('EXPIRE', KEYS[2], ARGV[5])
 return 1"#,
     )
 });
@@ -560,14 +549,8 @@ impl RedisMarketCache {
         let mut connection = self.manager.clone();
         let accepted: i64 = SAVE_TICKER_IF_FRESH_SCRIPT
             .key(key)
-            .key(history::price_history_key(symbol.as_str()))
             .arg(entry.observed_at().timestamp_millis())
             .arg(&payload)
-            .arg(entry.observed_at().timestamp_micros())
-            .arg(serde_json::to_string(
-                &history::PriceObservation::from_entry(&entry, &payload),
-            )?)
-            .arg(history::PRICE_RETENTION_SECONDS)
             .invoke_async(&mut connection)
             .await?;
         Ok(cache_write_outcome(accepted))

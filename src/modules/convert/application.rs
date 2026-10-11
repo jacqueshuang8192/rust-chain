@@ -98,7 +98,7 @@ pub(crate) async fn create_convert_quote(
     ensure_sufficient_convert_balance(&request.from_amount, &balance)?;
 
     let database_now = infrastructure::database_now(&pool).await?;
-    let mut pricing = resolve_convert_quote_rate(&pool, &pair, database_now).await?;
+    let mut pricing = resolve_convert_quote_rate(redis.as_ref(), &pair, database_now).await?;
     pricing.rate = normalize_convert_rate_for_storage(&pricing.rate)?;
     let amounts = convert_quote_amounts(
         &request.from_amount,
@@ -248,7 +248,7 @@ pub(crate) async fn confirm_convert_quote_with_events(
 /// 返回的是尚未叠加价差的原始汇率，价差与手续费在 `convert_quote_amounts` 中统一折算。
 /// 未识别的 pricing_mode 返回参数错误；本函数只读配置和缓存，不写库、不冻结资金。
 async fn resolve_convert_quote_rate(
-    pool: &Pool<MySql>,
+    redis: Option<&ConnectionManager>,
     pair: &ConvertPairRule,
     database_now: chrono::DateTime<Utc>,
 ) -> AppResult<ResolvedConvertPrice> {
@@ -267,11 +267,11 @@ async fn resolve_convert_quote_rate(
         "market" => {
             let (symbol, market_base_asset_id, market_quote_asset_id) =
                 convert_market_pricing_source(pair)?;
-            let market_price = infrastructure::latest_market_price(pool, symbol)
+            let market_price = infrastructure::latest_market_price(redis, symbol)
                 .await?
                 .ok_or_else(|| {
                     AppError::Validation(
-                        "convert market pricing requires authoritative price history".to_owned(),
+                        "convert market pricing requires latest Redis ticker".to_owned(),
                     )
                 })?;
             validate_convert_market_price_snapshot(&market_price, symbol, database_now, 60)?;

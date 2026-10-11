@@ -1,5 +1,11 @@
 # Synthetic Market and Manual K-line Recovery Contracts
 
+Latest-only update (2026-10-11): [Market Price Retention](./market-price-retention.md)
+supersedes ticker archival references below. Generated publication uses one
+overwritten checkpoint per symbol in market_generation_price_checkpoints.
+Live external reference prices come from Redis; only legacy admin history preview
+may still read old ticks. K-line storage/recovery is unchanged.
+
 ## Scenario: Deterministic strategy-market OHLCV and explicit historical recovery
 
 ### 1. Scope / Trigger

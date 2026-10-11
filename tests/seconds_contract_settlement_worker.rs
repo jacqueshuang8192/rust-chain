@@ -475,7 +475,93 @@ fn settlement_result_uses_direction_and_exact_prices() {
 }
 
 #[tokio::test]
-async fn window_pricing_and_retention_preserve_order_evidence() -> Result<(), Box<dyn Error>> {
+async fn latest_only_migration_preserves_completed_evidence_and_seeds_one_checkpoint()
+-> Result<(), Box<dyn Error>> {
+    let Ok(url) = std::env::var("LATEST_PRICE_MIGRATION_DATABASE_URL") else {
+        return Ok(());
+    };
+    let parsed = url::Url::parse(&url)?;
+    assert_eq!(parsed.host_str(), Some("127.0.0.1"));
+    assert!(parsed.path().ends_with("_test"));
+    let pool = MySqlPoolOptions::new().connect(&url).await?;
+    let mut previous = sqlx::migrate!();
+    previous.migrations = previous
+        .migrations
+        .iter()
+        .filter(|m| m.version < 148)
+        .cloned()
+        .collect::<Vec<_>>()
+        .into();
+    previous.run(&pool).await?;
+    let fixture = seed_fixture(&pool).await?;
+    let now = Utc::now();
+    let opened = seed_order(&pool, &fixture, now, "up").await?;
+    let settled = seed_order(&pool, &fixture, now, "up").await?;
+    for id in [opened, settled] {
+        sqlx::query("INSERT INTO seconds_contract_price_evidence(order_id,entry_json) VALUES (?,JSON_OBJECT('price','100.123456789012345678'))")
+            .bind(id).execute(&pool).await?;
+    }
+    sqlx::query(
+        "UPDATE seconds_contract_orders SET status='settled',settlement_price=99 WHERE id=?",
+    )
+    .bind(settled)
+    .execute(&pool)
+    .await?;
+    insert_tick(
+        &pool,
+        &fixture.pair_symbol,
+        "1",
+        "default",
+        now - TimeDelta::seconds(2),
+        1,
+    )
+    .await?;
+    insert_tick(
+        &pool,
+        &fixture.pair_symbol,
+        "2",
+        "default",
+        now - TimeDelta::seconds(1),
+        1,
+    )
+    .await?;
+    insert_tick(&pool, &fixture.pair_symbol, "999", "bitget", now, 1).await?;
+    // 早期无策略身份的遗留记录不能被误当成有效生成器检查点。
+    insert_tick(&pool, "INVALIDUSDT", "1", "strategy", now, 1).await?;
+    sqlx::migrate!().run(&pool).await?;
+    sqlx::migrate!().run(&pool).await?;
+    let rows: Vec<(u64, String, String)> = sqlx::query_as("SELECT order_id,policy,CAST(JSON_UNQUOTE(JSON_EXTRACT(entry_json,'$.price')) AS CHAR) FROM seconds_contract_price_evidence ORDER BY order_id")
+        .fetch_all(&pool).await?;
+    assert_eq!(
+        rows,
+        vec![
+            (
+                opened,
+                "redis_latest_v1".into(),
+                "100.123456789012345678".into()
+            ),
+            (
+                settled,
+                "redis_window_v1".into(),
+                "100.123456789012345678".into()
+            )
+        ]
+    );
+    let checkpoints: Vec<BigDecimal> =
+        sqlx::query_scalar("SELECT price FROM market_generation_price_checkpoints")
+            .fetch_all(&pool)
+            .await?;
+    assert_eq!(checkpoints, vec![decimal("2")]);
+    assert_eq!(order_snapshot(&pool, settled).await?.1, Some(decimal("99")));
+    let balance: BigDecimal = sqlx::query_scalar("SELECT SUM(available) FROM wallet_accounts")
+        .fetch_one(&pool)
+        .await?;
+    assert_eq!(balance, decimal("80"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn latest_pricing_and_retention_preserve_order_evidence() -> Result<(), Box<dyn Error>> {
     let _guard = TEST_LOCK.lock().await;
     let (Some(pool), Some(redis)) = (mysql_pool_or_skip().await?, cached_test_redis().await?)
     else {
@@ -509,11 +595,11 @@ async fn window_pricing_and_retention_preserve_order_evidence() -> Result<(), Bo
             .await?;
     }
     run_once_with_cached_prices(&pool, &redis, None, expiry + TimeDelta::seconds(4), 500).await?;
-    assert_eq!(order_snapshot(&pool, order).await?.0, "opened");
+    assert_eq!(order_snapshot(&pool, order).await?.0, "settled");
     run_once_with_cached_prices(&pool, &redis, None, expiry + TimeDelta::seconds(30), 500).await?;
     let result = order_snapshot(&pool, order).await?;
     assert_eq!(result.0, "settled");
-    assert_eq!(result.1, Some(decimal("101.123456789012345678")));
+    assert_eq!(result.1, Some(decimal("1")));
     assert_eq!(result.3.as_deref(), Some("bitget"));
     use redis::AsyncCommands;
     let _: usize = redis
@@ -528,16 +614,14 @@ async fn window_pricing_and_retention_preserve_order_evidence() -> Result<(), Bo
     let evidence: String = sqlx::query_scalar("SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(entry_json,'$.price')) AS CHAR) FROM seconds_contract_price_evidence WHERE order_id=?").bind(order).fetch_one(&pool).await?;
     assert_eq!(evidence, "100");
 
-    // 最新价存在也不能替代缺失的窗口；超时只转人工审核，不提前出款。
-    let missing = seed_order(&pool, &fixture, expiry, "up").await?;
-    sqlx::query("INSERT INTO seconds_contract_price_evidence(order_id,entry_json) VALUES (?, JSON_OBJECT('price','100'))")
-        .bind(missing).execute(&pool).await?;
-    run_once_with_cached_prices(&pool, &redis, None, expiry + TimeDelta::seconds(30), 500).await?;
-    assert_eq!(order_snapshot(&pool, missing).await?.0, "opened");
-    run_once_with_cached_prices(&pool, &redis, None, expiry + TimeDelta::seconds(306), 500).await?;
-    let missing_snapshot = order_snapshot(&pool, missing).await?;
-    assert_eq!(missing_snapshot.0, "manual_review");
-    assert!(missing_snapshot.1.is_none());
+    // 即使证据来自上一版窗口策略，也按用户确认的最新价立即结算；不查历史。
+    let immediate = seed_order(&pool, &fixture, expiry, "up").await?;
+    sqlx::query("INSERT INTO seconds_contract_price_evidence(order_id,policy,entry_json) VALUES (?, 'redis_window_v1', JSON_OBJECT('price','100'))")
+        .bind(immediate).execute(&pool).await?;
+    run_once_with_cached_prices(&pool, &redis, None, expiry, 500).await?;
+    let immediate_snapshot = order_snapshot(&pool, immediate).await?;
+    assert_eq!(immediate_snapshot.0, "settled");
+    assert_eq!(immediate_snapshot.1, Some(decimal("1")));
 
     let old = Utc::now() - TimeDelta::days(3);
     let remove = insert_tick(&pool, &fixture.pair_symbol, "90", "bitget", old, 1).await?;

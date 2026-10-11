@@ -254,7 +254,15 @@ async fn process_default(
             accepted_follow: old.as_ref().and_then(|s| s.accepted_follow.clone()),
         }
     };
-    let now = follow::refresh_frame(pool, row.pair_id, &row.symbol, &mut state, now).await?;
+    let now = follow::refresh_frame(
+        pool,
+        ingestion.market_cache(),
+        row.pair_id,
+        &row.symbol,
+        &mut state,
+        now,
+    )
+    .await?;
     let state_json = serde_json::to_value(&state).map_err(|e| AppError::Internal(e.to_string()))?;
     lock.ensure_owned().await?;
     let generation = default_runtime::activate_pair_source(

@@ -8,8 +8,8 @@ use crate::modules::market::{
     synthetic_realtime::build_observed_market_details,
 };
 
-/// 新秒前以归档事实区分冻结待发帧与已接受帧；同秒失败仍原样重试，不重读参考。
-/// ticker 已归档而后续缓存/聚合失败亦视为已接受，避免重启丢失已用于价格消费的证据。
+/// 新秒前以检查点事实区分冻结待发帧与已接受帧；同秒失败仍原样重试，不重读参考。
+/// ticker 已检查点而后续缓存/聚合失败亦视为已接受，避免重启丢失已用于价格消费的证据。
 pub(super) async fn reconcile_archived_frame(
     pool: &Pool<MySql>,
     pair_id: u64,
@@ -23,7 +23,7 @@ pub(super) async fn reconcile_archived_frame(
         return Ok(());
     }
     let accepted: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM market_price_ticks WHERE symbol=? AND source='default' AND source_version=CONCAT('default:',?,':g',generation,':v',?) AND observed_at=? AND price=?)",
+        "SELECT EXISTS(SELECT 1 FROM market_generation_price_checkpoints WHERE symbol=? AND source='default' AND source_version=CONCAT('default:',?,':g',generation,':v',?) AND observed_at=? AND price=?)",
     ).bind(frame.frame.symbol()).bind(pair_id).bind(state.version)
         .bind(frame.frame.observed_at().naive_utc()).bind(frame.frame.close())
         .fetch_one(pool).await?;
@@ -35,9 +35,10 @@ pub(super) async fn reconcile_archived_frame(
     Ok(())
 }
 
-/// 同秒直接重放已冻结帧；新秒只读可信参考归档，正常缺失切独立震荡，存储故障仍停止本轮。
+/// 同秒直接重放已冻结帧；新秒只读可信参考检查点，正常缺失切独立震荡，存储故障仍停止本轮。
 pub(super) async fn refresh_frame(
     pool: &Pool<MySql>,
+    cache: &crate::modules::market::RedisMarketCache,
     pair_id: u64,
     symbol: &str,
     state: &mut StoredMinute,
@@ -52,6 +53,7 @@ pub(super) async fn refresh_frame(
         state.accepted_follow = None;
         return Ok(now);
     }
+    let reference_now = now;
     let now = DateTime::from_timestamp(now.timestamp(), 0)
         .ok_or_else(|| AppError::Validation("跟随行情时间无效".into()))?;
     if state.follow.as_ref().is_some_and(|f| {
@@ -65,9 +67,10 @@ pub(super) async fn refresh_frame(
         .ok_or_else(|| AppError::Validation("跟随行情缺少参考配置".into()))?;
     let reference = default_runtime::load_follow_reference(
         pool,
+        cache,
         pair_id,
         config.reference_pair_id,
-        now,
+        reference_now,
         config.stale_after_seconds,
         state
             .follow
@@ -83,7 +86,7 @@ pub(super) async fn refresh_frame(
             price_precision: state.price_precision,
             qty_precision: state.qty_precision,
             fallback: &fallback,
-            now,
+            now: reference_now,
             reference_symbol: &reference.symbol,
             unavailable_reason: reference.reason.as_deref(),
         },

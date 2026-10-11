@@ -15,7 +15,6 @@ use futures_util::FutureExt;
 use mongodb::bson::{Document, doc};
 use redis::AsyncCommands;
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
 use sqlx::{MySqlPool, mysql::MySqlConnectOptions, mysql::MySqlPoolOptions};
 use uuid::Uuid;
 
@@ -161,15 +160,8 @@ impl FollowFixture {
             "fixture never inserts future reference evidence"
         );
         let price = decimal(price);
-        let key = hex::encode(Sha256::digest(format!(
-            "bitget|{}|{}|{}",
-            self.reference_symbol,
-            at.timestamp_micros(),
-            price.normalized()
-        )));
-        sqlx::query("INSERT INTO market_price_ticks(event_key,symbol,price,source,observed_at,generation,source_version) VALUES(?,?,?,'bitget',?,1,?)")
-            .bind(&key).bind(&self.reference_symbol).bind(price).bind(at.naive_utc()).bind(&key)
-            .execute(&self.pool).await?;
+        let _: () = self.redis.clone().set(format!("market:ticker:{}", self.reference_symbol),
+            json!({"symbol":self.reference_symbol,"last_price":price.to_string(),"provider":"bitget","source":"external","observed_at":at.timestamp_millis()}).to_string()).await?;
         Ok(())
     }
 
@@ -212,12 +204,12 @@ impl FollowFixture {
     }
 
     async fn count(&self) -> TestResult<i64> {
-        Ok(
-            sqlx::query_scalar("SELECT COUNT(*) FROM market_price_ticks WHERE symbol=?")
-                .bind(&self.symbol)
-                .fetch_one(&self.pool)
-                .await?,
+        Ok(sqlx::query_scalar(
+            "SELECT COUNT(*) FROM market_generation_price_checkpoints WHERE symbol=?",
         )
+        .bind(&self.symbol)
+        .fetch_one(&self.pool)
+        .await?)
     }
 
     async fn candle(&self, open: DateTime<Utc>) -> TestResult<Document> {
@@ -229,7 +221,7 @@ impl FollowFixture {
     async fn fail_archival(&self, enabled: bool) -> TestResult {
         let statement = if enabled {
             format!(
-                "CREATE TRIGGER {} BEFORE INSERT ON market_price_ticks FOR EACH ROW BEGIN IF NEW.symbol='{}' AND NEW.source='default' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='follow fixture archive failure'; END IF; END",
+                "CREATE TRIGGER {} BEFORE INSERT ON market_generation_price_checkpoints FOR EACH ROW BEGIN IF NEW.symbol='{}' AND NEW.source='default' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='follow fixture archive failure'; END IF; END",
                 self.trigger, self.symbol
             )
         } else {
@@ -446,7 +438,7 @@ async fn unpublished_frames(fixture: &mut FollowFixture) -> TestResult {
     fixture.fail_archival(true).await?;
     fixture.run(at(56), "follow-owner", false).await?;
     fixture.fail_archival(false).await?;
-    assert_eq!(fixture.count().await?, 2);
+    assert_eq!(fixture.count().await?, 1);
     assert_eq!(
         field(&fixture.state().await?["follow"]["frame"], "close"),
         decimal("0.11")
@@ -504,7 +496,7 @@ async fn unpublished_frames(fixture: &mut FollowFixture) -> TestResult {
         decimal("0.101"),
         "failed pending high must not enter historical OHLC"
     );
-    let identity:(String,Option<u64>)=sqlx::query_as("SELECT source,strategy_id FROM market_price_ticks WHERE symbol=? ORDER BY observed_at DESC,id DESC LIMIT 1")
+    let identity:(String,Option<u64>)=sqlx::query_as("SELECT source,strategy_id FROM market_generation_price_checkpoints WHERE symbol=? ORDER BY observed_at DESC,id DESC LIMIT 1")
         .bind(&fixture.symbol).fetch_one(&fixture.pool).await?;
     assert_eq!(identity, ("strategy".into(), Some(manual)));
     assert_eq!(

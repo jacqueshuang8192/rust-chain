@@ -102,8 +102,9 @@ pub fn advance_follow_frame(
             && !r.event_key.trim().is_empty()
             && r.price > 0
             && super::sanitize_symbol(&r.symbol) == super::sanitize_symbol(input.reference_symbol)
-            && r.observed_at <= now
-            && now - r.observed_at <= TimeDelta::seconds(i64::from(config.stale_after_seconds))
+            && r.observed_at <= input.now
+            && input.now - r.observed_at
+                <= TimeDelta::seconds(i64::from(config.stale_after_seconds))
             && previous
                 .and_then(|p| p.last_reference.as_ref())
                 .is_none_or(|old| {

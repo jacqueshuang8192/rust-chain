@@ -155,27 +155,6 @@ async fn make_order_due_with_event_price(pool: &MySqlPool, order_id: u64, price:
         "SELECT pairs.symbol FROM seconds_contract_orders orders JOIN trading_pairs pairs ON pairs.id = orders.pair_id WHERE orders.id = ?",
     ).bind(order_id).fetch_one(pool).await.unwrap();
     seed_ticker(&redis_manager().await, &symbol, price).await;
-    if let Some(mut redis) = redis_manager().await {
-        let expires_at: chrono::DateTime<chrono::Utc> =
-            sqlx::query_scalar("SELECT expires_at FROM seconds_contract_orders WHERE id=?")
-                .bind(order_id)
-                .fetch_one(pool)
-                .await
-                .unwrap();
-        let symbol = exchange_api::modules::market::ValidatedMarketSymbol::from_raw(&symbol)
-            .unwrap()
-            .as_str()
-            .to_owned();
-        let payload = serde_json::json!({"symbol":symbol,"price":price,"source":"bitget","observed_at":expires_at,"source_version":"redis:test-window"}).to_string();
-        let _: usize = redis
-            .zadd(
-                format!("market:price-history:v1:{symbol}"),
-                payload,
-                expires_at.timestamp_micros(),
-            )
-            .await
-            .unwrap();
-    }
 }
 
 async fn seed_order_event_price(pool: &MySqlPool, order_id: u64, price: &str) {
@@ -1152,7 +1131,7 @@ async fn seconds_contract_stake_and_manual_payout_respect_asset_precision()
     make_order_due_with_event_price(&pool, order_id, "105.000000000000000000").await;
     let (policy, price): (String, String) = sqlx::query_as("SELECT policy, CAST(JSON_UNQUOTE(JSON_EXTRACT(entry_json, '$.price')) AS CHAR) FROM seconds_contract_price_evidence WHERE order_id=?")
         .bind(order_id).fetch_one(&pool).await?;
-    assert_eq!(policy, "redis_window_v1");
+    assert_eq!(policy, "redis_latest_v1");
     assert_eq!(decimal(&price), decimal("100"));
 
     let settled = admin_routes()
@@ -3039,7 +3018,7 @@ async fn seconds_contract_open_order_uses_requested_product_cycle() -> Result<()
 }
 
 #[tokio::test]
-async fn seconds_contract_review_recovery_requires_history_and_pays_once()
+async fn seconds_contract_review_recovery_uses_latest_price_and_pays_once()
 -> Result<(), Box<dyn Error>> {
     let Some(pool) = mysql_pool().await else {
         return Ok(());
@@ -3092,7 +3071,15 @@ async fn seconds_contract_review_recovery_requires_history_and_pays_once()
         TokenScope::Admin,
         900,
     )?;
-    let app = admin_routes().with_state(state_with_mysql_and_redis(settings, pool.clone(), None));
+    let Some(manager) = redis_manager().await else {
+        return Ok(());
+    };
+    let redis = Some(manager);
+    let app = admin_routes().with_state(state_with_mysql_and_redis(
+        settings,
+        pool.clone(),
+        redis.clone(),
+    ));
     let request = |result: &str| {
         Request::builder()
             .method("POST")
@@ -3107,14 +3094,18 @@ async fn seconds_contract_review_recovery_requires_history_and_pays_once()
     for result in ["win", "auto"] {
         assert_eq!(
             app.clone().oneshot(request(result)).await?.status(),
-            StatusCode::CONFLICT
+            if result == "win" {
+                StatusCode::CONFLICT
+            } else {
+                StatusCode::BAD_REQUEST
+            }
         );
     }
     let state: (String, BigDecimal) = sqlx::query_as(
         "SELECT orders.status, wallets.available FROM seconds_contract_orders orders JOIN wallet_accounts wallets ON wallets.user_id = orders.user_id AND wallets.asset_id = orders.stake_asset WHERE orders.id = ?",
     ).bind(order_id).fetch_one(&pool).await?;
     assert_eq!(state, ("manual_review".to_owned(), decimal("40")));
-    seed_order_event_price(&pool, order_id, "105").await;
+    seed_ticker(&redis, &symbol, "105").await;
     let (one, two) = tokio::join!(
         app.clone().oneshot(request("auto")),
         app.clone().oneshot(request("auto")),
@@ -3123,7 +3114,7 @@ async fn seconds_contract_review_recovery_requires_history_and_pays_once()
         assert_eq!(response.status(), StatusCode::OK);
         let payload = body_json(response).await?;
         assert_eq!(payload["order"]["result"], "win");
-        assert_eq!(payload["order"]["settlement_price_source"], "bitget");
+        assert_eq!(payload["order"]["settlement_price_source"], "redis");
     }
     let amount: BigDecimal = sqlx::query_scalar(
         "SELECT available FROM wallet_accounts WHERE user_id = ? AND asset_id = ?",

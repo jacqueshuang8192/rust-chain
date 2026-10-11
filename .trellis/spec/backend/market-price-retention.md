@@ -1,89 +1,90 @@
-# Redis Prices And Short Retention
+# Latest Prices And Legacy Retention
 
 ## 1. Scope
 
-Realtime status and new seconds-order pricing no longer query SQL tick history.
-Unlimited retention is replaced with a 24-hour working window. Asynchronous SQL
-ingestion remains short-lived for platform follow, continuity and legacy manual
-recovery. Mongo candle history is unchanged.
+The user's explicit latest-only decision supersedes the 24-hour ticker/window
+design. Realtime prices, seconds pricing, convert market rates, live follow
+references and feed status use Redis latest quotes. No new ticker history is
+written to Redis sorted sets or MySQL market_price_ticks. Mongo K-line history
+and completed order evidence remain unchanged.
 
 ## 2. Signatures
 
-- `market:price-history:v1:<SYMBOL>`: sorted set with microsecond event-time score,
-  `PriceObservation` JSON member, exact decimal and RFC3339 time.
-- `PRICE_RETENTION_SECONDS = 86400`, shared by SQL cleanup and Redis history.
-- `market:received:v1:<SYMBOL>`: Redis-server receipt milliseconds.
-- `market:admin-status:v1`: configuration and K-line diagnostics; 30-second TTL,
-  refreshed every five seconds independently of feed enablement.
-- `seconds_contract_price_evidence`: immutable entry JSON and `redis_window_v1`
-  policy per new order. Settlement evidence stays in existing order columns.
-- `prune_price_batch(pool, cursor)`: checks up to 500 expired candidate keys per transaction,
-  at most 5000 per ten-second round, cycling at the end.
+- Latest key: market:ticker:<SYMBOL>; no quote-age gate for seconds.
+- market:received:v1:<SYMBOL>: Redis receipt milliseconds.
+- market:admin-status:v1: configuration/diagnostics, 30-second TTL, five-second refresh.
+- seconds_contract_price_evidence: permanent entry evidence, redis_latest_v1.
+- Existing settlement price/source/time/hash fields: permanent selected result.
+- market_generation_price_checkpoints: UNIQUE(symbol), one overwritten runtime
+  checkpoint per generated symbol; not a sequence of historical quotes.
+- Old market:price-history:v1 keys are no longer read/written and expire naturally.
+- Old archive queue is retired by validated exact-head ACK without SQL writes;
+  spot/margin/K-line durable jobs are still processed normally.
 
 ## 3. Contracts
 
-Latest ticker/history insertion and expiry are atomic Lua writes. Validate key
-types before changing any cache/queue. Only accepted observations enter Redis
-history; replay does not duplicate history. Prune by Redis wall time, with idle
-TTL; old source time never extends the event-time window.
+Seconds opening and operational settlement read a positive latest Redis quote.
+Expiry is checked with database time; no additional five-second wait. Processing
+delay can change the selected quote before commit, by explicit user choice.
+After commit, replay uses stored evidence, never reprices or pays again. Admin
+review still requires result=auto and an audited reason; no user-supplied price.
+Missing/invalid Redis is an error/retry, never zero or SQL fallback. Quote age
+does not reject seconds pricing; convert and follow retain their own existing
+freshness policies.
 
-New orders commit entry evidence with wallet debit/order insertion. Select the
-first accepted tick in `[expires_at, expires_at + 5s)` after the window closes.
-Delayed execution must not substitute a later latest price. Legacy orders without
-evidence keep their established pricing policy. The five-second wait is not
-exchange finality for arbitrarily late network data. Missing history follows
-bounded waiting/manual review; dependency errors remain retryable. New-policy
-manual review also requires Redis history; after expiry/loss, use the existing
-audited refund workflow, not a fabricated/current/SQL-conflicting price.
+External admission atomically updates latest/receipt and financial queues, with
+no archive work. Old/wrong-type/full archive keys cannot block current quotes.
+Generated sources keep lease/version/fence validation and one transactional
+checkpoint before publication. This is required restart/idempotency state, not
+ticker archival. Current checkpoints may contain price and identity, but their
+row count never grows with quote count. No existing order points to these mutable
+checkpoints; historical order FKs still reference immutable legacy ticks.
 
-Status business reads only Redis plus process-local supervisor state; existing
-authentication remains unchanged. Bound reads to two seconds. Provider must match
-configuration. `last_ingested_at` now denotes Redis admission, not SQL archive.
-Config/diagnostics are eventually updated within five seconds. Missing/older-than-
-30-second metadata returns 503 `MARKET_STATUS_NOT_READY`, with no SQL fallback.
+Live follow reads only the latest external quote. Validate it against actual
+receipt time, not the frame's rounded second, preserving subsecond observations.
+Historical admin follow preview may read remaining legacy records; absent history
+is explicitly labelled fallback, never fabricated from current prices.
 
-SQL cleanup requires both observation and ingestion older than 24 hours. Preserve
-order-referenced ticks, unresolved opened/manual-review windows and the last tick
-per `(symbol, source)` for continuity. Advance cursor only after commit; failures
-keep data. Retention is eventual, not exact-time erasure; monitor cleanup backlog.
+Status business reads remain Redis plus the local supervisor, with a two-second
+deadline. Missing/expired metadata returns 503 MARKET_STATUS_NOT_READY, with no
+SQL fallback. last_ingested_at denotes Redis receipt, not archive completion.
 
-Migration 0147 creates indexes/evidence table, but deletes nothing itself. Apply
-before deploying code. Keep persistent standalone Redis/AOF/noeviction. Do not
-downgrade to binaries ignoring evidence policy while new-policy orders are open.
-Redis loss can remove unsettled history; already-committed order evidence survives.
-Existing durable queues are consumed normally, never deleted to hide backlog.
-Size Redis for the full 24-hour accepted-tick rate including sorted-set overhead;
-time retention is not a fixed byte cap. Monitor memory and cleanup throughput.
-Index creation on a large existing tick table needs a planned migration window.
+Apply immutable migrations through 0148 before code. It updates only pending
+entry policy metadata, not completed prices or money, and seeds one generated
+checkpoint per symbol from valid legacy evidence. Plan the one-time old-table
+scan and stop/drain old generators before rollout. Existing legacy SQL cleanup
+remains bounded and protects order references/pending windows/continuity heads.
+It is legacy housekeeping, not ongoing retention of newly received ticks.
 
 ## 4. Error Matrix
 
-| Condition | Outcome |
+| Condition | Result |
 | --- | --- |
-| Wrong history type/full financial queue | Reject before writes |
-| Missing latest/window | Reject entry / wait then manual review |
-| Later latest quote | Never replaces deadline-window evidence |
-| Missing/expired status metadata | 503, never false healthy |
-| Cleanup failure | Roll back, retain cursor/data and retry |
-| Referenced/pending/head tick | Preserve beyond retention |
+| Positive latest quote, even old | Seconds may use it immediately at expiry |
+| Missing/malformed/identity mismatch | Error; no financial mutation |
+| Changed latest quote after committed settlement | Replay stored result |
+| Full/wrong-type legacy archive key | Does not block new admission |
+| Full financial work queue | Reject before partial fan-out |
+| Old generator owner/version/conflicting replay | Reject, preserve checkpoint |
+| Missing status metadata | Explicit 503, no request-time SQL scan |
 
 ## 5. Cases
 
-Good: a late settlement selects its deadline-window quote. Base: expiry cleanup
-leaves order evidence intact. Bad: deleting all old ticks without reference checks.
+Good: delayed settlement uses the actual execution-time latest quote and records
+it atomically. Base: only one generator checkpoint remains after many updates.
+Bad: stopping archive writes but leaving convert/follow to read stale SQL prices.
 
 ## 6. Verification
 
-Isolated Redis: wrong-type atomicity, replay, microsecond boundaries, later-price
-exclusion, TTL/trimming. Isolated MySQL/Redis: window settlement/replay, exact
-decimals, permanent evidence and cleanup reference/pending/head guards. Status:
-no SQL dependency, source isolation, receipt timestamps and stale metadata.
-Run legacy settlement/routes, OpenAPI, library/architecture/documentation and
-strict all-target Clippy.
+Real isolated MySQL/Redis: latest-only settlement/entry evidence, replay and
+rollback; convert prices without tick rows; no new Redis history or SQL ticks;
+legacy archive retirement and independent financial queues; generator checkpoints,
+stale-owner/replay fences. Pure follow tests cover subsecond/future observations.
+Run library, architecture/documentation, feed and OpenAPI regressions plus strict
+all-target Clippy. Real Mongo runtime suites require an explicit isolated service;
+never describe an internally skipped optional service test as executed.
 
 ## 7. Wrong Vs Correct
 
-Wrong: status HTTP -> aggregate all ticks; due order -> current price.
-
-Correct: status HTTP -> Redis metadata/quotes; due order -> immutable policy ->
-short Redis window -> permanent evidence in the money transaction.
+Wrong: Redis latest -> ticker archive -> deadline lookup.
+Correct: Redis latest -> order transaction/evidence; K-lines remain separate.

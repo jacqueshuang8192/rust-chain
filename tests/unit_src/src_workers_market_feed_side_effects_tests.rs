@@ -194,15 +194,22 @@ async fn durable_pipeline_real_redis_mysql() -> Result<(), Box<dyn std::error::E
             .is_err(),
         "stale prices must not be published"
     );
+    let _: () = redis
+        .set(
+            ExternalMarketLane::Archive.key(),
+            "obsolete wrong-type archive",
+        )
+        .await?;
     let second = ticker(&symbol, base + 1, 101);
     assert_eq!(
         cache.admit_external_with_capacity(&second, 7).await?,
         MarketCacheWriteOutcome::Accepted
     );
+    let _: usize = redis.del(ExternalMarketLane::Archive.key()).await?;
     fence.activate(2).await;
     assert!(worker.ingest_frame(&frame(base + 2, 102)).await.is_err());
     let third = ticker(&symbol, base + 2, 102);
-    assert!(cache.admit_external_with_capacity(&third, 7).await.is_err());
+    assert!(cache.admit_external_with_capacity(&third, 2).await.is_err());
     let value: String = redis.get(market_ticker_redis_key(&symbol)).await?;
     assert_eq!(
         serde_json::from_str::<serde_json::Value>(&value)?["observed_at"],
@@ -216,20 +223,17 @@ async fn durable_pipeline_real_redis_mysql() -> Result<(), Box<dyn std::error::E
         assert_eq!(
             redis.llen::<_, usize>(lane.key()).await?,
             if matches!(lane, ExternalMarketLane::Archive) {
-                7
+                0
             } else {
                 2
             }
         );
     }
 
-    // 重建客户端等价于接收进程重启，原队头仍然存在；错误确认不得删掉任何事件。
-    let reconnected = redis::Client::open(redis_url.as_str())?
-        .get_connection_manager()
-        .await?;
-    let head: Vec<String> = reconnected
-        .clone()
-        .lrange(ExternalMarketLane::Archive.key(), 0, -1)
+    // 资金队列仍持久化；遗留归档工作被安全确认，不再依赖行情历史表。
+    let head: Vec<String> = redis.lrange(ExternalMarketLane::Spot.key(), 0, -1).await?;
+    let _: usize = redis
+        .rpush(ExternalMarketLane::Archive.key(), &head)
         .await?;
     assert!(
         acknowledge(
@@ -247,23 +251,19 @@ async fn durable_pipeline_real_redis_mysql() -> Result<(), Box<dyn std::error::E
     sqlx::query("RENAME TABLE market_price_ticks TO market_price_ticks_held")
         .execute(&pool)
         .await?;
-    assert!(archive(&state, &events).await.is_err());
-    assert_eq!(
-        redis
-            .llen::<_, usize>(ExternalMarketLane::Archive.key())
-            .await?,
-        7
-    );
+    retire_archive(&events).await?;
+    retire_archive(&events).await?;
     sqlx::query("RENAME TABLE market_price_ticks_held TO market_price_ticks")
         .execute(&pool)
         .await?;
-    archive(&state, &events).await?;
-    archive(&state, &events).await?;
     let count: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM market_price_ticks WHERE symbol = ?")
         .bind(&symbol)
         .fetch_one(&pool)
         .await?;
-    assert_eq!(count, 4, "commit-before-ack replay is idempotent");
+    assert_eq!(
+        count, 0,
+        "legacy archive retirement must not persist prices"
+    );
     verify_auxiliary_admission(&cache, &mut redis, &symbol, base).await?;
 
     // 故意持有现货通道锁；归档、杠杆和实时写入必须仍能推进。
@@ -337,7 +337,7 @@ async fn durable_pipeline_real_redis_mysql() -> Result<(), Box<dyn std::error::E
         .bind(&symbol)
         .fetch_one(&pool)
         .await?;
-    assert_eq!(count, 504);
+    assert_eq!(count, 0, "live consumption must not archive ticker history");
     let precise_time =
         Utc.timestamp_millis_opt(base + 501).unwrap() + chrono::Duration::microseconds(123);
     let precise = ExternalMarketEvent::Ticker {
@@ -369,23 +369,14 @@ async fn durable_pipeline_real_redis_mysql() -> Result<(), Box<dyn std::error::E
     let pending_archive: Vec<String> = redis
         .lrange(ExternalMarketLane::Archive.key(), 0, -1)
         .await?;
-    let jobs = pending_archive
-        .iter()
-        .map(|value| serde_json::from_str(value))
-        .collect::<Result<Vec<_>, _>>()?;
-    archive(&state, &jobs).await?;
-    let precise_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM market_price_ticks WHERE symbol = ? AND observed_at = ?",
-    )
-    .bind(&symbol)
-    .bind(precise_time.naive_utc())
-    .fetch_one(&pool)
-    .await?;
-    assert_eq!(
-        precise_count, 1,
-        "public millisecond replay must not lose distinct microsecond history"
+    assert!(
+        pending_archive.is_empty(),
+        "replay must not create archive jobs"
     );
-    acknowledge(&mut redis, ExternalMarketLane::Archive, &pending_archive).await?;
+    let history_exists: bool = redis
+        .exists(format!("market:price-history:v1:{symbol}"))
+        .await?;
+    assert!(!history_exists, "no Redis ticker history is maintained");
     assert_eq!(
         redis
             .llen::<_, usize>(ExternalMarketLane::Kline.key())

@@ -274,10 +274,10 @@ pub(crate) async fn load_settlement_pair_capability(
     })
 }
 
-/// 判定 strategy/internal 交易对是否具备人工策略或默认生成器的可结算归档能力；全部暂停优先拒绝。
+/// 判定 strategy/internal 交易对是否具备人工策略或默认生成器的可结算运行能力；全部暂停优先拒绝。
 /// 条件同时要求策略 active、数据库当前时间在策略区间内、run 为 running/live，
 /// 租约 owner 非空且未过期，并能按 `active_version` 连到 `strategy_versions`；命中行会锁到调用方事务结束，
-/// 防止能力检查把仅有配置但没有实时归档 worker 的策略当成可结算。
+/// 防止能力检查把仅有配置但没有实时生成 worker 的策略当成可结算。
 /// 任一缺失都返回 false，不使用草稿或旧版本充数。
 pub(crate) async fn runnable_strategy_settlement_history_exists(
     tx: &mut Transaction<'_, MySql>,
@@ -321,7 +321,7 @@ pub(crate) async fn runnable_strategy_settlement_history_exists(
     runnable_default_settlement_history_exists(tx, pair_id).await
 }
 
-/// 默认行情须无运行错误，并同时具备有效租约、不可变版本、60 秒内的非未来检查点及同代际真实归档记录。
+/// 默认行情须无运行错误，并同时具备有效租约、不可变版本、60 秒内的非未来运行检查点及同代际已接受价格检查点。
 /// 此处只确认新开仓能力，不修改到期取价窗口或已有订单结果；配置存在或 Redis 旧价本身不构成证据。
 async fn runnable_default_settlement_history_exists(
     tx: &mut Transaction<'_, MySql>,
@@ -342,7 +342,7 @@ async fn runnable_default_settlement_history_exists(
              AND runs.last_tick_at >= DATE_SUB(CURRENT_TIMESTAMP(6), INTERVAL 60 SECOND)
              AND runs.last_tick_at <= CURRENT_TIMESTAMP(6)
              AND EXISTS (
-                 SELECT 1 FROM market_price_ticks ticks
+                 SELECT 1 FROM market_generation_price_checkpoints ticks
                  WHERE ticks.symbol = REPLACE(REPLACE(REPLACE(UPPER(pairs.symbol), '-', ''), '/', ''), '_', '')
                    AND ticks.source = 'default' AND ticks.generation = runs.generation
                    AND ticks.source_version = CONCAT('default:', runs.pair_id, ':g', runs.generation, ':v', runs.default_version)
@@ -844,41 +844,6 @@ pub(crate) async fn save_entry_evidence(
         .execute(&mut **tx)
         .await?;
     Ok(())
-}
-
-/// 从订单不可变证据识别到期窗口策略；不根据当前配置重解释旧订单。
-pub(crate) async fn uses_window_price(
-    tx: &mut Transaction<'_, MySql>,
-    order_id: u64,
-) -> AppResult<bool> {
-    Ok(sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM seconds_contract_price_evidence WHERE order_id = ? AND policy = 'redis_window_v1')")
-        .bind(order_id).fetch_one(&mut **tx).await?)
-}
-
-/// 选择 Redis 到期后五秒内首条已接受行情；没有窗口记录时保持缺失，不回落到执行时最新价。
-pub(crate) async fn cached_window_price(
-    redis: Option<&ConnectionManager>,
-    symbol: &str,
-    expires_at: DateTime<Utc>,
-) -> AppResult<Option<SecondsContractSettlementPriceRow>> {
-    let redis =
-        redis.ok_or_else(|| AppError::Internal("Redis is required for window pricing".into()))?;
-    let end = expires_at + chrono::TimeDelta::seconds(5);
-    Ok(
-        crate::modules::market::infrastructure::cache::history::load_price_window(
-            redis, symbol, expires_at, end,
-        )
-        .await?
-        .map(|tick| SecondsContractSettlementPriceRow {
-            id: None,
-            symbol: tick.symbol,
-            price: tick.price,
-            source: tick.source,
-            observed_at: tick.observed_at,
-            generation: None,
-            source_version: tick.source_version,
-        }),
-    )
 }
 
 /// 下单路径上锁定可交易的秒合约产品，并解析出本次下单实际适用的那条周期规则。

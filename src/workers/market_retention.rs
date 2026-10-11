@@ -1,10 +1,12 @@
 //! 短期 ticker 清理与状态元数据刷新；不在实时摄取或 HTTP 请求路径执行。
 use crate::{
     error::{AppError, AppResult},
-    modules::market::infrastructure::cache::history::PRICE_RETENTION_SECONDS,
     state::AppState,
 };
 use chrono::{DateTime, Utc};
+
+// 仅清理遗留历史表；新行情不再写入该表。
+const PRICE_RETENTION_SECONDS: i64 = 86_400;
 use sqlx::{MySql, Pool, QueryBuilder};
 use tokio::time::{Duration, MissedTickBehavior};
 

@@ -78,6 +78,36 @@ fn step(
 }
 
 #[test]
+fn latest_subsecond_reference_is_compared_to_receipt_time_not_rounded_frame_time() {
+    let p = params();
+    let c = candle(&p, 0, "1");
+    let now = start() + TimeDelta::milliseconds(900);
+    let input = FollowFrameInput {
+        symbol: "FOLLOW-USDT",
+        parameters: &p,
+        price_precision: 6,
+        qty_precision: 2,
+        fallback: &c,
+        now,
+        reference_symbol: "BTCUSDT",
+        unavailable_reason: None,
+    };
+    let mut reference = obs(0, "100");
+    reference.observed_at = start() + TimeDelta::milliseconds(500);
+    let accepted = advance_follow_frame(&input, None, Some(reference.clone())).unwrap();
+    assert_eq!(accepted.status.mode, "following");
+    assert_eq!(accepted.frame.observed_at(), start());
+    reference.observed_at = now + TimeDelta::milliseconds(1);
+    assert_eq!(
+        advance_follow_frame(&input, None, Some(reference))
+            .unwrap()
+            .status
+            .mode,
+        "fallback"
+    );
+}
+
+#[test]
 fn relative_returns_preserve_own_price_and_do_not_compound_duplicate_samples() {
     let p = params();
     let c = candle(&p, 0, "1");
@@ -195,7 +225,7 @@ fn minute_ohlc_tracks_only_observed_prices_and_keeps_own_volume_plan() {
 }
 
 #[test]
-fn subsecond_reference_is_not_consumed_ahead_of_frozen_second_cutoff() {
+fn latest_subsecond_reference_is_consumed_at_receipt_and_frozen_in_its_second() {
     let p = params();
     let c = candle(&p, 0, "1");
     let mut tick = obs(1, "100");
@@ -215,8 +245,10 @@ fn subsecond_reference_is_not_consumed_ahead_of_frozen_second_cutoff() {
         Some(tick.clone()),
     )
     .unwrap();
-    assert_eq!(state.status.mode, "fallback");
+    assert_eq!(state.status.mode, "following");
     assert_eq!(state.frame.observed_at(), start() + TimeDelta::seconds(1));
+    let replay = step(&p, &c, Some(&state), 1, Some(obs(1, "500")));
+    assert_eq!(replay.frame.close(), state.frame.close());
     let next = step(&p, &c, Some(&state), 2, Some(tick));
     assert_eq!(next.status.mode, "following");
 }

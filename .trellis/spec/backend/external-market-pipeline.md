@@ -4,10 +4,9 @@
 
 External Bitget/HTX/Coinbase WebSocket and REST fallback ingestion in
 `workers/market_feed.rs`. Synthetic/default generation keeps its synchronous
-provenance, lease, archive and checkpoint contracts. Seconds pricing now follows
-[Market Price Retention](./market-price-retention.md): new orders use Redis
-deadline-window prices, legacy orders retain their policy. SQL ticker archives
-are short-lived rather than retained indefinitely.
+provenance, lease and current-checkpoint contracts. The latest-only pricing and
+archive retirement rules in [Market Price Retention](./market-price-retention.md)
+supersede historical ticker archival below.
 
 ## 2. Signatures
 
@@ -15,7 +14,8 @@ are short-lived rather than retained indefinitely.
   `MarketCacheWriteOutcome`.
 - `MarketIngestionSink::accept_{ticker,depth,kline}` returns publication permission.
 - Redis lists: `market:external-work:v1:{archive,spot,margin,kline}`.
-- Each list is capped at 50,000 unacknowledged observations; no TTL or trimming.
+- Active spot/margin/K-line lists cap at 50,000 pending observations; no TTL or trimming.
+- The archive list is legacy-only: validate and ACK old jobs without SQL inserts.
 - Queue envelope: `event` plus full-precision UTC `observed_at`. Public snapshot
   timestamps stay milliseconds; archive identity retains microseconds.
 - Consumers use one dedicated MySQL connection per lane and a database-scoped
@@ -52,13 +52,12 @@ public JSON key disappears. Equal-time conflicting payloads cannot overwrite.
 Identical replay does not enqueue triggers again, but may broadcast the confirmed
 current snapshot: Redis is shared across instances while each public hub is process-local.
 Suppressing every replay would starve clients on instances that lose the Redis
-CAS race. Every valid ticker, including replay/stale/conflict, enters the
-idempotent archive lane, preserving historical evidence and distinct microsecond
-observations whose public millisecond JSON happens to match. Stale/conflicting
-tickers never trigger orders or broadcast. Stale depth/candles have no side effects.
+CAS race. New tickers never enter an archive lane. Stale/conflicting tickers do not trigger
+orders or broadcast. Identical replay can broadcast but never enqueues another
+financial event. Stale depth/candles have no side effects.
 
-Four supervised consumers progress independently. Archive batches up to 100
-rows into one idempotent INSERT; other lanes process one observation at a time.
+Three active consumers progress independently. A compatibility drainer validates
+and ACKs old archive batches without SQL writes. Other lanes process one event at a time.
 FIFO is receive/admission order, including ticker and depth sharing the spot
 lane, not a promise to globally reorder different providers by source time.
 No unbounded spawn, pending-job eviction or detached financial tasks.
@@ -95,10 +94,10 @@ supersedes the queued one; a first-insert race won by an older document must ret
 | --- | --- |
 | Invalid price/provenance/frame | No realtime acceptance |
 | Full or wrong-type required queue | Error; no new cache or partial fan-out |
-| Stale ticker | Historical queue only; no triggers/public hint |
-| Duplicate accepted observation | No repeated trigger admission; idempotent archive and current local hub snapshot allowed |
-| Slow archive/spot/margin/Mongo | Other lanes and realtime admission continue within queue capacity |
-| Failed candidate query / archive / Mongo write | Retain head, report and retry |
+| Stale ticker | No new queues or public hint |
+| Duplicate accepted observation | No repeated trigger/archive admission; current local hub snapshot allowed |
+| Slow spot/margin/Mongo | Other lanes and realtime admission continue within active queue capacity |
+| Failed candidate query / Mongo write | Retain head, report and retry |
 | Individual order cannot execute | Existing rollback/log/continue policy; later observations may retry |
 | Competing API instances | One normal-operation consumer per lane via session lock |
 | Lost lock/uncertain ACK | Leave/replay work; existing financial idempotency remains required |
@@ -111,8 +110,8 @@ supersedes the queued one; a first-insert race won by an older document must ret
 
 Good: blocked spot processing does not delay a new ticker's Redis value/public
 event or prevent archive/margin progression.
-Base: consumer stops after an archive commit and before ACK; replay creates no
-second tick.
+Base: consumer stops after a financial commit and before ACK; replay creates no
+second fill. Legacy archive retirement never inserts ticks.
 Bad: enqueue only in memory, trim oldest unprocessed ticks, use `join!` inside
 the socket read loop, or fill newly created orders against queued old prices.
 
@@ -144,7 +143,7 @@ loopback `EXTERNAL_MARKET_TEST_DATABASE_URL` (an `_test` schema) and
 `EXTERNAL_MARKET_TEST_REDIS_URL` (empty isolated database), never generic
 production environment fallbacks. Cover wrong-type/full admission, replay,
 stale public suppression, generation fencing, durable retry, conditional ACK,
-batch archive idempotency, source-time precision, slow lane independence,
+legacy archive retirement without tick writes, source-time precision, slow lane independence,
 Mongo failure retention, consumer restart and creation-time cutoffs.
 Also run library, market feed, architecture, existing spot/margin fill tests,
 format, all-target compilation and strict Clippy.
@@ -158,7 +157,7 @@ every admitted pre-reconnect frame reached its sink and public hub.
 ## 7. Wrong Vs Correct
 
 ```text
-Wrong: read socket -> archive -> match spot -> match margin -> publish
+Wrong: read socket -> archive every ticker -> match spot -> match margin -> publish
 Correct: read socket -> atomic Redis cache/queue admission -> publish
          supervised independent FIFO consumers -> commit -> conditional ACK
 ```

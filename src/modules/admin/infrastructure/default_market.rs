@@ -66,7 +66,7 @@ pub(crate) async fn load_default_market_bootstrap_in_tx(
     tx: &mut Transaction<'_, MySql>,
     symbol: &str,
 ) -> AppResult<Option<BigDecimal>> {
-    Ok(sqlx::query_scalar("SELECT price FROM market_price_ticks WHERE symbol = ? AND price > 0 AND observed_at <= UTC_TIMESTAMP(6) ORDER BY observed_at DESC, id DESC LIMIT 1")
+    Ok(sqlx::query_scalar("SELECT price FROM market_generation_price_checkpoints WHERE symbol = ? AND price > 0 AND observed_at <= UTC_TIMESTAMP(6) ORDER BY observed_at DESC, id DESC LIMIT 1")
         .bind(crate::modules::market::sanitize_symbol(symbol)).fetch_optional(&mut **tx).await?)
 }
 

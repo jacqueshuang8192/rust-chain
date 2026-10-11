@@ -482,7 +482,7 @@ const accounts = await GET("/api/v1/wallet/accounts");
 await POST("/api/v1/seconds-contracts/orders", order);
 ```
 
-## Scenario: Redis Settlement And Historical Review Recovery
+## Scenario: Redis Latest Settlement And Audited Review Recovery
 
 ### 1. Scope / Trigger
 
@@ -495,7 +495,7 @@ await POST("/api/v1/seconds-contracts/orders", order);
 ```text
 ordinary price authority: market:ticker:{SANITIZED_SYMBOL}
 ordinary evidence: price, original observed_at, source=redis, payload SHA-256
-legacy review recovery: market_price_ticks in [expires_at, expires_at + 5s)
+review recovery: latest Redis quote, result=auto and audited reason
 ```
 
 ### 3. Contracts
@@ -524,8 +524,8 @@ legacy review recovery: market_price_ticks in [expires_at, expires_at + 5s)
   defer its first scan until that timestamp; do not mutate orders during deploy.
 - `manual_review` is an operational terminal state for automatic settlement. It causes no guessed payout and no implicit refund. Explicit principal refund is governed only by the prospective snapshot contract below; it never invents a commission rollback.
 - Admin `POST /seconds-contracts/orders/:id/settle` with `result=auto` and a
-  required reason may resolve `manual_review` using the same validated event-time
-  history as the original review rule. No client price or requested win/loss can
+  required reason may resolve `manual_review` using the latest Redis quote,
+  as explicitly requested on 2026-10-11. No client price or requested win/loss can
   resolve a reviewed order. Missing evidence leaves review and funds unchanged.
 - Recovery retains the original exception, writes a
   `seconds_contract_order.recover` audit with operator/reason/before/after price
@@ -558,7 +558,7 @@ legacy review recovery: market_price_ticks in [expires_at, expires_at + 5s)
 | Valid positive cached quote, even old | Settle ordinary opened order at that quote |
 | Cache is missing, malformed or invalid | Keep opened and retry after one second |
 | Redis has a price but MySQL event history is absent | Ordinary settlement still succeeds |
-| Old manual-review order has only Redis evidence | Leave review/funds unchanged |
+| Old manual-review order has valid Redis evidence | Explicit audited auto recovery allowed; never automatic worker recovery |
 | Worker restarts after settlement/manual review | No duplicate wallet or audit effect |
 
 ### 5. Good / Base / Bad Cases
@@ -574,7 +574,7 @@ legacy review recovery: market_price_ticks in [expires_at, expires_at + 5s)
 - Real MySQL/Redis tests cover settlement at expiry, old quote acceptance,
   conflicting historical price exclusion, missing/invalid cache retry, exact
   decimals, concurrent single payment/event, restart replay and transaction
-  rollback. Preserve legacy history recovery/refund tests and evidence.
+  rollback. Preserve legacy historical test entry points and refund evidence; production recovery uses Redis.
 - Market feed tests preserve successful cache-write-before-event sequencing.
 - With a batch limit of one, hold the first due order lock and assert another
   user's order on the same pair settles. Assert failed-cache orders rotate

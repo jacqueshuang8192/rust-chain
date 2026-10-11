@@ -115,7 +115,7 @@ async fn default_runtime_publishes_without_strategy_replays_restart_and_fences_p
     }
     let collection = mongo.collection::<Document>(&format!("market_klines_{symbol}"));
     assert_eq!(collection.count_documents(doc! {"interval":"1m"}).await?, 1);
-    let count:i64=sqlx::query_scalar("SELECT COUNT(*) FROM market_price_ticks WHERE symbol=? AND source='default' AND strategy_id IS NULL AND strategy_version IS NULL").bind(&symbol).fetch_one(&pool).await?;
+    let count:i64=sqlx::query_scalar("SELECT COUNT(*) FROM market_generation_price_checkpoints WHERE symbol=? AND source='default' AND strategy_id IS NULL AND strategy_version IS NULL").bind(&symbol).fetch_one(&pool).await?;
     assert_eq!(count, 1);
     assert_eq!(
         sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM spot_trades")
@@ -253,7 +253,7 @@ async fn default_runtime_publishes_without_strategy_replays_restart_and_fences_p
         let _: i64 = connection.del(keys).await?;
     }
     mongo.drop().await?;
-    sqlx::query("DELETE FROM market_price_ticks WHERE symbol=?")
+    sqlx::query("DELETE FROM market_generation_price_checkpoints WHERE symbol=?")
         .bind(&symbol)
         .execute(&pool)
         .await?;

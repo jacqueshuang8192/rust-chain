@@ -185,7 +185,7 @@ pub(crate) async fn latest_archived_pair_price(
     now: DateTime<Utc>,
 ) -> AppResult<Option<BigDecimal>> {
     Ok(sqlx::query_scalar::<_, BigDecimal>(
-        "SELECT price FROM market_price_ticks WHERE symbol = ? AND observed_at <= ? AND price > 0 ORDER BY observed_at DESC, id DESC LIMIT 1",
+        "SELECT price FROM market_generation_price_checkpoints WHERE symbol = ? AND observed_at <= ? AND price > 0 ORDER BY observed_at DESC, id DESC LIMIT 1",
     ).bind(sanitize_symbol(symbol)).bind(now.naive_utc()).fetch_optional(pool).await?)
 }
 

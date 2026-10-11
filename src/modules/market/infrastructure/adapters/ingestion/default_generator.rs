@@ -1,8 +1,8 @@
-//! 默认来源的持锁归档，复用既有缓存和广播协议；默认来源不伪造人工策略 ID。
+//! 默认来源的持锁检查点，复用既有缓存和广播协议；默认来源不伪造人工策略 ID。
 
 use super::*;
 
-/// 交易对共同互斥证据；归档时同时核对数据库命名锁、持久化代际和 worker 身份。
+/// 交易对共同互斥证据；检查点时同时核对数据库命名锁、持久化代际和 worker 身份。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PairTickerFence {
     pub pair_id: u64,
@@ -20,7 +20,7 @@ pub struct DefaultTickerProvenance {
 }
 
 impl MarketIngestionService {
-    /// 默认 ticker 先核对交易对所有者、配置及人工排期优先级，再幂等归档；随后才写缓存并调用已有价格消费者。
+    /// 默认 ticker 先核对交易对所有者、配置及人工排期优先级，再幂等检查点；随后才写缓存并调用已有价格消费者。
     /// 模拟盘口/成交仍只走展示链，不生成真实委托；同事件重试不重复触发价格消费者。
     pub async fn ingest_and_publish_default_ticker(
         &self,
@@ -199,8 +199,8 @@ async fn archive_default_ticker(
     if valid != 1 {
         return Err(stale_synthetic_provenance_conflict());
     }
-    // 交易对行锁串行化该符号归档；同时间不同来源或载荷是冲突，不产生第二个候选结算价格。
-    let latest=sqlx::query_as::<_,SyntheticTickerArchiveRow>("SELECT event_key,symbol,price,source,observed_at,generation,source_version,strategy_id,strategy_version FROM market_price_ticks WHERE symbol=? ORDER BY observed_at DESC,id DESC LIMIT 1 FOR UPDATE")
+    // 交易对行锁串行化该符号检查点；同时间不同来源或载荷是冲突，不产生第二个候选结算价格。
+    let latest=sqlx::query_as::<_,SyntheticTickerArchiveRow>("SELECT event_key,symbol,price,source,observed_at,generation,source_version,strategy_id,strategy_version FROM market_generation_price_checkpoints WHERE symbol=? ORDER BY observed_at DESC,id DESC LIMIT 1 FOR UPDATE")
         .bind(&symbol).fetch_optional(&mut *tx).await?;
     if let Some(latest) = latest {
         if latest.observed_at > observed_at {
@@ -216,7 +216,7 @@ async fn archive_default_ticker(
             ));
         }
     }
-    sqlx::query("INSERT INTO market_price_ticks(event_key,symbol,price,source,observed_at,generation,source_version) VALUES(?,?,?,'default',?,?,?)")
+    sqlx::query("INSERT INTO market_generation_price_checkpoints(event_key,symbol,price,source,observed_at,generation,source_version) VALUES(?,?,?,'default',?,?,?) ON DUPLICATE KEY UPDATE event_key=VALUES(event_key), price=VALUES(price), source=VALUES(source), observed_at=VALUES(observed_at), generation=VALUES(generation), source_version=VALUES(source_version), strategy_id=NULL, strategy_version=NULL")
         .bind(key).bind(symbol).bind(snapshot.last_price()).bind(observed_at.naive_utc()).bind(fence.generation).bind(source_version).execute(&mut *tx).await?;
     tx.commit().await?;
     Ok(SyntheticTickerArchiveOutcome::Inserted)

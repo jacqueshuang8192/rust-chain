@@ -25,7 +25,7 @@ pub(crate) struct QueuedMarketEvent {
     pub(crate) observed_at: DateTime<Utc>,
 }
 
-/// 四条独立 FIFO；ticker 同时进入归档、现货和杠杆，盘口只进入现货，蜡烛只进入历史。
+/// 三条业务 FIFO 加遗留归档排空通道；新 ticker 仅进入现货和杠杆，盘口进入现货，蜡烛进入历史。
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum ExternalMarketLane {
     Archive,
@@ -73,12 +73,6 @@ static ADMIT: LazyLock<Script> = LazyLock::new(|| {
     Script::new(
         r#"
 local current = redis.call('GET', KEYS[1])
-if ARGV[6] == '1' then
-    local history_type = redis.call('TYPE', KEYS[3]).ok
-    if history_type ~= 'none' and history_type ~= 'zset' then
-        return redis.error_reply('invalid price history type')
-    end
-end
 local observed = tonumber(ARGV[1])
 local incoming_open = tonumber(ARGV[2])
 local current_open = nil
@@ -102,33 +96,21 @@ if incoming_open > 0 then
 end
 if current_open and (current_open > incoming_open or
    (current_open == incoming_open and current_observed and current_observed >= observed)) then
-    if ARGV[6] == '1' then
-        if redis.call('LLEN', KEYS[5]) >= tonumber(ARGV[5]) then
-            return redis.error_reply('external market archive queue is full')
-        end
-        redis.call('RPUSH', KEYS[5], ARGV[4])
-    end
     if current_open == incoming_open and current_observed == observed and current == ARGV[3] then
         return 2
     end
     return 0
 end
-for i = 5, #KEYS do
+for i = 4, #KEYS do
     if redis.call('LLEN', KEYS[i]) >= tonumber(ARGV[5]) then
         return redis.error_reply('external market work queue is full')
     end
 end
-for i = 5, #KEYS do redis.call('RPUSH', KEYS[i], ARGV[4]) end
+for i = 4, #KEYS do redis.call('RPUSH', KEYS[i], ARGV[4]) end
 redis.call('SET', KEYS[1], ARGV[3])
 if ARGV[6] == '1' then
     local now = redis.call('TIME')
-    local cutoff = (tonumber(now[1]) - tonumber(ARGV[9])) * 1000000
-    if tonumber(ARGV[7]) >= cutoff then
-        redis.call('ZADD', KEYS[3], ARGV[7], ARGV[8])
-    end
-    redis.call('ZREMRANGEBYSCORE', KEYS[3], '-inf', '(' .. string.format('%.0f', cutoff))
-    redis.call('EXPIRE', KEYS[3], ARGV[9])
-    redis.call('SET', KEYS[4], tostring(tonumber(now[1]) * 1000 + math.floor(tonumber(now[2]) / 1000)))
+    redis.call('SET', KEYS[3], tostring(tonumber(now[1]) * 1000 + math.floor(tonumber(now[2]) / 1000)))
 end
 if incoming_open > 0 then
     redis.call('SET', KEYS[2], ARGV[2] .. ':' .. ARGV[1])
@@ -139,7 +121,7 @@ return 1
 });
 
 impl RedisMarketCache {
-    /// 原子接受外部行情并记录全部待处理副作用；旧/回放 ticker 仅幂等归档，不重复触发资金处理。
+    /// 原子接受外部行情并记录全部待处理副作用；旧/回放 ticker 不再归档，也不重复触发资金处理。
     /// 仅用于单机 Redis（与现有多键 CAS 一致）；队列无 TTL，需持久化及 noeviction 部署策略。
     pub(crate) async fn admit_external(
         &self,
@@ -185,11 +167,7 @@ impl RedisMarketCache {
                     entry.redis_key().to_owned(),
                     0,
                     serde_json::to_value(entry),
-                    vec![
-                        ExternalMarketLane::Archive,
-                        ExternalMarketLane::Spot,
-                        ExternalMarketLane::Margin,
-                    ],
+                    vec![ExternalMarketLane::Spot, ExternalMarketLane::Margin],
                 )
             }
             ExternalMarketEvent::Depth(snapshot) => {
@@ -228,17 +206,6 @@ impl RedisMarketCache {
         };
         let payload = payload.map_err(|e| AppError::Internal(e.to_string()))?;
         let payload = encode(&payload)?;
-        let history = match event {
-            ExternalMarketEvent::Ticker { snapshot, .. } => {
-                let entry = MarketTickerCacheEntry::from_snapshot(snapshot)
-                    .map_err(|e| AppError::Validation(e.to_string()))?;
-                serde_json::to_string(&super::history::PriceObservation::from_entry(
-                    &entry, &payload,
-                ))
-                .map_err(|e| AppError::Internal(e.to_string()))?
-            }
-            _ => String::new(),
-        };
         let job = serde_json::to_string(&QueuedMarketEvent {
             event: event.clone(),
             observed_at: event.observed_at(),
@@ -248,7 +215,6 @@ impl RedisMarketCache {
         invocation
             .key(key)
             .key(sequence)
-            .key(super::history::price_history_key(event.symbol()))
             .key(format!("market:received:v1:{}", event.symbol()));
         for lane in lanes {
             invocation.key(lane.key());
@@ -264,9 +230,6 @@ impl RedisMarketCache {
             } else {
                 0
             })
-            .arg(event.observed_at().timestamp_micros())
-            .arg(history)
-            .arg(super::history::PRICE_RETENTION_SECONDS)
             .invoke_async(&mut self.manager.clone())
             .await?;
         Ok(cache_write_outcome(result))

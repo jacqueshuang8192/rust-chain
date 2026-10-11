@@ -21,6 +21,6 @@
   "children": [],
   "parent": null,
   "relatedFiles": [],
-  "notes": "Implementation and isolated integration verification complete. Local commit only; rollout requires migration 0147 and Redis capacity assessment. Existing Web bundle-budget blocker remains.",
+  "notes": "User superseded window retention with latest-only pricing. No new ticker history; Redis seconds/convert/live-follow reads and bounded generator checkpoints implemented. Real MySQL/Redis, migration upgrade, library and strict Clippy verified. Full Mongo runtime unavailable. Local commit only; migrate through 0148 before deployment.",
   "meta": {}
 }

@@ -380,32 +380,27 @@ pub(crate) async fn load_wallet_balance(
     }))
 }
 
-/// 从 MySQL append-only 行情历史选择该交易对事件时间最新的 ticker。
-/// 本查询刻意不跳过未来、陈旧或异常快照；服务层校验最新行并 fail closed，禁止回退旧价掩盖坏数据。
+/// 市价闪兑只读取 Redis 当前报价；缺失或损坏不回退 SQL，报价凭据仍在确认事务中持久化。
 pub(crate) async fn latest_market_price(
-    pool: &Pool<MySql>,
+    redis: Option<&redis::aio::ConnectionManager>,
     pair_symbol: &str,
 ) -> AppResult<Option<ConvertMarketPriceSnapshot>> {
-    sqlx::query_as::<_, ConvertMarketPriceSnapshot>(
-        r#"SELECT price, source, symbol, observed_at, source_version
-           FROM market_price_ticks
-           WHERE symbol = REPLACE(REPLACE(REPLACE(UPPER(?), '-', ''), '/', ''), '_', '')
-           ORDER BY observed_at DESC,
-                    CASE source
-                        WHEN 'bitget' THEN 0
-                        WHEN 'htx' THEN 1
-                        WHEN 'coinbase' THEN 2
-                        WHEN 'strategy' THEN 3
-                        ELSE 9
-                    END ASC,
-                    source_version DESC,
-                    id DESC
-           LIMIT 1"#,
+    let redis =
+        redis.ok_or_else(|| AppError::Validation("Redis is required for market pricing".into()))?;
+    Ok(
+        crate::modules::market::infrastructure::cache::latest::load_latest_price(
+            redis,
+            pair_symbol,
+        )
+        .await?
+        .map(|p| ConvertMarketPriceSnapshot {
+            price: p.price,
+            source: p.source,
+            symbol: p.symbol,
+            observed_at: p.observed_at,
+            source_version: p.source_version,
+        }),
     )
-    .bind(pair_symbol)
-    .fetch_optional(pool)
-    .await
-    .map_err(AppError::from)
 }
 
 /// 返回 MySQL 当前时间，quote 创建与过期边界均以该时钟为准。

@@ -40,8 +40,8 @@ the feature contract for the business context being modified.
 | [Risk Configuration](./risk-configuration.md) | Known JSON validation, locked enable/legacy disable and exact spot pair scopes | Active |
 | [Withdrawal Policy](./withdrawal-policy.md) | Explicit rolling allowances, address/security cooling, frozen reviewer requirements and unknown-broadcast safety | Active |
 | [External Market Fallback](./market-fallback.md) | Request-time Coinbase windows and provider/failure isolation | Active |
-| [External Market Pipeline](./external-market-pipeline.md) | Atomic Redis admission, durable FIFO consumers, historical archive and order-time cutoffs | Active |
-| [Market Price Retention](./market-price-retention.md) | Redis status and deadline history, short SQL retention and permanent order evidence | Active |
+| [External Market Pipeline](./external-market-pipeline.md) | Atomic Redis admission, durable FIFO consumers, legacy archive retirement and order-time cutoffs | Active |
+| [Market Price Retention](./market-price-retention.md) | Redis latest-only pricing/status, bounded generator checkpoints and permanent order evidence | Active |
 | [Deposit Address Contracts](./deposit-addresses.md) | Configurable deposit network address groups and address-pool allocation contracts | Active |
 | [Order Identifier Display Contract](./order-identifiers.md) | User-visible order numbers and internal ID separation across admin and PC UI | Active |
 | [Auth Session Contract](./auth-sessions.md) | sa-token-rust Redis session, refresh, extractor, and frontend Bearer compatibility contracts | Active |

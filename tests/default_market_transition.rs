@@ -51,7 +51,7 @@ async fn strategy(
 }
 
 async fn archive_count(pool: &MySqlPool, symbol: &str) -> Result<i64, sqlx::Error> {
-    sqlx::query_scalar("SELECT COUNT(*) FROM market_price_ticks WHERE symbol=?")
+    sqlx::query_scalar("SELECT COUNT(*) FROM market_generation_price_checkpoints WHERE symbol=?")
         .bind(symbol)
         .fetch_one(pool)
         .await
@@ -240,7 +240,7 @@ async fn default_manual_default_transition_waits_for_real_minutes_and_preserves_
         first_root,
         "new manual algorithm must not replace the preceding default candle"
     );
-    let identity:(String,Option<u64>,Option<i32>,BigDecimal)=sqlx::query_as("SELECT source,strategy_id,strategy_version,price FROM market_price_ticks WHERE symbol=? ORDER BY observed_at DESC,id DESC LIMIT 1")
+    let identity:(String,Option<u64>,Option<i32>,BigDecimal)=sqlx::query_as("SELECT source,strategy_id,strategy_version,price FROM market_generation_price_checkpoints WHERE symbol=? ORDER BY observed_at DESC,id DESC LIMIT 1")
         .bind(&symbol).fetch_one(&pool).await?;
     assert_eq!(
         identity,
@@ -284,7 +284,7 @@ async fn default_manual_default_transition_waits_for_real_minutes_and_preserves_
     );
     assert_eq!(redis.get::<_, String>(&ticker_key).await?, manual_ticker);
     assert_eq!(root(&collection, minute(manual_time)).await?, manual_root);
-    assert_eq!(archive_count(&pool, &symbol).await?, 2);
+    assert_eq!(archive_count(&pool, &symbol).await?, 1);
     eprintln!(
         "Manual source committed at {manual_time}; same-minute default resumption correctly deferred"
     );
@@ -312,8 +312,8 @@ async fn default_manual_default_transition_waits_for_real_minutes_and_preserves_
     assert_eq!(root(&collection, minute(default_time)).await?, first_root);
     assert_eq!(root(&collection, minute(manual_time)).await?, manual_root);
     assert_eq!(collection.count_documents(doc! {"interval":"1m"}).await?, 3);
-    assert_eq!(archive_count(&pool, &symbol).await?, 3);
-    let latest:(String,Option<u64>,Option<i32>,u64)=sqlx::query_as("SELECT source,strategy_id,strategy_version,generation FROM market_price_ticks WHERE symbol=? ORDER BY observed_at DESC,id DESC LIMIT 1")
+    assert_eq!(archive_count(&pool, &symbol).await?, 1);
+    let latest:(String,Option<u64>,Option<i32>,u64)=sqlx::query_as("SELECT source,strategy_id,strategy_version,generation FROM market_generation_price_checkpoints WHERE symbol=? ORDER BY observed_at DESC,id DESC LIMIT 1")
         .bind(&symbol).fetch_one(&pool).await?;
     assert_eq!(
         latest,
@@ -349,14 +349,14 @@ async fn default_manual_default_transition_waits_for_real_minutes_and_preserves_
         "{stopped:?}"
     );
     assert_eq!(redis.get::<_, String>(&ticker_key).await?, before_pause);
-    assert_eq!(archive_count(&pool, &symbol).await?, 3);
+    assert_eq!(archive_count(&pool, &symbol).await?, 1);
 
     let keys: Vec<String> = redis.keys(format!("market:*{symbol}*")).await?;
     if !keys.is_empty() {
         let _: i64 = redis.del(keys).await?;
     }
     mongo.drop().await?;
-    sqlx::query("DELETE FROM market_price_ticks WHERE symbol=?")
+    sqlx::query("DELETE FROM market_generation_price_checkpoints WHERE symbol=?")
         .bind(&symbol)
         .execute(&pool)
         .await?;

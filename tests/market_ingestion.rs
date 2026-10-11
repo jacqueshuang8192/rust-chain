@@ -346,7 +346,7 @@ async fn synthetic_ticker_archives_replays_repairs_and_rejects_stale_lease()
     let archived = sqlx::query_as::<_, ArchivedSyntheticTicker>(
         r#"SELECT event_key, symbol, price, source, observed_at, generation,
                   source_version, strategy_id, strategy_version
-           FROM market_price_ticks
+           FROM market_generation_price_checkpoints
            WHERE strategy_id = ? AND strategy_version = 1 AND observed_at = ?"#,
     )
     .bind(fixture.strategy_id)
@@ -386,7 +386,7 @@ async fn synthetic_ticker_archives_replays_repairs_and_rejects_stale_lease()
             .is_err()
     );
     let archive_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM market_price_ticks WHERE strategy_id = ? AND strategy_version = 1 AND observed_at = ?",
+        "SELECT COUNT(*) FROM market_generation_price_checkpoints WHERE strategy_id = ? AND strategy_version = 1 AND observed_at = ?",
     )
     .bind(fixture.strategy_id)
     .bind(observed_at.naive_utc())
@@ -438,7 +438,7 @@ async fn synthetic_ticker_archives_replays_repairs_and_rejects_stale_lease()
     assert!(regressed_error.to_string().contains("event time regressed"));
     assert_eq!(
         sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM market_price_ticks WHERE strategy_id = ?",
+            "SELECT COUNT(*) FROM market_generation_price_checkpoints WHERE strategy_id = ?",
         )
         .bind(fixture.strategy_id)
         .fetch_one(&pool)
@@ -479,11 +479,12 @@ async fn synthetic_ticker_archives_replays_repairs_and_rejects_stale_lease()
             .to_string()
             .contains("lease changed before archive")
     );
-    let stale_archive_count: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM market_price_ticks WHERE strategy_id = ?")
-            .bind(stale_fixture.strategy_id)
-            .fetch_one(&pool)
-            .await?;
+    let stale_archive_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM market_generation_price_checkpoints WHERE strategy_id = ?",
+    )
+    .bind(stale_fixture.strategy_id)
+    .fetch_one(&pool)
+    .await?;
     assert_eq!(stale_archive_count, 0);
     assert!(
         !connection
@@ -522,7 +523,7 @@ async fn synthetic_ticker_archives_replays_repairs_and_rejects_stale_lease()
     );
     assert_eq!(
         sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM market_price_ticks WHERE strategy_id = ?",
+            "SELECT COUNT(*) FROM market_generation_price_checkpoints WHERE strategy_id = ?",
         )
         .bind(old_version_fixture.strategy_id)
         .fetch_one(&pool)
@@ -558,7 +559,7 @@ async fn synthetic_ticker_archives_replays_repairs_and_rejects_stale_lease()
     );
     assert_eq!(
         sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM market_price_ticks WHERE strategy_id = ?",
+            "SELECT COUNT(*) FROM market_generation_price_checkpoints WHERE strategy_id = ?",
         )
         .bind(future_fixture.strategy_id)
         .fetch_one(&pool)
@@ -599,11 +600,12 @@ async fn synthetic_ticker_archives_replays_repairs_and_rejects_stale_lease()
     );
     let repaired_event = timeout(Duration::from_millis(100), repair_receiver.recv()).await??;
     assert!(repaired_event.payload().contains("\"last_price\":\"40\""));
-    let repaired_archive_count: i64 =
-        sqlx::query_scalar("SELECT COUNT(*) FROM market_price_ticks WHERE strategy_id = ?")
-            .bind(repair_fixture.strategy_id)
-            .fetch_one(&pool)
-            .await?;
+    let repaired_archive_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM market_generation_price_checkpoints WHERE strategy_id = ?",
+    )
+    .bind(repair_fixture.strategy_id)
+    .fetch_one(&pool)
+    .await?;
     assert_eq!(repaired_archive_count, 1);
 
     // A later default-source event remains authoritative even if Redis is lost:
@@ -611,7 +613,7 @@ async fn synthetic_ticker_archives_replays_repairs_and_rejects_stale_lease()
     let default_key = hex::encode(sha2::Sha256::digest(format!(
         "default-fence:{repair_symbol}"
     )));
-    sqlx::query("INSERT INTO market_price_ticks(event_key,symbol,price,source,observed_at,generation,source_version,strategy_id,strategy_version) VALUES (?,?,41,'default',?,1,'default:fixture:g1:v1',NULL,NULL)")
+    sqlx::query("INSERT INTO market_generation_price_checkpoints(event_key,symbol,price,source,observed_at,generation,source_version,strategy_id,strategy_version) VALUES (?,?,41,'default',?,1,'default:fixture:g1:v1',NULL,NULL) ON DUPLICATE KEY UPDATE event_key=VALUES(event_key),price=VALUES(price),source=VALUES(source),observed_at=VALUES(observed_at),generation=VALUES(generation),source_version=VALUES(source_version),strategy_id=NULL,strategy_version=NULL")
         .bind(&default_key).bind(&repair_symbol)
         .bind((observed_at + chrono::TimeDelta::milliseconds(1)).naive_utc())
         .execute(&pool).await?;
@@ -637,7 +639,7 @@ async fn synthetic_ticker_archives_replays_repairs_and_rejects_stale_lease()
             .await
             .is_err()
     );
-    sqlx::query("DELETE FROM market_price_ticks WHERE event_key=?")
+    sqlx::query("DELETE FROM market_generation_price_checkpoints WHERE event_key=?")
         .bind(default_key)
         .execute(&pool)
         .await?;

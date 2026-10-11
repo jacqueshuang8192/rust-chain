@@ -16,8 +16,7 @@ use crate::{
     state::AppState,
 };
 use redis::{AsyncCommands, Script};
-use sha2::{Digest, Sha256};
-use sqlx::{Connection, MySqlConnection, QueryBuilder};
+use sqlx::{Connection, MySqlConnection};
 use std::sync::LazyLock;
 use tokio::{
     task::JoinSet,
@@ -165,7 +164,7 @@ async fn consume_locked(
             .collect::<AppResult<Vec<_>>>()?;
         let started = Instant::now();
         if matches!(lane, ExternalMarketLane::Archive) {
-            archive(state, &events).await?;
+            retire_archive(&events).await?;
         } else {
             process(state, ingestion, lane, &events[0]).await?;
         }
@@ -236,60 +235,19 @@ async fn acknowledge(
     Ok(())
 }
 
-async fn archive(state: &AppState, events: &[QueuedMarketEvent]) -> AppResult<()> {
-    let pool = state
-        .mysql
-        .as_ref()
-        .ok_or_else(|| AppError::Internal("mysql is missing".into()))?;
-    let mut rows = Vec::with_capacity(events.len());
+// 旧版本归档队列不再写入 SQL；只确认合法 ticker，现货/杠杆独立工作项不受影响。
+async fn retire_archive(events: &[QueuedMarketEvent]) -> AppResult<()> {
     for event in events {
-        let ExternalMarketEvent::Ticker {
-            snapshot,
-            generation,
-        } = &event.event
-        else {
-            return Err(AppError::Validation("non-ticker in archive queue".into()));
-        };
-        let source = match snapshot.provider() {
-            MarketDataProvider::Bitget => "bitget",
-            MarketDataProvider::Htx => "htx",
-            MarketDataProvider::Coinbase => "coinbase",
-            MarketDataProvider::Strategy => {
-                return Err(AppError::Validation("strategy in external queue".into()));
+        match &event.event {
+            ExternalMarketEvent::Ticker { snapshot, .. }
+                if snapshot.provider() != MarketDataProvider::Strategy => {}
+            _ => {
+                return Err(AppError::Validation(
+                    "invalid legacy archive observation".into(),
+                ));
             }
-        };
-        let canonical = format!(
-            "{}|{}|{}|{}",
-            source,
-            snapshot.symbol(),
-            event.observed_at.timestamp_micros(),
-            snapshot.last_price().normalized()
-        );
-        rows.push((
-            snapshot,
-            generation,
-            source,
-            hex::encode(Sha256::digest(canonical.as_bytes())),
-            event.observed_at,
-        ));
+        }
     }
-    let mut query = QueryBuilder::new(
-        "INSERT INTO market_price_ticks (event_key, symbol, price, source, observed_at, generation, source_version) ",
-    );
-    query.push_values(
-        &rows,
-        |mut row, (snapshot, generation, source, key, observed_at)| {
-            row.push_bind(key)
-                .push_bind(snapshot.symbol())
-                .push_bind(snapshot.last_price())
-                .push_bind(*source)
-                .push_bind(observed_at.naive_utc())
-                .push_bind(**generation)
-                .push_bind(key);
-        },
-    );
-    query.push(" ON DUPLICATE KEY UPDATE event_key = VALUES(event_key)");
-    query.build().execute(pool).await?;
     Ok(())
 }
 

@@ -69,7 +69,7 @@ pub(crate) fn mysql_pool(state: &AppState) -> AppResult<Pool<MySql>> {
 
 /// 以一个共享门禁判定交易对是否能持续产生秒合约事件时间结算历史。
 /// `strategy`/`internal` 必须存在当前 active、在有效期、绑定精确版本且租约 owner 非空未过期的 running/live 策略；
-/// 或具有显式启用、未整体暂停、无运行错误且最近六十秒同版本同代际归档的默认来源；默认展示本身不等于结算能力。
+/// 或具有显式启用、未整体暂停、无运行错误且最近六十秒同版本同代际检查点的默认来源；默认展示本身不等于结算能力。
 /// `external` 必须被某条已启用 `market_feed_configs` 覆盖，且同一配置至少含一个运行时支持的 provider。
 /// 产品创建/更新/上架保留此配置门禁；普通开仓和结算改用 Redis，不在下单时等待历史能力。
 async fn ensure_settlement_history_capability(
@@ -589,35 +589,12 @@ pub(crate) async fn settle_order(
         ));
     }
     let database_now = infrastructure::database_now(&mut tx).await?;
-    let window_pricing = infrastructure::uses_window_price(&mut tx, order.id).await?;
-    let settlement_window_closes_at = if order.status == "manual_review" || window_pricing {
-        order.expires_at + chrono::TimeDelta::seconds(SETTLEMENT_PRICE_WINDOW_SECONDS)
-    } else {
-        order.expires_at
-    };
-    if database_now < settlement_window_closes_at {
+    if database_now < order.expires_at {
         return Err(AppError::Conflict(
-            "seconds contract order is not yet eligible for settlement".to_owned(),
+            "seconds contract order is not yet eligible for settlement".into(),
         ));
     }
-    let snapshot = if window_pricing {
-        infrastructure::cached_window_price(redis, &order.symbol, order.expires_at)
-            .await?
-            .ok_or_else(|| {
-                AppError::Conflict("秒合约到期窗口报价缺失，不能使用当前价格结算".into())
-            })?
-    } else if order.status == "manual_review" {
-        infrastructure::select_settlement_price_snapshot(&mut tx, &order.symbol, order.expires_at)
-            .await?
-            .ok_or_else(|| {
-                AppError::Conflict(
-                    "seconds contract settlement price history is pending for the event window"
-                        .to_owned(),
-                )
-            })?
-    } else {
-        infrastructure::cached_settlement_price(redis, &order.symbol).await?
-    };
+    let snapshot = infrastructure::cached_settlement_price(redis, &order.symbol).await?;
     let entry_price = order.entry_price.as_ref().ok_or_else(|| {
         AppError::Validation("seconds contract entry price is required for settlement".to_owned())
     })?;
