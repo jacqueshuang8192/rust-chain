@@ -92,6 +92,10 @@ pub(crate) struct ConvertOrderResponse {
     pub(crate) convert_pair_id: u64,
     pub(crate) from_asset_id: u64,
     pub(crate) to_asset_id: u64,
+    pub(crate) from_asset_symbol: Option<String>,
+    pub(crate) from_asset_logo_url: Option<String>,
+    pub(crate) to_asset_symbol: Option<String>,
+    pub(crate) to_asset_logo_url: Option<String>,
     /// 实际从源资产 available 扣除的数量。
     pub(crate) from_amount: BigDecimal,
     /// 实际计入目标资产 available 的数量，已扣除手续费。

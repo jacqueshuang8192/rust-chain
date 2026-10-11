@@ -13,11 +13,12 @@ import {
   X,
 } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import AssetMark from '@/components/AssetMark.vue'
 import LoginRequiredState from '@/components/LoginRequiredState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { apiErrorMessage } from '@/api/client'
-import { confirmConvertQuote, fetchConvertOrders, fetchConvertPairs, requestConvertQuote, type ConvertOrder, type ConvertPair, type ConvertQuote } from '@/api/swap'
+import { confirmConvertQuote, fetchConvertPairs, requestConvertQuote, type ConvertPair, type ConvertQuote } from '@/api/swap'
 import { fetchWalletAccounts } from '@/api/wallet'
 import { formatExactAmount as formatAmount, formatDateTime, formatExactAmount as formatPrice, formatRatePercent } from '@/core/format'
 import {
@@ -26,7 +27,6 @@ import {
   decimalWithinRange,
   positiveDecimalInput,
 } from '@/core/decimal'
-import { convertStatusPresentation } from '@/core/financialEnumPresentation'
 import { useModalDialog } from '@/core/modalDialog'
 import {
   buildSwapAvailableBalanceMap,
@@ -42,10 +42,10 @@ import type { WalletAccount } from '@/core/types'
 
 const session = useSessionStore()
 const navigation = useNavigationStore()
+const router = useRouter()
 const { t } = useI18n()
 const pairs = ref<ConvertPair[]>([])
 const accounts = ref<WalletAccount[]>([])
-const orders = ref<ConvertOrder[]>([])
 const pairSelectionKey = ref('')
 const amount = ref('')
 const quote = ref<ConvertQuote | null>(null)
@@ -61,7 +61,6 @@ const pickerDialog = ref<HTMLElement | null>(null)
 const pickerSide = ref<'from' | 'to'>('from')
 const pickerFilter = ref<'popular' | 'holding' | 'all'>('popular')
 const pickerQuery = ref('')
-const historySection = ref<HTMLElement | null>(null)
 const { trapFocus: trapReviewFocus } = useModalDialog(reviewOpen, reviewDialog, '[data-dialog-cancel]')
 const { trapFocus: trapPickerFocus } = useModalDialog(pickerOpen, pickerDialog, '[data-picker-search]')
 
@@ -106,9 +105,7 @@ async function load(): Promise<void> {
     pairs.value = nextPairs
     pairSelectionKey.value = nextSelectedPair ? swapPairSelectionKey(nextSelectedPair) : ''
     if (session.isAuthenticated) {
-      const [wallets, history] = await Promise.all([fetchWalletAccounts(), fetchConvertOrders()])
-      accounts.value = wallets
-      orders.value = history
+      accounts.value = await fetchWalletAccounts()
     }
   } catch (reason) {
     error.value = apiErrorMessage(reason, t('swap.loadFailed'))
@@ -154,7 +151,7 @@ function selectPickerAsset(symbol: string): void {
 }
 
 function openHistory(): void {
-  historySection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  void router.push({ name: 'swap-history' })
 }
 
 async function getQuote(): Promise<void> {
@@ -213,9 +210,7 @@ async function confirm(): Promise<void> {
     quote.value = null
     amount.value = ''
     reviewOpen.value = false
-    const [wallets, history] = await Promise.all([fetchWalletAccounts(), fetchConvertOrders()])
-    accounts.value = wallets
-    orders.value = history
+    accounts.value = await fetchWalletAccounts()
   } catch (reason) {
     error.value = apiErrorMessage(reason, t('swap.confirmFailed'))
   } finally {
@@ -229,11 +224,6 @@ function handleReviewKeydown(event: KeyboardEvent): void {
 
 function handlePickerKeydown(event: KeyboardEvent): void {
   trapPickerFocus(event, closePicker)
-}
-
-function orderStatusLabel(status: string): string {
-  const presentation = convertStatusPresentation(status)
-  return t(presentation.translationKey, { source: presentation.source || '--' })
 }
 
 onMounted(() => { void load() })
@@ -326,19 +316,6 @@ onMounted(() => { void load() })
             {{ t('swap.spotWalletNote') }}
           </p>
 
-          <section ref="historySection" class="pencil-section swap-history-pencil">
-            <div class="pencil-section__heading">
-              <h2>{{ t('swap.history') }}</h2>
-              <button type="button" :disabled="loading" @click="load">{{ t('swap.all') }}</button>
-            </div>
-            <div v-if="orders.length" class="pencil-list">
-              <article v-for="order in orders" :key="order.id" class="pencil-row swap-history-row">
-                <span class="pencil-row__copy"><strong>{{ order.fromAssetSymbol || t('swap.asset') }} → {{ order.toAssetSymbol || t('swap.asset') }}</strong><small>{{ formatDateTime(order.createdAt) }}</small></span>
-                <span class="pencil-row__value"><strong class="pencil-numeric">{{ formatAmount(order.fromAmount) }} → {{ formatAmount(order.toAmount) }}</strong><small>{{ orderStatusLabel(order.status) }}</small></span>
-              </article>
-            </div>
-            <div v-else class="pencil-state"><PackageOpen :size="22" /><span>{{ t('swap.emptyHistory') }}</span></div>
-          </section>
         </template>
         <div v-else-if="!error" class="pencil-state"><PackageOpen :size="23" /><span>{{ t('swap.noPairs') }}</span></div>
       </template>

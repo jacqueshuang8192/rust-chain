@@ -128,7 +128,40 @@ SELECT from_assets.logo_url AS from_asset_logo_url,
        to_assets.logo_url AS to_asset_logo_url
 ```
 
-## Error Matrix
+## Scenario: Historical Convert Asset Metadata
+
+### 1. Scope
+`GET /api/v1/convert/orders` now includes asset display metadata independent of
+the currently enabled convert-pair catalogue. Monetary snapshots stay unchanged.
+
+### 2. Signatures
+Each row adds nullable `from_asset_symbol`, `to_asset_symbol`,
+`from_asset_logo_url`, and `to_asset_logo_url` from the two joined asset IDs.
+
+### 3. Contracts
+Use LEFT JOIN on the order's from/to asset IDs, with no enabled-pair filter.
+Preserve authenticated user filtering, status, pagination and descending ID.
+Mobile prioritizes row metadata; only omitted fields use the legacy pair
+fallback. Explicit null logos stay absent. Catalogue failure cannot hide orders.
+
+### 4. Errors
+Missing metadata preserves the row and falls back through AssetMark; invalid
+money still fails the response contract. No derived logo URLs or external lookup.
+
+### 5. Cases
+Good: disabling a pair does not remove historical logos. Base: null logos use
+the normal asset mark fallback. Bad: coupling history access to enabled pairs.
+
+### 6. Tests
+DB route checks assert configured directional metadata after disabling a pair;
+mobile API tests assert reverse direction, null/legacy fallback, unavailable
+catalogue and exact large/tiny amounts. Run convert routes and mobile gate.
+
+### 7. Wrong Vs Correct
+Wrong: inner join history to enabled pairs. Correct: join asset metadata by
+immutable order asset IDs, without changing price/fee snapshots.
+
+## Favorites Error Matrix
 
 | Condition | Required result |
 | --- | --- |

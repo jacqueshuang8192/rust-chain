@@ -27,6 +27,7 @@ const EXPECTED_ROUTE_NAMES = [
   'message-center',
   'trade',
   'swap',
+  'swap-history',
   'products',
   'earn',
   'loan',
@@ -162,6 +163,7 @@ test('every named mobile destination resolves a symmetric localized document tit
 
   assert.equal(localizedRouteDocumentTitle(route('home', '/'), zh), '首页 · HIPPO')
   assert.equal(localizedRouteDocumentTitle(route('seconds-history', '/seconds/history'), english), 'Seconds order history · HIPPO')
+  assert.equal(localizedRouteDocumentTitle(route('swap-history', '/swap/history'), zh), '闪兑记录 · HIPPO')
   assert.equal(localizedRouteDocumentTitle(route('future-route', '/future'), zh), 'HIPPO')
 
   for (const name of EXPECTED_ROUTE_NAMES) {

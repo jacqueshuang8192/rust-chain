@@ -273,20 +273,25 @@ pub(crate) async fn list_convert_orders(
     offset: u32,
 ) -> AppResult<(Vec<ConvertOrderResponse>, bool)> {
     let mut builder = QueryBuilder::<MySql>::new(
-        r#"SELECT id, quote_id, convert_pair_id, from_asset AS from_asset_id,
-                  to_asset AS to_asset_id, from_amount, to_amount, rate,
-                  fee_rate, fee_amount, status, created_at
-           FROM convert_orders
-           WHERE user_id = "#,
+        r#"SELECT orders.id, orders.quote_id, orders.convert_pair_id,
+                  orders.from_asset AS from_asset_id, orders.to_asset AS to_asset_id,
+                  from_assets.symbol AS from_asset_symbol, from_assets.logo_url AS from_asset_logo_url,
+                  to_assets.symbol AS to_asset_symbol, to_assets.logo_url AS to_asset_logo_url,
+                  orders.from_amount, orders.to_amount, orders.rate,
+                  orders.fee_rate, orders.fee_amount, orders.status, orders.created_at
+           FROM convert_orders orders
+           LEFT JOIN assets from_assets ON from_assets.id = orders.from_asset
+           LEFT JOIN assets to_assets ON to_assets.id = orders.to_asset
+           WHERE orders.user_id = "#,
     );
     builder.push_bind(user_id);
 
     if let Some(status) = status {
-        builder.push(" AND status = ");
+        builder.push(" AND orders.status = ");
         builder.push_bind(status);
     }
 
-    builder.push(" ORDER BY id DESC LIMIT ");
+    builder.push(" ORDER BY orders.id DESC LIMIT ");
     builder.push_bind((limit + 1) as i64);
     builder.push(" OFFSET ");
     builder.push_bind(offset as i64);

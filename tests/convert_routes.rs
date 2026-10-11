@@ -604,6 +604,12 @@ async fn convert_routes_list_pairs_and_user_orders() -> Result<(), Box<dyn Error
     assert!(null_logo_pair.get("to_asset_logo_url").is_some());
     assert!(null_logo_pair["to_asset_logo_url"].is_null());
 
+    // 历史订单的币种元数据不依赖当前可闪兑目录，停用交易对后仍可展示 Logo。
+    sqlx::query("UPDATE convert_pairs SET enabled = FALSE WHERE id = ?")
+        .bind(pair_id)
+        .execute(&pool)
+        .await?;
+
     let orders_response = app
         .oneshot(
             Request::builder()
@@ -623,13 +629,14 @@ async fn convert_routes_list_pairs_and_user_orders() -> Result<(), Box<dyn Error
         String::from_utf8_lossy(&orders_body)
     );
     let orders: Value = serde_json::from_slice(&orders_body)?;
-    assert!(
-        orders["orders"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|order| { order["quote_id"] == quote_id && order["status"] == "pending" })
-    );
+    assert!(orders["orders"].as_array().unwrap().iter().any(|order| {
+        order["quote_id"] == quote_id
+            && order["status"] == "pending"
+            && order["from_asset_symbol"] == from_symbol
+            && order["to_asset_symbol"] == to_symbol
+            && order["from_asset_logo_url"] == from_logo_url
+            && order["to_asset_logo_url"] == to_logo_url
+    }));
 
     sqlx::query("DELETE FROM convert_pairs WHERE id = ?")
         .bind(null_pair_id)

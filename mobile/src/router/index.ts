@@ -33,6 +33,7 @@ const SecondsHistoryView = () => import('@/views/SecondsHistoryView.vue')
 const SecondsView = () => import('@/views/SecondsView.vue')
 const SupportChatView = () => import('@/views/SupportChatView.vue')
 const SwapView = () => import('@/views/SwapView.vue')
+const SwapHistoryView = () => import('@/views/SwapHistoryView.vue')
 const EarnView = () => import('@/views/EarnView.vue')
 const TradeView = () => import('@/views/TradeView.vue')
 const WalletLedgerView = () => import('@/views/WalletLedgerView.vue')
@@ -51,6 +52,7 @@ const router = createRouter({
     { path: '/messages', name: 'message-center', component: () => import('@/views/MessageCenterView.vue'), meta: { depth: 1, showBottomNav: false, backFallback: { name: 'home' } } },
     { path: '/trade/:symbol?', name: 'trade', component: TradeView, meta: { depth: 0, showBottomNav: true } },
     { path: '/swap', name: 'swap', component: SwapView, meta: { showBottomNav: false, depth: 1, backFallback: '/' } },
+    { path: '/swap/history', name: 'swap-history', component: SwapHistoryView, meta: { showBottomNav: false, depth: 2, backFallback: '/swap' } },
     { path: '/products', name: 'products', component: ProductHubView, meta: { showBottomNav: false, depth: 1, backFallback: '/' } },
     { path: '/products/earn', name: 'earn', component: EarnView, meta: { showBottomNav: false, depth: 2, backFallback: '/products' } },
     { path: '/products/loan', name: 'loan', component: LoanView, meta: { showBottomNav: false, depth: 2, backFallback: '/products' } },

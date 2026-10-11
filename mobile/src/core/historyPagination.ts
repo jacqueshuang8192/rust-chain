@@ -132,6 +132,9 @@ export function createHistoryPaginationController<T>(input: {
       const page = await input.fetchPage({ limit: pageSize, offset })
       if (!active || requestGeneration !== generation || session !== input.sessionKey()) return null
       return page
+    } catch (error) {
+      if (!active || requestGeneration !== generation || session !== input.sessionKey()) return null
+      throw error
     } finally {
       if (requestGeneration === generation) inFlight = false
     }

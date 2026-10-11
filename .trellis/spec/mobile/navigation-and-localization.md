@@ -176,6 +176,17 @@ lastTradePath: ComputedRef<string>
 - Storage keys are `hippo_mobile_last_trade_symbol` and `hippo_mobile_last_trade_mode`.
 - Switching spot/futures updates the current trade route with `replace`, so switching modes does not add a back-stack entry.
 
+### Swap history
+
+- Swap History is the named `/swap/history` detail route (`swap-history`), depth
+  2 with the Dock hidden and a `/swap` fallback. Its accessible title is
+  `swap.history`. The Swap header pushes this route instead of scrolling to an
+  embedded list. Records load only on the history page, not on quote/confirm.
+- Swap history uses `createHistoryPaginationController` with both session token
+  and generation, clearing rows on identity change and stopping on unmount.
+  Late failures must be ignored just like late successes before entering the
+  outer initial/append error handlers. Preserve retry and exact decimal strings.
+
 ### Authentication redirects
 
 - Only single-slash internal paths are accepted.

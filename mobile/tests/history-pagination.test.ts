@@ -47,3 +47,30 @@ test('history controller retries append without losing loaded records and ignore
   controller.reset()
   assert.equal(calls, 3)
 })
+
+test('old initial and append failures cannot replace a new authenticated history page', async () => {
+  for (const append of [false, true]) {
+    let session = 'old'
+    let reject!: (error: Error) => void
+    const controller = createHistoryPaginationController({
+      sessionKey: () => session,
+      fetchPage: async ({ offset }) => {
+        if (session === 'new') return { items: [{ id: 9 }], nextOffset: 1, hasMore: false }
+        if (append && offset === 0) return { items: [{ id: 1 }], nextOffset: 1, hasMore: true }
+        return new Promise<{ items: { id: number }[]; nextOffset: number; hasMore: boolean }>((_, no) => { reject = no })
+      },
+      identity: (row) => String(row.id),
+    })
+    if (append) await controller.loadInitial()
+    const old = append ? controller.loadMore() : controller.loadInitial()
+    session = 'new'
+    controller.reset()
+    await controller.loadInitial()
+    reject(new Error('old response'))
+    assert.equal(await old, 'stale')
+    assert.deepEqual(controller.snapshot().items, [{ id: 9 }])
+    assert.equal(controller.snapshot().initialError, null)
+    assert.equal(controller.snapshot().appendError, null)
+    controller.stop()
+  }
+})

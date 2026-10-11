@@ -7,6 +7,7 @@ import {
 import { requiredId, requiredSafeInteger, normalizeTimestamp } from '@/core/numeric'
 import {
   mapDirectionalConvertPairs,
+  normalizeConvertPairLogoUrl,
   type BackendConvertPair,
   type ConvertPair,
 } from '@/core/swapAssetLogos'
@@ -31,6 +32,8 @@ export interface ConvertOrder {
   toAssetId: number
   fromAssetSymbol?: string
   toAssetSymbol?: string
+  fromAssetLogoUrl?: string
+  toAssetLogoUrl?: string
   fromAmount: DecimalText
   toAmount: DecimalText
   rate: DecimalText
@@ -80,7 +83,7 @@ export async function fetchConvertOrdersPage(input: {
       requestUrl('/convert/orders'),
       { params: { limit, offset } },
     ),
-    fetchConvertPairs(),
+    fetchConvertPairs().catch(() => []),
   ])
   return mapHistoryPage(
     { items: response.data.orders || [], has_more: response.data.has_more },
@@ -95,6 +98,10 @@ export async function fetchConvertOrdersPage(input: {
     toAssetId,
     fromAssetSymbol: text(order.from_asset_symbol) || pair?.fromAssetSymbol,
     toAssetSymbol: text(order.to_asset_symbol) || pair?.toAssetSymbol,
+    fromAssetLogoUrl: order.from_asset_logo_url === undefined
+      ? pair?.fromAssetLogoUrl : normalizeConvertPairLogoUrl(order.from_asset_logo_url),
+    toAssetLogoUrl: order.to_asset_logo_url === undefined
+      ? pair?.toAssetLogoUrl : normalizeConvertPairLogoUrl(order.to_asset_logo_url),
     fromAmount: convertDecimal(order.from_amount, 'from_amount'),
     toAmount: convertDecimal(order.to_amount, 'to_amount'),
     rate: convertDecimal(order.rate, 'rate'),

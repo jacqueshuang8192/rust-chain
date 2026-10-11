@@ -18,6 +18,7 @@ export const ROUTE_ACCESSIBILITY_TITLE_KEYS = Object.freeze({
   'message-center': 'routeAccessibility.titles.messageCenter',
   trade: 'routeAccessibility.titles.trade',
   swap: 'routeAccessibility.titles.swap',
+  'swap-history': 'swap.history',
   products: 'routeAccessibility.titles.products',
   earn: 'routeAccessibility.titles.earn',
   loan: 'routeAccessibility.titles.loan',
