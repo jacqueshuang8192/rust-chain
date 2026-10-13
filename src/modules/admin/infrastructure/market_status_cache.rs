@@ -88,8 +88,14 @@ pub(crate) async fn load_live_market_observations(
         .arg(keys)
         .query_async(&mut redis.clone())
         .await?;
+    let (row_pairs, remainder) = rows.as_chunks::<2>();
+    if !remainder.is_empty() || row_pairs.len() != symbols.len() {
+        return Err(AppError::Internal(
+            "Redis 行情状态批量结果数量异常".to_owned(),
+        ));
+    }
     let mut observations = Vec::new();
-    for (symbol, row) in symbols.iter().zip(rows.chunks_exact(2)) {
+    for (symbol, row) in symbols.iter().zip(row_pairs) {
         let Some(payload) = &row[0] else {
             continue;
         };
