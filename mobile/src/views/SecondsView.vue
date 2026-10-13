@@ -2671,7 +2671,6 @@ onBeforeUnmount(() => {
   font-size: 8px;
   font-weight: 700;
   line-height: 16px;
-  padding: 0 6px;
 }
 
 .seconds-active-order__identity > span.down {
