@@ -104,3 +104,38 @@ from a screenshot. No production database was changed; no push or deployment.
 - Reviewed final 390px screenshot; the browser used in-memory read-only
   fixtures and its TaskSpace was closed. No production data, push or deployment;
   physical-device validation remains outstanding.
+
+## Follow-up: Registration Consent Interaction
+
+- Replaced the duplicate link row with one localized sentence containing
+  separate Terms and Privacy buttons. The native checkbox target is 44x44;
+  document buttons are at least 44px high, use underlines and readable theme
+  colors, and sit outside the checkbox label to avoid accidental toggles.
+- Unread checkbox interaction opens the first unread document and stays
+  unchecked. Each named link opens its own tab. The parent retains the viewed
+  set across dismissals for the current loaded bundle, without granting
+  acceptance. Both-document review still gates explicit acceptance; the
+  confirmation action now clearly says Agree and continue. Country/locale
+  changes and publication reloads clear review and acceptance. A shared guard
+  opens the reader before send/register without automatically retrying either
+  request; API publication and actual-locale fields remain unchanged.
+- Final `npm run release:gate` passed: 850/850 tests, both type checks,
+  PWA/Tauri web builds, artifact and unchanged bundle/source/test budgets.
+  Six added behavior tests execute actual SFC setup with Vue reactivity.
+  Initial JS budget failures were resolved by deduplicating tabs/consent guards
+  and removing unused Mobile date messages, not by changing limits.
+- Browser checks passed 16 registration layouts across zh-CN/en, light/dark,
+  320x568, 390x844, 448x900 and 844x390. Consent targets never overlapped, stayed
+  at least 44px, and had no horizontal overflow. Chinese fits one 44px row;
+  English naturally wraps to 88px. Eight reader layouts retained visible
+  actions, hidden dates and scroll locking. Verified independent tabs,
+  separate-session review, no acceptance on close, explicit confirm/toggle,
+  Space, arrow tabs, Escape/focus return, country/locale reset, unavailable
+  documents and zero email/registration requests without consent.
+- Inspected light/dark Chinese/English screenshots and the final clean 390px
+  light screenshot. Legal content used a browser-memory-only read fixture;
+  the exact timestamped Vite module URL was required to intercept the active
+  client. Early untimestamped imports created a separate unused client, so
+  those checks were repeated against verified fixtures. No production writes.
+  Task validation and diff checks passed. The test TaskSpace was closed;
+  port 5186 remains available. No push/deployment or physical-device testing.

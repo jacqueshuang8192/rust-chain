@@ -7,15 +7,15 @@ import { normalizeNewsRichText } from '@/core/newsRichText'
 import type { RegistrationLegalBundle } from '@/api/auth'
 import NewsRichText from '@/components/NewsRichText.vue'
 
-const props = defineProps<{ bundle: RegistrationLegalBundle }>()
-const emit = defineEmits<{ close: []; confirm: [] }>()
+type DocumentKind = 'terms' | 'privacy'
+const props = defineProps<{ bundle: RegistrationLegalBundle; initial: DocumentKind; seen: ReadonlySet<DocumentKind> }>()
+const emit = defineEmits<{ close: []; confirm: []; view: [kind: DocumentKind] }>()
 const { t } = useI18n()
 const open = ref(false)
 const dialog = ref<HTMLElement | null>(null)
 const copy = ref<HTMLElement | null>(null)
 const { trapFocus } = useModalDialog(open, dialog, '[data-legal-close]')
-const selected = ref<'terms' | 'privacy'>('terms')
-const visited = ref(new Set<'terms' | 'privacy'>(['terms']))
+const selected = ref(props.initial)
 const document = computed(() => props.bundle[selected.value])
 const bodyBlocks = computed(() => normalizeNewsRichText(document.value.body))
 const language = computed(() => {
@@ -24,12 +24,12 @@ const language = computed(() => {
   return props.bundle.locale
 })
 
-onMounted(() => { open.value = true })
+onMounted(() => { open.value = true; emit('view', selected.value) })
 
-async function select(kind: 'terms' | 'privacy') {
+async function select(kind: DocumentKind) {
   if (selected.value === kind) return
   selected.value = kind
-  visited.value = new Set([...visited.value, kind])
+  emit('view', kind)
   await nextTick()
   if (copy.value) copy.value.scrollTop = 0
 }
@@ -45,7 +45,7 @@ async function navigateTabs(event: KeyboardEvent) {
 }
 
 async function dismiss(confirmed = false) {
-  if (!open.value || (confirmed && visited.value.size < 2)) return
+  if (!open.value || (confirmed && props.seen.size < 2)) return
   open.value = false
   await nextTick()
   if (confirmed) emit('confirm')
@@ -67,12 +67,9 @@ async function dismiss(confirmed = false) {
           <button data-legal-close type="button" :aria-label="t('common.close')" @click="dismiss()"><X :size="20" aria-hidden="true" /></button>
         </header>
         <div class="legal-tabs" role="tablist" :aria-label="t('auth.legalReadTitle')" @keydown="navigateTabs">
-          <button id="registration-legal-tab-terms" type="button" role="tab" :aria-selected="selected === 'terms'"
-            aria-controls="registration-legal-panel" :tabindex="selected === 'terms' ? 0 : -1"
-            @click="select('terms')">{{ t('auth.legalTerms') }}</button>
-          <button id="registration-legal-tab-privacy" type="button" role="tab" :aria-selected="selected === 'privacy'"
-            aria-controls="registration-legal-panel" :tabindex="selected === 'privacy' ? 0 : -1"
-            @click="select('privacy')">{{ t('auth.legalPrivacy') }}</button>
+          <button v-for="kind in (['terms', 'privacy'] as const)" :id="`registration-legal-tab-${kind}`" :key="kind"
+            type="button" role="tab" :aria-selected="selected === kind" aria-controls="registration-legal-panel"
+            :tabindex="selected === kind ? 0 : -1" @click="select(kind)">{{ t(kind === 'terms' ? 'auth.legalTerms' : 'auth.legalPrivacy') }}</button>
         </div>
         <div id="registration-legal-panel" ref="copy" class="legal-copy" tabindex="0" role="tabpanel"
           :aria-labelledby="`registration-legal-tab-${selected}`" :lang="bundle.locale">
@@ -81,7 +78,7 @@ async function dismiss(confirmed = false) {
         </div>
         <footer class="legal-actions">
           <button type="button" @click="dismiss()">{{ t('common.cancel') }}</button>
-          <button type="button" :disabled="visited.size < 2" @click="dismiss(true)">{{ t('auth.legalAcknowledge') }}</button>
+          <button type="button" :disabled="seen.size < 2" @click="dismiss(true)">{{ t('auth.legalAcknowledge') }}</button>
         </footer>
       </section>
     </div>

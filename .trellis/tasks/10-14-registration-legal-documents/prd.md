@@ -65,3 +65,10 @@ Present actual Terms of Service and Privacy Policy during user registration on M
 - [x] Remove effective/last-updated dates from the Mobile reading dialog in both themes; retain backend dates and publication/acknowledgement contracts.
 - [x] Preserve the dark-theme palette, reading/focus behavior, safe-area layout and both-document acknowledgement.
 - [x] Review phone screenshots, verify responsive interactions and pass the unchanged mobile release gate.
+
+## Mobile Registration Consent Follow-Up
+
+- [x] Replace the duplicate document-link row with one localized sentence containing independent Terms and Privacy buttons, plus a 44px checkbox target.
+- [x] Let an unchecked, unread consent control open the first unread document; each document link opens its own tab without changing acceptance.
+- [x] Preserve viewed documents across dismissals for the current publication only; require an explicit acknowledgement or checkbox action, and reset on country/locale/publication reload.
+- [x] Keep dates hidden, existing API/version validation and both themes intact; verify mobile layouts, keyboard behavior, request guards and the unchanged release gate.

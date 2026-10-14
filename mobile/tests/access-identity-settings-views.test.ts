@@ -31,10 +31,10 @@ test('登录与注册保留配置、挑战、重定向和请求载荷合同', ()
   assert.match(sources.login, /replaceAuthStep\(router, safeRedirect\.value\)/)
 
   assert.match(sources.register, /Promise\.allSettled\(\[fetchCountries\(\), fetchRegisterConfig\(\)\]\)/)
-  assert.match(sources.register, /await sendRegistrationCode\(email\.value, countryCode\.value, legalDocuments\.value\.locale, legalDocuments\.value\.publication_id\)/)
+  assert.match(sources.register, /await sendRegistrationCode\(email\.value, countryCode\.value, legal\.locale, legal\.publication_id\)/)
   assert.match(
     sources.register,
-    /registerWithEmail\(\{ email: email\.value, password: password\.value, code: code\.value, countryCode: countryCode\.value, inviteCode: inviteCode\.value, legalLocale: legalDocuments\.value\.locale, legalPublicationId: legalDocuments\.value\.publication_id \}\)/,
+    /registerWithEmail\(\{ email: email\.value, password: password\.value, code: code\.value, countryCode: countryCode\.value, inviteCode: inviteCode\.value, legalLocale: legal\.locale, legalPublicationId: legal\.publication_id \}\)/,
   )
   assert.match(sources.register, /emailCodeRequired\.value && !code\.value\.trim\(\)/)
   assert.match(sources.register, /inviteCodeRequired\.value && !inviteCode\.value\.trim\(\)/)

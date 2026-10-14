@@ -9669,3 +9669,10 @@
 - 修改文件：`mobile/src/components/RegistrationLegalDialog.vue`、`.trellis/spec/mobile/navigation-and-localization.md`、`.trellis/tasks/10-14-registration-legal-documents/{prd,delivery}.md`、`docs/superpowers/PROGRESS.md`。
 - 验证结果：完整`mobile/npm run release:gate`通过，844/844测试、生产/测试类型检查、PWA/Tauri Web构建、产物及既有包体/源码/测试预算均通过，未放宽限制。浏览器使用内存只读夹具验证明暗主题320/390/448px、844x390横屏及1280px，无水平溢出或操作区遮挡；中英文、纯文本/富文本、长词换行、日期隐藏、确认门槛、滚动复位及焦点交互通过。全页重新加载后再次通过10组尺寸/主题检查并查看最终截图；`git diff --check`通过。
 - 后续事项：本次仅本地提交，未推送或部署；5186开发服务继续运行，验收浏览器已关闭。实体手机及安装态PWA未实机验证。
+
+## 2026-10-15 07:10 - PWA注册协议勾选区手机交互优化
+
+- 完成内容：移除重复协议链接行，改为一句话内的用户协议和隐私政策独立入口；勾选区扩大至44px，使用清晰的主题链接色。未阅读时点勾选打开首份未查看文件，分次阅读保留当前版本的查看状态，关闭不自动同意；主动确认或勾选才接受，切换国家/语言及重新加载版本后清空。发码和注册共用协议校验，保留实际语言和发布编号，不自动重试请求；日期继续隐藏。
+- 修改文件：`mobile/src/views/RegisterView.vue`、`mobile/src/components/RegistrationLegalDialog.vue`、`mobile/src/i18n/messages/{zh-CN,en}.ts`、`mobile/tests/{registration-legal-consent,access-identity-settings-views,pencil-selected-unmapped-pages}.test.ts`、`.trellis/spec/mobile/navigation-and-localization.md`、`.trellis/tasks/10-14-registration-legal-documents/{prd,delivery}.md`、`docs/superpowers/PROGRESS.md`。
+- 验证结果：完整`mobile/npm run release:gate`通过，850/850测试、生产/测试类型检查、PWA/Tauri Web构建及产物/包体/源码/测试预算均通过。初次JS超预算已通过本次组件去重和删除未使用日期文案解决，未放宽门槛。真实浏览器16组中英文/明暗主题/320、390、448px及横屏布局无横向溢出或点击范围重叠，入口均至少44px；8组阅读弹窗布局无操作区遮挡。独立页签、分次阅读、主动勾选/取消、关闭不接受、键盘、国家/语言清空、无文件禁用及未同意时零发码/注册请求均通过。已检查最终截图，任务校验与diff检查通过；Vite带时间戳模块夹具确认生效后重跑了交互检查。
+- 后续事项：已获用户确认，本次仅做本地提交；未推送、部署或操作生产数据。5186开发服务保留，验收浏览器已关闭；实体手机和安装态PWA未实机验证，`.vite/`缓存不纳入改动。

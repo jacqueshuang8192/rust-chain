@@ -2,7 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import axios from 'axios'
 import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
-import { useI18n } from 'vue-i18n'
+import { I18nT, useI18n } from 'vue-i18n'
 import { Check, ChevronDown, Eye, EyeOff, MailCheck, Search, X } from 'lucide-vue-next'
 import { apiErrorMessage } from '@/api/client'
 import { fetchCountries, fetchRegisterConfig, fetchRegistrationLegal, registerWithEmail, sendRegistrationCode, type CountryOption, type RegistrationLegalBundle } from '@/api/auth'
@@ -35,7 +35,9 @@ const sending = ref(false)
 const submitting = ref(false)
 const remainingSeconds = ref(0)
 const acceptedTerms = ref(false)
-const reviewedLegal = ref(false)
+const legalSeen = ref(new Set<'terms' | 'privacy'>())
+const reviewedLegal = computed(() => legalSeen.value.size === 2)
+const legalInitial = ref<'terms' | 'privacy'>('terms')
 const legalDocuments = ref<RegistrationLegalBundle | null>(null)
 const legalLoading = ref(false)
 const legalError = ref('')
@@ -121,7 +123,7 @@ async function loadLegal(): Promise<void> {
   const request = ++legalRequest
   legalDocuments.value = null
   acceptedTerms.value = false
-  reviewedLegal.value = false
+  legalSeen.value.clear()
   legalOpen.value = false
   legalError.value = ''
   if (!country) return
@@ -137,6 +139,26 @@ async function loadLegal(): Promise<void> {
 }
 
 watch([countryCode, locale], () => { void loadLegal() })
+
+function openLegal(kind: 'terms' | 'privacy' = legalSeen.value.has('terms') ? 'privacy' : 'terms'): void {
+  if (!legalDocuments.value) return
+  legalInitial.value = kind
+  legalOpen.value = true
+}
+
+function toggleLegal(event: Event): void {
+  const input = event.target as HTMLInputElement
+  if (legalDocuments.value && reviewedLegal.value) acceptedTerms.value = input.checked
+  else openLegal()
+  input.checked = acceptedTerms.value
+}
+
+function requireLegal(): RegistrationLegalBundle | null {
+  if (acceptedTerms.value && reviewedLegal.value && legalDocuments.value) return legalDocuments.value
+  error.value = t('auth.termsRequired')
+  openLegal()
+  return null
+}
 
 function handleCountryPickerKeydown(event: KeyboardEvent): void {
   trapCountryPickerFocus(event, closeCountryPicker)
@@ -158,18 +180,15 @@ function startCountdown() {
 async function sendCode() {
   if (!emailCodeRequired.value) return
   error.value = ''
-  if (!acceptedTerms.value || !reviewedLegal.value || !legalDocuments.value) {
-    error.value = t('auth.termsRequired')
-    if (legalDocuments.value) legalOpen.value = true
-    return
-  }
+  const legal = requireLegal()
+  if (!legal) return
   if (!email.value.trim() || !email.value.includes('@')) {
     error.value = t('auth.validEmailRequired')
     return
   }
   sending.value = true
   try {
-    await sendRegistrationCode(email.value, countryCode.value, legalDocuments.value.locale, legalDocuments.value.publication_id)
+    await sendRegistrationCode(email.value, countryCode.value, legal.locale, legal.publication_id)
     sent.value = true
     startCountdown()
   } catch (reason) {
@@ -183,10 +202,8 @@ async function sendCode() {
 
 async function submit() {
   error.value = ''
-  if (!acceptedTerms.value || !reviewedLegal.value || !legalDocuments.value) {
-    error.value = t('auth.termsRequired')
-    return
-  }
+  const legal = requireLegal()
+  if (!legal) return
   if (!email.value.trim() || !email.value.includes('@') || !countryCode.value || (emailCodeRequired.value && !code.value.trim()) || !password.value) {
     error.value = t('auth.completeRegistration')
     return
@@ -205,7 +222,7 @@ async function submit() {
   }
   submitting.value = true
   try {
-    await registerWithEmail({ email: email.value, password: password.value, code: code.value, countryCode: countryCode.value, inviteCode: inviteCode.value, legalLocale: legalDocuments.value.locale, legalPublicationId: legalDocuments.value.publication_id })
+    await registerWithEmail({ email: email.value, password: password.value, code: code.value, countryCode: countryCode.value, inviteCode: inviteCode.value, legalLocale: legal.locale, legalPublicationId: legal.publication_id })
     session.sync()
     await replaceAuthStep(router, safeRedirect.value)
   } catch (reason) {
@@ -318,11 +335,15 @@ onUnmounted(() => { if (timer) window.clearInterval(timer) })
       </div>
 
       <div class="terms-row">
-        <label class="terms-choice"><input v-model="acceptedTerms" type="checkbox" :disabled="!reviewedLegal || !legalDocuments" />
-          <span class="terms-check"><Check :size="12" /></span>
-          <span>{{ t('auth.legalAgreement') }}</span>
+        <label class="terms-choice">
+          <input :checked="acceptedTerms" type="checkbox" :disabled="!legalDocuments"
+            aria-labelledby="registration-legal-agreement" @change="toggleLegal" />
+          <span class="terms-check" aria-hidden="true"><Check :size="14" /></span>
         </label>
-        <button type="button" :disabled="!legalDocuments" @click="legalOpen = true">{{ t('auth.legalTerms') }} · {{ t('auth.legalPrivacy') }}</button>
+        <I18nT id="registration-legal-agreement" class="terms-copy" keypath="auth.legalAgreement" tag="div" scope="global">
+          <template #terms><button type="button" :disabled="!legalDocuments" aria-haspopup="dialog" @click="openLegal('terms')">{{ t('auth.legalTerms') }}</button></template>
+          <template #privacy><button type="button" :disabled="!legalDocuments" aria-haspopup="dialog" @click="openLegal('privacy')">{{ t('auth.legalPrivacy') }}</button></template>
+        </I18nT>
       </div>
       <p v-if="legalLoading" class="register-notice" role="status">{{ t('common.loading') }}</p>
       <p v-if="legalError" class="register-notice" role="alert">{{ legalError }}</p>
@@ -339,8 +360,8 @@ onUnmounted(() => { if (timer) window.clearInterval(timer) })
     </form>
 
     <RegistrationLegalDialog v-if="legalOpen && legalDocuments" :key="legalDocuments.publication_id"
-      :bundle="legalDocuments" @close="legalOpen = false"
-      @confirm="reviewedLegal = true; acceptedTerms = true; legalOpen = false" />
+      :bundle="legalDocuments" :initial="legalInitial" :seen="legalSeen" @view="legalSeen.add($event)"
+      @close="legalOpen = false" @confirm="acceptedTerms = reviewedLegal; legalOpen = false; error = ''" />
 
     <Teleport to="body">
       <div v-if="countryPickerOpen" class="auth-pencil-page country-picker-mask" @click.self="closeCountryPicker">
@@ -581,43 +602,38 @@ onUnmounted(() => { if (timer) window.clearInterval(timer) })
 
 .terms-row {
   display: grid;
-  gap: 2px;
-  grid-template-columns: minmax(0, 1fr);
-  min-height: 72px;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 4px;
+  align-items: start;
 }
 .terms-choice {
   display: grid;
-  grid-template-columns: 16px minmax(0, 1fr);
-  align-items: center;
-  gap: 8px;
-  min-height: 40px;
+  place-items: center;
+  height: 44px;
   position: relative;
 }
-.terms-choice > span:last-child { color: var(--muted); font-size: 11px; line-height: 1.4; }
-.terms-row > button { justify-self: start; border: 0; background: transparent; padding: 0 0 0 24px; color: var(--accent); min-height: 40px; text-align: left; font-size: 11px; }
-.terms-row > button:disabled { color: var(--muted); }
+.terms-copy { color: var(--muted-strong); font-size: 13px; line-height: 22px; overflow-wrap: anywhere; }
+.terms-copy button { display: inline-flex; align-items: center; min-height: 44px; padding: 0 2px; border: 0; background: transparent; color: var(--positive); font: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.terms-copy button:disabled { color: var(--muted); }
 
 .terms-row input {
-  height: 44px;
-  left: -14px;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   margin: 0;
   opacity: 0;
   position: absolute;
-  top: -14px;
-  width: 44px;
 }
 
 .terms-check {
-  align-items: center;
+  display: grid;
+  place-items: center;
   background: var(--surface-2);
   border: 1px solid var(--line-strong);
-  border-radius: 3px;
-  box-sizing: border-box;
+  border-radius: 4px;
   color: transparent;
-  display: inline-flex;
-  height: 16px;
-  justify-content: center;
-  width: 16px;
+  height: 20px;
+  width: 20px;
 }
 
 .terms-row input:checked + .terms-check { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }

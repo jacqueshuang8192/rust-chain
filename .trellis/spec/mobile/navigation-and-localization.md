@@ -32,10 +32,37 @@ focus and the previous body overflow. Tabs use roving tabindex with arrows,
 Home/End and associated panel labels; changing documents resets panel scroll.
 Viewing both documents still gates acknowledgement, and closing never grants it.
 
+The registration consent row uses one `I18nT` sentence with named `terms` and
+`privacy` button slots. Do not repeat a separate link row or nest document
+buttons inside the checkbox label. The native checkbox has a 44x44 label/input
+target and `aria-labelledby` points to the full sentence; document buttons
+retain 44px height, underline and contrast-safe `--positive` text in both themes.
+
+`RegistrationLegalDialog` receives `initial: 'terms' | 'privacy'` and
+`seen: ReadonlySet<'terms' | 'privacy'>`; mounting or changing a tab emits
+`view(kind)`. The parent owns this in-memory set for the current loaded bundle,
+so separate reading sessions count without granting acceptance. An unread
+checkbox opens the first unseen document and restores its unchecked DOM state.
+After both documents have been viewed, an explicit checkbox action or the
+reader's acknowledgement may accept; closing or opening a document cannot.
+Country/locale changes and every publication reload clear the set and
+acceptance. Missing/loading documents disable all three consent controls.
+`requireLegal()` gates both sending registration email and creating the user,
+opening the reader on missing consent without automatically retrying either
+request after acknowledgement. Accepted requests retain the loaded publication
+ID and actual document locale, including fallback languages.
+
 Verify light/dark 320x568, 390x844, 448x900 and 844x390 layouts, English long
 text, plain/rich bodies, Tab containment, Escape/backdrop/cancel dismissal,
 focus return, locale reset and simulated safe insets. Desktop previews retain
 the same handset-width sheet. Follow the mobile release gate for bundle budgets.
+`tests/registration-legal-consent.test.ts` executes the real SFC setup with Vue
+reactivity to cover independent entry, cross-session review, explicit acceptance,
+context invalidation, late reads, request guards and publication payloads.
+Browser checks must also cover checkbox Space, separate link focus, nonoverlapping
+touch targets and wrapped English copy. When installing an in-memory adapter in
+Vite, import the exact module URL (including its HMR timestamp) used by the page;
+an untimestamped import can create a second client that does not intercept I/O.
 
 ## 1. Scope / Trigger
 
