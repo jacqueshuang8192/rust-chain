@@ -9662,3 +9662,10 @@
 - 修改文件：`mobile/src/components/RegistrationLegalDialog.vue`、`.trellis/spec/mobile/navigation-and-localization.md`、`.trellis/tasks/10-14-registration-legal-documents/{prd,delivery}.md`、`docs/superpowers/PROGRESS.md`。
 - 验证结果：`mobile/npm run release:gate`全部通过，含844/844测试、生产/测试类型检查、PWA/Tauri Web构建、产物及包体/源码预算检查；初次包体超限已通过精简本组件解决，未放宽门槛。真实浏览器使用内存只读夹具验收明暗主题320/390/448px、844x390横屏及1280px预览，无水平溢出或正文与按钮遮挡；确认门槛、滚动复位、键盘切换、焦点闭环/恢复、Escape/遮罩/取消、语言变更清空确认、中英文及纯文本/富文本、减少动态效果均通过。模拟20px侧边/34px底部安全区在等待布局稳定后通过，截图已检查；`git diff --check`通过。
 - 后续事项：本次仅本地提交，未推送或部署；手机端开发服务5186已启动，验收浏览器已关闭，不持久化测试正文。实体手机和安装态PWA安全区未实机验证。
+
+## 2026-10-15 06:27 - 白色主题协议弹窗优化与日期隐藏
+
+- 完成内容：白色主题协议弹窗改为细线标签页、同行语言标识、清晰的文档标题及15px正文，弱化取消按钮，确认按钮使用深绿底白字；保留深色配色。按用户追加要求，两个主题均移除生效日期和最后更新，保留后台版本元数据及确认逻辑。合并本组件重复样式，使用独占legal-*命名防止样式影响其他页面。
+- 修改文件：`mobile/src/components/RegistrationLegalDialog.vue`、`.trellis/spec/mobile/navigation-and-localization.md`、`.trellis/tasks/10-14-registration-legal-documents/{prd,delivery}.md`、`docs/superpowers/PROGRESS.md`。
+- 验证结果：完整`mobile/npm run release:gate`通过，844/844测试、生产/测试类型检查、PWA/Tauri Web构建、产物及既有包体/源码/测试预算均通过，未放宽限制。浏览器使用内存只读夹具验证明暗主题320/390/448px、844x390横屏及1280px，无水平溢出或操作区遮挡；中英文、纯文本/富文本、长词换行、日期隐藏、确认门槛、滚动复位及焦点交互通过。全页重新加载后再次通过10组尺寸/主题检查并查看最终截图；`git diff --check`通过。
+- 后续事项：本次仅本地提交，未推送或部署；5186开发服务继续运行，验收浏览器已关闭。实体手机及安装态PWA未实机验证。

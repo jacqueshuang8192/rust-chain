@@ -14,6 +14,16 @@ panel scrolls; the heading, two tabs and safe-area acknowledgement row stay
 visible. Keep 44px close/tab targets and 50px actions, long-word wrapping,
 and reduced-motion support.
 
+Light theme uses a white document surface, underline tabs, a 15px reading
+body, 20px document title and a dark-green (`#087b52`) acknowledgement with
+white text. Cancel is a low-emphasis text action; dark theme retains its mint
+action and 14px reading body. Neither theme displays effective or last-updated
+dates in this dialog; their API/storage fields and version checks stay intact.
+The component owns the globally unique `legal-*` CSS namespace so theme
+selectors work across Teleport without repeated scoped selectors. Keep every
+rule under that namespace. Target `.legal-copy > h3` for the document title:
+a descendant selector would incorrectly restyle rich-text section headings.
+
 `RegistrationLegalDialog` mounts under `v-if`: initialize its modal-open ref to
 false, set it true in `onMounted`, and close it before emitting dismissal. The
 shared `useModalDialog` watcher is not immediate; a permanently true ref skips

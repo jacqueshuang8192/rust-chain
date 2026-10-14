@@ -58,3 +58,10 @@ Present actual Terms of Service and Privacy Policy during user registration on M
 - [x] Keep title, document tabs and acknowledgement visible while only the document scrolls; support 320-448px handsets, landscape and safe areas.
 - [x] Preserve both-document review, safe rich/plain rendering and publication identity; fix initial focus, scroll lock, dismissal focus return and tab keyboard navigation.
 - [x] Verify real browser interactions with local read-only fixtures and run the mobile release gate.
+
+## Light Theme Visual Refinement
+
+- [x] Simplify the white reading surface, use underline tabs, improve document typography and give the primary acknowledgement a restrained green treatment.
+- [x] Remove effective/last-updated dates from the Mobile reading dialog in both themes; retain backend dates and publication/acknowledgement contracts.
+- [x] Preserve the dark-theme palette, reading/focus behavior, safe-area layout and both-document acknowledgement.
+- [x] Review phone screenshots, verify responsive interactions and pass the unchanged mobile release gate.

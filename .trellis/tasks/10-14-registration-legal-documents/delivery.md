@@ -83,3 +83,24 @@ from a screenshot. No production database was changed; no push or deployment.
 - Screenshots were inspected. Physical devices and installed PWA safe areas
   were not tested. The regular dev server is on port 5186; test overrides were
   browser-memory-only and the test TaskSpace was closed.
+
+## Follow-up: White Theme And Date Removal
+
+- Refined the light reader with a white surface, underline tabs, inline
+  language label, 20px document title, 15px body, smaller section headings,
+  low-emphasis Cancel and dark-green/white acknowledgement. The dark palette
+  remains unchanged. Removed effective/last-updated date rows from both themes
+  without changing API metadata, publication identity or consent behavior.
+- Styles use the component-owned `legal-*` namespace. Removed duplicate
+  box-sizing/wrapping declarations and scoped-selector overhead so the
+  existing bundle budgets pass without raising limits. Document-title CSS
+  targets its direct child and does not leak into rich-text headings.
+- Final Mobile release gate passed: 844/844 tests, both type checks, PWA/Tauri
+  builds, artifact assertions and unchanged bundle/source/test budgets.
+  Browser checks covered light/dark 320x568, 390x844, 448x900, 844x390 and
+  1280x800, English/plain/rich text, long words and reading/focus behavior.
+  A full reload (not hash navigation) verified the final stylesheet and a
+  second ten-layout pass, hidden dates, acknowledgement and Escape/focus return.
+- Reviewed final 390px screenshot; the browser used in-memory read-only
+  fixtures and its TaskSpace was closed. No production data, push or deployment;
+  physical-device validation remains outstanding.
