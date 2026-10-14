@@ -400,6 +400,7 @@ async fn registration_legal_publication_and_acceptance_are_versioned_atomically(
     let global = body_json(global).await?;
     assert_eq!(global["publication_id"], global_id);
     assert_eq!(global["scope_code"], "GLOBAL");
+    assert!(global["terms"]["body"].is_string());
 
     let body =
         "Reviewed test text for the two registration documents and their immutable audit records. "
@@ -412,18 +413,58 @@ async fn registration_legal_publication_and_acceptance_are_versioned_atomically(
             "reason": format!("Reviewed legal copy {marker}")
         })
     };
+    let rich_terms = json!([
+        {"type": "h2", "children": [{"text": "Terms"}]},
+        {"type": "p", "children": [{"text": "Agreed", "bold": true}]}
+    ]);
+    let rich_privacy = json!([
+        {"type": "p", "children": [{"text": "Notice", "italic": true}]}
+    ]);
+    let mut first_request = publish_body(0, "A");
+    first_request["terms_body"] = rich_terms.clone();
+    first_request["privacy_body"] = rich_privacy.clone();
     let first = json_request(
         app.clone(),
         "POST",
         "/admin/api/v1/legal-documents",
         Some(&token),
-        publish_body(0, "A"),
+        first_request,
     )
     .await;
     assert_eq!(first.status(), StatusCode::OK);
     let first = body_json(first).await?;
     assert_eq!(first["edition"], 1);
+    assert_eq!(first["terms"]["body"], rich_terms);
+    assert_eq!(first["privacy"]["body"], rich_privacy);
     let first_id = first["publication_id"].as_u64().unwrap();
+    let body_format: String =
+        sqlx::query_scalar("SELECT body_format FROM registration_legal_documents WHERE id=?")
+            .bind(first["terms"]["id"].as_u64().unwrap())
+            .fetch_one(&pool)
+            .await?;
+    assert_eq!(body_format, "rich_json");
+    let mut invalid_request = publish_body(1, "invalid");
+    invalid_request["terms_body"] = json!([{"type": "script", "children": [{"text": "unsafe"}]}]);
+    let invalid = json_request(
+        app.clone(),
+        "POST",
+        "/admin/api/v1/legal-documents",
+        Some(&token),
+        invalid_request,
+    )
+    .await;
+    assert_eq!(invalid.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let mut empty_request = publish_body(1, "empty");
+    empty_request["privacy_body"] = json!([{"type": "p", "children": [{"text": "  "}]}]);
+    let empty = json_request(
+        app.clone(),
+        "POST",
+        "/admin/api/v1/legal-documents",
+        Some(&token),
+        empty_request,
+    )
+    .await;
+    assert_eq!(empty.status(), StatusCode::BAD_REQUEST);
     let duplicate = json_request(
         app.clone(),
         "POST",
@@ -626,7 +667,9 @@ async fn registration_legal_publication_and_acceptance_are_versioned_atomically(
         json!({}),
     )
     .await;
-    assert_eq!(body_json(old).await?["terms"]["title"], "Terms A");
+    let old = body_json(old).await?;
+    assert_eq!(old["terms"]["title"], "Terms A");
+    assert_eq!(old["terms"]["body"], rich_terms);
     let editions = json_request(
         app,
         "GET",

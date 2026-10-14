@@ -15,6 +15,8 @@ Present actual Terms of Service and Privacy Policy during user registration on M
 - The registration email-code endpoint also checks the current notice before generating or sending a code; both clients show the notice before submitting an email request.
 - Existing non-user admin/agent auth must remain unaffected.
 - No fabricated legal language or claim of automatic compliance with every country's law.
+- Admin body editing uses rich text; legacy plain-text editions remain readable.
+- Publish prerequisites must be visible instead of leaving a disabled button unexplained.
 
 ## Decision
 
@@ -46,6 +48,6 @@ Present actual Terms of Service and Privacy Policy during user registration on M
 ## Verified Delivery
 
 - The global pair and optional country/language overrides use immutable revisions and one atomic current publication pointer.
-- Both Vue registration clients show full plain-text terms and privacy; country/language changes clear acknowledgement.
+- Both Vue registration clients show full plain-text or safe rich-text terms and privacy; country/language changes clear acknowledgement.
 - Server-side registration validates the current pair before consuming email code and stores one immutable receipt with the user.
 - Exact API, RBAC, release gates and 320px browser interaction were checked. Final test counts and limitations are in `delivery.md`.

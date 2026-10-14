@@ -3,7 +3,9 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { X } from 'lucide-vue-next'
 import { useModalDialog } from '@/core/modalDialog'
+import { normalizeNewsRichText } from '@/core/newsRichText'
 import type { RegistrationLegalBundle } from '@/api/auth'
+import NewsRichText from '@/components/NewsRichText.vue'
 
 const props = defineProps<{ bundle: RegistrationLegalBundle }>()
 const emit = defineEmits<{ close: []; confirm: [] }>()
@@ -14,6 +16,7 @@ const { trapFocus } = useModalDialog(open, dialog, '[data-legal-initial]')
 const selected = ref<'terms' | 'privacy'>('terms')
 const visited = ref(new Set<'terms' | 'privacy'>(['terms']))
 const document = computed(() => props.bundle[selected.value])
+const bodyBlocks = computed(() => normalizeNewsRichText(document.value.body))
 
 function select(kind: 'terms' | 'privacy') {
   selected.value = kind
@@ -43,7 +46,7 @@ function select(kind: 'terms' | 'privacy') {
           <h3>{{ document.title }}</h3>
           <p class="registration-legal-date">{{ t('auth.legalEffectiveOn', { date: document.effective_on }) }}</p>
           <p class="registration-legal-date">{{ t('auth.legalUpdatedOn', { date: bundle.published_at.slice(0, 10) }) }}</p>
-          <div class="registration-legal-body">{{ document.body }}</div>
+          <div class="registration-legal-body"><NewsRichText :blocks="bodyBlocks" empty-text="" /></div>
         </div>
         <footer class="registration-legal-actions">
           <button type="button" @click="emit('close')">{{ t('common.cancel') }}</button>
@@ -67,7 +70,9 @@ function select(kind: 'terms' | 'privacy') {
 .registration-legal-copy { overflow-y: auto; overscroll-behavior: contain; padding: 18px 20px 24px; outline-offset: -4px; }
 .registration-legal-copy h3 { font-size: 15px; margin: 0 0 6px; }
 .registration-legal-date { font-size: 12px; color: var(--muted); margin: 0 0 4px; }
-.registration-legal-body { margin-top: 18px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.65; font-size: 14px; }
+.registration-legal-body { margin-top: 18px; overflow-wrap: anywhere; }
+.registration-legal-body :deep(.news-rich-text) { margin-top: 0; font-size: 14px; line-height: 1.65; }
+.registration-legal-body :deep(p) { white-space: pre-wrap; }
 .registration-legal-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); }
 .registration-legal-actions button { min-height: 44px; padding: 0 16px; border-radius: 5px; border: 1px solid var(--line-strong); background: var(--surface-elevated); color: inherit; }
 .registration-legal-actions button:last-child { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }

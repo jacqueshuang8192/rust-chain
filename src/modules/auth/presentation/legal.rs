@@ -5,8 +5,45 @@ use serde::{Deserialize, Serialize};
 pub struct RegistrationLegalDocument {
     pub id: u64,
     pub title: String,
-    pub body: String,
+    pub body: RegistrationLegalBody,
     pub effective_on: NaiveDate,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum RegistrationLegalBody {
+    Plain(String),
+    Rich(Vec<RegistrationLegalBlock>),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RegistrationLegalBlock {
+    #[serde(rename = "type")]
+    pub kind: RegistrationLegalBlockType,
+    pub children: Vec<RegistrationLegalLeaf>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum RegistrationLegalBlockType {
+    P,
+    H1,
+    H2,
+    H3,
+    Blockquote,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RegistrationLegalLeaf {
+    pub text: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bold: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub italic: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub underline: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -39,9 +76,9 @@ pub struct PublishRegistrationLegalRequest {
     pub expected_edition: u64,
     pub effective_on: NaiveDate,
     pub terms_title: String,
-    pub terms_body: String,
+    pub terms_body: RegistrationLegalBody,
     pub privacy_title: String,
-    pub privacy_body: String,
+    pub privacy_body: RegistrationLegalBody,
     pub reason: String,
 }
 

@@ -9648,3 +9648,10 @@
 - 修改文件：`mobile/src/styles/prototype-parity.css`、`mobile/tests/pencil-selected-home-layout.test.ts`、`.trellis/spec/mobile/pwa-and-shell.md`、`docs/superpowers/PROGRESS.md`。
 - 验证结果：`mobile/npm run release:gate`通过，包含类型检查、全量测试、PWA/Tauri构建及预算检查；真实浏览器在320/390/448px宽、844px高滚动到底测得列表与导航间距均为12px，文档无横向溢出；390px截图已检查。
 - 后续事项：未推送或部署；尚未在实体手机及非零安全区设备上验证。
+
+## 2026-10-15 03:01 - 注册法律文件富文本与发布按钮修复
+
+- 完成内容：取消隐藏的80字正文门槛，后台逐项提示标题、正文、日期和发布原因缺失；用户协议与隐私政策改用现有Quill富文本编辑器，并修复编辑区覆盖发布按钮。新增0150迁移区分旧纯文本和新受控富文本；后端校验富文本节点和128 KiB限制，后台历史及手机/PC注册弹窗按安全元素显示。
+- 修改文件：`migrations/0150_registration_legal_rich_text.sql`、`src/modules/auth/{presentation,application,infrastructure}/legal.rs`、`src/openapi/registration_legal.rs`、`web/src/admin/actions/RegistrationLegalPage.{tsx,css}`及测试、`mobile/src/{api/auth.ts,components/RegistrationLegalDialog.vue}`、`pc/src/{api/auth.ts,views/auth/Register.vue}`、相关Trellis规范/任务记录与本进度文件。
+- 验证结果：全新独立MySQL库实跑法律文件发布/注册集成测试1/1通过，迁移重复执行通过，测试库已清理；Rust严格Clippy、fmt、架构11/11、OpenAPI定向1/1通过。后台全量1064/1064、最后定向3/3、类型/lint/build、策略15/15及覆盖23/23通过；手机端完整release:gate与PC类型/构建通过。浏览器在390px下以本地内存API夹具确认短正文可启用发布、弹窗可提交两份富文本，且编辑器不再遮挡按钮，无生产写入。后台全量JS预算仍为2658813/2600000字节超限，此既有门禁未放宽。
+- 后续事项：仅本地提交，未推送或部署。上线须先执行0150迁移；正式正文仍需法律审核。后台JS预算需另行处理；实体手机及生产环境未验收。

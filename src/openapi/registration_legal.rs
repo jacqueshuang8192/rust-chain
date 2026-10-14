@@ -6,8 +6,40 @@ use super::*;
 struct LegalDocument {
     id: u64,
     title: String,
-    body: String,
+    body: LegalBody,
     effective_on: String,
+}
+
+#[derive(ToSchema)]
+#[serde(untagged)]
+enum LegalBody {
+    Plain(String),
+    Rich(Vec<LegalTextBlock>),
+}
+
+#[derive(ToSchema)]
+struct LegalTextBlock {
+    #[serde(rename = "type")]
+    kind: LegalBlockType,
+    children: Vec<LegalTextLeaf>,
+}
+
+#[derive(ToSchema)]
+#[serde(rename_all = "lowercase")]
+enum LegalBlockType {
+    P,
+    H1,
+    H2,
+    H3,
+    Blockquote,
+}
+
+#[derive(ToSchema)]
+struct LegalTextLeaf {
+    text: String,
+    bold: Option<bool>,
+    italic: Option<bool>,
+    underline: Option<bool>,
 }
 
 #[derive(ToSchema)]
@@ -42,9 +74,9 @@ struct PublishLegalRequest {
     expected_edition: u64,
     effective_on: String,
     terms_title: String,
-    terms_body: String,
+    terms_body: LegalBody,
     privacy_title: String,
-    privacy_body: String,
+    privacy_body: LegalBody,
     reason: String,
 }
 
@@ -103,6 +135,10 @@ fn admin_legal_receipt() {}
     ),
     components(schemas(
         LegalDocument,
+        LegalBody,
+        LegalTextBlock,
+        LegalBlockType,
+        LegalTextLeaf,
         LegalBundle,
         LegalEdition,
         AdminLegalResponse,

@@ -3,8 +3,8 @@
 Registration uses the backend
 [Registration Legal Documents](../backend/registration-legal-documents.md)
 contract. Country/locale changes clear review state, published bodies render as
-plain text, and registration submits the exact publication ID. Missing copy is
-never represented by a placeholder link.
+escaped plain text or allowlisted rich-text blocks, and registration submits
+the exact publication ID. Missing copy is never a placeholder link.
 
 ## 1. Scope / Trigger
 

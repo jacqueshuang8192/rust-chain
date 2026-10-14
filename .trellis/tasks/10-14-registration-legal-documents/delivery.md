@@ -44,3 +44,19 @@ cached clients lack the version fields and will be refused by the new server.
 For country-specific law and translations, the operator must provide factual
 content and legal review. The mechanism cannot certify substantive compliance
 from a screenshot. No production database was changed; no push or deployment.
+
+## Follow-up: Rich Text And Publish Usability
+
+- Removed the undisclosed 80-character prerequisite. The Admin page now lists
+  missing publication fields; the existing Quill editor authors allowed text
+  blocks, and its fixed container height keeps the publish action clickable.
+- Migration 0150 preserves old plain-text rows and marks new structured
+  editions `rich_json`. The backend rejects unsupported nodes and size/empty
+  violations; Admin history, Mobile and PC render safe text nodes.
+- The isolated MySQL publication/registration test, strict Rust Clippy,
+  OpenAPI/architecture tests, Mobile release gate, PC build, Web 1064 tests,
+  type/lint/build/policy/coverage passed. The existing Web JS budget remains
+  over its 2,600,000-byte limit (2,658,813 bytes); it was not relaxed.
+- In a local browser with an in-memory API fixture, 390px editing enabled the
+  button for short copy, the modal submitted both rich documents, and the
+  editor no longer intercepted the action. No production write occurred.

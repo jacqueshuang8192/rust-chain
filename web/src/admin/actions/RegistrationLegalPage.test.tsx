@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { readFileSync } from 'node:fs';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
@@ -45,8 +46,10 @@ it('publishes terms and privacy together with expected edition and audit reason'
   mount();
   fireEvent.change(await screen.findByLabelText('用户协议标题'), { target: { value: 'Terms' } });
   fireEvent.change(screen.getByLabelText('隐私政策标题'), { target: { value: 'Privacy' } });
-  fireEvent.change(screen.getByLabelText('用户协议正文'), { target: { value: body } });
-  fireEvent.change(screen.getByLabelText('隐私政策正文'), { target: { value: body } });
+  expect(screen.getByRole('button', { name: '发布两份文件' })).toBeDisabled();
+  expect(screen.getByText('请填写用户协议正文。')).toBeInTheDocument();
+  fireEvent.input(screen.getByLabelText('用户协议正文'), { target: { innerText: 'Terms.' } });
+  fireEvent.input(screen.getByLabelText('隐私政策正文'), { target: { innerText: 'Privacy.' } });
   fireEvent.change(screen.getByLabelText('发布原因'), { target: { value: 'Legal review approved' } });
   expect(screen.getByRole('button', { name: '发布两份文件' })).toBeEnabled();
   await user.click(screen.getByRole('button', { name: '发布两份文件' }));
@@ -57,7 +60,9 @@ it('publishes terms and privacy together with expected edition and audit reason'
   expect(JSON.parse(String(init?.body))).toMatchObject({
     scope_code: 'GLOBAL', locale: 'en', expected_edition: 0,
     terms_title: 'Terms', privacy_title: 'Privacy',
-    terms_body: body, privacy_body: body, reason: 'Legal review approved'
+    terms_body: [{ type: 'p', children: [{ text: 'Terms.' }] }],
+    privacy_body: [{ type: 'p', children: [{ text: 'Privacy.' }] }],
+    reason: 'Legal review approved'
   });
   expect(await screen.findByText('两份文件已同时发布。')).toBeInTheDocument();
 });
@@ -65,6 +70,11 @@ it('publishes terms and privacy together with expected edition and audit reason'
 it('disables editing for a read-only administrator', async () => {
   mount(false);
   expect(await screen.findByLabelText('用户协议标题')).toBeDisabled();
-  expect(screen.getByLabelText('用户协议正文')).toBeDisabled();
+  expect(screen.queryByLabelText('用户协议正文')).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '发布两份文件' })).not.toBeInTheDocument();
+});
+
+it('keeps Quill inside its legal editor field so it cannot cover the publish action', () => {
+  const styles = readFileSync('src/admin/actions/RegistrationLegalPage.css', 'utf8');
+  expect(styles).toMatch(/\.legal-editor-body-field \.quill-rich-text-container\s*\{[^}]*height:\s*320px;[^}]*min-height:\s*320px;/);
 });

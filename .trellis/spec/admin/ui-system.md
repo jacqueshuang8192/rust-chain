@@ -6,6 +6,13 @@ documents publish together, guarded by `system.legal.write`; read access uses
 `system.legal.read`. See the backend
 [Registration Legal Documents](../backend/registration-legal-documents.md)
 contract. Never insert unreviewed boilerplate as published text.
+The editor reuses `QuillRichTextEditor` without image upload and sends its
+allowlisted block array, not HTML. A short nonempty document can publish;
+show every missing title/body/reason or invalid date beside a disabled publish
+action. In this page, `.quill-rich-text-container` needs an explicit height
+because Quill's `height: 100%` otherwise extends past its field and intercepts
+the publish button. History and read-only views render safe elements, not raw
+HTML.
 
 ## Numeric Form Controls
 

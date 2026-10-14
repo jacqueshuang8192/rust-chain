@@ -183,7 +183,16 @@
             <h3 class="font-semibold">{{ legalBundle[legalTab].title }}</h3>
             <p class="text-muted-foreground text-xs mb-1">{{ t('auth.register_legal_effective', { date: legalBundle[legalTab].effective_on }) }}</p>
             <p class="text-muted-foreground text-xs mb-4">{{ t('auth.register_legal_last_updated', { date: legalBundle.published_at.slice(0, 10) }) }}</p>
-            <div class="whitespace-pre-wrap break-words">{{ legalBundle[legalTab].body }}</div>
+            <div class="space-y-3 break-words">
+              <div v-if="typeof legalBody === 'string'" class="whitespace-pre-wrap">{{ legalBody }}</div>
+              <template v-else>
+                <component :is="legalBlockTag(block.type)" v-for="(block, blockIndex) in legalRichBlocks" :key="blockIndex"
+                  :class="block.type === 'blockquote' ? 'border-l-2 border-border pl-3' : block.type.startsWith('h') ? 'font-semibold' : 'whitespace-pre-wrap'">
+                  <span v-for="(leaf, leafIndex) in block.children" :key="leafIndex"
+                    :class="{ 'font-bold': leaf.bold, italic: leaf.italic, underline: leaf.underline }">{{ leaf.text }}</span>
+                </component>
+              </template>
+            </div>
           </div>
           <footer class="flex justify-end gap-2 border-t border-border p-4">
             <button type="button" class="min-h-11 rounded border border-border px-4" @click="closeLegal">{{ t('auth.register_legal_cancel') }}</button>
@@ -198,7 +207,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { getRegisterConfig, getRegistrationLegal, register, sendVerifyCode, type RegistrationLegalBundle } from '@/api/auth'
+import { getRegisterConfig, getRegistrationLegal, register, sendVerifyCode, type RegistrationLegalBlock, type RegistrationLegalBundle } from '@/api/auth'
 import { fetchPublicCountries } from '@/api/countries'
 import type { PcCountryOption } from '@/api/backendAdapters'
 import { useUserStore } from '@/stores/user'
@@ -228,6 +237,11 @@ const legalVisited = ref(new Set<'terms' | 'privacy'>())
 const legalReviewed = ref(false)
 const legalAcknowledged = ref(false)
 const legalDialog = ref<HTMLElement | null>(null)
+const legalBody = computed(() => legalBundle.value?.[legalTab.value].body ?? '')
+const legalRichBlocks = computed(() => Array.isArray(legalBody.value) ? legalBody.value : [])
+function legalBlockTag(type: RegistrationLegalBlock['type']): 'p' | 'h1' | 'h2' | 'h3' | 'blockquote' {
+  return type === 'h1' || type === 'h2' || type === 'h3' || type === 'blockquote' ? type : 'p'
+}
 let legalRequest = 0
 let previousOverflow = ''
 let returnFocus: HTMLElement | null = null

@@ -1,28 +1,54 @@
 import { IconRefresh, IconSave, IconSearch } from '@douyinfe/semi-icons';
-import { Button, Modal, Spin, TextArea, Typography } from '@douyinfe/semi-ui';
-import { useEffect, useRef, useState } from 'react';
+import { Button, Modal, Spin, Typography } from '@douyinfe/semi-ui';
+import { createElement, useEffect, useRef, useState, type ReactNode } from 'react';
 import { apiRequest, ApiError } from '../../api/client';
 import { PageHeader } from '../../layouts/PageHeader';
+import { QuillRichTextEditor, type RichTextLeaf, type RichTextValue } from '../../shared/QuillRichTextEditor';
 import { AdminSelect, AdminTextInput } from '../../shared/SemiFormControls';
 import { useCanAdminRequest } from '../access';
 import { UnsavedChangesGuard } from '../settings/UnsavedChangesGuard';
 import './RegistrationLegalPage.css';
 
-type Document = { id: number; title: string; body: string; effective_on: string };
+type Document = { id: number; title: string; body: string | RichTextValue; effective_on: string };
 type Bundle = { publication_id: number; scope_code: string; locale: string; edition: number; terms: Document; privacy: Document };
 type Edition = { id: number; edition: number; published_at: string; published_by: number };
 type LegalState = { current: Bundle | null; editions: Edition[] };
 type Country = { country_code: string; country_name: string; supported_locales: string[] };
 type Receipt = { user_id: number; country_code: string; scope_code: string; locale: string; publication_id: number; terms_id: number; privacy_id: number; acknowledged_at: string };
-type Draft = { termsTitle: string; termsBody: string; privacyTitle: string; privacyBody: string; effectiveOn: string; reason: string };
+type Draft = { termsTitle: string; termsBody: RichTextValue; privacyTitle: string; privacyBody: RichTextValue; effectiveOn: string; reason: string };
 
 const path = '/admin/api/v1/legal-documents';
-const emptyDraft = (): Draft => ({ termsTitle: '', termsBody: '', privacyTitle: '', privacyBody: '', effectiveOn: new Date().toISOString().slice(0, 10), reason: '' });
+const emptyBody = (): RichTextValue => [{ type: 'p', children: [{ text: '' }] }];
+const toRichText = (body: string | RichTextValue): RichTextValue => typeof body === 'string'
+  ? body.replace(/\r\n/g, '\n').split('\n').map((text) => ({ type: 'p', children: [{ text }] }))
+  : body;
+const emptyDraft = (): Draft => ({ termsTitle: '', termsBody: emptyBody(), privacyTitle: '', privacyBody: emptyBody(), effectiveOn: new Date().toISOString().slice(0, 10), reason: '' });
 const fromCurrent = (current: Bundle | null): Draft => current ? {
-  termsTitle: current.terms.title, termsBody: current.terms.body,
-  privacyTitle: current.privacy.title, privacyBody: current.privacy.body,
+  termsTitle: current.terms.title, termsBody: toRichText(current.terms.body),
+  privacyTitle: current.privacy.title, privacyBody: toRichText(current.privacy.body),
   effectiveOn: current.terms.effective_on, reason: ''
 } : emptyDraft();
+
+function bodyIssue(body: RichTextValue, label: string): string | null {
+  if (body.some((block) => block.type === 'image')) return `${label}不支持图片，请删除后发布。`;
+  if (!body.some((block) => block.type !== 'image' && block.children.some((leaf) => leaf.text.trim()))) return `请填写${label}正文。`;
+  if (new TextEncoder().encode(JSON.stringify(body)).length > 131_072) return `${label}正文不能超过128 KiB。`;
+  return null;
+}
+
+function legalLeaf(leaf: RichTextLeaf, index: number): ReactNode {
+  let content: ReactNode = leaf.text;
+  if (leaf.bold) content = <strong>{content}</strong>;
+  if (leaf.italic) content = <em>{content}</em>;
+  if (leaf.underline) content = <u>{content}</u>;
+  return <span key={index}>{content}</span>;
+}
+
+function LegalBodyView({ body }: { body: string | RichTextValue }) {
+  const blocks = toRichText(body);
+  return <div className="legal-editor-body-preview">{blocks.map((block, index) => block.type === 'image' ? null
+    : createElement(block.type, { key: index }, block.children.map(legalLeaf)))}</div>;
+}
 
 function legalQuery(scope: string, locale: string) {
   return `${path}?scope_code=${encodeURIComponent(scope)}&locale=${encodeURIComponent(locale)}`;
@@ -86,15 +112,19 @@ export function RegistrationLegalPage() {
     setSnapshot(null);
   }
 
-  function change(field: keyof Draft, value: string) {
+  function change<K extends keyof Draft>(field: K, value: Draft[K]) {
     setDraft((current) => ({ ...current, [field]: value }));
   }
 
-  const valid = draft.termsTitle.trim().length > 0 && draft.termsTitle.length <= 160
-    && draft.privacyTitle.trim().length > 0 && draft.privacyTitle.length <= 160
-    && draft.termsBody.trim().length >= 80 && draft.privacyBody.trim().length >= 80
-    && draft.termsBody.length <= 131072 && draft.privacyBody.length <= 131072
-    && /^\d{4}-\d{2}-\d{2}$/.test(draft.effectiveOn) && draft.reason.trim().length > 0;
+  const validationIssues = [
+    !draft.termsTitle.trim() ? '请填写用户协议标题。' : [...draft.termsTitle].length > 160 ? '用户协议标题不能超过160字。' : null,
+    bodyIssue(draft.termsBody, '用户协议'),
+    !draft.privacyTitle.trim() ? '请填写隐私政策标题。' : [...draft.privacyTitle].length > 160 ? '隐私政策标题不能超过160字。' : null,
+    bodyIssue(draft.privacyBody, '隐私政策'),
+    !/^\d{4}-\d{2}-\d{2}$/.test(draft.effectiveOn) ? '请选择生效日期。' : draft.effectiveOn > new Date().toISOString().slice(0, 10) ? '生效日期不能晚于UTC当天。' : null,
+    !draft.reason.trim() ? '请填写发布原因。' : [...draft.reason].length > 500 ? '发布原因不能超过500字。' : null
+  ].filter((issue): issue is string => Boolean(issue));
+  const valid = validationIssues.length === 0;
 
   async function publish() {
     if (!snapshot || !valid || saving) return;
@@ -156,14 +186,21 @@ export function RegistrationLegalPage() {
       <div className="legal-editor-documents">
         <section><h2>用户协议</h2>
           <label>标题<AdminTextInput ariaLabel="用户协议标题" disabled={!canWrite} value={draft.termsTitle} onChange={(value) => change('termsTitle', value)} /></label>
-          <label>正文<TextArea aria-label="用户协议正文" disabled={!canWrite} value={draft.termsBody} onChange={(value) => change('termsBody', value)} /></label>
+          <div className="legal-editor-body-field"><span>正文</span>{canWrite
+            ? <QuillRichTextEditor ariaLabel="用户协议正文" placeholder="请输入用户协议正文" value={draft.termsBody} onChange={(value) => change('termsBody', value)} />
+            : <LegalBodyView body={draft.termsBody} />}</div>
         </section>
         <section><h2>隐私政策</h2>
           <label>标题<AdminTextInput ariaLabel="隐私政策标题" disabled={!canWrite} value={draft.privacyTitle} onChange={(value) => change('privacyTitle', value)} /></label>
-          <label>正文<TextArea aria-label="隐私政策正文" disabled={!canWrite} value={draft.privacyBody} onChange={(value) => change('privacyBody', value)} /></label>
+          <div className="legal-editor-body-field"><span>正文</span>{canWrite
+            ? <QuillRichTextEditor ariaLabel="隐私政策正文" placeholder="请输入隐私政策正文" value={draft.privacyBody} onChange={(value) => change('privacyBody', value)} />
+            : <LegalBodyView body={draft.privacyBody} />}</div>
         </section>
       </div>
-      {canWrite && <div className="legal-editor-commands"><Button icon={<IconSave aria-hidden />} disabled={!valid || loading || saving} loading={saving} theme="solid" onClick={() => setConfirmOpen(true)}>发布两份文件</Button></div>}
+      {canWrite && <div className="legal-editor-commands">
+        {validationIssues.length > 0 && <ul className="legal-editor-validation" aria-label="发布前需完成">{validationIssues.map((issue) => <li key={issue}>{issue}</li>)}</ul>}
+        <Button icon={<IconSave aria-hidden />} disabled={!valid || loading || saving} loading={saving} theme="solid" onClick={() => setConfirmOpen(true)}>发布两份文件</Button>
+      </div>}
       <section className="legal-editor-history"><h2>发布历史</h2>
         {snapshot.editions.length ? <div className="legal-editor-history-list">{snapshot.editions.map((edition) =>
           <button type="button" key={edition.id} onClick={() => void showHistory(edition.id)}>第 {edition.edition} 版 · {new Date(edition.published_at).toLocaleString()} · 管理员 {edition.published_by}</button>)}</div> : <p>暂无发布记录</p>}
@@ -180,7 +217,7 @@ export function RegistrationLegalPage() {
       <Typography.Text>发布后，适用地区的新注册用户需要确认这个版本。原有注册确认记录不会改写。</Typography.Text>
     </Modal>
     <Modal visible={Boolean(selectedHistory)} title={selectedHistory ? `第 ${selectedHistory.edition} 版 · ${selectedHistory.scope_code} · ${selectedHistory.locale}` : '历史版本'} footer={null} onCancel={() => setSelectedHistory(null)}>
-      {selectedHistory && <div className="legal-editor-history-copy"><h3>{selectedHistory.terms.title}</h3><p>{selectedHistory.terms.body}</p><h3>{selectedHistory.privacy.title}</h3><p>{selectedHistory.privacy.body}</p></div>}
+      {selectedHistory && <div className="legal-editor-history-copy"><h3>{selectedHistory.terms.title}</h3><LegalBodyView body={selectedHistory.terms.body} /><h3>{selectedHistory.privacy.title}</h3><LegalBodyView body={selectedHistory.privacy.body} /></div>}
     </Modal>
   </main>;
 }

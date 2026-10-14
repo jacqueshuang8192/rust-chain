@@ -112,6 +112,8 @@ async fn openapi_documents_registration_legal_versions_and_receipts() {
         assert!(bundle.get(field).is_some(), "missing legal bundle {field}");
     }
     assert!(bundle.get("published_at").is_some());
+    assert!(document["components"]["schemas"]["LegalBody"].is_object());
+    assert!(document["components"]["schemas"]["LegalTextBlock"].is_object());
 }
 
 #[tokio::test]

@@ -6,8 +6,8 @@ use crate::{
         auth::{
             infrastructure::legal as store,
             presentation::legal::{
-                AdminLegalResponse, PublishRegistrationLegalRequest, RegistrationLegalBundle,
-                UserRegistrationLegalReceipt,
+                AdminLegalResponse, PublishRegistrationLegalRequest, RegistrationLegalBody,
+                RegistrationLegalBundle, UserRegistrationLegalReceipt,
             },
         },
         countries::normalize_country_code,
@@ -58,16 +58,42 @@ fn validate_publication(request: &mut PublishRegistrationLegalRequest) -> AppRes
         (&mut request.privacy_title, &mut request.privacy_body),
     ] {
         *title = title.trim().to_owned();
-        *body = body.trim().to_owned();
-        if title.is_empty()
-            || title.chars().count() > 160
-            || body.chars().count() < 80
-            || body.len() > 131_072
-        {
+        if title.is_empty() || title.chars().count() > 160 {
             return Err(AppError::Validation(
-                "legal document title/body length is invalid".into(),
+                "法律文件标题不能为空且不得超过160字".into(),
             ));
         }
+        validate_body(body)?;
+    }
+    Ok(())
+}
+
+fn validate_body(body: &mut RegistrationLegalBody) -> AppResult<()> {
+    let has_text = match body {
+        RegistrationLegalBody::Plain(text) => {
+            *text = text.trim().to_owned();
+            !text.is_empty()
+        }
+        RegistrationLegalBody::Rich(blocks) => {
+            !blocks.is_empty()
+                && blocks.iter().all(|block| !block.children.is_empty())
+                && blocks
+                    .iter()
+                    .flat_map(|block| &block.children)
+                    .any(|leaf| !leaf.text.trim().is_empty())
+        }
+    };
+    if !has_text {
+        return Err(AppError::Validation("法律文件正文不能为空".into()));
+    }
+    let serialized_len = match body {
+        RegistrationLegalBody::Plain(text) => text.len(),
+        RegistrationLegalBody::Rich(_) => serde_json::to_vec(body)
+            .map_err(|_| AppError::Internal("法律文件序列化失败".into()))?
+            .len(),
+    };
+    if serialized_len > 131_072 {
+        return Err(AppError::Validation("法律文件正文不得超过128 KiB".into()));
     }
     Ok(())
 }

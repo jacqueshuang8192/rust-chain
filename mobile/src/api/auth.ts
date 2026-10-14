@@ -34,8 +34,13 @@ export interface RegisterConfig {
 export interface RegistrationLegalDocument {
   id: number
   title: string
-  body: string
+  body: string | RegistrationLegalBlock[]
   effective_on: string
+}
+
+export interface RegistrationLegalBlock {
+  type: 'p' | 'h1' | 'h2' | 'h3' | 'blockquote'
+  children: Array<{ text: string; bold?: boolean; italic?: boolean; underline?: boolean }>
 }
 
 export interface RegistrationLegalBundle {

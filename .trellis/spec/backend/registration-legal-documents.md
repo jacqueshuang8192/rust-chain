@@ -10,7 +10,8 @@ published. This is a publication and evidence workflow, not approved legal text.
 
 - `GET /api/v1/auth/register/legal?country_code=CN&locale=zh-CN` returns one
   `RegistrationLegalBundle`: publication ID, actual scope/locale/edition, both
-  immutable document IDs, titles, plain text and effective dates. Anonymous.
+  immutable document IDs, titles, body and effective dates. `body` is either
+  legacy plain text or an array of approved rich-text blocks. Anonymous.
 - `POST /api/v1/auth/register` adds `legal_publication_id`, `legal_locale`,
   `legal_acknowledged=true`.
 - `POST /api/v1/auth/register/email-code` requires the same country and
@@ -18,8 +19,9 @@ published. This is a publication and evidence workflow, not approved legal text.
   notice before submitting this email request.
 - Admin `GET/POST /admin/api/v1/legal-documents`, `GET` by publication ID and
   user receipt ID require `system.legal.read/write` permissions.
-- Tables: `registration_legal_documents`, `registration_legal_publications`,
-  `registration_legal_current`, `user_registration_legal_receipts`.
+- Tables: `registration_legal_documents` (including `body_format`),
+  `registration_legal_publications`, `registration_legal_current`,
+  `user_registration_legal_receipts`.
 
 ## 3. Contracts
 
@@ -42,7 +44,18 @@ atomically. A failed receipt rolls back account and code consumption. Existing
 users have no retroactive receipt; never fabricate one. Public reads expose
 only published copy and never user receipts.
 
-Render document bodies as escaped plain text with line breaks. The affirmative
+Migration 0150 backfills old rows with `body_format='plain'`; new rich editions
+store JSON in the existing `body_text` LONGTEXT with `body_format='rich_json'`.
+The API accepts a plain string for compatibility or an array of `p`, `h1`,
+`h2`, `h3`, and `blockquote` blocks. Each block has nonempty `children` with
+text leaves and optional boolean bold/italic/underline marks. Unknown block,
+leaf, image, link or HTML fields are rejected. At least one non-whitespace
+text leaf is required; there is no arbitrary 80-character minimum. Serialized
+body size is at most 128 KiB. Publishing a rich edition does not rewrite old
+plain-text rows or receipts.
+
+Render plain text with preserved line breaks and rich blocks with escaped text
+nodes and allowlisted elements, never raw HTML injection. The affirmative
 action accepts the terms and acknowledges the privacy notice; marketing consent
 is separate. UI requires viewing both tabs and resets review on country, locale
 or publication changes. The server stores the asserted action, not a claim to
@@ -66,7 +79,7 @@ updated.
 | Stale or wrong-country publication | 409 `LEGAL_DOCUMENTS_STALE` |
 | Wrong Admin role | 403 |
 | Edition conflict | 409, no partial publish/audit |
-| Body outside 80 chars to 128 KiB / future effective date | 400 |
+| Empty body, unknown rich node, body over 128 KiB / future effective date | 400 or JSON extraction 422 |
 
 ## 5. Cases
 
@@ -77,7 +90,8 @@ links, only a client checkbox, or one old and one new document in one bundle.
 
 ## 6. Verification
 
-Real isolated MySQL: global/country and language selection, Admin permissions,
+Real isolated MySQL: migration 0150 and old plain rows, short rich text,
+unknown rich-node rejection, global/country and language selection, Admin permissions,
 edition conflict, stale/missing acknowledgement, pending email code, immutable
 old content, receipt and audit. OpenAPI: all routes and registration fields.
 Mobile release gate, PC build, Web checks and phone viewport dialog review.

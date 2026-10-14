@@ -1,12 +1,12 @@
-//! 注册法律文件的不可变版本和当前指针；正文始终以纯文本读写。
+//! 注册法律文件的不可变版本和当前指针；纯文本与受控富文本分格式保存。
 
 use crate::{
     error::{AppError, AppResult},
     modules::{
         admin::infrastructure::{AdminAuditLogEntry, insert_admin_audit_log_entry_in_tx},
         auth::presentation::legal::{
-            PublishRegistrationLegalRequest, RegistrationLegalBundle, RegistrationLegalDocument,
-            RegistrationLegalEdition, UserRegistrationLegalReceipt,
+            PublishRegistrationLegalRequest, RegistrationLegalBody, RegistrationLegalBundle,
+            RegistrationLegalDocument, RegistrationLegalEdition, UserRegistrationLegalReceipt,
         },
     },
 };
@@ -32,6 +32,7 @@ struct DocumentRow {
     kind: String,
     title: String,
     body_text: String,
+    body_format: String,
     effective_on: NaiveDate,
 }
 
@@ -152,7 +153,7 @@ async fn load_document(
     kind: &str,
 ) -> AppResult<RegistrationLegalDocument> {
     let row = sqlx::query_as::<_, DocumentRow>(
-        "SELECT id,scope_code,locale,kind,title,body_text,effective_on FROM registration_legal_documents WHERE id=?",
+        "SELECT id,scope_code,locale,kind,title,body_text,body_format,effective_on FROM registration_legal_documents WHERE id=?",
     )
     .bind(id)
     .fetch_one(&mut **tx)
@@ -160,10 +161,22 @@ async fn load_document(
     if row.scope_code != scope || row.locale != locale || row.kind != kind {
         return Err(AppError::Internal("法律文件发布指针与正文不匹配".into()));
     }
+    let body = match row.body_format.as_str() {
+        "plain" => RegistrationLegalBody::Plain(row.body_text),
+        "rich_json" => match serde_json::from_str(&row.body_text)
+            .map_err(|_| AppError::Internal("法律文件富文本存储格式错误".into()))?
+        {
+            RegistrationLegalBody::Rich(blocks) => RegistrationLegalBody::Rich(blocks),
+            RegistrationLegalBody::Plain(_) => {
+                return Err(AppError::Internal("法律文件富文本存储格式错误".into()));
+            }
+        },
+        _ => return Err(AppError::Internal("法律文件正文格式不受支持".into())),
+    };
     Ok(RegistrationLegalDocument {
         id: row.id,
         title: row.title,
-        body: row.body_text,
+        body,
         effective_on: row.effective_on,
     })
 }
@@ -260,10 +273,18 @@ async fn insert_document(
     admin_id: u64,
     kind: &str,
     title: &str,
-    body: &str,
+    body: &RegistrationLegalBody,
 ) -> AppResult<u64> {
-    Ok(sqlx::query("INSERT INTO registration_legal_documents(scope_code,locale,kind,title,body_text,effective_on,published_by) VALUES (?,?,?,?,?,?,?)")
-        .bind(&request.scope_code).bind(&request.locale).bind(kind).bind(title).bind(body)
+    let (body_format, body_text) = match body {
+        RegistrationLegalBody::Plain(text) => ("plain", text.clone()),
+        RegistrationLegalBody::Rich(_) => (
+            "rich_json",
+            serde_json::to_string(body)
+                .map_err(|_| AppError::Internal("法律文件序列化失败".into()))?,
+        ),
+    };
+    Ok(sqlx::query("INSERT INTO registration_legal_documents(scope_code,locale,kind,title,body_text,body_format,effective_on,published_by) VALUES (?,?,?,?,?,?,?,?)")
+        .bind(&request.scope_code).bind(&request.locale).bind(kind).bind(title).bind(body_text).bind(body_format)
         .bind(request.effective_on).bind(admin_id).execute(&mut **tx).await?.last_insert_id())
 }
 
