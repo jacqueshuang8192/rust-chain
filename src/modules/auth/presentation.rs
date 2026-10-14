@@ -9,6 +9,8 @@
 //! 二次验证绑定阶段的 `secret` 与 `otpauth_uri` 是唯一会外发的敏感字段，只允许回给已完成前置校验的本人，
 //! 调用链上任何一层都不得把这些结构体整体写入日志。
 
+pub(crate) mod legal;
+
 use crate::{
     architecture::PresentationLayer,
     modules::auth::{IssuedTokens, TokenScope},
@@ -70,6 +72,9 @@ pub(crate) struct UserAuthRequest {
     pub(crate) username: Option<String>,
     pub(crate) password: Option<String>,
     pub(crate) country_code: Option<String>,
+    pub(crate) legal_locale: Option<String>,
+    pub(crate) legal_publication_id: Option<u64>,
+    pub(crate) legal_acknowledged: Option<bool>,
     pub(crate) code: Option<String>,
     pub(crate) invite_code: Option<String>,
     pub(crate) promotion: Option<String>,
@@ -79,6 +84,10 @@ pub(crate) struct UserAuthRequest {
 #[derive(Debug, Deserialize)]
 pub(crate) struct RegisterEmailCodeRequest {
     pub(crate) email: String,
+    pub(crate) country_code: Option<String>,
+    pub(crate) legal_locale: Option<String>,
+    pub(crate) legal_publication_id: Option<u64>,
+    pub(crate) legal_acknowledged: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]

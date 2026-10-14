@@ -9,6 +9,8 @@
 //! 需要特别注意的是，二次验证挑战的可用性检查与消费大多不是同一个原子操作，
 //! 各函数注释分别写明了自己的并发与重放边界，调用方不得默认这些用例具备严格的一次性语义。
 
+pub(crate) mod legal;
+
 use crate::{
     error::{AppError, AppResult},
     infra::{
@@ -24,7 +26,8 @@ use crate::{
             AdminLoginResponse, AdminPasswordChangeRequest, AdminPasswordChangeResponse,
             AdminTwoFactorSetupResponse, AdminTwoFactorStatusResponse, LoginTransportContext,
             LoginTwoFactorChallengeResponse, LoginTwoFactorSetupChallengeResponse,
-            LoginTwoFactorSetupResponse, TokenResponse, UserAuthRequest, UserLoginResponse,
+            LoginTwoFactorSetupResponse, RegisterEmailCodeRequest, TokenResponse, UserAuthRequest,
+            UserLoginResponse,
         },
         auth::{
             ActorType, AdminCredentials, AdminRegistration, AgentCredentials, AuthActor,
@@ -168,6 +171,9 @@ pub(crate) struct RegisterUserWithEmailCodeInput {
     pub(crate) password: Option<String>,
     pub(crate) code: Option<String>,
     pub(crate) country_code: Option<String>,
+    pub(crate) legal_locale: Option<String>,
+    pub(crate) legal_publication_id: Option<u64>,
+    pub(crate) legal_acknowledged: Option<bool>,
     pub(crate) invite_code: Option<String>,
     pub(crate) promotion: Option<String>,
 }
@@ -507,7 +513,7 @@ pub(crate) async fn load_login_config(state: &AppState) -> AppResult<LoginConfig
     })
 }
 
-/// 编排邮件码注册：同事务锁国家配置、消费验证码、写用户、邀请关系、零余额钱包与 outbox。
+/// 编排邮件码注册：同事务锁国家与协议组、消费验证码、写用户/确认凭据、邀请关系、零余额钱包与 outbox。
 /// 错码仅提交试错计数；其他事务内失败整体回滚。提交后才签发令牌，令牌后端失败时
 /// 已注册用户、邀请关系、钱包账户和 outbox 仍然保留；重放注册受邮箱唯一约束阻断。
 pub(crate) async fn register_user_with_email_code(
@@ -533,6 +539,15 @@ pub(crate) async fn register_user_with_email_code(
     let now = Utc::now();
     let mut tx = pool.begin().await?;
     let country = lock_registration_country_in_tx(&mut tx, &country_code).await?;
+    let legal = legal::require_current_registration_legal(
+        &mut tx,
+        &country.country_code,
+        &country.default_locale,
+        input.legal_locale.as_deref(),
+        input.legal_publication_id,
+        input.legal_acknowledged,
+    )
+    .await?;
     match verify_registration_email_code_in_tx(&mut tx, &email, &code, now).await {
         Ok(()) => {}
         Err(error) if matches!(error, AppError::Validation(_)) => {
@@ -555,6 +570,8 @@ pub(crate) async fn register_user_with_email_code(
         now,
     )
     .await?;
+    legal::store_registration_legal_receipt(&mut tx, user_id, &country.country_code, &legal)
+        .await?;
 
     create_user_invite_code_in_tx(&mut tx, user_id).await?;
     if let Some(binding) = referral_binding {
@@ -586,6 +603,9 @@ pub(crate) async fn register_user_with_email_code_response(
             password: request.password,
             code: request.code,
             country_code: request.country_code,
+            legal_locale: request.legal_locale,
+            legal_publication_id: request.legal_publication_id,
+            legal_acknowledged: request.legal_acknowledged,
             invite_code: request.invite_code,
             promotion: request.promotion,
         },
@@ -780,9 +800,23 @@ fn normalized_env_value(value: String) -> Option<String> {
 pub(crate) async fn send_registration_email_code(
     state: &AppState,
     pool: &Pool<MySql>,
-    email: String,
+    request: RegisterEmailCodeRequest,
 ) -> AppResult<DateTime<Utc>> {
-    let email = validate_registration_email(Some(email))?;
+    let email = validate_registration_email(Some(request.email))?;
+    let country_code =
+        normalize_country_code(&required_string(request.country_code, "country_code")?)?;
+    let mut legal_tx = pool.begin().await?;
+    let country = lock_registration_country_in_tx(&mut legal_tx, &country_code).await?;
+    legal::require_current_registration_legal(
+        &mut legal_tx,
+        &country.country_code,
+        &country.default_locale,
+        request.legal_locale.as_deref(),
+        request.legal_publication_id,
+        request.legal_acknowledged,
+    )
+    .await?;
+    legal_tx.commit().await?;
     let now = Utc::now();
     let expires_at = now + Duration::minutes(10);
     let code = generate_email_code()?;

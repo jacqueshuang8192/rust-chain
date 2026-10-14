@@ -13,6 +13,7 @@ mod content;
 mod default_market;
 mod financial_reconciliation;
 mod financial_retries;
+mod legal_documents;
 mod market_trading;
 mod new_coin_convert;
 mod new_coin_market;
@@ -247,6 +248,7 @@ pub fn routes() -> Router<AppState> {
         .merge(config_center::routes())
         .merge(system_config::routes())
         .merge(content::routes())
+        .merge(legal_documents::routes())
         .merge(users_agents::routes())
         .merge(wallet_assets::routes())
         .merge(risk_security::routes())

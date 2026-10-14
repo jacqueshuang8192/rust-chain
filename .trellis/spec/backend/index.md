@@ -46,6 +46,7 @@ the feature contract for the business context being modified.
 | [Order Identifier Display Contract](./order-identifiers.md) | User-visible order numbers and internal ID separation across admin and PC UI | Active |
 | [Auth Session Contract](./auth-sessions.md) | sa-token-rust Redis session, refresh, extractor, and frontend Bearer compatibility contracts | Active |
 | [User Authentication Contracts](./user-authentication.md) | User username configuration, username login policy, and cross-layer login identifier contracts | Active |
+| [Registration Legal Documents](./registration-legal-documents.md) | Global/country published pairs, registration version checks and immutable receipts | Active |
 | [PC Display and Chart Contracts](./platform-display-and-chart.md) | PC brand configuration, global K-line renderer selection, and TradingView Lightweight Charts data-source boundaries | Active |
 | [Prediction Market Contracts](./prediction-markets.md) | Polymarket-sourced prediction market sync, quote, wallet, settlement, and PC/admin display contracts | Active |
 | [Realtime WebSocket Contracts](./realtime-websockets.md) | Business-scoped public aliases, exact-user private refresh hints, and REST reconciliation boundaries | Active |

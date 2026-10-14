@@ -141,16 +141,19 @@
           </div>
         </div>
 
-        <div class="text-xs text-muted-foreground">
-            {{ t('auth.register_agreement_prefix') }}
-            <a href="#" class="text-primary hover:underline">{{ t('auth.register_terms') }}</a>
-            {{ t('auth.register_agreement_middle') }}
-            <a href="#" class="text-primary hover:underline">{{ t('auth.register_privacy') }}</a>.
+        <div class="flex items-start gap-3 text-xs text-muted-foreground">
+          <input v-model="legalAcknowledged" type="checkbox" class="mt-0.5 h-4 w-4 shrink-0" :disabled="!legalReviewed || !legalBundle" :aria-label="t('auth.register_legal_agreement')" />
+          <div>
+            <span>{{ t('auth.register_legal_agreement') }}</span>
+            <button type="button" class="ml-2 text-primary underline" :disabled="!legalBundle" @click="openLegal">{{ t('auth.register_terms') }} · {{ t('auth.register_privacy') }}</button>
+            <p v-if="legalLoading">{{ t('auth.register_legal_loading') }}</p>
+            <p v-if="legalError" role="alert" class="text-red-500">{{ legalError }}</p>
+          </div>
         </div>
 
         <button
           type="submit"
-          :disabled="loading || countriesLoading || configLoading || !form.countryCode"
+          :disabled="loading || countriesLoading || configLoading || legalLoading || !legalBundle || !legalAcknowledged || !form.countryCode"
           class="w-full py-3 bg-primary text-primary-foreground font-bold rounded-lg hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           <span v-if="loading" class="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin"></span>
@@ -163,24 +166,51 @@
         <router-link to="/login" class="text-primary hover:underline font-bold">{{ t('auth.sign_in') }}</router-link>
       </div>
     </div>
+    <Teleport to="body">
+      <div v-if="legalOpen && legalBundle" class="fixed inset-0 z-[120] grid place-items-center bg-black/70 p-3" @click.self="closeLegal">
+        <section ref="legalDialog" role="dialog" aria-modal="true" aria-labelledby="pc-registration-legal-title"
+          class="grid w-full max-w-[560px] max-h-[94dvh] grid-rows-[auto_auto_minmax(0,1fr)_auto] overflow-hidden rounded-lg border border-border bg-card text-foreground shadow-2xl"
+          @keydown="handleLegalKeydown">
+          <header class="flex items-center justify-between gap-3 px-5 pt-5 pb-3">
+            <div><h2 id="pc-registration-legal-title" class="text-lg font-semibold">{{ t('auth.register_legal_read') }}</h2><small class="text-muted-foreground">{{ legalBundle.locale }}</small></div>
+            <button type="button" class="grid h-11 w-11 place-items-center" :aria-label="t('auth.register_legal_cancel')" @click="closeLegal"><X :size="20" /></button>
+          </header>
+          <div role="tablist" class="mx-5 grid grid-cols-2 rounded-md bg-secondary p-1">
+            <button data-legal-initial type="button" role="tab" class="min-h-11 rounded" :aria-selected="legalTab === 'terms'" :class="legalTab === 'terms' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'" @click="selectLegalTab('terms')">{{ t('auth.register_terms') }}</button>
+            <button type="button" role="tab" class="min-h-11 rounded" :aria-selected="legalTab === 'privacy'" :class="legalTab === 'privacy' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'" @click="selectLegalTab('privacy')">{{ t('auth.register_privacy') }}</button>
+          </div>
+          <div role="tabpanel" tabindex="0" class="min-h-0 overflow-y-auto overscroll-contain px-5 py-5 text-sm leading-6">
+            <h3 class="font-semibold">{{ legalBundle[legalTab].title }}</h3>
+            <p class="text-muted-foreground text-xs mb-1">{{ t('auth.register_legal_effective', { date: legalBundle[legalTab].effective_on }) }}</p>
+            <p class="text-muted-foreground text-xs mb-4">{{ t('auth.register_legal_last_updated', { date: legalBundle.published_at.slice(0, 10) }) }}</p>
+            <div class="whitespace-pre-wrap break-words">{{ legalBundle[legalTab].body }}</div>
+          </div>
+          <footer class="flex justify-end gap-2 border-t border-border p-4">
+            <button type="button" class="min-h-11 rounded border border-border px-4" @click="closeLegal">{{ t('auth.register_legal_cancel') }}</button>
+            <button type="button" class="min-h-11 rounded bg-primary px-4 text-primary-foreground disabled:opacity-50" :disabled="legalVisited.size < 2" @click="confirmLegal">{{ t('auth.register_legal_confirm') }}</button>
+          </footer>
+        </section>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { getRegisterConfig, register, sendVerifyCode } from '@/api/auth'
+import { getRegisterConfig, getRegistrationLegal, register, sendVerifyCode, type RegistrationLegalBundle } from '@/api/auth'
 import { fetchPublicCountries } from '@/api/countries'
 import type { PcCountryOption } from '@/api/backendAdapters'
 import { useUserStore } from '@/stores/user'
 import { useToast } from 'vue-toastification'
 import { useI18n } from 'vue-i18n'
 import BrandLogo from '@/components/common/BrandLogo.vue'
+import { X } from 'lucide-vue-next'
 
 const router = useRouter()
 const userStore = useUserStore()
 const toast = useToast()
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const loading = ref(false)
 const codeLoading = ref(false)
 const countriesLoading = ref(false)
@@ -189,6 +219,18 @@ const countdown = ref(0)
 const countryOptions = ref<PcCountryOption[]>([])
 const emailCodeRequired = ref(true)
 const inviteCodeRequired = ref(false)
+const legalBundle = ref<RegistrationLegalBundle | null>(null)
+const legalLoading = ref(false)
+const legalError = ref('')
+const legalOpen = ref(false)
+const legalTab = ref<'terms' | 'privacy'>('terms')
+const legalVisited = ref(new Set<'terms' | 'privacy'>())
+const legalReviewed = ref(false)
+const legalAcknowledged = ref(false)
+const legalDialog = ref<HTMLElement | null>(null)
+let legalRequest = 0
+let previousOverflow = ''
+let returnFocus: HTMLElement | null = null
 const countrySelectOpen = ref(false)
 const countrySearch = ref('')
 const countrySelectRef = ref<HTMLElement | null>(null)
@@ -199,6 +241,68 @@ const form = ref({
   countryCode: '',
   promotion: ''
 })
+
+async function loadLegal() {
+  const country = form.value.countryCode
+  const language = locale.value
+  const request = ++legalRequest
+  legalBundle.value = null
+  legalReviewed.value = false
+  legalAcknowledged.value = false
+  if (legalOpen.value) closeLegal()
+  legalError.value = ''
+  if (!country) return
+  legalLoading.value = true
+  try {
+    const bundle = await getRegistrationLegal(country, language)
+    if (request === legalRequest) legalBundle.value = bundle
+  } catch {
+    if (request === legalRequest) legalError.value = t('auth.register_legal_unavailable')
+  } finally {
+    if (request === legalRequest) legalLoading.value = false
+  }
+}
+
+watch([() => form.value.countryCode, locale], () => { void loadLegal() })
+
+function openLegal() {
+  if (!legalBundle.value) return
+  returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null
+  previousOverflow = document.body.style.overflow
+  document.body.style.overflow = 'hidden'
+  legalTab.value = 'terms'
+  legalVisited.value = new Set(['terms'])
+  legalOpen.value = true
+  void nextTick(() => legalDialog.value?.querySelector<HTMLElement>('[data-legal-initial]')?.focus())
+}
+
+function closeLegal() {
+  legalOpen.value = false
+  document.body.style.overflow = previousOverflow
+  returnFocus?.focus()
+  returnFocus = null
+}
+
+function selectLegalTab(tab: 'terms' | 'privacy') {
+  legalTab.value = tab
+  legalVisited.value = new Set([...legalVisited.value, tab])
+}
+
+function confirmLegal() {
+  if (legalVisited.value.size < 2) return
+  legalReviewed.value = true
+  legalAcknowledged.value = true
+  closeLegal()
+}
+
+function handleLegalKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') { event.preventDefault(); closeLegal(); return }
+  if (event.key !== 'Tab' || !legalDialog.value) return
+  const buttons = [...legalDialog.value.querySelectorAll<HTMLElement>('button:not([disabled]), [tabindex="0"]')]
+  const first = buttons[0]; const last = buttons.at(-1)
+  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
+  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
+}
 
 const countryDropdownDisabled = computed(() => countriesLoading.value || countryOptions.value.length === 0)
 const selectedCountry = computed(() => countryOptions.value.find((country) => country.code === form.value.countryCode))
@@ -283,12 +387,22 @@ const loadRegisterConfig = async () => {
 
 const sendCode = async () => {
     if (!form.value.email) return
+    if (!legalAcknowledged.value || !legalBundle.value) {
+      toast.error(t('auth.register_legal_required'))
+      if (legalBundle.value) openLegal()
+      return
+    }
     codeLoading.value = true
     try {
-        await sendVerifyCode(form.value.email)
+        await sendVerifyCode(form.value.email, form.value.countryCode, legalBundle.value.locale, legalBundle.value.publication_id)
         toast.success(t('auth.register_code_sent'))
         startCountdown()
     } catch (e: any) {
+        if (e?.response?.data?.code === 'LEGAL_DOCUMENTS_STALE') {
+            void loadLegal()
+            toast.error(t('auth.register_legal_updated'))
+            return
+        }
         console.error(e)
         // Global error handling in request interceptor handles 500s, but we can catch specific logic here if needed
     } finally {
@@ -297,6 +411,10 @@ const sendCode = async () => {
 }
 
 const handleRegister = async () => {
+  if (!legalAcknowledged.value || !legalBundle.value) {
+    toast.error(t('auth.register_legal_required'))
+    return
+  }
   if (!form.value.countryCode) {
     toast.error(t('auth.register_no_countries'))
     return
@@ -317,7 +435,9 @@ const handleRegister = async () => {
         code: form.value.code,
         password: form.value.password,
         countryCode: form.value.countryCode,
-        inviteCode: form.value.promotion
+        inviteCode: form.value.promotion,
+        legalLocale: legalBundle.value.locale,
+        legalPublicationId: legalBundle.value.publication_id,
     })
 
     if (res.code === 200 || res.code === 0) {
@@ -334,6 +454,11 @@ const handleRegister = async () => {
         toast.error(res.message || t('auth.register_failed'))
     }
   } catch (error: any) {
+    if (error?.response?.data?.code === 'LEGAL_DOCUMENTS_STALE') {
+      void loadLegal()
+      toast.error(t('auth.register_legal_updated'))
+      return
+    }
     console.error(error)
     // Toast error is handled by request interceptor for 500s, but we might want to show generic error if not handled
     if (!error.response) { // Network errors etc
@@ -352,5 +477,6 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
     window.removeEventListener('click', handleCountryOutsideClick)
+    if (legalOpen.value) document.body.style.overflow = previousOverflow
 })
 </script>

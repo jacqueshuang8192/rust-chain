@@ -144,6 +144,10 @@ async fn cleanup_security_users(pool: &MySqlPool, user_ids: &[u64]) -> Result<()
             .bind(user_id)
             .execute(pool)
             .await?;
+        sqlx::query("DELETE FROM user_registration_legal_receipts WHERE user_id = ?")
+            .bind(user_id)
+            .execute(pool)
+            .await?;
         sqlx::query("DELETE FROM refresh_tokens WHERE actor_type = 'user' AND actor_id = ?")
             .bind(user_id)
             .execute(pool)
@@ -309,6 +313,335 @@ async fn insert_registration_email_code(
     .bind(code_hash)
     .execute(pool)
     .await?;
+    Ok(())
+}
+
+async fn ensure_test_legal_bundle(pool: &MySqlPool) -> Result<u64, sqlx::Error> {
+    let mut tx = pool.begin().await?;
+    sqlx::query(
+        "INSERT IGNORE INTO registration_legal_current(scope_code,locale) VALUES ('GLOBAL','en')",
+    )
+    .execute(&mut *tx)
+    .await?;
+    let current: Option<u64> = sqlx::query_scalar("SELECT publication_id FROM registration_legal_current WHERE scope_code='GLOBAL' AND locale='en' FOR UPDATE")
+        .fetch_one(&mut *tx).await?;
+    if let Some(id) = current {
+        tx.commit().await?;
+        return Ok(id);
+    }
+    let body = "Test-only agreement content for registration version and locale checks. ".repeat(3);
+    let mut ids = Vec::new();
+    for kind in ["terms", "privacy"] {
+        ids.push(sqlx::query("INSERT INTO registration_legal_documents(scope_code,locale,kind,title,body_text,effective_on,published_by) VALUES ('GLOBAL','en',?,?,?,'2026-01-01',1)")
+            .bind(kind).bind(format!("Test {kind}")).bind(&body).execute(&mut *tx).await?.last_insert_id());
+    }
+    let id = sqlx::query("INSERT INTO registration_legal_publications(scope_code,locale,edition,terms_id,privacy_id,published_by) VALUES ('GLOBAL','en',1,?,?,1)")
+        .bind(ids[0]).bind(ids[1]).execute(&mut *tx).await?.last_insert_id();
+    sqlx::query("UPDATE registration_legal_current SET edition=1,publication_id=? WHERE scope_code='GLOBAL' AND locale='en'")
+        .bind(id).execute(&mut *tx).await?;
+    tx.commit().await?;
+    Ok(id)
+}
+
+#[tokio::test]
+async fn registration_legal_publication_and_acceptance_are_versioned_atomically()
+-> Result<(), Box<dyn Error>> {
+    let _country_guard = COUNTRY_CONFIG_TEST_LOCK.lock().await;
+    let _policy_guard = SECURITY_POLICY_TEST_LOCK.lock().await;
+    let Some(pool) = mysql_pool().await else {
+        return Ok(());
+    };
+    reset_security_policy_invite_required(&pool, false).await?;
+    let country_suffix = *Uuid::new_v4().as_bytes();
+    let country_code = format!(
+        "{}{}",
+        char::from(b'A' + country_suffix[0] % 26),
+        char::from(b'A' + country_suffix[1] % 26)
+    );
+    upsert_test_country(
+        &pool,
+        &country_code,
+        "Legal Registration Country",
+        "en",
+        json!(["en"]),
+        true,
+        "active",
+    )
+    .await?;
+    let global_id = ensure_test_legal_bundle(&pool).await?;
+    let suffix = Uuid::now_v7().simple().to_string();
+    let role_id = sqlx::query("INSERT INTO admin_roles(name,permissions) VALUES (?,JSON_ARRAY('system.legal.read','system.legal.write'))")
+        .bind(format!("legal-editor-{suffix}")).execute(&pool).await?.last_insert_id();
+    let admin_id =
+        sqlx::query("INSERT INTO admin_users(username,password_hash,role_id) VALUES (?,?,?)")
+            .bind(format!("legal-editor-{suffix}"))
+            .bind("test")
+            .bind(role_id)
+            .execute(&pool)
+            .await?
+            .last_insert_id();
+    let settings = test_settings();
+    let token = issue_token(
+        &settings,
+        format!("admin:{admin_id}"),
+        TokenScope::Admin,
+        900,
+    )?;
+    let app = exchange_api::build_router(AppState::new(settings).with_mysql(pool.clone()));
+
+    let global = json_request(
+        app.clone(),
+        "GET",
+        &format!("/api/v1/auth/register/legal?country_code={country_code}&locale=en"),
+        None,
+        json!({}),
+    )
+    .await;
+    let global = body_json(global).await?;
+    assert_eq!(global["publication_id"], global_id);
+    assert_eq!(global["scope_code"], "GLOBAL");
+
+    let body =
+        "Reviewed test text for the two registration documents and their immutable audit records. "
+            .repeat(2);
+    let publish_body = |edition, marker: &str| {
+        json!({
+            "scope_code": country_code, "locale": "en", "expected_edition": edition,
+            "effective_on": "2026-10-14", "terms_title": format!("Terms {marker}"), "terms_body": body,
+            "privacy_title": format!("Privacy {marker}"), "privacy_body": body,
+            "reason": format!("Reviewed legal copy {marker}")
+        })
+    };
+    let first = json_request(
+        app.clone(),
+        "POST",
+        "/admin/api/v1/legal-documents",
+        Some(&token),
+        publish_body(0, "A"),
+    )
+    .await;
+    assert_eq!(first.status(), StatusCode::OK);
+    let first = body_json(first).await?;
+    assert_eq!(first["edition"], 1);
+    let first_id = first["publication_id"].as_u64().unwrap();
+    let duplicate = json_request(
+        app.clone(),
+        "POST",
+        "/admin/api/v1/legal-documents",
+        Some(&token),
+        publish_body(0, "duplicate"),
+    )
+    .await;
+    assert_eq!(duplicate.status(), StatusCode::CONFLICT);
+    let after_duplicate: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM registration_legal_publications WHERE scope_code=?",
+    )
+    .bind(&country_code)
+    .fetch_one(&pool)
+    .await?;
+    assert_eq!(after_duplicate, 1);
+
+    let read_role = sqlx::query(
+        "INSERT INTO admin_roles(name,permissions) VALUES (?,JSON_ARRAY('system.legal.read'))",
+    )
+    .bind(format!("legal-reader-{suffix}"))
+    .execute(&pool)
+    .await?
+    .last_insert_id();
+    let reader_id =
+        sqlx::query("INSERT INTO admin_users(username,password_hash,role_id) VALUES (?,?,?)")
+            .bind(format!("legal-reader-{suffix}"))
+            .bind("test")
+            .bind(read_role)
+            .execute(&pool)
+            .await?
+            .last_insert_id();
+    let read_token = issue_token(
+        &test_settings(),
+        format!("admin:{reader_id}"),
+        TokenScope::Admin,
+        900,
+    )?;
+    let denied = json_request(
+        app.clone(),
+        "POST",
+        "/admin/api/v1/legal-documents",
+        Some(&read_token),
+        publish_body(1, "forbidden"),
+    )
+    .await;
+    assert_eq!(denied.status(), StatusCode::FORBIDDEN);
+
+    let zh_publish = json_request(app.clone(), "POST", "/admin/api/v1/legal-documents", Some(&token), json!({
+        "scope_code": "GLOBAL", "locale": "zh-CN", "expected_edition": 0,
+        "effective_on": "2026-10-14", "terms_title": "Test zh terms", "terms_body": body,
+        "privacy_title": "Test zh privacy", "privacy_body": body, "reason": "Reviewed translation"
+    })).await;
+    assert_eq!(zh_publish.status(), StatusCode::OK);
+    let localized = json_request(
+        app.clone(),
+        "GET",
+        &format!("/api/v1/auth/register/legal?country_code={country_code}&locale=zh-CN"),
+        None,
+        json!({}),
+    )
+    .await;
+    let localized = body_json(localized).await?;
+    assert_eq!(localized["scope_code"], "GLOBAL");
+    assert_eq!(localized["locale"], "zh-CN");
+
+    let email = format!("legal-{suffix}@example.test");
+    let unconfirmed_send = json_request(
+        app.clone(),
+        "POST",
+        "/api/v1/auth/register/email-code",
+        None,
+        json!({
+            "email": email, "country_code": country_code, "legal_locale": "en",
+            "legal_publication_id": first_id, "legal_acknowledged": false
+        }),
+    )
+    .await;
+    assert_eq!(unconfirmed_send.status(), StatusCode::BAD_REQUEST);
+    let unsent: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*) FROM user_registration_email_verifications WHERE email=?",
+    )
+    .bind(&email)
+    .fetch_one(&pool)
+    .await?;
+    assert_eq!(unsent, 0);
+    insert_registration_email_code(&pool, &email, "123456").await?;
+    let request = |publication_id: u64, acknowledged: bool| {
+        json!({
+        "email": email, "password": "RegisterPassword123!", "country_code": country_code, "code": "123456",
+            "legal_locale": "en", "legal_publication_id": publication_id, "legal_acknowledged": acknowledged
+        })
+    };
+    let unchecked = json_request(
+        app.clone(),
+        "POST",
+        "/api/v1/auth/register",
+        None,
+        request(first_id, false),
+    )
+    .await;
+    assert_eq!(unchecked.status(), StatusCode::BAD_REQUEST);
+    let country_mismatch = json_request(
+        app.clone(),
+        "POST",
+        "/api/v1/auth/register",
+        None,
+        request(global_id, true),
+    )
+    .await;
+    assert_eq!(country_mismatch.status(), StatusCode::CONFLICT);
+
+    let mut country_lock = pool.begin().await?;
+    sqlx::query("SELECT id FROM country_configs WHERE country_code=? FOR UPDATE")
+        .bind(&country_code)
+        .fetch_one(&mut *country_lock)
+        .await?;
+    let second = json_request(
+        app.clone(),
+        "POST",
+        "/admin/api/v1/legal-documents",
+        Some(&token),
+        publish_body(1, "B"),
+    );
+    tokio::pin!(second);
+    assert!(
+        tokio::time::timeout(std::time::Duration::from_millis(100), &mut second)
+            .await
+            .is_err(),
+        "地区发布必须等待正在注册的国家行锁"
+    );
+    country_lock.commit().await?;
+    let second = second.await;
+    assert_eq!(second.status(), StatusCode::OK);
+    let second = body_json(second).await?;
+    let second_id = second["publication_id"].as_u64().unwrap();
+    let stale = json_request(
+        app.clone(),
+        "POST",
+        "/api/v1/auth/register",
+        None,
+        request(first_id, true),
+    )
+    .await;
+    assert_eq!(stale.status(), StatusCode::CONFLICT);
+    assert_eq!(body_json(stale).await?["code"], "LEGAL_DOCUMENTS_STALE");
+    let stale_send = json_request(
+        app.clone(),
+        "POST",
+        "/api/v1/auth/register/email-code",
+        None,
+        json!({
+            "email": email, "country_code": country_code, "legal_locale": "en",
+            "legal_publication_id": first_id, "legal_acknowledged": true
+        }),
+    )
+    .await;
+    assert_eq!(stale_send.status(), StatusCode::CONFLICT);
+    let pending_code: String = sqlx::query_scalar("SELECT status FROM user_registration_email_verifications WHERE email=? ORDER BY id DESC LIMIT 1")
+        .bind(&email).fetch_one(&pool).await?;
+    assert_eq!(pending_code, "pending");
+    let no_user: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM users WHERE email=?")
+        .bind(&email)
+        .fetch_one(&pool)
+        .await?;
+    assert_eq!(no_user, 0);
+
+    let registered = json_request(
+        app.clone(),
+        "POST",
+        "/api/v1/auth/register",
+        None,
+        request(second_id, true),
+    )
+    .await;
+    assert_eq!(registered.status(), StatusCode::OK);
+    let user_id: u64 = sqlx::query_scalar("SELECT id FROM users WHERE email=?")
+        .bind(&email)
+        .fetch_one(&pool)
+        .await?;
+    let receipt = json_request(
+        app.clone(),
+        "GET",
+        &format!("/admin/api/v1/legal-documents/receipts/{user_id}"),
+        Some(&token),
+        json!({}),
+    )
+    .await;
+    assert_eq!(receipt.status(), StatusCode::OK);
+    let receipt = body_json(receipt).await?;
+    assert_eq!(receipt["publication_id"], second_id);
+    assert_eq!(receipt["terms_id"], second["terms"]["id"]);
+    assert_eq!(receipt["privacy_id"], second["privacy"]["id"]);
+    assert_eq!(receipt["country_code"], country_code);
+    let old = json_request(
+        app.clone(),
+        "GET",
+        &format!("/admin/api/v1/legal-documents/publications/{first_id}"),
+        Some(&token),
+        json!({}),
+    )
+    .await;
+    assert_eq!(body_json(old).await?["terms"]["title"], "Terms A");
+    let editions = json_request(
+        app,
+        "GET",
+        &format!("/admin/api/v1/legal-documents?scope_code={country_code}&locale=en"),
+        Some(&token),
+        json!({}),
+    )
+    .await;
+    assert_eq!(
+        body_json(editions).await?["editions"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
     Ok(())
 }
 
@@ -654,12 +987,13 @@ async fn user_registration_requires_active_country_and_persists_locale()
     )
     .await?;
     insert_registration_email_code(&pool, &email, "123456").await?;
+    let legal_id = ensure_test_legal_bundle(&pool).await?;
     let registered = json_request(
         app.clone(),
         "POST",
         "/api/v1/auth/register",
         None,
-        json!({ "email": email, "password": "RegisterPassword123!", "country_code": "zz", "code": "123456" }),
+        json!({ "email": email, "password": "RegisterPassword123!", "country_code": "zz", "code": "123456", "legal_locale": "en", "legal_publication_id": legal_id, "legal_acknowledged": true }),
     )
     .await;
     let registered_status = registered.status();
@@ -723,6 +1057,7 @@ async fn user_registration_email_code_and_invite_policy_are_enforced() -> Result
     )
     .await?;
     upsert_default_smtp_config(&pool).await?;
+    let legal_id = ensure_test_legal_bundle(&pool).await?;
 
     let settings = test_settings();
     let app = exchange_api::build_router(
@@ -749,7 +1084,7 @@ async fn user_registration_email_code_and_invite_policy_are_enforced() -> Result
         "POST",
         "/api/v1/auth/register/email-code",
         None,
-        json!({ "email": send_email }),
+        json!({ "email": send_email, "country_code": "RI", "legal_locale": "en", "legal_publication_id": legal_id, "legal_acknowledged": true }),
     )
     .await;
     let sent_status = sent.status();
@@ -802,7 +1137,7 @@ async fn user_registration_email_code_and_invite_policy_are_enforced() -> Result
         "POST",
         "/api/v1/auth/register",
         None,
-        json!({ "email": register_email, "password": "RegisterPassword123!", "country_code": "RI", "code": "123456", "invite_code": invite_code }),
+        json!({ "email": register_email, "password": "RegisterPassword123!", "country_code": "RI", "code": "123456", "invite_code": invite_code, "legal_locale": "en", "legal_publication_id": legal_id, "legal_acknowledged": true }),
     )
     .await;
     let registered_status = registered.status();
@@ -848,7 +1183,8 @@ async fn user_registration_email_code_and_invite_policy_are_enforced() -> Result
             "password": "RegisterPassword123!",
             "country_code": "RI",
             "code": "234567",
-            "invite_code": &user_invite_code
+            "invite_code": &user_invite_code,
+            "legal_locale": "en", "legal_publication_id": legal_id, "legal_acknowledged": true
         }),
     )
     .await;
@@ -897,7 +1233,8 @@ async fn user_registration_email_code_and_invite_policy_are_enforced() -> Result
             "password": "RegisterPassword123!",
             "country_code": "RI",
             "code": "345678",
-            "invite_code": &user_invite_code
+            "invite_code": &user_invite_code,
+            "legal_locale": "en", "legal_publication_id": legal_id, "legal_acknowledged": true
         }),
     )
     .await;
@@ -1776,6 +2113,7 @@ async fn user_security_password_change_requires_old_password_and_revokes_refresh
     )
     .await?;
     insert_registration_email_code(&pool, &email, "123456").await?;
+    let legal_id = ensure_test_legal_bundle(&pool).await?;
     let app = exchange_api::build_router(AppState::new(settings).with_mysql(pool.clone()));
 
     let register = json_request(
@@ -1783,7 +2121,7 @@ async fn user_security_password_change_requires_old_password_and_revokes_refresh
         "POST",
         "/api/v1/auth/register",
         None,
-        json!({ "email": email, "password": "OldPassword123!", "country_code": "PW", "code": "123456" }),
+        json!({ "email": email, "password": "OldPassword123!", "country_code": "PW", "code": "123456", "legal_locale": "en", "legal_publication_id": legal_id, "legal_acknowledged": true }),
     )
     .await;
     let register_payload = body_json(register).await?;

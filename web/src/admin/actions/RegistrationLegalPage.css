@@ -1,0 +1,21 @@
+.legal-editor-page { width: 100%; }
+.legal-editor-toolbar, .legal-editor-fields { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; margin: 18px 0; }
+.legal-editor-toolbar label, .legal-editor-fields label { display: grid; gap: 6px; width: min(100%, 270px); font-size: 13px; }
+.legal-editor-edition { color: var(--semi-color-text-2); font-size: 13px; padding-bottom: 8px; }
+.legal-editor-documents { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; max-width: 1300px; }
+.legal-editor-documents section { display: grid; align-content: start; gap: 12px; min-width: 0; }
+.legal-editor-documents h2, .legal-editor-history h2, .legal-editor-receipts h2 { font-size: 16px; margin: 0 0 8px; }
+.legal-editor-documents label { display: grid; gap: 5px; min-width: 0; font-size: 13px; }
+.legal-editor-documents textarea { min-height: 320px; max-height: 640px; resize: vertical; }
+.legal-editor-commands { display: flex; justify-content: flex-end; max-width: 1300px; margin: 20px 0 24px; }
+.legal-editor-history, .legal-editor-receipts { padding: 20px 0; border-top: 1px solid var(--semi-color-border); max-width: 1300px; }
+.legal-editor-history-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.legal-editor-history-list button { border: 1px solid var(--semi-color-border); border-radius: 4px; padding: 8px 12px; color: var(--semi-color-text-0); background: var(--semi-color-bg-0); }
+.legal-editor-receipt-search { display: flex; max-width: 400px; gap: 8px; }
+.legal-editor-receipts dl { display: grid; grid-template-columns: 115px minmax(0, 1fr); gap: 8px; max-width: 600px; }
+.legal-editor-receipts dt { color: var(--semi-color-text-2); }
+.legal-editor-receipts dd { margin: 0; overflow-wrap: anywhere; }
+.legal-editor-history-copy { overflow-y: auto; max-height: 60vh; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
+.legal-editor-error { color: var(--semi-color-danger); }
+.legal-editor-success { color: var(--semi-color-success); }
+@media (max-width: 820px) { .legal-editor-documents { grid-template-columns: 1fr; } }

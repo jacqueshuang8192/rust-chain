@@ -31,6 +31,36 @@ export interface RegisterConfig {
   inviteCodeRequired: boolean
 }
 
+export interface RegistrationLegalDocument {
+  id: number
+  title: string
+  body: string
+  effective_on: string
+}
+
+export interface RegistrationLegalBundle {
+  publication_id: number
+  published_at: string
+  scope_code: string
+  locale: string
+  edition: number
+  terms: RegistrationLegalDocument
+  privacy: RegistrationLegalDocument
+}
+
+export async function fetchRegistrationLegal(countryCode: string, locale: string): Promise<RegistrationLegalBundle> {
+  const response = await client.get<RegistrationLegalBundle>(requestUrl('/auth/register/legal'), {
+    params: { country_code: countryCode, locale },
+  })
+  const bundle = response.data
+  if (!Number.isSafeInteger(bundle.publication_id) || bundle.publication_id <= 0
+    || !bundle.terms?.body || !bundle.privacy?.body || !bundle.locale
+    || typeof bundle.published_at !== 'string' || !Number.isFinite(Date.parse(bundle.published_at))) {
+    throw new Error(i18n.global.t('auth.legalUnavailable'))
+  }
+  return bundle
+}
+
 export interface LoginTwoFactorSetup {
   secret: string
   otpAuthUri: string
@@ -130,16 +160,22 @@ export async function resetLoginTwoFactor(challengeId: string, code: string): Pr
   await client.post(requestUrl('/auth/login/2fa/reset'), { challenge_id: challengeId, code: code.trim() })
 }
 
-export async function sendRegistrationCode(email: string): Promise<void> {
-  await client.post(requestUrl('/auth/register/email-code'), { email: email.trim() })
+export async function sendRegistrationCode(email: string, countryCode: string, legalLocale: string, legalPublicationId: number): Promise<void> {
+  await client.post(requestUrl('/auth/register/email-code'), {
+    email: email.trim(), country_code: countryCode, legal_locale: legalLocale,
+    legal_publication_id: legalPublicationId, legal_acknowledged: true,
+  })
 }
 
-export async function registerWithEmail(input: { email: string; password: string; code: string; countryCode: string; inviteCode?: string }): Promise<void> {
+export async function registerWithEmail(input: { email: string; password: string; code: string; countryCode: string; inviteCode?: string; legalLocale: string; legalPublicationId: number }): Promise<void> {
   const response = await client.post<BackendLoginResponse>(requestUrl('/auth/register'), {
     email: input.email.trim(),
     password: input.password,
     code: input.code.trim(),
     country_code: input.countryCode,
+    legal_locale: input.legalLocale,
+    legal_publication_id: input.legalPublicationId,
+    legal_acknowledged: true,
     invite_code: input.inviteCode?.trim() || undefined,
   })
   if (!response.data.access_token) throw new Error(i18n.global.t('auth.invalidSession'))

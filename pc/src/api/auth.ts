@@ -17,6 +17,30 @@ export interface RegisterParams {
   countryCode: string
   inviteCode?: string
   promotion?: string
+  legalLocale: string
+  legalPublicationId: number
+}
+
+export interface RegistrationLegalBundle {
+  publication_id: number
+  published_at: string
+  scope_code: string
+  locale: string
+  edition: number
+  terms: { id: number; title: string; body: string; effective_on: string }
+  privacy: { id: number; title: string; body: string; effective_on: string }
+}
+
+export async function getRegistrationLegal(countryCode: string, locale: string): Promise<RegistrationLegalBundle> {
+    const response = await request.instance.get(backendApiUrl('/auth/register/legal'), {
+        params: { country_code: countryCode, locale },
+    })
+    const bundle = response.data as RegistrationLegalBundle
+    if (!Number.isSafeInteger(bundle.publication_id) || bundle.publication_id <= 0 || !bundle.terms?.body || !bundle.privacy?.body
+        || typeof bundle.published_at !== 'string' || !Number.isFinite(Date.parse(bundle.published_at))) {
+        throw new Error('Registration legal documents are unavailable')
+    }
+    return bundle
 }
 
 export interface RegisterConfig {
@@ -98,9 +122,13 @@ export async function getLoginConfig(): Promise<{ code: number; message: string;
     }
 }
 
-export async function sendVerifyCode(email: string) {
+export async function sendVerifyCode(email: string, countryCode: string, legalLocale: string, legalPublicationId: number) {
     const res = await request.instance.post(backendApiUrl('/auth/register/email-code'), {
         email,
+        country_code: countryCode,
+        legal_locale: legalLocale,
+        legal_publication_id: legalPublicationId,
+        legal_acknowledged: true,
     })
     return {
         code: 0,
@@ -115,6 +143,9 @@ export async function register(data: RegisterParams) {
         password: data.password,
         code: data.code,
         country_code: data.countryCode,
+        legal_locale: data.legalLocale,
+        legal_publication_id: data.legalPublicationId,
+        legal_acknowledged: true,
         invite_code: data.inviteCode || data.promotion || undefined,
     })
     return normalizeAuthResponse(res.data)

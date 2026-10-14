@@ -9,6 +9,8 @@
 //! 安全上这里只接收已经散列的口令与验证码，绝不写入任何明文凭据；刷新令牌在 MySQL 侧存 Argon2 摘要、
 //! 在 Redis 侧存 SHA-256 派生键；查询未命中一律返回 `None` 或统一的校验错误，不靠错误差异暴露账号是否存在。
 
+pub(crate) mod legal;
+
 use crate::{
     architecture::InfrastructureLayer,
     error::{AppError, AppResult},

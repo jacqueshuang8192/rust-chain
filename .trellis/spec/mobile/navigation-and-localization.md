@@ -1,5 +1,11 @@
 # Mobile Navigation and Localization Contract
 
+Registration uses the backend
+[Registration Legal Documents](../backend/registration-legal-documents.md)
+contract. Country/locale changes clear review state, published bodies render as
+plain text, and registration submits the exact publication ID. Missing copy is
+never represented by a placeholder link.
+
 ## 1. Scope / Trigger
 
 Apply this contract when changing a route, bottom navigation item, back button, trade pair/mode picker, authentication redirect, language selector, user-facing copy, or locale-sensitive API call in `mobile/`.

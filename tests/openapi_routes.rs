@@ -82,6 +82,39 @@ async fn openapi_json() -> Value {
 }
 
 #[tokio::test]
+async fn openapi_documents_registration_legal_versions_and_receipts() {
+    let document = openapi_json().await;
+    assert!(document["paths"]["/api/v1/auth/register/legal"]["get"].is_object());
+    for (path, method) in [
+        ("/admin/api/v1/legal-documents", "get"),
+        ("/admin/api/v1/legal-documents", "post"),
+        ("/admin/api/v1/legal-documents/publications/{id}", "get"),
+        ("/admin/api/v1/legal-documents/receipts/{user_id}", "get"),
+    ] {
+        assert!(
+            document["paths"][path][method]["security"].is_array(),
+            "missing {method} {path}"
+        );
+    }
+    let request = &document["components"]["schemas"]["UserAuthRequest"]["properties"];
+    for field in ["legal_locale", "legal_publication_id", "legal_acknowledged"] {
+        assert!(request.get(field).is_some(), "missing registration {field}");
+    }
+    let email_code = &document["components"]["schemas"]["RegisterEmailCodeRequest"]["properties"];
+    for field in ["country_code", "legal_publication_id", "legal_acknowledged"] {
+        assert!(
+            email_code.get(field).is_some(),
+            "missing email-code {field}"
+        );
+    }
+    let bundle = &document["components"]["schemas"]["LegalBundle"]["properties"];
+    for field in ["publication_id", "terms", "privacy", "locale", "scope_code"] {
+        assert!(bundle.get(field).is_some(), "missing legal bundle {field}");
+    }
+    assert!(bundle.get("published_at").is_some());
+}
+
+#[tokio::test]
 async fn openapi_documents_agent_recharges_money_nulls_permissions_and_aliases() {
     for alias in ["/openapi.json", "/api/openapi.json"] {
         let document = request_json(alias).await;

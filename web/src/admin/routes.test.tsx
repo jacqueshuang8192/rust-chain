@@ -81,6 +81,7 @@ describe('adminRoutes', () => {
     ['system/brand', 'PlatformBrandPage'],
     ['wallet/quick-recharge', 'QuickRechargeConfigPage'],
     ['system/security-policy', 'SecurityPolicyPage'],
+    ['system/legal-documents', 'RegistrationLegalPage'],
     ['account/security', 'AdminTwoFactorPage'],
     ['agents', 'AgentManagementPage'],
     ['dashboard', 'DashboardPage'],

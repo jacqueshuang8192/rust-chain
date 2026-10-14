@@ -12,6 +12,9 @@ pub(super) struct UserAuthRequest {
     username: Option<String>,
     password: Option<String>,
     country_code: Option<String>,
+    legal_locale: Option<String>,
+    legal_publication_id: Option<u64>,
+    legal_acknowledged: Option<bool>,
     code: Option<String>,
     invite_code: Option<String>,
 }
@@ -32,6 +35,10 @@ pub(super) struct LoginConfigResponse {
 #[derive(ToSchema)]
 pub(super) struct RegisterEmailCodeRequest {
     email: String,
+    country_code: String,
+    legal_locale: String,
+    legal_publication_id: u64,
+    legal_acknowledged: bool,
 }
 
 #[derive(ToSchema)]
@@ -215,7 +222,8 @@ fn get_admin_login_config() {}
 fn send_register_email_code() {}
 
 /// 完成用户注册并直接签发访问与刷新令牌，注册成功后无需再调一次登录接口。
-/// 邮箱验证码与邀请码是否必填由注册配置决定；账号已存在返回冲突，其余入参问题返回参数错误。
+/// 注册需提交当前已发布的协议组编号与明确的阅读确认；账号与版本凭据同事务写入。
+/// 邮箱验证码与邀请码是否必填由注册配置决定；版本过期返回冲突，其余入参问题返回参数错误。
 #[utoipa::path(
     post,
     path = "/api/v1/auth/register",

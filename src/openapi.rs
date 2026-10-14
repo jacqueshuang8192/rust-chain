@@ -27,6 +27,7 @@ mod loan;
 mod new_coin_market;
 mod news;
 mod quick_recharge;
+mod registration_legal;
 mod seconds_refund;
 mod support;
 mod system_config;
@@ -59,6 +60,7 @@ pub fn routes() -> Router<AppState> {
     document.merge(new_coin_market::NewCoinMarketApiDoc::openapi());
     document.merge(agent_recharges::AgentRechargesApiDoc::openapi());
     document.merge(agent_team_orders::AgentTeamOrdersApiDoc::openapi());
+    document.merge(registration_legal::RegistrationLegalApiDoc::openapi());
     let docs: Router<AppState> = SwaggerUi::new("/docs")
         .url("/openapi.json", document.clone())
         .into();

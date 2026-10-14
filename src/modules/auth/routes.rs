@@ -41,7 +41,7 @@ use crate::{
 };
 use axum::{
     Json, Router,
-    extract::State,
+    extract::{Query, State},
     http::HeaderMap,
     routing::{get, patch, post},
 };
@@ -55,6 +55,7 @@ use chrono::Utc;
 pub fn user_routes() -> Router<AppState> {
     Router::new()
         .route("/auth/register/config", get(get_register_config))
+        .route("/auth/register/legal", get(get_registration_legal))
         .route("/auth/login/config", get(get_login_config))
         .route("/auth/register/email-code", post(send_register_email_code))
         .route("/auth/register", post(user_register))
@@ -73,6 +74,21 @@ pub fn user_routes() -> Router<AppState> {
         )
         .route("/auth/login/2fa/reset", post(reset_login_two_factor))
         .route("/auth/refresh", post(user_refresh))
+}
+
+/// 匿名读取所选国家的已发布协议与隐私政策，实际地区和语言随响应返回。
+async fn get_registration_legal(
+    State(state): State<AppState>,
+    Query(query): Query<crate::modules::auth::presentation::legal::RegistrationLegalQuery>,
+) -> AppResult<Json<crate::modules::auth::presentation::legal::RegistrationLegalBundle>> {
+    Ok(Json(
+        crate::modules::auth::application::legal::public_registration_legal(
+            &mysql_pool(&state)?,
+            &query.country_code,
+            query.locale.as_deref(),
+        )
+        .await?,
+    ))
 }
 
 /// 组装管理后台认证路由表，包含管理员注册、登录、登录二次验证、令牌刷新以及四个二次验证管理入口。
@@ -131,7 +147,7 @@ async fn get_login_config(State(state): State<AppState>) -> AppResult<Json<Login
     }))
 }
 
-/// 向待注册邮箱发送验证码，用例内部会拒绝已被占用的邮箱并施加发送冷却。
+/// 向待注册邮箱发送验证码；提交邮箱前先核对已发布政策版本和明确确认，再检查占用与冷却。
 /// 响应只回传发送标志和按当前时刻算出的剩余有效秒数，秒数经下限夹取不会为负，验证码本身只出现在邮件里。
 /// 邮箱已注册时用例返回冲突错误，因此该入口可以被用来判断某个邮箱是否已注册，
 /// 对枚举的防护须依赖上游限流，路由层不做遮蔽。
@@ -140,7 +156,7 @@ async fn send_register_email_code(
     Json(request): Json<RegisterEmailCodeRequest>,
 ) -> AppResult<Json<RegisterEmailCodeResponse>> {
     let pool = mysql_pool(&state)?;
-    let expires_at = send_registration_email_code(&state, &pool, request.email).await?;
+    let expires_at = send_registration_email_code(&state, &pool, request).await?;
 
     Ok(Json(RegisterEmailCodeResponse {
         sent: true,
@@ -184,7 +200,7 @@ async fn reset_password(
 }
 
 /// 完成邮件验证码注册并直接返回首组令牌，让用户注册后无需再走一次登录。
-/// 用例在单个事务内锁国家配置、消费验证码、写入用户与邀请关系，事务提交后才签发令牌，
+/// 用例在单个事务内锁国家与发布版本、消费验证码、写入用户/协议确认与邀请关系，提交后才签发令牌，
 /// 因此响应成功即代表账号确实已经落库。验证码错误只提交试错计数并返回校验错误，不会创建账号。
 /// 该入口匿名可达且不经过 Turnstile，防刷完全依赖验证码发送侧的冷却与试错上限。
 async fn user_register(

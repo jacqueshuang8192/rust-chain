@@ -61,6 +61,7 @@ function guardedLazyRoute(path: string, load: () => Promise<ComponentType>): Rou
 export const adminRoutes: RouteObject[] = [
   { index: true, element: <Navigate to="dashboard" replace /> },
   guardedLazyRoute('dashboard', async () => (await import('./dashboard/DashboardPage')).DashboardPage),
+  guardedLazyRoute('system/legal-documents', async () => (await import('./actions/RegistrationLegalPage')).RegistrationLegalPage),
   guardedLazyRoute(
     'config-center',
     async () => (await import('./config-center/ConfigCenterPage')).ConfigCenterPage

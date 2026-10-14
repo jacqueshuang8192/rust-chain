@@ -38,6 +38,7 @@ const actionDescriptorMatrix: ActionDescriptor[] = [
   { endpoint: '/admin/api/v1/quick-recharge/config/test', method: 'POST', permission: 'wallet.quick_recharge.write' },
   { endpoint: '/admin/api/v1/quick-recharge/config', method: 'PATCH', permission: 'wallet.quick_recharge.write' },
   { endpoint: '/admin/api/v1/security-policy', method: 'PATCH', permission: 'system.security.write' },
+  { endpoint: '/admin/api/v1/legal-documents', method: 'POST', permission: 'system.legal.write' },
   { endpoint: '/admin/api/v1/upload/config', method: 'PATCH', permission: 'system.uploads.write' },
   { endpoint: '/admin/api/v1/uploads/images', method: 'POST', permission: 'system.uploads.write' },
   { endpoint: '/admin/api/v1/prediction/settings', method: 'PATCH', permission: 'prediction.settings.write' },

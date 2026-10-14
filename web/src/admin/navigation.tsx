@@ -168,6 +168,7 @@ export const adminNavItems: AdminNavItem[] = [
     children: [
       { path: '/admin/system/countries', label: '国家配置' },
       { path: '/admin/system/security-policy', label: '安全策略' },
+      { path: '/admin/system/legal-documents', label: '用户协议与隐私政策' },
       { path: '/admin/system/brand', label: 'PC 品牌配置' },
       { path: '/admin/system/smtp', label: 'SMTP 邮件配置' },
       { path: '/admin/system/uploads', label: '上传配置' }

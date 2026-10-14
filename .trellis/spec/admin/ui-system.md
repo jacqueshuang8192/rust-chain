@@ -1,5 +1,12 @@
 # Admin UI System Contract
 
+The registration legal editor is a full-width page with exact country/language
+selection, immutable publication history and read-only user receipts. Both
+documents publish together, guarded by `system.legal.write`; read access uses
+`system.legal.read`. See the backend
+[Registration Legal Documents](../backend/registration-legal-documents.md)
+contract. Never insert unreviewed boilerplate as published text.
+
 ## Numeric Form Controls
 
 - Monetary/rate drafts use text-valued Semi Input wrappers, not InputNumber or

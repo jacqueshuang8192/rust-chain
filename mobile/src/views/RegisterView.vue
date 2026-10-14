@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import axios from 'axios'
 import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Check, ChevronDown, Eye, EyeOff, MailCheck, Search, X } from 'lucide-vue-next'
 import { apiErrorMessage } from '@/api/client'
-import { fetchCountries, fetchRegisterConfig, registerWithEmail, sendRegistrationCode, type CountryOption } from '@/api/auth'
+import { fetchCountries, fetchRegisterConfig, fetchRegistrationLegal, registerWithEmail, sendRegistrationCode, type CountryOption, type RegistrationLegalBundle } from '@/api/auth'
+import RegistrationLegalDialog from '@/components/RegistrationLegalDialog.vue'
 import { filterCountryOptions } from '@/core/countrySearch'
 import { useModalDialog } from '@/core/modalDialog'
 import {
@@ -33,6 +35,12 @@ const sending = ref(false)
 const submitting = ref(false)
 const remainingSeconds = ref(0)
 const acceptedTerms = ref(false)
+const reviewedLegal = ref(false)
+const legalDocuments = ref<RegistrationLegalBundle | null>(null)
+const legalLoading = ref(false)
+const legalError = ref('')
+const legalOpen = ref(false)
+let legalRequest = 0
 const showPassword = ref(false)
 const emailCodeRequired = ref(true)
 const inviteCodeRequired = ref(false)
@@ -107,6 +115,29 @@ function selectCountry(code: string): void {
   closeCountryPicker()
 }
 
+async function loadLegal(): Promise<void> {
+  const country = countryCode.value
+  const language = locale.value
+  const request = ++legalRequest
+  legalDocuments.value = null
+  acceptedTerms.value = false
+  reviewedLegal.value = false
+  legalOpen.value = false
+  legalError.value = ''
+  if (!country) return
+  legalLoading.value = true
+  try {
+    const bundle = await fetchRegistrationLegal(country, language)
+    if (request === legalRequest) legalDocuments.value = bundle
+  } catch {
+    if (request === legalRequest) legalError.value = t('auth.legalUnavailable')
+  } finally {
+    if (request === legalRequest) legalLoading.value = false
+  }
+}
+
+watch([countryCode, locale], () => { void loadLegal() })
+
 function handleCountryPickerKeydown(event: KeyboardEvent): void {
   trapCountryPickerFocus(event, closeCountryPicker)
 }
@@ -127,17 +158,24 @@ function startCountdown() {
 async function sendCode() {
   if (!emailCodeRequired.value) return
   error.value = ''
+  if (!acceptedTerms.value || !reviewedLegal.value || !legalDocuments.value) {
+    error.value = t('auth.termsRequired')
+    if (legalDocuments.value) legalOpen.value = true
+    return
+  }
   if (!email.value.trim() || !email.value.includes('@')) {
     error.value = t('auth.validEmailRequired')
     return
   }
   sending.value = true
   try {
-    await sendRegistrationCode(email.value)
+    await sendRegistrationCode(email.value, countryCode.value, legalDocuments.value.locale, legalDocuments.value.publication_id)
     sent.value = true
     startCountdown()
   } catch (reason) {
-    error.value = apiErrorMessage(reason, t('auth.codeSendFailed'))
+    const staleLegal = axios.isAxiosError(reason) && reason.response?.data?.code === 'LEGAL_DOCUMENTS_STALE'
+    error.value = staleLegal ? t('auth.legalUpdated') : apiErrorMessage(reason, t('auth.codeSendFailed'))
+    if (staleLegal) void loadLegal()
   } finally {
     sending.value = false
   }
@@ -145,7 +183,7 @@ async function sendCode() {
 
 async function submit() {
   error.value = ''
-  if (!acceptedTerms.value) {
+  if (!acceptedTerms.value || !reviewedLegal.value || !legalDocuments.value) {
     error.value = t('auth.termsRequired')
     return
   }
@@ -167,11 +205,13 @@ async function submit() {
   }
   submitting.value = true
   try {
-    await registerWithEmail({ email: email.value, password: password.value, code: code.value, countryCode: countryCode.value, inviteCode: inviteCode.value })
+    await registerWithEmail({ email: email.value, password: password.value, code: code.value, countryCode: countryCode.value, inviteCode: inviteCode.value, legalLocale: legalDocuments.value.locale, legalPublicationId: legalDocuments.value.publication_id })
     session.sync()
     await replaceAuthStep(router, safeRedirect.value)
   } catch (reason) {
-    error.value = apiErrorMessage(reason, t('auth.registerFailed'))
+    const staleLegal = axios.isAxiosError(reason) && reason.response?.data?.code === 'LEGAL_DOCUMENTS_STALE'
+    error.value = staleLegal ? t('auth.legalUpdated') : apiErrorMessage(reason, t('auth.registerFailed'))
+    if (staleLegal) void loadLegal()
   } finally {
     submitting.value = false
   }
@@ -277,11 +317,15 @@ onUnmounted(() => { if (timer) window.clearInterval(timer) })
         </label>
       </div>
 
-      <label class="terms-row">
-        <input v-model="acceptedTerms" type="checkbox" />
-        <span class="terms-check"><Check :size="12" /></span>
-        <span>{{ t('auth.termsAgreement') }}</span>
-      </label>
+      <div class="terms-row">
+        <label class="terms-choice"><input v-model="acceptedTerms" type="checkbox" :disabled="!reviewedLegal || !legalDocuments" />
+          <span class="terms-check"><Check :size="12" /></span>
+          <span>{{ t('auth.legalAgreement') }}</span>
+        </label>
+        <button type="button" :disabled="!legalDocuments" @click="legalOpen = true">{{ t('auth.legalTerms') }} · {{ t('auth.legalPrivacy') }}</button>
+      </div>
+      <p v-if="legalLoading" class="register-notice" role="status">{{ t('common.loading') }}</p>
+      <p v-if="legalError" class="register-notice" role="alert">{{ legalError }}</p>
 
       <div class="register-submit-wrap">
         <button class="pencil-primary pencil-primary--full auth-pencil-submit" type="submit" :disabled="submitting">
@@ -293,6 +337,10 @@ onUnmounted(() => { if (timer) window.clearInterval(timer) })
       <p v-if="countriesNotice" class="register-notice" role="status">{{ countriesNotice }}</p>
       <p v-if="error" class="auth-pencil-feedback" role="alert">{{ error }}</p>
     </form>
+
+    <RegistrationLegalDialog v-if="legalOpen && legalDocuments" :key="legalDocuments.publication_id"
+      :bundle="legalDocuments" @close="legalOpen = false"
+      @confirm="reviewedLegal = true; acceptedTerms = true; legalOpen = false" />
 
     <Teleport to="body">
       <div v-if="countryPickerOpen" class="auth-pencil-page country-picker-mask" @click.self="closeCountryPicker">
@@ -532,16 +580,22 @@ onUnmounted(() => { if (timer) window.clearInterval(timer) })
 }
 
 .terms-row {
-  align-items: center;
-  cursor: pointer;
   display: grid;
-  gap: 8px;
+  gap: 2px;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 72px;
+}
+.terms-choice {
+  display: grid;
   grid-template-columns: 16px minmax(0, 1fr);
-  height: 16px;
-  margin-top: 0;
-  min-height: 16px;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
   position: relative;
 }
+.terms-choice > span:last-child { color: var(--muted); font-size: 11px; line-height: 1.4; }
+.terms-row > button { justify-self: start; border: 0; background: transparent; padding: 0 0 0 24px; color: var(--accent); min-height: 40px; text-align: left; font-size: 11px; }
+.terms-row > button:disabled { color: var(--muted); }
 
 .terms-row input {
   height: 44px;
@@ -568,11 +622,6 @@ onUnmounted(() => { if (timer) window.clearInterval(timer) })
 
 .terms-row input:checked + .terms-check { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .terms-row input:focus-visible + .terms-check { box-shadow: 0 0 0 3px var(--focus-ring); outline: 2px solid var(--focus); outline-offset: 2px; }
-.terms-row > span:last-child {
-  color: var(--muted);
-  font-size: 10px;
-  line-height: 16px;
-}
 
 .register-submit-wrap {
   box-sizing: border-box;
