@@ -51,3 +51,10 @@ Present actual Terms of Service and Privacy Policy during user registration on M
 - Both Vue registration clients show full plain-text or safe rich-text terms and privacy; country/language changes clear acknowledgement.
 - Server-side registration validates the current pair before consuming email code and stores one immutable receipt with the user.
 - Exact API, RBAC, release gates and 320px browser interaction were checked. Final test counts and limitations are in `delivery.md`.
+
+## Mobile Reading Sheet Follow-Up
+
+- [x] Match the PWA registration palette, bottom-sheet geometry, rounded close control and mint primary action in both themes.
+- [x] Keep title, document tabs and acknowledgement visible while only the document scrolls; support 320-448px handsets, landscape and safe areas.
+- [x] Preserve both-document review, safe rich/plain rendering and publication identity; fix initial focus, scroll lock, dismissal focus return and tab keyboard navigation.
+- [x] Verify real browser interactions with local read-only fixtures and run the mobile release gate.

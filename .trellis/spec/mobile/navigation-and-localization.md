@@ -6,6 +6,27 @@ contract. Country/locale changes clear review state, published bodies render as
 escaped plain text or allowlisted rich-text blocks, and registration submits
 the exact publication ID. Missing copy is never a placeholder link.
 
+The Mobile reading dialog is a body-Teleported `auth-pencil-page` bottom sheet,
+so it inherits the registration palette in both themes even outside the app
+canvas. It is at most 448px wide, has 24px top corners and a stable
+`min(800px, 90dvh)` height constrained by the top safe area. Only the document
+panel scrolls; the heading, two tabs and safe-area acknowledgement row stay
+visible. Keep 44px close/tab targets and 50px actions, long-word wrapping,
+and reduced-motion support.
+
+`RegistrationLegalDialog` mounts under `v-if`: initialize its modal-open ref to
+false, set it true in `onMounted`, and close it before emitting dismissal. The
+shared `useModalDialog` watcher is not immediate; a permanently true ref skips
+initial focus and body locking. Closing must let the helper restore trigger
+focus and the previous body overflow. Tabs use roving tabindex with arrows,
+Home/End and associated panel labels; changing documents resets panel scroll.
+Viewing both documents still gates acknowledgement, and closing never grants it.
+
+Verify light/dark 320x568, 390x844, 448x900 and 844x390 layouts, English long
+text, plain/rich bodies, Tab containment, Escape/backdrop/cancel dismissal,
+focus return, locale reset and simulated safe insets. Desktop previews retain
+the same handset-width sheet. Follow the mobile release gate for bundle budgets.
+
 ## 1. Scope / Trigger
 
 Apply this contract when changing a route, bottom navigation item, back button, trade pair/mode picker, authentication redirect, language selector, user-facing copy, or locale-sensitive API call in `mobile/`.

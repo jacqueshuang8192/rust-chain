@@ -9655,3 +9655,10 @@
 - 修改文件：`migrations/0150_registration_legal_rich_text.sql`、`src/modules/auth/{presentation,application,infrastructure}/legal.rs`、`src/openapi/registration_legal.rs`、`web/src/admin/actions/RegistrationLegalPage.{tsx,css}`及测试、`mobile/src/{api/auth.ts,components/RegistrationLegalDialog.vue}`、`pc/src/{api/auth.ts,views/auth/Register.vue}`、相关Trellis规范/任务记录与本进度文件。
 - 验证结果：全新独立MySQL库实跑法律文件发布/注册集成测试1/1通过，迁移重复执行通过，测试库已清理；Rust严格Clippy、fmt、架构11/11、OpenAPI定向1/1通过。后台全量1064/1064、最后定向3/3、类型/lint/build、策略15/15及覆盖23/23通过；手机端完整release:gate与PC类型/构建通过。浏览器在390px下以本地内存API夹具确认短正文可启用发布、弹窗可提交两份富文本，且编辑器不再遮挡按钮，无生产写入。后台全量JS预算仍为2658813/2600000字节超限，此既有门禁未放宽。
 - 后续事项：仅本地提交，未推送或部署。上线须先执行0150迁移；正式正文仍需法律审核。后台JS预算需另行处理；实体手机及生产环境未验收。
+
+## 2026-10-15 06:03 - PWA注册协议手机端阅读弹窗
+
+- 完成内容：用户协议与隐私政策改为统一底部弹出的手机阅读面板，复用注册页明暗主题、24px顶部圆角、圆形关闭按钮和薄荷色确认按钮；固定标题、标签页与底部操作区，仅正文滚动。补齐打开时的背景滚动锁、初始焦点、关闭后的焦点恢复及标签页键盘切换，保持两份文件查看后确认的规则。
+- 修改文件：`mobile/src/components/RegistrationLegalDialog.vue`、`.trellis/spec/mobile/navigation-and-localization.md`、`.trellis/tasks/10-14-registration-legal-documents/{prd,delivery}.md`、`docs/superpowers/PROGRESS.md`。
+- 验证结果：`mobile/npm run release:gate`全部通过，含844/844测试、生产/测试类型检查、PWA/Tauri Web构建、产物及包体/源码预算检查；初次包体超限已通过精简本组件解决，未放宽门槛。真实浏览器使用内存只读夹具验收明暗主题320/390/448px、844x390横屏及1280px预览，无水平溢出或正文与按钮遮挡；确认门槛、滚动复位、键盘切换、焦点闭环/恢复、Escape/遮罩/取消、语言变更清空确认、中英文及纯文本/富文本、减少动态效果均通过。模拟20px侧边/34px底部安全区在等待布局稳定后通过，截图已检查；`git diff --check`通过。
+- 后续事项：本次仅本地提交，未推送或部署；手机端开发服务5186已启动，验收浏览器已关闭，不持久化测试正文。实体手机和安装态PWA安全区未实机验证。

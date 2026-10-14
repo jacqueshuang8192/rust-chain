@@ -60,3 +60,26 @@ from a screenshot. No production database was changed; no push or deployment.
 - In a local browser with an in-memory API fixture, 390px editing enabled the
   button for short copy, the modal submitted both rich documents, and the
   editor no longer intercepted the action. No production write occurred.
+
+## Follow-up: Mobile Reading Sheet
+
+- Replaced the desktop-style reading dialog with a 448px-max bottom sheet using
+  the existing registration theme boundary, 24px top corners, circular Close,
+  segmented document tabs and mint acknowledgement. Header and actions remain
+  visible while the long document scrolls, with safe-area and reduced-motion CSS.
+- Fixed the conditional component's modal lifecycle so the existing watcher
+  receives an opening transition; dismissal now restores body overflow and
+  trigger focus. Tabs support arrows/Home/End and reset document scroll.
+- The full Mobile release gate passed: 844/844 tests, both type checks, PWA
+  and Tauri web builds, artifact assertions, unchanged bundle/source budgets
+  and critical-test governance. Initial bundle failures were resolved by
+  simplifying this component; no limits were raised.
+- Browser verification used an in-memory read-only API fixture, not production:
+  light/dark 320x568, 390x844, 448x900, 844x390 and 1280x800 had no horizontal
+  overflow or footer overlap. Verified review gating, tab keyboard navigation,
+  focus loop/return, Escape/cancel/backdrop, locale reset, plain/rich text,
+  English long-word wrapping and reduced motion. After waiting for emulated
+  layout updates, simulated 20px side/34px bottom insets retained visible actions.
+- Screenshots were inspected. Physical devices and installed PWA safe areas
+  were not tested. The regular dev server is on port 5186; test overrides were
+  browser-memory-only and the test TaskSpace was closed.
