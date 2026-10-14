@@ -9641,3 +9641,10 @@
 - 修改文件：`docs/superpowers/PROGRESS.md`（本条推送记录）。
 - 验证结果：`git push origin main` 成功；`git rev-parse HEAD` 与 `git ls-remote origin refs/heads/main` 均为 `caa3a40b480959427de8a51e5a2059ad6fa3be28`。功能验证见上条记录，本次未重复运行。
 - 后续事项：推送不等于生产部署；上线前仍需迁移0149并发布经法律审核的正文，后台包体预算仍超限。
+
+## 2026-10-15 00:08 - 修复首页行情列表被底部导航遮挡
+
+- 完成内容：修正首页行情区继承的标题上下边距及表头最小高度，保持三行行情在290px区域内，滚动到底时不再被固定导航遮挡；新增布局回归断言并记录规范。
+- 修改文件：`mobile/src/styles/prototype-parity.css`、`mobile/tests/pencil-selected-home-layout.test.ts`、`.trellis/spec/mobile/pwa-and-shell.md`、`docs/superpowers/PROGRESS.md`。
+- 验证结果：`mobile/npm run release:gate`通过，包含类型检查、全量测试、PWA/Tauri构建及预算检查；真实浏览器在320/390/448px宽、844px高滚动到底测得列表与导航间距均为12px，文档无横向溢出；390px截图已检查。
+- 后续事项：未推送或部署；尚未在实体手机及非零安全区设备上验证。

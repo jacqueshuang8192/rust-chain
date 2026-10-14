@@ -889,6 +889,13 @@ createTurnstileLifecycle(options?: TurnstileLifecycleOptions): {
   `elementFromPoint` hit within the Trade button. Source tests must fail when a
   legacy `.active:not(.seconds-nav-action)` selector does not also exclude
   `.trade-nav-action`.
+- Home market clearance: the 290px `.home-market-section` must override the
+  shared `.section-heading` margins to zero and the shared `.home-market-head`
+  minimum height to 24px. Its three 54px rows must stay inside the section;
+  at the bottom of the root scroll area on 320px, 390px, and 448px phones,
+  `.home-market-list` must finish above the fixed Dock without horizontal
+  overflow. Do not solve an internal section overflow by increasing only the
+  page's bottom padding.
 - Root trade chooser pass: at 390x844 assert the exact `X0ux9F` mask, path,
   358x300 surface, four 330x58 rows without an active selection state, 54px Close and 4px
   path-to-Dock gap. Repeat at 320x720 and 448x900 in both themes for safe-area,

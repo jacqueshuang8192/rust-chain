@@ -69,6 +69,8 @@ test('首页 390px 块级几何与三行真实行情按选中画板固定', () =
   assert.doesNotMatch(homeSource, /home-carousel__wash|home-carousel__cta|home-guest-hero__balance/)
   assert.match(parityCss, /@media \(prefers-reduced-motion: reduce\)[\s\S]*?home-carousel__dot/)
   assert.match(parityCss, /\.home-view \.home-market-section\s*\{[\s\S]*?height:\s*290px;/)
+  assert.match(parityCss, /\.home-view \.section-heading\s*\{[^}]*margin:\s*0;[^}]*min-height:\s*40px;/)
+  assert.match(parityCss, /\.home-view \.home-market-head\s*\{[^}]*height:\s*24px;[^}]*min-height:\s*24px;/)
   assert.equal((homeSource.match(/v-for="row in 3"/g) || []).length, 1)
   assert.match(homeSource, /v-for="ticker in visibleTickers\.slice\(0, 3\)"/)
   assert.match(homeSource, /marketRowsUnavailable[\s\S]*class="root-market-reserved-state" role="alert"/)
