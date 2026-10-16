@@ -1311,3 +1311,19 @@ Correct: pair lock + current read; error/last_tick evidence; actionable expiry m
 - Tests: `CoinApplicationsPage.test.tsx`, access/route tests and full web gates.
   Browser fixtures verify presentation/interaction only; real DB tests own the
   publication, audit rollback, authorization and concurrency guarantees.
+
+
+## Agent Header Identity
+
+- Header identity comes from `GET /agent/api/v1/me`: preserve `username` and
+  `agent_code`, show levels 1–3 as Chinese agent labels, and label the agent code.
+  Authentication subjects (including `agent:unknown` for opaque tokens) are
+  internal identifiers and must never be used as display-name fallbacks.
+- Validate nonblank username/code and supported levels at the API boundary.
+  Use neutral loading/error copy with explicit retry; do not fabricate identity.
+- Key identity state by agent subject and session generation, cancel on unmount,
+  and ignore aborted responses. Token refresh within a generation retains identity.
+- Constrain long header text with ellipsis and full-value titles. Keep menu, retry,
+  and logout accessible at 320px without horizontal overflow.
+- Verify malformed payloads, retry, same-subject session replacement, late
+  responses, and narrow/wide layouts. Header changes require no auth-store rewrite.

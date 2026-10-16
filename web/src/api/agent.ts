@@ -363,8 +363,16 @@ export async function listAgentFinancialRows<T extends Record<string, unknown>>(
   return { rows: rows as T[], total: value.total };
 }
 
-export function getAgentMe(): Promise<AgentMe> {
-  return agentRequest<AgentMe>('/agent/api/v1/me');
+export async function getAgentMe(signal?: AbortSignal): Promise<AgentMe> {
+  const path = '/agent/api/v1/me';
+  const value = await agentRequest<AgentMe>(path, { signal });
+  if (!isRecord(value)
+    || typeof value.username !== 'string' || !value.username.trim()
+    || typeof value.agent_code !== 'string' || !value.agent_code.trim()
+    || ![1, 2, 3].includes(value.level)) {
+    throw new ContractError('代理账号资料格式不完整', { path });
+  }
+  return value;
 }
 
 export function getAgentDashboard(): Promise<AgentDashboard> {

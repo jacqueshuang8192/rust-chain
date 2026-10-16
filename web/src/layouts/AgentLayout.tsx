@@ -9,16 +9,16 @@ import {
   IconMenu,
   IconUserGroup
 } from '@douyinfe/semi-icons';
-import { Avatar, Button, Layout, Nav, Space, Typography } from '@douyinfe/semi-ui';
+import { Avatar, Button, Layout, Nav } from '@douyinfe/semi-ui';
 import type { NavItems, OnSelectedData } from '@douyinfe/semi-ui/lib/es/navigation';
-import { useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import { authStore } from '../auth/authStore';
+import { getAgentMe, type AgentMe } from '../api/agent';
 import './AgentLayout.css';
 
 const { Header, Sider, Content } = Layout;
-const { Text } = Typography;
 
 type AgentNavItem = {
   icon: ReactNode;
@@ -85,12 +85,50 @@ function normalizePath(pathname: string): string {
   return pathname;
 }
 
+function AgentHeaderIdentity() {
+  const [profile, setProfile] = useState<AgentMe | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void getAgentMe(controller.signal).then((value) => {
+      if (!controller.signal.aborted) setProfile(value);
+    }).catch(() => {
+      if (!controller.signal.aborted) setFailed(true);
+    });
+    return () => controller.abort();
+  }, [attempt]);
+
+  const name = profile?.username ?? '代理账号';
+  const detail = profile
+    ? `${['一级代理', '二级代理', '三级代理'][profile.level - 1]} · 代理编号 ${profile.agent_code}`
+    : failed ? '账号资料暂不可用' : '账号资料加载中';
+
+  return (
+    <div className="agent-header-identity">
+      <Avatar className="agent-header-avatar" size="small" aria-hidden="true">
+        {profile ? Array.from(name)[0].toUpperCase() : '代'}
+      </Avatar>
+      <div className="agent-header-account" aria-live="polite" aria-busy={!profile && !failed}>
+        <span className="agent-header-name" title={name}>{name}</span>
+        <span className="agent-header-detail" title={detail} role={failed ? 'alert' : undefined}>{detail}</span>
+      </div>
+      {failed && (
+        <Button size="small" theme="borderless" aria-label="重新加载代理账号资料" onClick={() => {
+          setFailed(false);
+          setAttempt((value) => value + 1);
+        }}>重试</Button>
+      )}
+    </div>
+  );
+}
+
 export function AgentLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
-  const session = authStore.getSession('agent');
-  const subject = session?.subject ?? 'agent';
+  const session = useSyncExternalStore(authStore.subscribe, () => authStore.getSession('agent'));
   const activePath = normalizePath(location.pathname);
   const handleNavSelect = ({ itemKey }: OnSelectedData) => {
     const nextPath = String(itemKey);
@@ -122,11 +160,9 @@ export function AgentLayout() {
           <Button className="agent-menu-toggle" icon={<IconMenu />} theme="borderless"
             aria-label={menuOpen ? '收起代理菜单' : '展开代理菜单'} title={menuOpen ? '收起代理菜单' : '展开代理菜单'}
             aria-expanded={menuOpen} onClick={() => setMenuOpen((value) => !value)} />
-          <Space>
-            <Avatar size="small">{subject.slice(0, 1).toUpperCase()}</Avatar>
-            <Text>{subject}</Text>
-          </Space>
+          {session && <AgentHeaderIdentity key={`${session.subject}:${session.generation}`} />}
           <Button
+            className="agent-header-logout"
             icon={<IconExit />}
             onClick={() => {
               authStore.clearSession('agent');

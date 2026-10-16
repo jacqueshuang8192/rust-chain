@@ -1,0 +1,32 @@
+{
+  "id": "agent-header-identity",
+  "name": "agent-header-identity",
+  "title": "Improve agent header identity display",
+  "description": "",
+  "status": "completed",
+  "dev_type": "frontend",
+  "scope": "agent",
+  "package": "admin",
+  "priority": "P2",
+  "creator": "rust-chain",
+  "assignee": "rust-chain",
+  "createdAt": "2026-10-16",
+  "completedAt": "2026-10-16",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "web/src/layouts/AgentLayout.tsx",
+    "web/src/layouts/AgentLayout.css",
+    "web/src/layouts/AgentLayout.test.tsx",
+    "web/src/api/agent.ts",
+    "web/src/api/agent.test.ts"
+  ],
+  "notes": "",
+  "meta": {}
+}

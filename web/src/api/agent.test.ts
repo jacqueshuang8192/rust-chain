@@ -23,6 +23,11 @@ function jsonResponse(payload: unknown) {
   return new Response(JSON.stringify(payload), { status: 200 });
 }
 
+const agentIdentity = {
+  agent_admin_id: 9, agent_id: 3, username: 'active', agent_code: 'AG003',
+  level: 2, agent_status: 'active', admin_status: 'active'
+};
+
 describe('agent API', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -50,7 +55,7 @@ describe('agent API', () => {
   it('uses the agent auth scope for portal reads', async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(jsonResponse({ agent_admin_id: 9 }))
+      .mockResolvedValueOnce(jsonResponse(agentIdentity))
       .mockResolvedValueOnce(jsonResponse({ team_user_count: 2 }))
       .mockResolvedValueOnce(jsonResponse({ users: [] }))
       .mockResolvedValueOnce(jsonResponse({ invite_codes: [] }))
@@ -80,6 +85,29 @@ describe('agent API', () => {
       const headers = call[1].headers as Headers;
       expect(headers.get('Authorization')).toBe('Bearer agent-token');
     });
+  });
+
+  it.each([null, {}, { ...agentIdentity, username: ' ' }, { ...agentIdentity, agent_code: null },
+    { ...agentIdentity, level: 4 }, { ...agentIdentity, level: '2' }])('rejects malformed identity %j', async (value) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(value)));
+    await expect(getAgentMe()).rejects.toBeInstanceOf(ContractError);
+  });
+
+  it('preserves account text and forwards cancellation for identity reads', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(agentIdentity));
+    vi.stubGlobal('fetch', fetchMock);
+    const controller = new AbortController();
+    await expect(getAgentMe()).resolves.toEqual(agentIdentity);
+    fetchMock.mockImplementationOnce((_url: string, init: RequestInit) => new Promise((_resolve, reject) => {
+      init.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+    }));
+    const pending = getAgentMe(controller.signal);
+    const rejected = expect(pending).rejects.toMatchObject({ name: 'ApiAbortError' });
+    const signal = fetchMock.mock.calls[1][1].signal as AbortSignal;
+    expect(signal.aborted).toBe(false);
+    controller.abort();
+    expect(signal.aborted).toBe(true);
+    await rejected;
   });
 
   it('creates invite codes and updates status with the agent auth scope', async () => {

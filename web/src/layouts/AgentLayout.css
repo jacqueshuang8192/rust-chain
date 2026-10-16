@@ -5,6 +5,28 @@
   display: none;
 }
 
+.agent-layout .agent-header { gap: 16px; }
+.agent-header-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+.agent-header-identity .agent-header-avatar {
+  flex-shrink: 0;
+  background: var(--semi-color-fill-0);
+  color: var(--semi-color-text-1);
+  border: 1px solid var(--semi-color-border);
+}
+.agent-header-account { display: grid; gap: 2px; min-width: 0; }
+.agent-header-name,
+.agent-header-detail { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-header-name { color: var(--semi-color-text-0); font-size: 14px; font-weight: 600; line-height: 20px; }
+.agent-header-detail { color: var(--semi-color-text-2); font-size: 12px; line-height: 18px; }
+.agent-header-identity > .semi-button,
+.agent-layout .agent-header-logout { flex-shrink: 0; white-space: nowrap; }
+
 .agent-layout .exchange-page {
   padding: 24px 24px 40px;
   min-width: 0;
@@ -119,10 +141,6 @@
     padding: 12px !important;
     gap: 8px;
   }
-  .agent-header > .semi-space {
-    min-width: 0;
-  }
-  .agent-header .semi-typography {
-    overflow-wrap: anywhere;
-  }
+  .agent-header-identity { gap: 8px; }
+  .agent-layout .agent-header-logout { padding-inline: 8px; }
 }
