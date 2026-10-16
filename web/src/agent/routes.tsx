@@ -23,6 +23,7 @@ function agentRoute(path: string, page: AgentPageName): RouteObject {
 
 export const agentRoutes: RouteObject[] = [
   { index: true, element: <Navigate to="dashboard" replace /> },
+  { path: 'coin-applications', handle: { page: 'AgentCoinApplicationsPage' }, lazy: async () => ({ Component: (await import('../coin-applications/CoinApplicationsPage')).AgentCoinApplicationsPage }) },
   agentRoute('dashboard', 'AgentDashboardPage'),
   agentRoute('support', 'AgentSupportPage'),
   agentRoute('users', 'AgentUsersPage'),

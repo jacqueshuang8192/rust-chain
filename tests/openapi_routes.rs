@@ -1667,3 +1667,25 @@ async fn swagger_ui_route_is_registered() {
         );
     }
 }
+
+#[tokio::test]
+async fn openapi_documents_coin_application_review_and_own_history() {
+    let doc = openapi_json().await;
+    for (path, method) in [
+        ("/agent/api/v1/coin-applications", "get"),
+        ("/agent/api/v1/coin-applications", "post"),
+        ("/agent/api/v1/coin-applications/{id}", "get"),
+        ("/agent/api/v1/coin-applications/options", "get"),
+        ("/admin/api/v1/agent-coin-applications", "get"),
+        ("/admin/api/v1/agent-coin-applications/{id}", "get"),
+        ("/admin/api/v1/agent-coin-applications/{id}/review", "post"),
+    ] {
+        assert!(doc["paths"][path][method]["security"].is_array(), "{path}");
+    }
+    let fields = &doc["components"]["schemas"]["CoinApplicationRecord"]["properties"];
+    assert_eq!(fields["issue_price"]["type"], "string");
+    assert_eq!(fields["total_supply"]["type"], "string");
+    assert!(fields.get("idempotency_key").is_none());
+    assert!(fields.get("review_reason").is_some());
+    assert!(fields.get("project_id").is_some());
+}

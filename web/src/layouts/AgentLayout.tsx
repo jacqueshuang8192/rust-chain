@@ -34,6 +34,7 @@ const navItems: AgentNavItem[] = [
   { path: '/agent/orders/margin', label: '合约订单', icon: <IconLineChartStroked aria-hidden="true" /> },
   { path: '/agent/orders/earn', label: '理财订单', icon: <IconCoinMoneyStroked aria-hidden="true" /> },
   { path: '/agent/orders/spot', label: '现货订单', icon: <IconList aria-hidden="true" /> },
+  { path: '/agent/coin-applications', label: '新币发行申请', icon: <IconCoinMoneyStroked aria-hidden="true" /> },
   { path: '/agent/recharges', label: '我的充值申请', icon: <IconCoinMoneyStroked aria-hidden="true" /> },
   { path: '/agent/invite-codes', label: '邀请码', icon: <IconList aria-hidden="true" /> },
   { path: '/agent/commissions', label: '佣金记录', icon: <IconCoinMoneyStroked aria-hidden="true" /> },

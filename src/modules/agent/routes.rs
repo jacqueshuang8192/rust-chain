@@ -31,6 +31,7 @@ use axum::{
     routing::{get, patch, post},
 };
 
+mod coin_applications;
 mod recharges;
 mod team_orders;
 mod wallet_records;
@@ -40,6 +41,7 @@ mod wallet_records;
 /// 这里只声明路由表，鉴权由各处理器的 `AgentAuth` 提取器完成，本函数不注册中间件也不做限流。
 pub fn routes() -> Router<AppState> {
     Router::new()
+        .merge(coin_applications::routes())
         .merge(recharges::routes())
         .merge(team_orders::routes())
         .merge(wallet_records::routes())

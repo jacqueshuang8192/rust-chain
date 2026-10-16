@@ -38,6 +38,7 @@ const ADMIN_PERMISSION_RESOURCES: &[&str] = &[
     "new_coin.distributions",
     "new_coin.locks",
     "new_coin.projects",
+    "new_coin.applications",
     "new_coin.purchases",
     "new_coin.subscriptions",
     "new_coin.unlocks",
@@ -93,6 +94,29 @@ pub(crate) fn admin_scope_from_record(record: AdminAccessRecord) -> AppResult<Ad
 /// 未登记的后台业务路径返回 `admin.unmapped`，仅 `*` 可访问，避免新路由因遗漏映射而默认放行。
 pub(crate) fn required_admin_permission(method: &str, raw_path: &str) -> Option<String> {
     let path = raw_path.strip_prefix("/admin/api/v1").unwrap_or(raw_path);
+    if path.starts_with("/agent-coin-applications") {
+        let parts: Vec<_> = path.split('/').collect();
+        let valid_id = parts.get(2).is_some_and(|s| {
+            s.starts_with(|c: char| c.is_ascii_digit() && c != '0')
+                && s.bytes().all(|c| c.is_ascii_digit())
+                && s.parse::<u64>().is_ok_and(|id| id <= 9_007_199_254_740_991)
+        });
+        return Some(
+            match (method, parts.as_slice()) {
+                ("GET" | "HEAD" | "OPTIONS", ["", "agent-coin-applications"]) => {
+                    "new_coin.applications.read"
+                }
+                ("GET" | "HEAD" | "OPTIONS", ["", "agent-coin-applications", _]) if valid_id => {
+                    "new_coin.applications.read"
+                }
+                ("POST", ["", "agent-coin-applications", _, "review"]) if valid_id => {
+                    "new_coin.applications.review"
+                }
+                _ => "admin.unmapped.write",
+            }
+            .into(),
+        );
+    }
     if path.starts_with("/agent-recharges")
         || (path.starts_with("/agents/") && path.contains("/recharge-policy"))
     {

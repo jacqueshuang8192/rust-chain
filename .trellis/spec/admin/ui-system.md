@@ -1289,3 +1289,25 @@ or obtains overlap evidence before waiting for the pair lock.
 Wrong: SELECT overlap before lock; active => healthy; hide expired action without explanation.
 Correct: pair lock + current read; error/last_tick evidence; actionable expiry message.
 ```
+
+## Agent New-Coin Applications
+
+- Agent `/agent/coin-applications` combines issuance form and own-account
+  application history. Admin `/admin/agent-coin-applications` is a separately
+  permissioned review queue; keep exact `.read` / `.review` mappings aligned.
+- Use shared DataTable, status filters, server pagination, TimestampText and
+  detail SideSheet. Show complete input, submission time, decision/rejection
+  reason, review time and published project ID. Approved means preheat published,
+  not actually listed; planned time never promises an automatic transition.
+- Persist unknown submission intent (full immutable payload and idempotency key)
+  in sessionStorage scoped to subject/session generation. Remount reuses the key;
+  storage failure blocks sending. Successful response must match submitted fields
+  and exact Decimal values before releasing the intent. No Number money adapter.
+- Review requires a reason, confirmation and the independent review permission.
+  After an uncertain review, block decisions until authoritative detail is read.
+  Scope/session changes remount state; abort and ignore old list/detail responses.
+- Keep 1728/1280 and 390/320 layouts free of document overflow. Tables retain
+  column resizing and contained horizontal scrolling; narrow forms use one column.
+- Tests: `CoinApplicationsPage.test.tsx`, access/route tests and full web gates.
+  Browser fixtures verify presentation/interaction only; real DB tests own the
+  publication, audit rollback, authorization and concurrency guarantees.

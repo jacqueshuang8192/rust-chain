@@ -10,6 +10,7 @@ use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+pub(crate) mod coin_applications;
 pub(crate) mod recharges;
 pub(crate) mod team_orders;
 pub(crate) mod wallet_records;

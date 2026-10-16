@@ -16,6 +16,8 @@ use std::{error::Error, str::FromStr};
 use tower::ServiceExt;
 use uuid::Uuid;
 
+#[path = "agent_routes/coin_applications.rs"]
+mod coin_applications;
 #[path = "agent_routes/recharges.rs"]
 mod recharges;
 #[path = "agent_routes/team_orders.rs"]

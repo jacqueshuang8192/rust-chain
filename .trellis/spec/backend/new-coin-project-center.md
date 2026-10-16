@@ -197,3 +197,48 @@ Wrong: label the existing immediate generator PATCH as "Save draft".
 Correct: persist the project draft separately, then publish under the shared
 writer lock and existing generator transaction. A fresh displayed price still
 does not prove financial price eligibility or worker lease health.
+
+## Agent Issuance Applications
+
+Migration `0151_agent_new_coin_applications.sql` adds immutable applications,
+separate from public assets/projects. Agent endpoints are
+`/agent/api/v1/coin-applications` (GET/POST), `/options` (GET) and `/:id` (GET).
+Admin endpoints use `/admin/api/v1/agent-coin-applications` (GET), `/:id` (GET)
+and `/:id/review` (POST). Admin read and review independently require
+`new_coin.applications.read` and `.review`; project write does not substitute.
+
+- Owner identity is the authenticated portal account plus its original agent.
+  Both list/count and detail constrain those IDs. There is no team-subtree read;
+  parents, siblings and another portal on the same node cannot see applications.
+  Unknown owner/status fields in input are rejected. Status filters and paging
+  are bounded (limit 1..100, offset <=100000), ordered by descending ID.
+- Inputs pin symbol, name, precision, positive supply/price, quote asset,
+  planned listing time and reason. Money is Decimal text, timestamps milliseconds.
+  Symbol/name/precision reuse asset validation; amounts use DECIMAL(38,18) and
+  authoritative precision. Pending/rejected records never create assets/projects.
+- `(agent_admin_id, idempotency_key VARBINARY(128))` is unique. Lock canonical
+  ancestor primary keys, then portal account before the first key read. Validate
+  active state, unchanged path/owner and session version; compare all immutable
+  inputs on replay. The same key cannot change intent or current owner.
+- Approval locks ancestors/portal then application, quote asset and new asset.
+  Quote uses an exclusive lock to avoid shared-to-exclusive upgrade deadlocks
+  when the project helper later rechecks precision. Recheck original ownership
+  and active hierarchy; rejection can close a disabled/reassigned application.
+- Review only transitions pending -> approved/rejected. Approval atomically
+  creates a coin asset with funding/withdrawal/margin-transfer disabled, zero
+  wallet accounts, and a preheat project with immediate-on-actual-listing unlock
+  and no unlock fee. No mint, balance credit, trading pair, subscription or
+  actual listing is implied. The existing Admin lifecycle manages later stages.
+- Project creation is shared via `create_admin_new_coin_project_in_tx`; project,
+  lifecycle event, approval receipt and review audit commit together. Audit or
+  duplicate-symbol failure rolls everything back and leaves pending unchanged.
+  Identical reviewer/decision/trimmed-reason replay returns the original receipt;
+  other terminal writes conflict. Detail GET recovers an uncertain outcome.
+- Deploy migration before API/Admin. Existing administrator direct project
+  creation and historical settlement behavior remain unchanged.
+
+Validation: `coin_applications_enforce_ownership_and_atomic_publication` uses
+real MySQL for portal isolation, immutable replay, pending invisibility, terminal
+races, independent RBAC, numeric fields, rejection visibility, inactive-agent
+approval and final-audit rollback. Also run existing Admin project-create tests,
+OpenAPI, architecture/documentation guards, all-target Clippy and frontend gates.

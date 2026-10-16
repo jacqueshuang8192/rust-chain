@@ -98,6 +98,7 @@ export const adminRoutes: RouteObject[] = [
   ),
   { path: 'users/kyc', element: <Navigate to="/admin/users/kyc/reviews" replace /> },
   guardedLazyRoute('agents', async () => (await import('./actions/AgentManagementPage')).AgentManagementPage),
+  guardedLazyRoute('agent-coin-applications', async () => (await import('../coin-applications/CoinApplicationsPage')).AdminCoinApplicationsPage),
   guardedLazyRoute('agent-recharges', async () => (await import('./recharges/RechargeReviewPage')).RechargeReviewPage),
   resourceRoute('agent-commissions', 'agentCommissions'),
   resourceRoute('agent-commission-rules', 'agentCommissionRules'),

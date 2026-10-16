@@ -20,6 +20,7 @@ mod agent_recharges;
 mod agent_team_orders;
 mod agents;
 mod auth;
+mod coin_applications;
 mod financial_reconciliation;
 mod financial_retries;
 mod home_carousel;
@@ -59,6 +60,7 @@ pub fn routes() -> Router<AppState> {
     document.merge(seconds_refund::SecondsRefundApiDoc::openapi());
     document.merge(new_coin_market::NewCoinMarketApiDoc::openapi());
     document.merge(agent_recharges::AgentRechargesApiDoc::openapi());
+    document.merge(coin_applications::CoinApplicationsApiDoc::openapi());
     document.merge(agent_team_orders::AgentTeamOrdersApiDoc::openapi());
     document.merge(registration_legal::RegistrationLegalApiDoc::openapi());
     let docs: Router<AppState> = SwaggerUi::new("/docs")

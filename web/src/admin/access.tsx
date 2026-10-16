@@ -71,6 +71,7 @@ const frontendPathResources: Array<[string, string]> = [
   ['/admin/users/kyc', 'users.kyc'],
   ['/admin/users', 'users'],
   ['/admin/agents', 'agents'],
+  ['/admin/agent-coin-applications', 'new_coin.applications'],
   ['/admin/agent-recharges', 'agents.recharges'],
   ['/admin/agent-commissions', 'agents.commissions'],
   ['/admin/agent-commission-rules', 'agents.commission_rules'],
@@ -147,6 +148,7 @@ const apiPathResources: Array<[string, string]> = [
   ['/kyc', 'users.kyc'],
   ['/users', 'users'],
   ['/agents', 'agents'],
+  ['/agent-coin-applications', 'new_coin.applications'],
   ['/agent-recharges', 'agents.recharges'],
   ['/agent-commissions', 'agents.commissions'],
   ['/agent-commission-rules', 'agents.commission_rules'],
@@ -256,6 +258,14 @@ export function adminActionForRequest(endpoint: string, method: AdminHttpMethod)
 
 export function adminPermissionForRequest(endpoint: string, method: AdminHttpMethod): string | null {
   const path = endpoint.replace(/^\/admin\/api\/v1/, '').split('?')[0];
+  if (path.startsWith('/agent-coin-applications')) {
+    const read = ['GET', 'HEAD', 'OPTIONS'].includes(method);
+    const match = /^\/agent-coin-applications\/([1-9]\d*)(\/review)?$/.exec(path);
+    const valid = match && BigInt(match[1]) <= BigInt(Number.MAX_SAFE_INTEGER);
+    if (read && (path === '/agent-coin-applications' || (valid && !match[2]))) return 'new_coin.applications.read';
+    if (valid && match[2] && method === 'POST') return 'new_coin.applications.review';
+    return 'admin.unmapped.write';
+  }
   if (path.startsWith('/agent-recharges') || (path.startsWith('/agents/') && path.includes('/recharge-policy'))) {
     const read = ['GET', 'HEAD', 'OPTIONS'].includes(method);
     if (read && path === '/agent-recharges') return 'agents.recharges.read';

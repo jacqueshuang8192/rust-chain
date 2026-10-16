@@ -92,6 +92,7 @@ export const adminNavItems: AdminNavItem[] = [
     label: '新币管理',
     icon: <IconBell aria-hidden="true" />,
     children: [
+      { path: '/admin/agent-coin-applications', label: '代理发币审核' },
       { path: '/admin/new-coins/projects', label: '项目管理' },
       { path: '/admin/new-coins/subscriptions', label: '申购与配售' },
       { path: '/admin/new-coins/distributions', label: '派发与退款记录' },

@@ -284,6 +284,19 @@ pub(crate) async fn create_admin_new_coin_project(
 
     // 新币项目创建、生命周期事件和后台审计必须同事务提交，避免项目已开放但缺少追踪记录。
     let mut tx = pool.begin().await?;
+    let project = create_admin_new_coin_project_in_tx(&mut tx, admin_id, request).await?;
+    tx.commit().await?;
+    Ok(project)
+}
+
+/// 复用调用方事务创建项目、事件及审计；代理审核可将申请终态和资产一并原子发布。
+/// 本函数重新校验发行与解锁规则并锁定资产精度，不提交事务；任一步失败由调用方整体回滚。
+pub(crate) async fn create_admin_new_coin_project_in_tx(
+    tx: &mut Transaction<'_, MySql>,
+    admin_id: u64,
+    request: CreateNewCoinProjectRequest,
+) -> AppResult<NewCoinProjectResponse> {
+    validate_create_new_coin_project(&request)?;
     let unlock_fee_asset = request
         .unlock_fee_enabled
         .unwrap_or(false)
@@ -291,7 +304,7 @@ pub(crate) async fn create_admin_new_coin_project(
         .flatten();
     let mut asset_ids = vec![request.asset_id, request.quote_asset_id];
     asset_ids.extend(unlock_fee_asset);
-    let precisions = lock_new_coin_asset_precisions_in_order(&mut tx, asset_ids).await?;
+    let precisions = lock_new_coin_asset_precisions_in_order(tx, asset_ids).await?;
     ensure_new_coin_amount_precision(
         &request.total_supply,
         new_coin_asset_precision(&precisions, request.asset_id)?,
@@ -303,7 +316,7 @@ pub(crate) async fn create_admin_new_coin_project(
         "issue_price",
     )?;
     let project_id = insert_admin_new_coin_project_in_tx(
-        &mut tx,
+        tx,
         AdminNewCoinProjectInsert {
             asset_id: request.asset_id,
             symbol: request.symbol.trim().to_owned(),
@@ -333,10 +346,10 @@ pub(crate) async fn create_admin_new_coin_project(
         },
     )
     .await?;
-    let project = load_admin_new_coin_project_in_tx(&mut tx, project_id).await?;
+    let project = load_admin_new_coin_project_in_tx(tx, project_id).await?;
     let event_payload = new_coin_project_audit_json(&project);
     insert_admin_new_coin_lifecycle_event_in_tx(
-        &mut tx,
+        tx,
         project.id,
         "new_coin_project.create",
         event_payload.clone(),
@@ -344,7 +357,7 @@ pub(crate) async fn create_admin_new_coin_project(
     )
     .await?;
     insert_admin_audit_log_entry_in_tx(
-        &mut tx,
+        tx,
         admin_id,
         AdminAuditLogEntry {
             action: "new_coin_project.create",
@@ -356,7 +369,6 @@ pub(crate) async fn create_admin_new_coin_project(
         },
     )
     .await?;
-    tx.commit().await?;
     Ok(project)
 }
 

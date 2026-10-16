@@ -7,6 +7,7 @@
 
 mod access_control;
 mod agent_recharges;
+mod coin_applications;
 mod config_center;
 mod config_changes;
 mod content;
@@ -243,6 +244,7 @@ use axum::{
 pub fn routes() -> Router<AppState> {
     Router::new()
         .merge(access_control::routes())
+        .merge(coin_applications::routes())
         .merge(agent_recharges::routes())
         .merge(config_changes::routes())
         .merge(config_center::routes())
