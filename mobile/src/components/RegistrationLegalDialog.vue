@@ -148,8 +148,8 @@ async function dismiss(confirmed = false) {
 .legal-copy:focus-visible { outline-offset: -4px; }
 
 [data-theme='light'] .legal-sheet {
-  --line: #e7ece9;
-  --surface-2: #f4f6f5;
+  --line: #e5e5e5;
+  --surface-2: #f6f6f6;
   --accent: #087b52;
   --on-accent: #ffffff;
   --legal-title: 20px;

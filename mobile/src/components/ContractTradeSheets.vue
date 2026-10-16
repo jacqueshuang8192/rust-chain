@@ -612,10 +612,10 @@ function orderTypeDescription(orderType: MarginOrderType): string {
 
 .contract-sheet {
   --sheet-page: #ffffff;
-  --sheet-canvas: #f7f9f8;
-  --sheet-raised: #eef2f0;
-  --sheet-line: #ccd5d0;
-  --sheet-line-strong: #aebbb4;
+  --sheet-canvas: #ffffff;
+  --sheet-raised: #f6f6f6;
+  --sheet-line: #e5e5e5;
+  --sheet-line-strong: #c8c8c8;
   --sheet-text: #111714;
   --sheet-muted: #68736d;
   --sheet-accent: #43efa9;

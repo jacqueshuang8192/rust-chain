@@ -22,7 +22,7 @@ function goToLogin() {
     role="group"
     :aria-label="t('common.loginRequiredTitle')"
   >
-    <span class="login-required__icon"><LockKeyhole :size="22" /></span>
+    <span class="login-required__icon" aria-hidden="true"><LockKeyhole :size="22" /></span>
     <div class="login-required__copy">
       <strong>{{ t('common.loginRequiredTitle') }}</strong>
       <p>{{ resolvedDescription }}</p>
@@ -35,68 +35,66 @@ function goToLogin() {
 
 <style scoped>
 .login-required {
-  align-items: center;
-  background:
-    linear-gradient(var(--grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
-    linear-gradient(110deg, color-mix(in srgb, var(--signal-green) 12%, transparent), transparent 58%),
-    var(--surface-elevated);
-  background-size: 36px 36px, 36px 36px, auto, auto;
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--positive);
-  color: var(--muted);
   display: grid;
-  gap: 12px;
-  grid-template-columns: 44px minmax(0, 1fr) auto;
-  min-height: 96px;
-  padding: 14px;
-  text-align: left;
+  align-items: center;
+  gap: 16px;
+  color: var(--muted-strong);
 }
 
 .login-required__icon {
-  align-items: center;
-  background: var(--signal-green);
-  border: 1px solid var(--line-strong);
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
-  color: var(--on-positive);
-  display: inline-flex;
-  height: 44px;
-  justify-content: center;
-  width: 44px;
+  background: var(--surface-2);
+  color: var(--positive);
 }
 
 .login-required__copy {
   display: grid;
-  gap: 6px;
-  max-width: 320px;
+  gap: 10px;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .login-required strong {
   color: var(--ink);
-  font-size: 14px;
+  font-size: 22px;
+  line-height: 30px;
 }
 
 .login-required p {
-  font-size: 13px;
-  line-height: 1.55;
+  font-size: 15px;
+  line-height: 24px;
   margin: 0;
 }
 
 .login-required .button {
   min-height: 46px;
-  padding-inline: 13px;
+  padding-inline: 28px;
   white-space: nowrap;
 }
 
-@media (max-width: 340px) {
-  .login-required {
-    align-items: start;
-    grid-template-columns: 44px minmax(0, 1fr);
-  }
+.login-required:not(.wallet-login-prompt) {
+  align-content: center;
+  justify-items: center;
+  min-height: calc(100dvh - var(--login-required-offset, 160px) - env(safe-area-inset-bottom));
+  padding: 32px 16px;
+  background: transparent;
+  border: 0;
+  text-align: center;
+}
 
-  .login-required .button {
-    grid-column: 2;
-    justify-self: start;
-  }
+.login-required:not(.wallet-login-prompt) .login-required__copy { max-width: 280px; text-wrap: balance; }
+
+.login-required:not(.wallet-login-prompt) .button {
+  width: min(100%, 240px);
+  margin-top: 12px;
+  border: 0;
+  box-shadow:none;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
 }
 </style>

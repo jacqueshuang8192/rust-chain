@@ -56,8 +56,8 @@ test('账户所选页面使用组合选择器锁定白色与纯黑根画布且�
   assert.equal(declarationValue(darkDeclarations, 'background'), '#000000')
 
   const sharedDeclarations = declarationsForSelectorGroup(selectedPageCss, ['.pencil-page', '.auth-pencil-page'])
-  assert.equal(declarationValue(sharedDeclarations, '--page'), '#f7f9f8')
-  assert.equal(declarationValue(sharedDeclarations, '--surface'), '#f7f9f8')
+  assert.equal(declarationValue(sharedDeclarations, '--page'), '#ffffff')
+  assert.equal(declarationValue(sharedDeclarations, '--surface'), '#ffffff')
   assert.equal(declarationValue(sharedDeclarations, 'background'), 'var(--page)')
   assert.match(authEntrySources.login, /class="auth-pencil-page login-pencil"/)
   assert.match(authEntrySources.register, /class="auth-pencil-page register-pencil"/)

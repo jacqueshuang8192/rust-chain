@@ -514,7 +514,7 @@ test('产品中心明暗色复用 Pencil 语义变量并保持 Header 尺寸', (
   assert.equal(cssValue(productTokens, '--product-hub-muted'), '#7a8b80')
   assert.equal(cssValue(lightTokens, '--text'), '#111714')
   assert.equal(cssValue(lightTokens, '--surface-elevated'), '#ffffff')
-  assert.equal(cssValue(lightTokens, '--line'), '#ccd5d0')
+  assert.equal(cssValue(lightTokens, '--line'), '#e5e5e5')
   assert.equal(cssValue(darkTokens, '--text'), '#f2f7f4')
   assert.equal(cssValue(darkTokens, '--surface-elevated'), '#0c100e')
   assert.equal(cssValue(darkTokens, '--line'), '#29342e')

@@ -22,7 +22,7 @@ function assertOrdered(source: string, selectors: string[]): void {
 }
 
 test('Instrument Editorial 全局材质收敛为淡网格画布、连续面板与薄荷主动作', () => {
-  assert.match(baseCss, /--background:\s*#f7faf8/)
+  assert.match(baseCss, /--background:\s*#ffffff/)
   assert.match(baseCss, /:root\[data-theme='dark'\]\s*\{[\s\S]*?--background:\s*#070908/)
   assert.match(
     baseCss,
@@ -30,7 +30,7 @@ test('Instrument Editorial 全局材质收敛为淡网格画布、连续面板�
   )
   assert.match(parityCss, /\.app-stage\s*\{[\s\S]*?--page:\s*#080a09;[\s\S]*?--green:\s*#52e2a1/)
   assert.match(parityCss, /--accent:\s*var\(--green\)/)
-  assert.match(parityCss, /\.app-stage\.theme-light\s*\{[\s\S]*?--page:\s*#f8faf8;[\s\S]*?--surface:\s*#ffffff;[\s\S]*?--green:\s*#007a4d/)
+  assert.match(parityCss, /\.app-stage\.theme-light\s*\{[\s\S]*?--page:\s*#ffffff;[\s\S]*?--surface:\s*#ffffff;[\s\S]*?--green:\s*#007a4d/)
   assert.match(parityCss, /\.markets-view \.markets-hero\s*\{[\s\S]*?var\(--signal-green\)/)
   assert.doesNotMatch(`${baseCss}\n${parityCss}`, /#0b1811|rgba\(11,\s*24,\s*17/i)
 })

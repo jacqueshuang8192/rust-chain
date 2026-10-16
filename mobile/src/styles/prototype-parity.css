@@ -87,12 +87,12 @@ body,
 }
 
 .app-stage.theme-light {
-  --page: #f8faf8;
+  --page: #ffffff;
   --surface: #ffffff;
-  --surface-2: #f1f5f2;
-  --surface-3: #e3e9e5;
-  --line: rgb(25 43 34 / 14%);
-  --line-strong: rgb(25 43 34 / 26%);
+  --surface-2: #f6f6f6;
+  --surface-3: #ededed;
+  --line: rgb(0 0 0 / 10%);
+  --line-strong: rgb(0 0 0 / 22%);
   --text: #0a100d;
   --muted: #536159;
   --soft: #26332c;
@@ -1217,9 +1217,9 @@ body,
 }
 
 .app-stage .mobile-canvas .bottom-nav__item.active:not(.seconds-nav-action):not(.trade-nav-action) .bottom-nav__icon {
-  background: linear-gradient(var(--signal-green), var(--signal-green)) center / 28px 28px no-repeat;
+  background: transparent;
   border-color: transparent;
-  color: var(--on-positive);
+  color: var(--pencil-positive);
 }
 
 .app-stage .mobile-canvas .bottom-nav .seconds-nav-action {
@@ -2032,9 +2032,9 @@ body,
 }
 
 .app-stage .mobile-canvas .bottom-nav__item.active:not(.seconds-nav-action):not(.trade-nav-action) .bottom-nav__icon {
-  background: linear-gradient(var(--signal-green), var(--signal-green)) center / 28px 28px no-repeat;
+  background: transparent;
   border-color: transparent;
-  color: var(--on-positive);
+  color: var(--pencil-positive);
 }
 
 .app-stage .mobile-canvas .bottom-nav__item.active::after {
@@ -2216,10 +2216,10 @@ body,
 }
 
 .app-stage.theme-light {
-  --pencil-canvas: #f7f9f8;
+  --pencil-canvas: #ffffff;
   --pencil-surface: #ffffff;
   --pencil-surface-strong: #ffffff;
-  --pencil-border: #ccd5d0;
+  --pencil-border: #e5e5e5;
   --pencil-text: #111714;
   --pencil-muted: #68736d;
   --pencil-positive: #087b52;
@@ -3048,7 +3048,7 @@ body,
 }
 
 .app-stage .mobile-canvas .bottom-nav__item.active .bottom-nav__label {
-  color: var(--pencil-text);
+  color: var(--pencil-positive);
 }
 
 .app-stage .mobile-canvas .bottom-nav__item.active:not(.trade-nav-action) .bottom-nav__icon {

@@ -16,7 +16,7 @@ const productHubSource = read('../src/views/ProductHubView.vue')
 
 test('共享基础使用淡网格纸面、薄荷信号和 84px 五入口浮动 Dock', () => {
   assert.match(baseCss, /--bottom-nav-height:\s*84px/)
-  assert.match(parityCss, /\.app-stage\.theme-light\s*\{[\s\S]*?--page:\s*#f8faf8/)
+  assert.match(parityCss, /\.app-stage\.theme-light\s*\{[\s\S]*?--page:\s*#ffffff/)
   assert.match(parityCss, /\.app-stage\s*\{[\s\S]*?--page:\s*#080a09/)
   assert.match(baseCss, /\.page--prototype-grid\s*\{[\s\S]*?background-image:/)
   assert.match(parityCss, /\.app-stage \.mobile-canvas\s*\{[\s\S]*?background-image:/)

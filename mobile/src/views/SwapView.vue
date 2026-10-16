@@ -358,7 +358,8 @@ onMounted(() => { void load() })
       </section>
     </div>
 
-    <div v-if="reviewOpen && quote && selectedPair" class="swap-review-mask" @click.self="closeReview">
+    <Teleport to="body">
+    <div v-if="reviewOpen && quote && selectedPair" class="pencil-page swap-review-mask" @click.self="closeReview">
       <section
         ref="reviewDialog"
         class="swap-review"
@@ -389,6 +390,7 @@ onMounted(() => { void load() })
         </div>
       </section>
     </div>
+    </Teleport>
   </main>
 </template>
 
@@ -405,6 +407,7 @@ onMounted(() => { void load() })
 }
 
 .swap-pencil__content {
+  --login-required-offset: calc(var(--pencil-header-height) + 12px);
   min-height: 639px;
   padding-bottom: calc(12px + env(safe-area-inset-bottom));
   padding-top: 0;
@@ -517,8 +520,7 @@ onMounted(() => { void load() })
 }
 
 .swap-asset-button:focus-visible,
-.swap-card__balance button:focus-visible,
-.swap-history-pencil button:focus-visible {
+.swap-card__balance button:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
@@ -618,48 +620,6 @@ onMounted(() => { void load() })
   min-height: 20px;
 }
 
-.swap-history-pencil {
-  height: 168px;
-  margin-top: 10px;
-  scroll-margin-top: 60px;
-}
-
-.swap-history-pencil .pencil-section__heading {
-  min-height: 30px;
-}
-
-.swap-history-pencil .pencil-section__heading h2 {
-  font-size: 14px;
-}
-
-.swap-history-pencil .pencil-section__heading button {
-  color: var(--muted);
-  min-height: 24px;
-}
-
-.swap-history-row {
-  grid-template-columns: minmax(0, 1fr) minmax(92px, auto);
-  min-height: 69px;
-}
-
-.swap-history-row .pencil-row__copy strong,
-.swap-history-row .pencil-row__value strong {
-  font-size: 11px;
-}
-
-.swap-history-row .pencil-row__value {
-  align-items: end;
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-  overflow-wrap: anywhere;
-  white-space: normal;
-}
-
-.swap-history-row .pencil-row__value small {
-  color: var(--positive);
-}
-
 .swap-picker {
   overflow-x: hidden;
 }
@@ -752,81 +712,6 @@ onMounted(() => { void load() })
   box-shadow: none;
 }
 
-.swap-review-mask {
-  align-items: end;
-  background: var(--overlay);
-  display: grid;
-  inset: 0;
-  position: fixed;
-  z-index: var(--layer-overlay);
-}
-
-.swap-review {
-  background: var(--surface-elevated);
-  border-radius: 20px 20px 0 0;
-  box-shadow: none;
-  padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
-  width: 100%;
-}
-
-.swap-review > header {
-  align-items: start;
-  display: flex;
-  justify-content: space-between;
-}
-
-.swap-review > header div {
-  display: grid;
-  gap: 4px;
-}
-
-.swap-review > header span,
-.swap-review > header small {
-  color: var(--muted);
-  font-size: 10px;
-}
-
-.swap-review h2 {
-  overflow-wrap: anywhere;
-  font-size: 18px;
-  margin: 0;
-}
-
-.swap-review__summary {
-  display: grid;
-  gap: 10px;
-  margin: 18px 0;
-}
-
-.swap-review__summary > div {
-  align-items: center;
-  display: flex;
-  font-size: 11px;
-  justify-content: space-between;
-}
-
-.swap-review__summary dt {
-  color: var(--muted);
-}
-
-.swap-review__summary dd {
-  margin: 0;
-  max-width: 76%;
-  overflow-wrap: anywhere;
-  text-align: right;
-}
-
-.swap-review__error {
-  color: var(--negative);
-  font-size: 11px;
-}
-
-.swap-review__actions {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: 1fr 1fr;
-}
-
 @media (max-width: 340px) {
   .swap-card {
     padding-inline: 12px;
@@ -849,4 +734,109 @@ onMounted(() => { void load() })
     max-width: 64%;
   }
 }
+</style>
+
+<style>
+.swap-review-mask {
+  align-items: end;
+  justify-items: center;
+  background: var(--overlay);
+  display: grid;
+  inset: 0;
+  position: fixed;
+  z-index: var(--layer-overlay);
+  padding-top: max(12px, env(safe-area-inset-top, 0px));
+}
+
+.swap-review {
+  font-size: 13px;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+  background: var(--surface-elevated);
+  border: 1px solid var(--line);
+  border-radius: 24px 24px 0 0;
+  padding: 20px max(20px, env(safe-area-inset-right, 0px)) max(20px, env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px));
+  width: min(100%, 448px);
+  max-height: 100%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.swap-review > header {
+  align-items: start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.swap-review > header div {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.swap-review .icon-button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--muted-strong);
+  box-shadow: none;
+}
+
+.swap-review header :is(span, small) {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.swap-review h2 {
+  font-size: 20px;
+  line-height: 28px;
+  margin: 0;
+}
+
+.swap-review__summary {
+  margin: 20px 0;
+  padding: 4px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+
+.swap-review__summary > div {
+  align-items: baseline;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 12px;
+  padding: 12px 0;
+}
+
+.swap-review__summary > div + div { border-top: 1px solid var(--line); }
+.swap-review__summary dt { color: var(--muted); }
+.swap-review__summary dd { margin: 0; text-align: right; }
+
+.swap-review__error {
+  color: var(--negative);
+}
+
+.swap-review__actions {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+}
+
+.swap-review__actions > button {
+  min-width: 0;
+  min-height: 50px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+
 </style>

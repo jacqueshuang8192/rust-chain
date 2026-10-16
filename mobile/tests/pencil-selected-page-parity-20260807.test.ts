@@ -116,7 +116,7 @@ test('资金划转按 Pencil 主弹窗与资产选择弹窗渲染，并保留真
   assert.match(sources.assets, /\.assets-transfer-layer \{[\s\S]*?position: fixed;[\s\S]*?right: 5\.5vw;[\s\S]*?width: min\(100%, 448px\);/)
   assert.match(sources.assets, /@media \(max-width: 820px\)[\s\S]*?\.assets-transfer-layer \{[\s\S]*?right: 0;[\s\S]*?width: 100%;/)
   assert.match(sources.assets, /height: min\(520px,/)
-  assert.match(sources.assets, /\.assets-transfer-sheet \{[\s\S]*?--surface: rgb\(247 249 248\);[\s\S]*?--surface-2: rgb\(238 242 240\);[\s\S]*?--accent: rgb\(67 239 169\);/)
+  assert.match(sources.assets, /\.assets-transfer-sheet \{[\s\S]*?--surface: rgb\(255 255 255\);[\s\S]*?--surface-2: rgb\(246 246 246\);[\s\S]*?--accent: rgb\(67 239 169\);/)
   assert.match(sources.assets, /html\[data-theme='dark'\] \.assets-transfer-sheet \{[\s\S]*?--surface: rgb\(0 0 0\);[\s\S]*?--surface-2: rgb\(18 23 20\);/)
   assert.match(sources.assets, /\.assets-transfer-amount \{[\s\S]*?min-height: 140px;/)
   assert.match(sources.assets, /\.assets-transfer-amount input \{[\s\S]*?font-size: 30px;/)

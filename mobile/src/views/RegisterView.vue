@@ -281,10 +281,10 @@ onUnmounted(() => { if (timer) window.clearInterval(timer) })
           <i class="auth-pencil-field__action"><ChevronDown :size="16" /></i>
         </button>
 
-        <label class="pencil-field__shell auth-pencil-field" :class="{ 'auth-pencil-field--action': emailCodeRequired && email.includes('@') }">
+        <label class="pencil-field__shell auth-pencil-field" :class="{ 'auth-pencil-field--code': emailCodeRequired && email.includes('@') }">
           <span>{{ t('auth.email') }}</span>
           <input ref="emailInput" v-model="email" autocomplete="email" inputmode="email" placeholder="name@example.com" />
-          <button v-if="emailCodeRequired && email.includes('@')" type="button" :disabled="sending || remainingSeconds > 0" @click="sendCode">
+          <button v-if="emailCodeRequired && email.includes('@')" class="auth-send-code" type="button" :disabled="sending || remainingSeconds > 0" @click="sendCode">
             {{ sending ? t('auth.sending') : sendLabel }}
           </button>
         </label>
@@ -914,4 +914,26 @@ onUnmounted(() => { if (timer) window.clearInterval(timer) })
     backdrop-filter: none;
   }
 }
+</style>
+
+<style>
+.auth-pencil-page .auth-pencil-field--code {
+  grid-template-columns: minmax(0, 1fr) max-content;
+  padding-right: 2px;
+}
+
+.auth-pencil-page .auth-pencil-field--code > .auth-send-code {
+  width: auto;
+  margin: 0;
+  padding: 0 12px;
+  border-radius: 7px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+
+
 </style>

@@ -6,6 +6,13 @@ contract. Country/locale changes clear review state, published bodies render as
 escaped plain text or allowlisted rich-text blocks, and registration submits
 the exact publication ID. Missing copy is never a placeholder link.
 
+The registration email code action uses a content-sized grid column and
+`white-space: nowrap`, never the password icon's 44px column. Keep its mint
+background, 44px touch height, global disabled/focus states, and verify Chinese
+and English initial/sending/countdown/resend labels at 320px. Unscoped rules
+must outrank the scoped generic field/button geometry and remain confined to
+`auth-pencil-field--code` / `auth-send-code`.
+
 The Mobile reading dialog is a body-Teleported `auth-pencil-page` bottom sheet,
 so it inherits the registration palette in both themes even outside the app
 canvas. It is at most 448px wide, has 24px top corners and a stable
@@ -240,6 +247,16 @@ lastTradePath: ComputedRef<string>
 - Storage keys are `hippo_mobile_last_trade_symbol` and `hippo_mobile_last_trade_mode`.
 - Switching spot/futures updates the current trade route with `replace`, so switching modes does not add a back-stack entry.
 
+### Swap confirmation sheet
+
+- `swap-review` Teleports to `body`; its mask also owns `pencil-page` to retain
+  global light/dark tokens. Keep all unscoped rules within `swap-review*`.
+- The sheet is centered, at most 448px wide, with 24px top corners and bounded
+  viewport height. Short landscapes scroll the sheet and keep actions reachable.
+  Preserve `useModalDialog`, quote expiry and submit guards.
+- Verify 320/390/448px and 844x390 in both themes: no horizontal overflow,
+  actions reachable, Escape dismisses and restores body scrolling.
+
 ### Swap history
 
 - Swap History is the named `/swap/history` detail route (`swap-history`), depth
@@ -250,6 +267,21 @@ lastTradePath: ComputedRef<string>
   and generation, clearing rows on identity change and stopping on unmount.
   Late failures must be ignored just like late successes before entering the
   outer initial/append error handlers. Preserve retry and exact decimal strings.
+
+### Shared centered login-required state
+
+- `LoginRequiredState` centers its icon, title, description and login action in
+  the available viewport without a card border/background. The decorative icon
+  is 64px; the pill action is at most 240px wide and at least 44px high.
+- Consumers can set `--login-required-offset` for their header/navigation.
+  Preserve the compact `.wallet-login-prompt` variant.
+- Preserve localized copy and `redirect: route.fullPath`, including queries.
+  Verify both themes/languages and 320/390/448px plus landscape.
+- Light production surfaces use white canvas, neutral #f6f6f6/#ededed secondary
+  surfaces and neutral borders. Keep the prototype snapshot unchanged.
+- Ordinary active bottom tabs color only icon and label with positive green;
+  their icon background and background-image remain transparent/none. The
+  central trade chooser retains its independent raised action treatment.
 
 ### Authentication redirects
 

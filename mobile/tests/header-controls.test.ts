@@ -129,7 +129,7 @@ test('明暗主题分别定义冷中性面板与金属边框且不恢复退役�
   assert.equal(declarationValue(darkTokens, '--page'), '#080a09')
   assert.equal(declarationValue(darkTokens, '--surface'), '#0c100e')
   assert.equal(declarationValue(darkTokens, '--text'), '#f4f7f5')
-  assert.equal(declarationValue(lightTokens, '--page'), '#f8faf8')
+  assert.equal(declarationValue(lightTokens, '--page'), '#ffffff')
   assert.equal(declarationValue(lightTokens, '--surface'), '#ffffff')
   assert.equal(declarationValue(lightTokens, '--text'), '#0a100d')
   assert.match(sources.app, /class="app-stage"/)

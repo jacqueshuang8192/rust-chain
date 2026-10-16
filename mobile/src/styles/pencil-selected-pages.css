@@ -2,14 +2,14 @@
 
 .pencil-page,
 .auth-pencil-page {
-  --page: #f7f9f8;
-  --surface: #f7f9f8;
+  --page: #ffffff;
+  --surface: #ffffff;
   --surface-elevated: #ffffff;
-  --surface-2: #eef2f0;
-  --surface-3: #e4eae7;
-  --line: #ccd5d0;
-  --line-strong: #aebbb4;
-  --hairline: #dde4e0;
+  --surface-2: #f6f6f6;
+  --surface-3: #ededed;
+  --line: #e5e5e5;
+  --line-strong: #c8c8c8;
+  --hairline: #eeeeee;
   --ink: #111714;
   --text: #111714;
   --muted: #68736d;
@@ -115,9 +115,9 @@ html[data-theme='dark'] .wallet-pencil-page .deposit-detail__qr {
 
 .app-stage .mobile-canvas .contract-trade {
   --surface-elevated: #ffffff;
-  --surface-2: #f7f9f8;
-  --line: #dde4e0;
-  --line-strong: #ccd5d0;
+  --surface-2: #f6f6f6;
+  --line: #e5e5e5;
+  --line-strong: #c8c8c8;
   --ink: #111714;
   --text: #111714;
   --muted: #68736d;

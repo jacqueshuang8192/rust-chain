@@ -27,7 +27,7 @@ test('共享视觉令牌固定为 448px 冷中性双主题与低圆角', () => {
   assert.match(baseCss, /--signal-coral:/)
   assert.match(baseCss, /--data-font:/)
   assert.match(baseCss, /:root\[data-theme='dark'\]/)
-  assert.match(parityCss, /\.app-stage\.theme-light\s*\{[\s\S]*?--page:\s*#f8faf8/)
+  assert.match(parityCss, /\.app-stage\.theme-light\s*\{[\s\S]*?--page:\s*#ffffff/)
 })
 
 test('共享输入把可见焦点提升到单一完整容器光环且清除嵌套输入内框', () => {
@@ -80,9 +80,10 @@ test('五栏根导航保留 44px 焦点与抬升交易入口', () => {
   assert.doesNotMatch(bottomNavSource, /<style scoped/)
 })
 
-test('登录状态带保持真实，PWA 状态升级为非阻塞沉浸式系统浮岛', () => {
-  assert.match(loginStateSource, /grid-template-columns:\s*44px minmax\(0,\s*1fr\) auto/)
-  assert.match(loginStateSource, /border-left:\s*3px solid var\(--positive\)/)
+test('登录引导居中展示，PWA 状态保持非阻塞系统浮岛', () => {
+  assert.doesNotMatch(loginStateSource, /linear-gradient|border-left/)
+  assert.match(loginStateSource, /\.login-required:not\(\.wallet-login-prompt\)\s*\{[\s\S]*?align-content: center;[\s\S]*?justify-items: center;/)
+  assert.match(loginStateSource, /query: \{ redirect: route\.fullPath \}/)
   assert.match(pwaStatusSource, /max-width:\s*var\(--app-max-width,\s*448px\)/)
   assert.match(pwaStatusSource, /<Transition name="pwa-status-reveal">/)
   assert.match(pwaStatusSource, /class="pwa-status__panel"/)

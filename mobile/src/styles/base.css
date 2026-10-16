@@ -1,13 +1,13 @@
 :root,
 :root[data-theme='light'] {
   --app-max-width: 448px;
-  --background: #f7faf8;
+  --background: #ffffff;
   --surface: #ffffff;
-  --surface-elevated: #fbfdfc;
-  --soft: #f0f4f1;
+  --surface-elevated: #ffffff;
+  --soft: #f6f6f6;
   --field-surface: #ffffff;
-  --line: rgb(25 43 34 / 14%);
-  --line-strong: rgb(25 43 34 / 26%);
+  --line: rgb(0 0 0 / 10%);
+  --line-strong: rgb(0 0 0 / 22%);
   --grid-line: rgb(25 43 34 / 5%);
   --ink: #0a100d;
   --muted: #536159;

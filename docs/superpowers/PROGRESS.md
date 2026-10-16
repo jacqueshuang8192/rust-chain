@@ -9676,3 +9676,24 @@
 - 修改文件：`mobile/src/views/RegisterView.vue`、`mobile/src/components/RegistrationLegalDialog.vue`、`mobile/src/i18n/messages/{zh-CN,en}.ts`、`mobile/tests/{registration-legal-consent,access-identity-settings-views,pencil-selected-unmapped-pages}.test.ts`、`.trellis/spec/mobile/navigation-and-localization.md`、`.trellis/tasks/10-14-registration-legal-documents/{prd,delivery}.md`、`docs/superpowers/PROGRESS.md`。
 - 验证结果：完整`mobile/npm run release:gate`通过，850/850测试、生产/测试类型检查、PWA/Tauri Web构建及产物/包体/源码/测试预算均通过。初次JS超预算已通过本次组件去重和删除未使用日期文案解决，未放宽门槛。真实浏览器16组中英文/明暗主题/320、390、448px及横屏布局无横向溢出或点击范围重叠，入口均至少44px；8组阅读弹窗布局无操作区遮挡。独立页签、分次阅读、主动勾选/取消、关闭不接受、键盘、国家/语言清空、无文件禁用及未同意时零发码/注册请求均通过。已检查最终截图，任务校验与diff检查通过；Vite带时间戳模块夹具确认生效后重跑了交互检查。
 - 后续事项：已获用户确认，本次仅做本地提交；未推送、部署或操作生产数据。5186开发服务保留，验收浏览器已关闭；实体手机和安装态PWA未实机验证，`.vite/`缓存不纳入改动。
+
+## 2026-10-16 09:50 - PWA注册发码按钮与闪兑确认弹窗样式
+
+- 完成内容：注册发码按钮按内容占宽、文字单行并使用主题色底色；闪兑确认弹窗统一全局明暗配色、24px圆角、明细卡片及主次按钮，移至body以修复横屏受祖先布局限制，最大448px且短屏可滚动。清理SwapView中已无模板引用的旧内嵌历史样式以满足既有包体预算。
+- 修改文件：`mobile/src/views/RegisterView.vue`、`mobile/src/views/SwapView.vue`、`.trellis/spec/mobile/navigation-and-localization.md`、`.trellis/tasks/10-16-pwa-registration-verification-button-layout/prd.md`及任务元数据、`docs/superpowers/PROGRESS.md`。
+- 验证结果：最终`npm --prefix mobile run release:gate`退出0，850/850测试、生产/测试类型检查、PWA/Tauri构建、产物及包体/源码/测试预算全部通过，未放宽限制。浏览器注册64组中英文/明暗/320、390、448px及横屏/初始、发送中、倒计时、重发全部通过；闪兑8组主题/尺寸无横向溢出，短屏按钮可滚动到达，Escape和滚动恢复通过；最终截图已查看。仅内存展示夹具，无发码或交易提交。`git diff --check`通过。
+- 后续事项：未提交、推送或部署；未在实体手机和安装态PWA验收。5186开发服务保留。
+
+## 2026-10-16 11:16 - 共享未登录提示卡片重新设计
+
+- 完成内容：login-required改为主题圆角卡片、柔和锁图标、清晰标题/说明和整行主题色登录按钮，移除网格底纹与左侧告警色条；保留钱包紧凑变体与登录跳转原始路径及查询参数。当时计划合并本地提交，实际尚未提交；后续用户要求改为页面居中。
+- 修改文件：`mobile/src/components/LoginRequiredState.vue`、`mobile/tests/ui-prototype-alignment-foundation.test.ts`、`.trellis/spec/mobile/navigation-and-localization.md`、当前任务`prd.md`、`docs/superpowers/PROGRESS.md`；提交同时包含前述`RegisterView.vue`、`SwapView.vue`及任务元数据。
+- 验证结果：最终`npm --prefix mobile run release:gate`退出0，850/850测试、生产/测试类型检查、PWA/Tauri构建、产物与包体/源码/测试预算全部通过。浏览器6条路由×4种尺寸×2种主题×2种语言共96组无水平溢出、无图文/按钮重叠且点击区域达标；点击登录保留`/swap?source=preview`返回地址。明暗最终截图已检查，`git diff --check`通过。
+- 后续事项：未推送或部署；实体手机与安装态PWA未实机验证；5186开发服务保留，`.vite/`缓存不纳入提交。
+
+## 2026-10-16 15:33 - 居中登录提示与白色主题优化
+
+- 完成内容：登录提示改为页面中间无外框布局；浅色主题使用纯白画布和中性灰次级底色；底部普通选中项仅图标和文字变绿，移除绿色背景。
+- 修改文件：`mobile/src/components/LoginRequiredState.vue`、主题样式与theme store、相关弹窗浅色变量、既有测试、手机导航规范及UI任务PRD。
+- 验证结果：最终mobile release:gate通过，850/850测试及类型、PWA/Tauri构建和全部预算通过；真实浏览器四导航项双主题点击验证图标/文字同绿、透明背景、正确theme-color与无横向溢出。居中布局此前96组验收通过。设计源码lint通过；整页inspect仍报告既有外壳及营销页规则问题，不宣称整页设计门禁通过。
+- 后续事项：新增弹窗色值未逐一重新进行浏览器验收；未实机验证、提交、推送或部署。继续代理新币申请、管理员审核及本人记录功能。

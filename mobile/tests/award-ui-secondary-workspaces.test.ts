@@ -138,7 +138,7 @@ test('三个工作台遵守 44px、窄屏、主题、安全区和低动态合同
     assert.doesNotMatch(template, /<svg\b|\p{Extended_Pictographic}/u)
   }
 
-  assert.match(selectedCss, /--page: #f7f9f8;/)
+  assert.match(selectedCss, /--page: #ffffff;/)
   assert.match(selectedCss, /--page: #000000;/)
   assert.match(selectedCss, /--ink: #f2f7f4;/)
 

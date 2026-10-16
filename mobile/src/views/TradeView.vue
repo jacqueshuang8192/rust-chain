@@ -4279,10 +4279,10 @@ onBeforeUnmount(() => {
 
 .contract-order-confirm {
   --confirm-page: #ffffff;
-  --confirm-canvas: #f7f9f8;
-  --confirm-raised: #eef2f0;
-  --confirm-line: #ccd5d0;
-  --confirm-line-strong: #aebbb4;
+  --confirm-canvas: #ffffff;
+  --confirm-raised: #f6f6f6;
+  --confirm-line: #e5e5e5;
+  --confirm-line-strong: #c8c8c8;
   --confirm-text: #111714;
   --confirm-muted: #68736d;
   --confirm-accent: #43efa9;
@@ -4639,12 +4639,12 @@ html[data-theme='dark'] .contract-order-confirm {
 }
 
 .contract-trade {
-  --contract-bg: #f7f9f8;
+  --contract-bg: #ffffff;
   --contract-surface: #ffffff;
-  --contract-surface-soft: #edf2ef;
-  --contract-line: #dce5e0;
-  --contract-line-strong: #c4d0ca;
-  --contract-control-line: #ccd5d0;
+  --contract-surface-soft: #f6f6f6;
+  --contract-line: #e5e5e5;
+  --contract-line-strong: #c8c8c8;
+  --contract-control-line: #e5e5e5;
   --contract-text: #111714;
   --contract-muted: #68736d;
   --contract-accent: #43efa9;

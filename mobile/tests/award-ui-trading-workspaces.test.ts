@@ -147,7 +147,7 @@ test('320–448px 响应式、安全区和低动态合同不产生工作区固�
     assert.doesNotMatch(css, /width:\s*100vw/)
     if (sourceName === 'trade') {
       assert.doesNotMatch(css, /overflow-x:\s*auto/)
-      assert.match(css, /--contract-bg: #f7f9f8;/)
+      assert.match(css, /--contract-bg: #ffffff;/)
       assert.match(css, /html\[data-theme='dark'\] \.contract-trade \{[\s\S]*?--contract-bg: #070a09;/)
       assert.match(css, /@media \(max-width: 359px\)[\s\S]*?grid-template-columns: minmax\(0, 1fr\) 132px;/)
     } else {

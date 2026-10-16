@@ -48,7 +48,7 @@ test('主题偏好只接受受支持值并默认使用深色主题', () => {
 })
 
 test('明暗主题提供高对比共享令牌与稳定主题色', () => {
-  assert.equal(THEME_META_COLORS.light, '#f7faf8')
+  assert.equal(THEME_META_COLORS.light, '#ffffff')
   assert.equal(THEME_META_COLORS.dark, '#070908')
   assert.match(indexHtml, /<html lang="zh-CN" data-theme="dark">/)
   assert.match(indexHtml, /name="theme-color" content="#070908"/)
@@ -86,6 +86,13 @@ test('两套主题的正文、辅助文字和语义色达到正文对比阈值',
     assert.ok(contrastRatio(tokenHex(source, '--on-positive'), signalGreen) >= 4.5)
   }
   assert.notEqual(tokenHex(baseCss, '--positive'), tokenHex(baseCss, '--signal-green'))
+  const selectedLight = selectedPageCss.slice(0, selectedPageCss.indexOf("html[data-theme='dark']"))
+  const soft = tokenHex(selectedLight, '--surface-2')
+  assert.notEqual(soft, tokenHex(selectedLight, '--surface'))
+  assert.equal(new Set(soft.slice(1).match(/../g)).size, 1, 'neutral controls must not carry a green tint')
+  for (const token of ['--ink', '--muted', '--positive']) {
+    assert.ok(contrastRatio(tokenHex(selectedLight, token), soft) >= 4.5, `${token} must remain readable on controls`)
+  }
 })
 
 test('生产原型覆盖层的中性色板在明暗主题下保持可访问对比', () => {

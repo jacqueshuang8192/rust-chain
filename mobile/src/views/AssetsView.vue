@@ -1425,13 +1425,13 @@ onUnmounted(() => {
 }
 
 .assets-transfer-sheet {
-  --surface: rgb(247 249 248);
+  --surface: rgb(255 255 255);
   --surface-elevated: rgb(255 255 255);
-  --surface-2: rgb(238 242 240);
-  --surface-3: rgb(228 234 231);
-  --line: rgb(204 213 208);
-  --line-strong: rgb(174 187 180);
-  --hairline: rgb(221 228 224);
+  --surface-2: rgb(246 246 246);
+  --surface-3: rgb(237 237 237);
+  --line: rgb(229 229 229);
+  --line-strong: rgb(200 200 200);
+  --hairline: rgb(238 238 238);
   --ink: rgb(17 23 20);
   --muted: rgb(104 115 109);
   --accent: rgb(67 239 169);
