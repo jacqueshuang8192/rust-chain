@@ -1,6 +1,13 @@
 use super::*;
 
-const KINDS: [&str; 4] = ["seconds", "margin", "earn", "spot"];
+const KINDS: [&str; 6] = [
+    "seconds",
+    "margin",
+    "earn",
+    "spot",
+    "new-coin-subscriptions",
+    "new-coin-purchases",
+];
 const CREATED_MS: i64 = 1_735_732_800_000;
 
 async fn seed_orders(
@@ -8,8 +15,8 @@ async fn seed_orders(
     user: u64,
     pair: u64,
     asset: u64,
-    products: [u64; 3],
-) -> Result<[u64; 4], sqlx::Error> {
+    products: [u64; 4],
+) -> Result<[u64; 6], sqlx::Error> {
     let seconds = sqlx::query(
         "INSERT INTO seconds_contract_orders \
          (user_id, product_id, pair_id, stake_asset, direction, stake_amount, duration_seconds, \
@@ -60,12 +67,24 @@ async fn seed_orders(
          (user_id, pair_id, side, order_type, price, quantity, filled_quantity, status, created_at) \
          VALUES (?, ?, 'buy', 'limit', 90.123456789012345678, 2, 1, 'partially_filled', '2025-01-01 12:00:00')",
     ).bind(user).bind(pair).execute(pool).await?.last_insert_id();
-    Ok([seconds, margin, earn, spot])
+    let subscription = sqlx::query("INSERT INTO new_coin_subscriptions (project_id,user_id,quote_asset,issue_price,quote_amount,requested_quantity,allocated_quantity,status,idempotency_key,created_at) VALUES (?,?,?,2.5,25,10,10,'available',?,'2025-01-01 12:00:00')")
+        .bind(products[3]).bind(user).bind(asset).bind(Uuid::now_v7().to_string()).execute(pool).await?.last_insert_id();
+    let purchase = sqlx::query("INSERT INTO new_coin_purchase_orders (project_id,user_id,pair_id,base_asset,quote_asset,price,quantity,quote_amount,status,idempotency_key,created_at) SELECT ?,?,?,base_asset,?,2.5,10,25,'available',?,'2025-01-01 12:00:00' FROM trading_pairs WHERE id=?")
+        .bind(products[3]).bind(user).bind(pair).bind(asset).bind(Uuid::now_v7().to_string()).bind(pair).execute(pool).await?.last_insert_id();
+    Ok([seconds, margin, earn, spot, subscription, purchase])
 }
 
 async fn read_snapshot(pool: &MySqlPool, user: u64) -> Result<Vec<Vec<String>>, sqlx::Error> {
     let mut snapshot = Vec::new();
     for (table, fields) in [
+        (
+            "new_coin_subscriptions",
+            "'id',id,'status',status,'quote',CAST(quote_amount AS CHAR),'allocated',CAST(allocated_quantity AS CHAR),'frozen',CAST(frozen_quote_amount AS CHAR),'settled',CAST(settled_quote_amount AS CHAR),'refund',CAST(refunded_quote_amount AS CHAR)",
+        ),
+        (
+            "new_coin_purchase_orders",
+            "'id',id,'status',status,'quote',CAST(quote_amount AS CHAR),'quantity',CAST(quantity AS CHAR),'lock',lock_position_id",
+        ),
         (
             "seconds_contract_orders",
             "'id',id,'status',status,'amount',CAST(stake_amount AS CHAR),'price',CAST(settlement_price AS CHAR),'settled',settled_at",
@@ -143,7 +162,10 @@ async fn team_orders_scope_filters_paging_precision_and_read_only() -> Result<()
         .bind(pair).bind(quote).execute(&pool).await?.last_insert_id();
     let earn_product = sqlx::query("INSERT INTO earn_products (asset_id, name, introduction_json, term_days, apr_rate, min_subscribe, status) VALUES (?, 'Team Earn', JSON_OBJECT(), 30, 0.08, 1, 'active')")
         .bind(quote).execute(&pool).await?.last_insert_id();
-    let products = [seconds_product, margin_product, earn_product];
+    let project_symbol = format!("NC{}", Uuid::now_v7().simple());
+    let project = sqlx::query("INSERT INTO new_coin_projects (asset_id,symbol,lifecycle_status,total_supply,issue_price,quote_asset_id,reserved_supply,allocated_supply,remaining_supply,unlock_type,fixed_unlock_at,status) VALUES (?,?,'listed',1000000,2.5,?,0,0,1000000,'fixed_time','2030-01-01','active')")
+        .bind(base).bind(&project_symbol).bind(quote).execute(&pool).await?.last_insert_id();
+    let products = [seconds_product, margin_product, earn_product, project];
     let mut ids = Vec::new();
     for user in &users {
         ids.push(seed_orders(&pool, *user, pair, quote, products).await?);
@@ -160,6 +182,12 @@ async fn team_orders_scope_filters_paging_precision_and_read_only() -> Result<()
         .bind(ids[6][2]).execute(&pool).await?;
     sqlx::query("UPDATE spot_orders SET status = 'filled', filled_quantity = 2 WHERE id = ?")
         .bind(ids[6][3])
+        .execute(&pool)
+        .await?;
+    sqlx::query("UPDATE new_coin_subscriptions SET settlement_mode='manual_distribution',status='partial_allocated',allocated_quantity=4,settled_quote_amount=10,refunded_quote_amount=15 WHERE id=?")
+        .bind(ids[6][4]).execute(&pool).await?;
+    sqlx::query("UPDATE new_coin_purchase_orders SET status='pending' WHERE id=?")
+        .bind(ids[6][5])
         .execute(&pool)
         .await?;
     for table in ["wallet_accounts", "margin_wallet_accounts"] {
@@ -271,6 +299,8 @@ async fn team_orders_scope_filters_paging_precision_and_read_only() -> Result<()
             ("opened", ids[6][1]),
             ("redeemed", ids[6][2]),
             ("filled", ids[6][3]),
+            ("partial_allocated", ids[6][4]),
+            ("pending", ids[6][5]),
         ][index];
         let (_, payload) = agent_get_json(
             app.clone(),
@@ -280,7 +310,33 @@ async fn team_orders_scope_filters_paging_precision_and_read_only() -> Result<()
         .await?;
         assert_eq!(payload["total"], 1);
         assert_eq!(payload["orders"][0]["id"], expected_id);
-        if *kind != "spot" {
+        if index >= 4 {
+            let (_, payload) = agent_get_json(
+                app.clone(),
+                &root_token,
+                format!(
+                    "{path}?project_id={project}&symbol={}",
+                    project_symbol.to_lowercase()
+                ),
+            )
+            .await?;
+            assert_eq!(payload["total"], 5);
+            for row in payload["orders"].as_array().unwrap() {
+                assert!(row.get("idempotency_key").is_none());
+                assert!(row["quote_symbol"].is_string());
+                assert_eq!(row["quote_amount"], "25.000000000000000000");
+                if index == 4 && row["status"] == "available" {
+                    assert!(row["settled_quote_amount"].is_null());
+                    assert!(row["refunded_quote_amount"].is_null());
+                }
+            }
+            for query in ["project_id=9007199254740991", "symbol=missing"] {
+                let (_, payload) =
+                    agent_get_json(app.clone(), &root_token, format!("{path}?{query}")).await?;
+                assert_eq!(payload, json!({"orders": [], "total": 0}));
+            }
+        }
+        if index < 3 {
             let (_, payload) = agent_get_json(
                 app.clone(),
                 &root_token,
@@ -289,7 +345,7 @@ async fn team_orders_scope_filters_paging_precision_and_read_only() -> Result<()
             .await?;
             assert_eq!(payload["total"], 5);
         }
-        if *kind != "earn" {
+        if index < 4 && *kind != "earn" {
             let direction = ["up", "long", "", "buy"][index];
             let (_, payload) = agent_get_json(
                 app.clone(),
@@ -364,6 +420,8 @@ async fn team_orders_scope_filters_paging_precision_and_read_only() -> Result<()
             "margin_positions",
             "earn_subscriptions",
             "spot_orders",
+            "new_coin_subscriptions",
+            "new_coin_purchase_orders",
             "wallet_accounts",
             "margin_wallet_accounts",
         ] {
@@ -377,6 +435,7 @@ async fn team_orders_scope_filters_paging_precision_and_read_only() -> Result<()
         ("seconds_contract_products", seconds_product),
         ("margin_products", margin_product),
         ("earn_products", earn_product),
+        ("new_coin_projects", project),
         ("trading_pairs", pair),
         ("assets", base),
         ("assets", quote),
@@ -449,6 +508,12 @@ async fn team_orders_reject_invalid_filters_before_database_and_require_agent_au
         "earn?direction=long",
         "margin?result=win",
         "spot?product_id=1",
+        "earn?project_id=1",
+        "new-coin-subscriptions?product_id=1",
+        "new-coin-subscriptions?direction=buy",
+        "new-coin-subscriptions?project_id=0",
+        "new-coin-purchases?result=win",
+        "new-coin-purchases?project_id=9007199254740992",
     ] {
         let (status, _) =
             agent_get_json(app.clone(), &token, format!("/agent/api/v1/orders/{path}")).await?;
@@ -488,6 +553,7 @@ async fn team_orders_openapi_documents_scoped_filters_and_business_snapshots()
         "order_id",
         "status",
         "product_id",
+        "project_id",
         "symbol",
         "direction",
         "result",
@@ -534,9 +600,36 @@ async fn team_orders_openapi_documents_scoped_filters_and_business_snapshots()
             .unwrap()
             .contains("refunded")
     );
-    // 包络不能退化为无类型 object，四个业务 DTO 都要能沿引用解析。
+    for name in ["AgentTeamNewCoinSubscription", "AgentTeamNewCoinPurchase"] {
+        assert_eq!(
+            schemas[name]["properties"]["quote_amount"]["type"],
+            "string"
+        );
+        assert_eq!(schemas[name]["properties"]["created_at"]["format"], "int64");
+        assert!(schemas[name]["properties"].get("idempotency_key").is_none());
+    }
+    assert!(
+        schemas["AgentTeamNewCoinSubscription"]["properties"]["status"]["pattern"]
+            .as_str()
+            .unwrap()
+            .contains("available")
+    );
+    assert!(
+        schemas["AgentTeamNewCoinSubscription"]["required"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("settled_quote_amount"))
+    );
+    // 包络不能退化为无类型 object，各业务 DTO 都要能沿引用解析。
     let encoded = serde_json::to_string(&schemas["AgentTeamOrdersResponse"])?;
-    for kind in ["Seconds", "Margin", "Earn", "Spot"] {
+    for kind in [
+        "Seconds",
+        "Margin",
+        "Earn",
+        "Spot",
+        "NewCoinSubscription",
+        "NewCoinPurchase",
+    ] {
         assert!(encoded.contains(kind), "{encoded}");
     }
     Ok(())

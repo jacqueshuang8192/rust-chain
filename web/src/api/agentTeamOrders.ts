@@ -5,7 +5,7 @@ import {
 import { requiredSafeInteger } from '../shared/integer';
 import type { ApiRecord } from './types';
 
-export const agentOrderKinds = ['seconds', 'margin', 'earn', 'spot'] as const;
+export const agentOrderKinds = ['seconds', 'margin', 'earn', 'spot', 'new-coin-subscriptions', 'new-coin-purchases'] as const;
 export type AgentOrderKind = typeof agentOrderKinds[number];
 export type AgentTeamOrder = ApiRecord & {
   id: number; user_id: number; email: string | null;
@@ -13,7 +13,7 @@ export type AgentTeamOrder = ApiRecord & {
 };
 export type AgentTeamOrdersQuery = {
   team_scope?: string; agent_id?: number; user_id?: number; email?: string;
-  order_id?: number; product_id?: number; symbol?: string; status?: string;
+  order_id?: number; product_id?: number; project_id?: number; symbol?: string; status?: string;
   direction?: string; result?: string; created_from?: number; created_to?: number;
   limit?: number; offset?: number;
 };
@@ -30,15 +30,38 @@ const earnContract: AgentFinancialRowContract = {
   enumFields: { status: ['subscribed', 'redeemed'] }
 };
 
+const newCoinCommon = {
+  requiredFields: ['id', 'user_id', 'project_id', 'symbol', 'quote_asset', 'quote_symbol', 'quote_amount', 'status', 'created_at'],
+  integerFields: ['id', 'user_id', 'project_id', 'quote_asset'],
+  stringFields: ['symbol', 'quote_symbol'],
+  timestampFields: ['created_at']
+};
+const subscriptionContract: AgentFinancialRowContract = {
+  ...newCoinCommon,
+  requiredFields: [...newCoinCommon.requiredFields, 'issue_price', 'settlement_mode', 'frozen_quote_amount',
+    'settled_quote_amount', 'refunded_quote_amount', 'requested_quantity', 'allocated_quantity'],
+  decimalFields: ['quote_amount', 'issue_price', 'frozen_quote_amount', 'requested_quantity', 'allocated_quantity'],
+  nullableDecimalFields: ['settled_quote_amount', 'refunded_quote_amount'],
+  enumFields: { status: ['pending', 'allocated', 'partial_allocated', 'refunded', 'available'], settlement_mode: ['manual_distribution', 'legacy_instant'] }
+};
+const purchaseContract: AgentFinancialRowContract = {
+  ...newCoinCommon,
+  requiredFields: [...newCoinCommon.requiredFields, 'pair_id', 'base_asset', 'price', 'quantity', 'lock_position_id'],
+  integerFields: [...newCoinCommon.integerFields, 'pair_id', 'base_asset'],
+  decimalFields: ['quote_amount', 'price', 'quantity'],
+  enumFields: { status: ['pending', 'locked', 'available'] }
+};
+
 const contracts: Record<AgentOrderKind, AgentFinancialRowContract> = {
   seconds: agentSecondsOrderContract, margin: agentMarginOrderContract,
-  earn: earnContract, spot: agentSpotOrderContract
+  earn: earnContract, spot: agentSpotOrderContract,
+  'new-coin-subscriptions': subscriptionContract, 'new-coin-purchases': purchaseContract
 };
 
 export async function getAgentTeamOrders(kind: AgentOrderKind, query: AgentTeamOrdersQuery = {}) {
   if (!agentOrderKinds.includes(kind)) throw new Error('订单类型无效');
   const params = new URLSearchParams();
-  const ids = ['agent_id', 'user_id', 'order_id', 'product_id'] as const;
+  const ids = ['agent_id', 'user_id', 'order_id', 'product_id', 'project_id'] as const;
   for (const key of ids) {
     if (query[key] !== undefined) params.set(key, String(requiredSafeInteger(query[key], key, 1)));
   }

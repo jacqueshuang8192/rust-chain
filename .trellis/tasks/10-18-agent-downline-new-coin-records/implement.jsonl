@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/backend/agent-hierarchy.md", "reason": "Subtree scope and team records"}
+{"file": ".trellis/spec/admin/ui-system.md", "reason": "Resource UI contracts"}
+{"file": ".trellis/spec/backend/new-coin-manual-distribution.md", "reason": "Authoritative settlement and historical nulls"}

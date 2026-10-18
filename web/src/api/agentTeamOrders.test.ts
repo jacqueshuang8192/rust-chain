@@ -31,7 +31,7 @@ describe('agent team order API', () => {
 
   it.each(agentOrderKinds)('rejects malformed %s metadata, money, enums and pagination', async (kind) => {
     const row = teamOrderFixtures[kind];
-    const amount = { seconds: 'stake_amount', margin: 'margin_amount', earn: 'amount', spot: 'quantity' }[kind];
+    const amount = { seconds: 'stake_amount', margin: 'margin_amount', earn: 'amount', spot: 'quantity', 'new-coin-subscriptions': 'quote_amount', 'new-coin-purchases': 'quote_amount' }[kind];
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
     for (const invalid of [
@@ -58,6 +58,17 @@ describe('agent team order API', () => {
     vi.stubGlobal('fetch', fetchMock);
     await expect(getAgentTeamOrders('seconds', query)).rejects.toThrow();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('preserves historical subscription nulls and rejects fabricated numeric settlement amounts', async () => {
+    const row = { ...teamOrderFixtures['new-coin-subscriptions'], status: 'available',
+      settlement_mode: 'legacy_instant', settled_quote_amount: null, refunded_quote_amount: null };
+    const fetchMock = vi.fn().mockResolvedValue(response({ orders: [row], total: 1 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await expect(getAgentTeamOrders('new-coin-subscriptions', { project_id: 8, symbol: 'NOVA' })).resolves.toEqual({ orders: [row], total: 1 });
+    expect(new URL(fetchMock.mock.calls[0][0]).searchParams.get('project_id')).toBe('8');
+    fetchMock.mockResolvedValue(response({ orders: [{ ...row, settled_quote_amount: 0 }], total: 1 }));
+    await expect(getAgentTeamOrders('new-coin-subscriptions')).rejects.toBeInstanceOf(ContractError);
   });
 
   it('accepts refunded seconds without a fabricated result and nullable email', async () => {

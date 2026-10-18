@@ -51,7 +51,7 @@ describe('AgentLayout', () => {
   it('renders the real account identity instead of the internal subject', async () => {
     renderAgentLayout();
 
-    ['总览', '在线客服', '团队用户', '秒合约订单', '合约订单', '理财订单', '现货订单', '邀请码', '佣金记录', '闪兑统计', '团队树', '下级代理'].forEach((label) => {
+    ['总览', '在线客服', '团队用户', '秒合约订单', '合约订单', '理财订单', '现货订单', '新币申购', '新币认购', '邀请码', '佣金记录', '闪兑统计', '团队树', '下级代理'].forEach((label) => {
       expect(screen.getByRole('menuitem', { name: label })).toBeInTheDocument();
     });
     expect(await screen.findByText('华南代理')).toBeInTheDocument();
@@ -60,7 +60,7 @@ describe('AgentLayout', () => {
     expect(screen.getByText('代理总览内容')).toBeInTheDocument();
   });
 
-  it.each(['秒合约订单', '合约订单', '理财订单', '现货订单'])('opens %s from navigation', async (label) => {
+  it.each(['秒合约订单', '合约订单', '理财订单', '现货订单', '新币申购', '新币认购'])('opens %s from navigation', async (label) => {
     renderAgentLayout();
     fireEvent.click(screen.getByRole('menuitem', { name: label }));
     expect(await screen.findByText('团队订单内容')).toBeInTheDocument();

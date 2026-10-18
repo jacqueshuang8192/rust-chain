@@ -9740,3 +9740,10 @@
 - 修改文件：`web/src/support/OnlineSupportWorkbench.tsx`、`OnlineSupportWorkbench.test.tsx`、`onlineSupport.css`、`web/src/styles.css`；`.trellis/spec/admin/ui-system.md`客服章节、`.trellis/tasks/10-18-support-workspace-design/`及本进度文件的客服记录。
 - 验证结果：双端1728/1280/768/390/320px共10组列表/聊天均无水平溢出、消息与输入区无重叠且发送按钮可达；本地内存夹具验证草稿返回、失败发送沿用同一标识重试、长消息、空搜索、同步失败保留已有会话和只读禁止写操作通过。6张桌面/平板/手机最终截图已查看。最终小幅呈现调整后typecheck、lint、客服/API 19/19和build通过；此前全量1086/1086、策略15/15及覆盖23/23通过。设计源码lint通过；使用技能inspect的probe/judge模块对已登录页面执行1440/768/390检查，仍报告既有全局外壳装饰、紧凑元数据小字及后台不适用的营销图片/hero要求，不宣称整页设计门禁通过。JS预算仍2675427 > 2600000，低于改前2677241，未放宽阈值。
 - 后续事项：未推送或部署；未发送真实客服消息，未做实体手机验证。Ego空间9已关闭，本地3030预览服务保留；既有包体预算和全局外壳设计问题另行处理。
+
+## 2026-10-18 17:10 - 代理查看下级用户新币申购与认购
+
+- 完成内容：代理导航新增新币申购、新币认购，只读展示本级及下级代理团队用户记录；支持团队/分支/用户/邮箱/项目/币种/状态/时间筛选、服务端分页和详情。查询与总数统一使用令牌子树，不能读取父级、兄弟、其他团队或未归属用户；保留申购配售/冻结/扣款/退款快照、历史已到账状态与未知金额空值，不触发资金操作。
+- 修改文件：`src/modules/agent/{application,infrastructure,presentation,routes}/team_orders.rs`、`repository.rs`、`src/openapi/agent_team_orders.rs`、`tests/agent_routes/team_orders.rs`；Web团队订单API/模型/页面/导航及测试夹具；后台/代理规范、`.trellis/tasks/10-18-agent-downline-new-coin-records/`及本记录。
+- 验证结果：独立MySQL9.3实跑团队订单3/3（涵盖六类订单、三级归属、越权排除、筛选/总数/稳定分页、历史空值及资金/订单不变）；架构11/11、OpenAPI16/16、文档1/1、all-target check、严格Clippy、fmt通过。Web全量113文件1098/1098、typecheck/lint/build、策略15/15及覆盖23/23通过。浏览器本地内存夹具两页1728/1280/390/320无页面横向溢出，项目空态/重置、错误恢复、详情及真实列宽200→230验证通过；已检查4张列表与1张详情截图，零写请求。既有JS预算仍失败2678862 > 2600000，未放宽阈值；git diff --check通过。
+- 后续事项：本任务整理为独立本地提交，未推送或部署；测试数据库和Ego空间10已清理，3030预览服务保留。前一轮新币申请Tabs仍保持未提交；既有包体预算另行处理。

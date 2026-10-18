@@ -9,7 +9,7 @@ use crate::{
 };
 use sqlx::{MySql, Pool, QueryBuilder};
 
-/// 用相同查询构造器读取四类订单及总数，保持业务 DTO 和金额文本；不锁行也不写账本。
+/// 用相同查询构造器读取团队订单及总数，保持业务 DTO 和金额文本；不锁行也不写账本。
 /// 范围取自身份路径；agent_id 只在该范围内选分支，不能让子代理读到父级或兄弟数据。
 pub(crate) async fn list_orders(
     pool: &Pool<MySql>,
@@ -28,6 +28,24 @@ pub(crate) async fn list_orders(
         .push_bind(i64::from(filter.page.offset));
     // 各分支仅决定静态 DTO，查询条件和总数逻辑在上方共用。
     Ok(match filter.kind {
+        AgentOrderKind::NewCoinSubscription => {
+            AgentTeamOrdersResponse::NewCoinSubscription(AgentTeamOrderPage {
+                orders: rows
+                    .build_query_as::<AgentTeamOrder<_>>()
+                    .fetch_all(pool)
+                    .await?,
+                total,
+            })
+        }
+        AgentOrderKind::NewCoinPurchase => {
+            AgentTeamOrdersResponse::NewCoinPurchase(AgentTeamOrderPage {
+                orders: rows
+                    .build_query_as::<AgentTeamOrder<_>>()
+                    .fetch_all(pool)
+                    .await?,
+                total,
+            })
+        }
         AgentOrderKind::Seconds => AgentTeamOrdersResponse::Seconds(AgentTeamOrderPage {
             orders: rows
                 .build_query_as::<AgentTeamOrder<_>>()
@@ -72,7 +90,26 @@ fn query(
     filter: &AgentTeamOrderFilter,
     count: bool,
 ) -> QueryBuilder<'static, MySql> {
+    let new_coin = matches!(
+        filter.kind,
+        AgentOrderKind::NewCoinSubscription | AgentOrderKind::NewCoinPurchase
+    );
     let (columns, from) = match filter.kind {
+        AgentOrderKind::NewCoinSubscription => (
+            "orders.project_id, projects.symbol, orders.quote_asset, assets.symbol AS quote_symbol, \
+             orders.issue_price, orders.quote_amount, orders.settlement_mode, orders.frozen_quote_amount, \
+             orders.settled_quote_amount, orders.refunded_quote_amount, orders.requested_quantity, \
+             orders.allocated_quantity, orders.status, orders.created_at",
+            "new_coin_subscriptions orders JOIN new_coin_projects projects ON projects.id = orders.project_id \
+             JOIN assets ON assets.id = orders.quote_asset",
+        ),
+        AgentOrderKind::NewCoinPurchase => (
+            "orders.project_id, projects.symbol, orders.quote_asset, assets.symbol AS quote_symbol, \
+             orders.pair_id, orders.base_asset, orders.price, orders.quantity, orders.quote_amount, \
+             orders.lock_position_id, orders.status, orders.created_at",
+            "new_coin_purchase_orders orders JOIN new_coin_projects projects ON projects.id = orders.project_id \
+             JOIN assets ON assets.id = orders.quote_asset",
+        ),
         AgentOrderKind::Seconds => (
             "orders.product_id, orders.pair_id, pairs.symbol, orders.stake_asset, \
              assets.symbol AS stake_asset_symbol, orders.direction, orders.stake_amount, \
@@ -152,6 +189,7 @@ fn query(
         ("orders.user_id", filter.user_id),
         ("orders.id", filter.order_id),
         ("orders.product_id", filter.product_id),
+        ("orders.project_id", filter.project_id),
     ] {
         if let Some(value) = value {
             builder
@@ -169,10 +207,16 @@ fn query(
     }
     if let Some(symbol) = &filter.symbol {
         builder
-            .push(
-                " AND REPLACE(REPLACE(REPLACE(UPPER(pairs.symbol), '-', ''), '/', ''), '_', '') = ",
-            )
-            .push_bind(symbol.replace(['-', '/', '_'], "").to_uppercase());
+            .push(if new_coin {
+                " AND UPPER(projects.symbol) = "
+            } else {
+                " AND REPLACE(REPLACE(REPLACE(UPPER(pairs.symbol), '-', ''), '/', ''), '_', '') = "
+            })
+            .push_bind(if new_coin {
+                symbol.to_uppercase()
+            } else {
+                symbol.replace(['-', '/', '_'], "").to_uppercase()
+            });
     }
     if filter.kind == AgentOrderKind::Margin && filter.status.as_deref() == Some("pending") {
         builder.push(" AND orders.status = 'opened' AND orders.entry_price IS NULL");

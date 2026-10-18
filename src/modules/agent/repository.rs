@@ -15,6 +15,8 @@ pub(crate) enum AgentOrderKind {
     Margin,
     Earn,
     Spot,
+    NewCoinSubscription,
+    NewCoinPurchase,
 }
 
 /// 已校验的团队订单筛选，代理 ID 只作为子树内进一步收窄的分支标识。
@@ -27,6 +29,7 @@ pub(crate) struct AgentTeamOrderFilter {
     pub(crate) email: Option<String>,
     pub(crate) order_id: Option<u64>,
     pub(crate) product_id: Option<u64>,
+    pub(crate) project_id: Option<u64>,
     pub(crate) symbol: Option<String>,
     pub(crate) status: Option<String>,
     pub(crate) direction: Option<String>,

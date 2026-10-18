@@ -5,6 +5,17 @@ const identity = {
   owner_agent_code: 'TEAM-003', created_at: 1_735_732_800_000
 };
 export const teamOrderFixtures: Record<AgentOrderKind, AgentTeamOrder> = {
+  'new-coin-subscriptions': {
+    ...identity, project_id: 8, symbol: 'NOVA', quote_asset: 2, quote_symbol: 'USDT',
+    issue_price: '2.5', quote_amount: '25', requested_quantity: '10', allocated_quantity: '4',
+    frozen_quote_amount: '0', settled_quote_amount: '10', refunded_quote_amount: '15',
+    settlement_mode: 'manual_distribution', status: 'partial_allocated'
+  },
+  'new-coin-purchases': {
+    ...identity, project_id: 8, symbol: 'NOVA', quote_asset: 2, quote_symbol: 'USDT',
+    pair_id: 3, base_asset: 7, price: '2.5', quantity: '10', quote_amount: '25',
+    lock_position_id: null, status: 'available'
+  },
   seconds: {
     ...identity, product_id: 7, pair_id: 5, symbol: 'BTC-USDT',
     stake_asset: 2, stake_asset_symbol: 'USDT', direction: 'up',

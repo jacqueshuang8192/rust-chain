@@ -1,4 +1,4 @@
-//! 团队四类订单入口：先校验筛选，再读取令牌所属代理子树，全程不触发金融写操作。
+//! 团队订单入口：先校验筛选，再读取令牌所属代理子树，全程不触发金融写操作。
 
 use super::agent_context;
 use crate::{
@@ -63,8 +63,17 @@ fn normalize_filter(kind: &str, query: AgentTeamOrdersQuery) -> AppResult<AgentT
         "margin" => AgentOrderKind::Margin,
         "earn" => AgentOrderKind::Earn,
         "spot" => AgentOrderKind::Spot,
+        "new-coin-subscriptions" => AgentOrderKind::NewCoinSubscription,
+        "new-coin-purchases" => AgentOrderKind::NewCoinPurchase,
         _ => return Err(AppError::NotFound),
     };
+    let new_coin = matches!(
+        kind,
+        AgentOrderKind::NewCoinSubscription | AgentOrderKind::NewCoinPurchase
+    );
+    if (new_coin && query.product_id.is_some()) || (!new_coin && query.project_id.is_some()) {
+        return Err(invalid("该订单类型不支持此产品或项目筛选"));
+    }
     let team_scope = text(query.team_scope, 16)?.unwrap_or_else(|| "all".to_owned());
     if !["all", "own", "descendants"].contains(&team_scope.as_str()) {
         return Err(invalid("团队范围无效"));
@@ -74,6 +83,7 @@ fn normalize_filter(kind: &str, query: AgentTeamOrdersQuery) -> AppResult<AgentT
         query.user_id,
         query.order_id,
         query.product_id,
+        query.project_id,
     ]
     .into_iter()
     .flatten()
@@ -92,6 +102,26 @@ fn normalize_filter(kind: &str, query: AgentTeamOrdersQuery) -> AppResult<AgentT
         AgentOrderKind::Seconds => normalized_agent_seconds_order_status(status)?,
         AgentOrderKind::Margin => normalized_agent_margin_order_status(status)?,
         AgentOrderKind::Spot => normalized_agent_spot_order_status(status)?,
+        AgentOrderKind::NewCoinSubscription | AgentOrderKind::NewCoinPurchase => {
+            let allowed: &[&str] = if kind == AgentOrderKind::NewCoinSubscription {
+                &[
+                    "pending",
+                    "allocated",
+                    "partial_allocated",
+                    "refunded",
+                    "available",
+                ]
+            } else {
+                &["pending", "locked", "available"]
+            };
+            if status
+                .as_ref()
+                .is_some_and(|value| !allowed.contains(&value.as_str()))
+            {
+                return Err(invalid("新币订单状态无效"));
+            }
+            status
+        }
         AgentOrderKind::Earn => {
             if status
                 .as_ref()
@@ -107,7 +137,9 @@ fn normalize_filter(kind: &str, query: AgentTeamOrdersQuery) -> AppResult<AgentT
         AgentOrderKind::Seconds => &["up", "down"],
         AgentOrderKind::Margin => &["long", "short"],
         AgentOrderKind::Spot => &["buy", "sell"],
-        AgentOrderKind::Earn => &[],
+        AgentOrderKind::Earn
+        | AgentOrderKind::NewCoinSubscription
+        | AgentOrderKind::NewCoinPurchase => &[],
     };
     if direction
         .as_ref()
@@ -141,6 +173,7 @@ fn normalize_filter(kind: &str, query: AgentTeamOrdersQuery) -> AppResult<AgentT
         user_id: query.user_id,
         order_id: query.order_id,
         product_id: query.product_id,
+        project_id: query.project_id,
         email: text(query.email, 254)?,
         symbol,
         status,

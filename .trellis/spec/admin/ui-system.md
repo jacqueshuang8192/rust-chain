@@ -1333,3 +1333,18 @@ Correct: pair lock + current read; error/last_tick evidence; actionable expiry m
   and logout accessible at 320px without horizontal overflow.
 - Verify malformed payloads, retry, same-subject session replacement, late
   responses, and narrow/wide layouts. Header changes require no auth-store rewrite.
+
+
+## Agent New-Coin Team Records
+
+- `/agent/orders/new-coin-subscriptions` (新币申购) and
+  `/agent/orders/new-coin-purchases` (新币认购) reuse the read-only team order page.
+  Purchase context explicitly means post-listing purchases, matching Admin.
+- Project ID replaces product ID; coin symbol replaces trading pair; direction
+  and result filters are absent. Preserve server paging, query/session stale
+  response guards, resizable contained tables and read-only detail drawers.
+- Subscription amounts show quote units and requested/allocated quantities show
+  coin units. Legacy settled/refunded nulls display unknown, never synthetic zero.
+  Historical available status remains accepted and labeled 已到账（历史）.
+- Only row user ownership defines agent visibility. No approval, allocation,
+  refund or lock release controls are added to these reporting pages.

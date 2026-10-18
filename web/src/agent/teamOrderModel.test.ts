@@ -21,6 +21,13 @@ describe('team order filters', () => {
   ])('rejects invalid enums and ranges %j', (filters) => {
     expect(() => teamOrderQuery('seconds', filters)).toThrow();
   });
+  it.each(['new-coin-subscriptions', 'new-coin-purchases'] as const)('uses project and coin filters for %s', kind => {
+    expect(teamOrderQuery(kind, { project_id: '8', symbol: ' NOVA ', user_id: '42' })).toEqual({ project_id: 8, symbol: 'NOVA', user_id: 42 });
+    const keys = teamOrderFilters(kind).map(field => field.key);
+    expect(keys).toContain('project_id');
+    for (const key of ['product_id', 'direction', 'result']) expect(keys).not.toContain(key);
+    expect(() => teamOrderQuery(kind, { project_id: '0' })).toThrow('项目ID');
+  });
   it('offers only meaningful business filters', () => {
     expect(teamOrderFilters('earn').map(field => field.key)).not.toEqual(expect.arrayContaining(['symbol', 'direction', 'result']));
     expect(teamOrderFilters('spot').map(field => field.key)).not.toContain('product_id');

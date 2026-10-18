@@ -19,6 +19,7 @@ pub(crate) struct AgentTeamOrdersQuery {
     pub(crate) email: Option<String>,
     pub(crate) order_id: Option<u64>,
     pub(crate) product_id: Option<u64>,
+    pub(crate) project_id: Option<u64>,
     pub(crate) symbol: Option<String>,
     pub(crate) status: Option<String>,
     pub(crate) direction: Option<String>,
@@ -55,6 +56,8 @@ pub(crate) enum AgentTeamOrdersResponse {
     Margin(AgentTeamOrderPage<AgentUserMarginPositionResponse>),
     Spot(AgentTeamOrderPage<AgentUserSpotOrderResponse>),
     Earn(AgentTeamOrderPage<AgentTeamEarnOrderResponse>),
+    NewCoinSubscription(AgentTeamOrderPage<AgentTeamNewCoinSubscriptionResponse>),
+    NewCoinPurchase(AgentTeamOrderPage<AgentTeamNewCoinPurchaseResponse>),
 }
 
 /// 理财仅显示申购时快照，不计算尚未落库的收益，不返回幂等键等内部字段。
@@ -76,4 +79,46 @@ pub(crate) struct AgentTeamEarnOrderResponse {
     pub(crate) matures_at: DateTime<Utc>,
     #[serde(with = "option_unix_millis")]
     pub(crate) redeemed_at: Option<DateTime<Utc>>,
+}
+
+/// 新币申购仅返回原始结算快照；历史未知扣款与退款保留空值，不执行派发。
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub(crate) struct AgentTeamNewCoinSubscriptionResponse {
+    pub(crate) id: u64,
+    pub(crate) user_id: u64,
+    pub(crate) project_id: u64,
+    pub(crate) symbol: String,
+    pub(crate) quote_asset: u64,
+    pub(crate) quote_symbol: String,
+    pub(crate) quote_amount: BigDecimal,
+    pub(crate) status: String,
+    #[serde(with = "unix_millis")]
+    pub(crate) created_at: DateTime<Utc>,
+    pub(crate) issue_price: BigDecimal,
+    pub(crate) settlement_mode: String,
+    pub(crate) frozen_quote_amount: BigDecimal,
+    pub(crate) settled_quote_amount: Option<BigDecimal>,
+    pub(crate) refunded_quote_amount: Option<BigDecimal>,
+    pub(crate) requested_quantity: BigDecimal,
+    pub(crate) allocated_quantity: BigDecimal,
+}
+
+/// 上市后认购使用订单成交快照；不暴露幂等键、不创建或释放锁仓。
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub(crate) struct AgentTeamNewCoinPurchaseResponse {
+    pub(crate) id: u64,
+    pub(crate) user_id: u64,
+    pub(crate) project_id: u64,
+    pub(crate) symbol: String,
+    pub(crate) quote_asset: u64,
+    pub(crate) quote_symbol: String,
+    pub(crate) quote_amount: BigDecimal,
+    pub(crate) status: String,
+    #[serde(with = "unix_millis")]
+    pub(crate) created_at: DateTime<Utc>,
+    pub(crate) pair_id: u64,
+    pub(crate) base_asset: u64,
+    pub(crate) price: BigDecimal,
+    pub(crate) quantity: BigDecimal,
+    pub(crate) lock_position_id: Option<u64>,
 }

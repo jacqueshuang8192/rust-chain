@@ -42,7 +42,19 @@ function columnsFor(kind: AgentOrderKind, detail: (row: AgentTeamOrder) => void)
       return <StatusTag value={status} label={(teamOrderStatuses[kind] as Record<string, string>)[status]} />;
     } }
   ];
-  if (kind === 'earn') {
+  if (kind === 'new-coin-subscriptions' || kind === 'new-coin-purchases') {
+    columns.push({ key: 'symbol', title: '新币项目', width: 180, render: (_, row) => <div className="agent-order-identity"><span>{String(row.symbol)}</span><small>项目ID：{String(row.project_id)}</small></div> });
+    if (kind === 'new-coin-subscriptions') {
+      columns.push(amountColumn('issue_price', '申购发行价', 'quote_symbol'),
+        amountColumn('quote_amount', '申购金额', 'quote_symbol'),
+        amountColumn('requested_quantity', '申购数量', 'symbol'), amountColumn('allocated_quantity', '获配数量', 'symbol'),
+        amountColumn('frozen_quote_amount', '待结算冻结', 'quote_symbol'),
+        amountColumn('settled_quote_amount', '实际扣款', 'quote_symbol'), amountColumn('refunded_quote_amount', '退款金额', 'quote_symbol'));
+    } else {
+      columns.push(amountColumn('price', '成交价', 'quote_symbol'), amountColumn('quantity', '认购数量', 'symbol'),
+        amountColumn('quote_amount', '支付金额', 'quote_symbol'));
+    }
+  } else if (kind === 'earn') {
     columns.push({ key: 'product_name', dataIndex: 'product_name', title: '理财产品', width: 220 },
       amountColumn('amount', '申购本金', 'asset_symbol'),
       { key: 'apr_rate', title: '年化收益率', width: 140, render: (_, row) => {
@@ -124,6 +136,7 @@ function TeamOrders({ kind }: { kind: AgentOrderKind }) {
       icon={<IconRefresh />} aria-label="刷新订单" disabled={current.loading}
       onClick={() => { setSelected(null); setRevision(value => value + 1); }} /></Tooltip>
     </>} />
+    {kind === 'new-coin-purchases' ? <p className="muted">查看团队用户上市后购买新币的认购记录。</p> : null}
     <FilterBar fields={teamOrderFilters(kind).filter(field => expandedFilters || primaryFilters.has(field.key))}
       value={filters} onChange={applyFilters} loading={current.loading} />
     {filterError ? <Banner type="danger" description={filterError} /> : null}
@@ -139,10 +152,15 @@ function TeamOrders({ kind }: { kind: AgentOrderKind }) {
         labels: {
           id: '记录ID', owner_agent_code: '归属代理编号', owner_agent_id: '归属代理ID',
           email: '用户邮箱', apr_rate: '年化收益率（比例）',
+          ...(kind.startsWith('new-coin-') ? { symbol: '新币代码', project_id: '项目ID', quote_symbol: '支付币种', quote_asset: '支付资产ID',
+            quote_amount: kind === 'new-coin-subscriptions' ? '申购金额' : '支付金额', issue_price: '申购发行价',
+            requested_quantity: '申购数量', allocated_quantity: '获配数量', frozen_quote_amount: '待结算冻结',
+            settled_quote_amount: '实际扣款', refunded_quote_amount: '退款金额', settlement_mode: '结算模式',
+            price: '成交价', quantity: '认购数量', lock_position_id: '锁仓ID' } : {}),
           ...(kind === 'earn' ? { product_name: '理财产品', amount: '申购本金', created_at: '申购时间', redeemed_at: '赎回时间' } : {})
         },
         types: { redeemed_at: 'timestamp' },
-        valueMaps: { status: { ...teamOrderStatuses[kind],
+        valueMaps: { settlement_mode: { manual_distribution: '后台派发', legacy_instant: '历史即时成交' }, status: { ...teamOrderStatuses[kind],
           ...(kind === 'margin' && selected.entry_price === null ? { opened: '待成交' } : {}) } }
       }
     } : null} onClose={() => setSelected(null)} />

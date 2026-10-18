@@ -28,7 +28,7 @@ describe('AgentTeamOrdersPage', () => {
   afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); });
 
   it.each<[AgentOrderKind, string]>([
-    ['seconds', '进行中'], ['margin', '待成交'], ['earn', '持有中'], ['spot', '部分成交']
+    ['seconds', '进行中'], ['margin', '待成交'], ['earn', '持有中'], ['spot', '部分成交'], ['new-coin-subscriptions', '已部分配售'], ['new-coin-purchases', '已到账']
   ])('shows %s user/agent identity and read-only Chinese details', async (kind, status) => {
     const user = userEvent.setup();
     renderPage(kind);
@@ -37,7 +37,7 @@ describe('AgentTeamOrdersPage', () => {
     expect(screen.getByText('TEAM-003')).toBeInTheDocument();
     expect(getOrders).toHaveBeenCalledWith(kind, { limit: 20, offset: 0 });
     if (kind === 'earn') expect(screen.getByText('8.00%')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /^(SC|MG|EA|SP)\d/ }));
+    await user.click(screen.getByRole('button', { name: /^(SC|MG|EA|SP|NC|NP)\d/ }));
     expect(await screen.findByText('记录ID', { selector: 'dt' })).toBeInTheDocument();
     expect(screen.getByText('归属代理编号')).toBeInTheDocument();
     expect(screen.getAllByText(status)).toHaveLength(2);
@@ -47,7 +47,25 @@ describe('AgentTeamOrdersPage', () => {
       expect(screen.queryByText('贷款产品')).not.toBeInTheDocument();
       expect(screen.queryByText('redeemed_at')).not.toBeInTheDocument();
     }
-    expect(screen.queryByRole('button', { name: /结算|赎回|取消订单/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /结算|赎回|取消订单|确认派发|确认退款/ })).not.toBeInTheDocument();
+  });
+
+  it('filters subscriptions by project and shows authoritative settlement details without actions', async () => {
+    const user = userEvent.setup();
+    renderPage('new-coin-subscriptions');
+    await screen.findByText('TEAM-003');
+    await user.click(screen.getByRole('button', { name: '更多筛选' }));
+    fireEvent.change(screen.getByLabelText('项目ID'), { target: { value: '8' } });
+    fireEvent.change(screen.getByLabelText('币种'), { target: { value: 'NOVA' } });
+    expect(screen.queryByLabelText('方向')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '查询' }));
+    await waitFor(() => expect(getOrders).toHaveBeenLastCalledWith('new-coin-subscriptions', { project_id: 8, symbol: 'NOVA', limit: 20, offset: 0 }));
+    await user.click(await screen.findByRole('button', { name: /^NC\d/ }));
+    for (const label of ['获配数量', '待结算冻结', '实际扣款', '退款金额']) {
+      expect(screen.getByText(label, { selector: 'dt' })).toBeInTheDocument();
+    }
+    expect(screen.getByText('后台派发')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /派发|退款|审核/ })).not.toBeInTheDocument();
   });
 
   it('submits draft filters, resets paging, and clears them on reset', async () => {

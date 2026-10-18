@@ -571,3 +571,56 @@ Bad: treating `user_referrals.root_agent_id` as the top-level agent, or letting
 Wrong: authorize a requested agent once, then query rows by its root ID.
 Correct: bind the current identity path in every rows/COUNT query; intersect a
 requested branch with that scope, and show the exact directly owning agent.
+
+
+## Scenario: Team New-Coin Subscriptions And Purchases
+
+### 1. Scope / Trigger
+Agent reporting for users owned by the authenticated agent or its descendant
+agents, including users invited by users who retain that ownership.
+
+### 2. Signatures
+GET `/agent/api/v1/orders/{kind}` additionally accepts
+`new-coin-subscriptions` and `new-coin-purchases`, returning `{orders,total}`.
+Both add `project_id` (positive safe integer); `symbol` is the project coin
+code, case-insensitive with separators preserved. Existing team, branch, user,
+email, record, status, half-open time and bounded paging filters remain valid.
+
+### 3. Contracts
+Use the existing static projection and shared SELECT/COUNT subtree builder.
+No client ID replaces the authenticated scope; project ownership does not grant
+visibility into other agents' customers. Read persisted rows only, with no
+wallet creation, allocation, settlement, unlocking or journal writes.
+Rows include project ID/symbol, quote asset/symbol, user email and direct owning
+agent identity. Amounts remain Decimal strings and dates Unix milliseconds.
+Subscriptions include original issue price, requested/allocated quantities,
+settlement mode and frozen/settled/refunded quote snapshots. Legacy null amounts
+remain null; historical `available` is valid alongside `pending`, `allocated`,
+`partial_allocated`, `refunded`. Purchases expose original price/quantity,
+pair/base asset and nullable lock position; statuses are pending/locked/available.
+Neither DTO exposes idempotency keys. Listing status changes never rewrite order
+status. New coin requests reject product_id, direction and result; other kinds
+reject project_id.
+
+### 4. Validation & Error Matrix
+Invalid ID/status/unsupported filters -> 400 before database access. Wrong token
+scope -> 403; inactive ancestor -> 401. Out-of-scope branch/user, unknown project
+or no matching rows -> empty orders and zero total. Database failure -> error.
+
+### 5. Good / Base / Bad Cases
+Good: parent sees a descendant user's partial allocation and exact refund.
+Base: historical available row shows unknown settlement amounts as null.
+Bad: expose all project investors because an agent applied to issue the project.
+
+### 6. Tests Required
+Real MySQL route suite covers all six kinds, three levels, sibling/other/unassigned
+users, inherited referral ownership, filters/counts/stable paging, null historical
+amounts, hidden idempotency keys and unchanged orders/wallets/journals. OpenAPI
+registers both concrete row/page generic instantiations and amount/null contracts.
+Frontend validates wire money/nulls/status and tests project filters, Chinese
+navigation and read-only detail controls. Browser checks desktop/narrow containment.
+
+### 7. Wrong vs Correct
+Wrong: query the current project's orders without filtering user ownership.
+Correct: intersect every row/count query with the token-derived agent subtree,
+then apply optional project, branch and user filters.
