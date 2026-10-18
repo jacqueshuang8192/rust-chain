@@ -34,6 +34,7 @@ use axum::{
 mod coin_applications;
 mod recharges;
 mod team_orders;
+mod token_issuance;
 mod wallet_records;
 
 /// 装配代理自助后台的全部端点，由上层挂载到代理专属前缀之下。
@@ -42,6 +43,7 @@ mod wallet_records;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .merge(coin_applications::routes())
+        .merge(token_issuance::routes())
         .merge(recharges::routes())
         .merge(team_orders::routes())
         .merge(wallet_records::routes())

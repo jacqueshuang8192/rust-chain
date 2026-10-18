@@ -2432,3 +2432,28 @@ if (directory.state === 'loaded') {
   existing 1m roots; do not independently fill gaps or generate prices in Vue.
 - Required regression: boundary burst, same-slot out-of-order observation,
   refreshed historical OHLC, all interactive default controls, release:gate.
+
+## Version 2 Token Issuance
+
+See [the versioned issuance contract](../backend/token-issuance-v2.md). New
+components consume exact quotes/holdings and keep unknown write intents in
+account-scoped session storage; unmount/account/project changes invalidate
+in-flight UI completions. Subscription creation returns a compact receipt,
+not the order-history row. Use the server's exact `post_listing_pair_symbol`.
+Legacy detail and unlock actions remain in the version 1 branch. Local token
+styles use the unique `token-surface` namespace; NewCoinDetail/Records use their
+exclusive `new-coin-*` classes without repeated Vue scope attributes. Build
+compression runs on ES module chunks before hashing, with unsafe transforms
+left disabled; tiny-chunk merging and direct Terser dependency preserve fixed
+bundle thresholds. Never weaken the release gate to add a feature.
+
+- Token styles must select their owned direct children; a `.token-surface dl`
+  or generic descendant button/input rule reaches the embedded chart inspector
+  and corrupts OHLC layout. Keep chart-owned controls outside token rules.
+- The installed chart library's built-in decimal formatter throws above 16
+  fractional digits despite supporting a smaller `minMove`/larger `base`.
+  Use its custom formatter for 17–18 digit scales; retain the original ticks
+  and OHLC, and format display labels to 12 significant digits so floating
+  tails do not consume the axis. The inspector uses the same display function.
+  Tiny values such as `1e-18` remain nonzero. Exact financial quote text is
+  independent of this chart-only presentation rule.

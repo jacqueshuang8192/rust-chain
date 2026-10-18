@@ -47,6 +47,8 @@ export const ADMIN_STATUS_META: Record<string, StatusMeta> = {
   deny: { label: '拒绝', color: 'red' },
   disabled: { label: '禁用', color: 'grey' },
   distribution: { label: '派发中', color: 'light-blue' },
+  purchase: { label: '认购中', color: 'blue' },
+  held: { label: '持有中', color: 'blue' },
   draft: { label: '草稿', color: 'grey' },
   down: { label: '看跌', color: 'red' },
   enabled: { label: '启用', color: 'green' },

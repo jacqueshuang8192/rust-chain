@@ -38,7 +38,8 @@ let marketInitialized = false
 const lifecycleFilters: ReadonlyArray<{ key: NewCoinLifecycleFilter; label: string }> = [
   { key: 'all', label: 'common.all' },
   { key: 'preheat', label: 'newCoin.preheat' },
-  { key: 'subscription', label: 'newCoin.subscribe' },
+  { key: 'subscription', label: 'newCoin.fixedSubscription' },
+  { key: 'purchase', label: 'newCoin.livePurchase' },
   { key: 'distribution', label: 'newCoin.pendingListing' },
   { key: 'listed', label: 'newCoin.listed' },
 ]

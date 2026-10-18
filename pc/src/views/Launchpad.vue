@@ -21,7 +21,7 @@
               ? 'bg-primary/10 text-primary border-primary/20'
               : 'bg-muted text-muted-foreground border-transparent hover:text-foreground'"
         >
-          {{ t(tab.labelKey) }}
+          {{ tab.value === 4 ? tokenT(tab.labelKey) : t(tab.labelKey) }}
         </button>
       </div>
     </div>
@@ -65,13 +65,14 @@
                 </div>
             </div>
 
+            <RouterLink v-if="project.issuanceVersion === 2" :to="{ name: 'TokenProject', params: { symbol: project.symbol } }" class="block rounded-lg border border-border px-4 py-3 mb-4 text-primary">{{ t('launchpad.view_details') }}</RouterLink>
             <!-- Description -->
             <p class="text-sm text-muted-foreground line-clamp-2 mb-6 h-10">{{ project.description }}</p>
 
             <!-- Key Info Grid -->
             <div class="grid grid-cols-2 gap-3 mb-6">
                  <div class="bg-muted/30 p-3 rounded-lg border border-border/50">
-                    <div class="text-xs text-muted-foreground mb-1">{{ t('launchpad.sale_price') }}</div>
+                    <div class="text-xs text-muted-foreground mb-1">{{ project.issuanceVersion === 2 ? tokenT('token.fixedPrice') : t('launchpad.sale_price') }}</div>
                     <div class="font-mono font-bold text-up text-sm">1 {{ project.symbol }} = {{ formatNumber(project.price) }} {{ project.acceptUnit?.split('-')[0] }}</div>
                  </div>
                  <div class="bg-muted/30 p-3 rounded-lg border border-border/50">
@@ -114,8 +115,8 @@
             <!-- Action Area -->
             <div class="space-y-4 pt-4 border-t border-border/50">
                  <!-- Time Status -->
-                 <div class="flex justify-center items-center gap-2 text-sm font-mono mb-2">
-                     <template v-if="project.statusStr === 'LIVE'">
+                 <div v-if="project.issuanceVersion !== 2" class="flex justify-center items-center gap-2 text-sm font-mono mb-2">
+                     <template v-if="project.statusStr === 'LIVE' && project.issuanceVersion !== 2">
                          <span class="text-muted-foreground">{{ t('launchpad.ends_in') }}</span>
                          <span class="text-foreground font-bold bg-muted px-2 rounded">{{ project.timeLeft }}</span>
                      </template>
@@ -130,7 +131,7 @@
                  </div>
 
                  <!-- Buy Input -->
-                 <div v-if="project.statusStr === 'LIVE'" class="flex gap-2">
+                 <div v-if="project.statusStr === 'LIVE' && project.issuanceVersion !== 2" class="flex gap-2">
                     <div class="relative flex-1 group/input">
                          <input type="number"
                                 v-model="amounts[project.id]"
@@ -145,7 +146,7 @@
                     </button>
                  </div>
 
-                 <button v-else class="w-full py-3 bg-muted/50 text-muted-foreground font-bold rounded-lg border border-border cursor-not-allowed">
+                 <button v-else-if="project.issuanceVersion !== 2" disabled class="w-full py-3 bg-muted/50 text-muted-foreground font-bold rounded-lg border border-border cursor-not-allowed">
                     {{ project.statusStr === 'UPCOMING' ? t('launchpad.coming_soon') : t('launchpad.sale_ended') }}
                  </button>
 
@@ -174,8 +175,10 @@ import numeral from 'numeral'
 import { useToast } from 'vue-toastification'
 import { fetchActivityList, attendActivity, type IEOProject } from '@/api/activity'
 import { useI18n } from 'vue-i18n'
+import { tokenIssuanceMessages } from '@/core/tokenIssuanceMessages'
 
 const { t } = useI18n()
+const { t: tokenT } = useI18n({ useScope: 'local', messages: tokenIssuanceMessages })
 const toast = useToast()
 const subscribing = ref(false)
 const amounts = ref<Record<number, number>>({})
@@ -188,6 +191,7 @@ const tabs = [
     { labelKey: 'launchpad.tabs.upcoming', value: 0 },
     { labelKey: 'launchpad.tabs.live', value: 1 },
     { labelKey: 'launchpad.tabs.distributing', value: 2 },
+    { labelKey: 'token.purchase', value: 4 },
     { labelKey: 'launchpad.tabs.ended', value: 3 }
 ]
 
@@ -209,6 +213,7 @@ const getStatusClass = (statusStr: string) => {
 
 const getTranslatedStatus = (statusStr: string) => {
     switch (statusStr) {
+        case 'PURCHASE': return tokenT('token.purchase')
         case 'LIVE': return t('launchpad.status.live')
         case 'UPCOMING': return t('launchpad.status.upcoming')
         case 'ENDED': return t('launchpad.status.ended')
@@ -221,6 +226,8 @@ const mapStepToStatus = (step: number) => {
     // 0: 未开始, 1: 进行中, 2: 派发中, 3: 已结束
     if (step === 0) return 'UPCOMING'
     if (step === 1) return 'LIVE'
+    if (step === 2) return 'DISTRIBUTING'
+    if (step === 4) return 'PURCHASE'
     return 'ENDED'
 }
 
@@ -277,6 +284,7 @@ const loadProjects = async () => {
 
                 return {
                     id: item.id,
+                    issuanceVersion: item.issuanceVersion,
                     name: item.title,
                     symbol: item.unit,
                     typeLabel: getProjectTypeLabel(item.type),

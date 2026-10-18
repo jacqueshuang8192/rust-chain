@@ -21,6 +21,9 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import AssetMark from '@/components/AssetMark.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import TokenSubscriptionForm from '@/components/TokenSubscriptionForm.vue'
+import TokenTradingPanel from '@/components/TokenTradingPanel.vue'
+import TokenIssuanceRules from '@/components/TokenIssuanceRules.vue'
 import { apiErrorMessage } from '@/api/client'
 import {
   createNewCoinPurchase,
@@ -70,7 +73,7 @@ const reviewDialog = ref<HTMLElement | null>(null)
 const { trapFocus: trapReviewFocus } = useModalDialog(reviewOpen, reviewDialog, '[data-dialog-cancel]')
 const lifecycle = computed(() => project.value?.lifecycleStatus.toLowerCase() || '')
 const canSubscribe = computed(() => lifecycle.value === 'subscription')
-const canPurchase = computed(() => lifecycle.value === 'listed'
+const canPurchase = computed(() => !project.value?.issuancePolicy && lifecycle.value === 'listed'
   && Boolean(project.value?.postListingPurchaseEnabled && project.value?.postListingPairId))
 const quoteSymbol = computed(() => project.value?.quoteAssetSymbol || t('newCoin.unavailableValue'))
 const projectName = computed(() => project.value?.name || t('newCoin.projectNameUnavailable'))
@@ -102,7 +105,7 @@ const canSubmit = computed(() => {
   return canPurchase.value
 })
 const lifecycleLabel = computed(() => statusLabel(project.value?.lifecycleStatus || ''))
-const milestone = computed(() => newCoinLifecycleMilestone(project.value?.lifecycleStatus || ''))
+const milestone = computed(() => project.value?.issuancePolicy ? ['preheat', 'subscription', 'distribution', 'purchase', 'listed'].indexOf(lifecycle.value) : newCoinLifecycleMilestone(project.value?.lifecycleStatus || ''))
 const progress = computed(() => project.value ? newCoinProjectProgress(project.value) : null)
 const progressText = computed(() => progress.value
   ? formatDecimalText(
@@ -113,8 +116,9 @@ const progressText = computed(() => progress.value
   : t('newCoin.unavailableValue'))
 const stageItems = computed(() => [
   { key: 'preheat', label: t('newCoin.preheat'), icon: Flame },
-  { key: 'subscription', label: t('newCoin.subscribe'), icon: TicketCheck },
-  { key: 'distribution', label: t('newCoin.pendingListing'), icon: PackageCheck },
+  { key: 'subscription', label: t(project.value?.issuancePolicy ? 'newCoin.fixedSubscription' : 'newCoin.subscribe'), icon: TicketCheck },
+  { key: 'distribution', label: t(project.value?.issuancePolicy ? 'newCoin.waitingDistribution' : 'newCoin.pendingListing'), icon: PackageCheck },
+  ...(project.value?.issuancePolicy ? [{ key: 'purchase', label: t('newCoin.livePurchase'), icon: LineChart }] : []),
   { key: 'listed', label: t('newCoin.listed'), icon: LineChart },
 ])
 const unlockSummary = computed(() => {
@@ -152,8 +156,9 @@ function formatMoney(value: DecimalText | null | undefined, assetSymbol?: string
 function statusLabel(status: string): string {
   const key = ({
     preheat: 'newCoin.preheat',
-    subscription: 'newCoin.subscriptionOpen',
+    subscription: project.value?.issuancePolicy ? 'newCoin.fixedSubscription' : 'newCoin.subscriptionOpen',
     distribution: 'newCoin.waitingDistribution',
+    purchase: 'newCoin.livePurchase',
     listed: 'newCoin.listed',
     closed: 'newCoin.closed',
   } as Record<string, string>)[status.toLowerCase()]
@@ -313,7 +318,7 @@ onMounted(() => { void load() })
         <p>{{ t('newCoin.projectDataDescription') }}</p>
         <dl class="new-coin-detail-plates">
           <div>
-            <dt><Tag :size="17" /><span>{{ t('newCoin.issuePrice') }}</span></dt>
+            <dt><Tag :size="17" /><span>{{ t(project.issuancePolicy ? 'newCoin.fixedSubscriptionPrice' : 'newCoin.issuePrice') }}</span></dt>
             <dd>{{ formatMoney(project.issuePriceText, project.quoteAssetSymbol) }} {{ quoteSymbol }}</dd>
           </div>
           <div>
@@ -332,7 +337,7 @@ onMounted(() => { void load() })
           <h2>{{ t('newCoin.currentStage') }}</h2>
           <small>{{ lifecycleLabel }} · {{ t('newCoin.progressRatio', { ratio: progressText }) }}</small>
         </header>
-        <ol>
+        <ol :style="{ gridTemplateColumns: `repeat(${stageItems.length}, minmax(0, 1fr))` }">
           <li
             v-for="(stage, index) in stageItems"
             :key="stage.key"
@@ -344,7 +349,8 @@ onMounted(() => { void load() })
         </ol>
       </section>
 
-      <section class="new-coin-detail-rules">
+      <TokenTradingPanel v-if="project.issuancePolicy" :project-id="project.id" :symbol="project.symbol" :quote-symbol="project.quoteAssetSymbol" :pair-symbol="project.postListingPairSymbol" :stage="project.lifecycleStatus" />
+      <section v-else class="new-coin-detail-rules">
         <header><h2>{{ t('newCoin.rules') }}</h2><ChevronRight :size="19" aria-hidden="true" /></header>
         <dl>
           <div><dt>{{ t('newCoin.paymentAsset') }}</dt><dd>{{ quoteSymbol }}</dd></div>
@@ -353,7 +359,9 @@ onMounted(() => { void load() })
         </dl>
       </section>
 
-      <section class="new-coin-detail-entry">
+      <TokenSubscriptionForm v-if="project.issuancePolicy && canSubscribe && project.quoteAssetId" :project-id="project.id" :symbol="project.symbol" :quote-symbol="quoteSymbol" :quote-asset-id="project.quoteAssetId" :price="project.issuePriceText" @completed="load" />
+      <TokenIssuanceRules v-if="project.issuancePolicy" :policy="project.issuancePolicy" :quote-symbol="project.quoteAssetSymbol" />
+      <section v-if="!project.issuancePolicy" class="new-coin-detail-entry">
         <h2>{{ t(canPurchase ? 'newCoin.purchaseTitle' : 'newCoin.subscribeTitle') }}</h2>
         <div class="new-coin-detail-balance">
           <span>{{ t('newCoin.availableBalance') }}</span>
@@ -405,21 +413,21 @@ onMounted(() => { void load() })
     <div v-else class="new-coin-detail-state"><PackageOpen :size="24" /><span>{{ t('newCoin.noProjects') }}</span></div>
 
     <Teleport to="body">
-      <div v-if="reviewOpen && project && selectedAccount" class="entry-review-mask new-coin-detail-review-layer" @click.self="closeReview">
+      <div v-if="reviewOpen && project && selectedAccount" class="new-coin-entry-review-mask new-coin-detail-review-layer" @click.self="closeReview">
         <section
           ref="reviewDialog"
-          class="entry-review"
+          class="new-coin-entry-review"
           role="dialog"
           aria-modal="true"
-          aria-labelledby="entry-review-title"
-          aria-describedby="entry-review-description"
+          aria-labelledby="new-coin-entry-review-title"
+          aria-describedby="new-coin-entry-review-description"
           @keydown="handleReviewKeydown"
         >
           <header>
             <div>
               <span>{{ t(canSubscribe ? 'newCoin.subscribe' : 'newCoin.postListingPurchase') }}</span>
-              <h2 id="entry-review-title">{{ t(canSubscribe ? 'newCoin.subscribeTitle' : 'newCoin.purchaseTitle') }}</h2>
-              <small id="entry-review-description">
+              <h2 id="new-coin-entry-review-title">{{ t(canSubscribe ? 'newCoin.subscribeTitle' : 'newCoin.purchaseTitle') }}</h2>
+              <small id="new-coin-entry-review-description">
                 {{ canSubscribe
                   ? t('newCoin.subscribeDescription')
                   : t('newCoin.purchaseDescription', { price: formatMoney(executionPriceText, quoteSymbol), asset: quoteSymbol }) }}
@@ -427,14 +435,14 @@ onMounted(() => { void load() })
             </div>
             <button class="icon-button" type="button" :aria-label="t('common.close')" :disabled="submitting" @click="closeReview"><X :size="21" /></button>
           </header>
-          <dl class="entry-review__summary">
+          <dl class="new-coin-entry-review__summary">
             <div><dt>{{ t('newCoin.paymentAsset') }}</dt><dd>{{ selectedAccount.symbol }}</dd></div>
             <div><dt>{{ t(canSubscribe ? 'newCoin.subscriptionAmount' : 'newCoin.purchaseQuantity', { asset: project.symbol }) }}</dt><dd>{{ formatMoney(amountText, canSubscribe ? selectedAccount.symbol : project.symbol) }} {{ canSubscribe ? selectedAccount.symbol : project.symbol }}</dd></div>
             <div><dt>{{ t(canSubscribe ? 'newCoin.estimatedSubscription' : 'newCoin.estimatedPayment') }}</dt><dd>{{ formatMoney(canSubscribe ? estimatedQuantity : paymentAmount, canSubscribe ? project.symbol : selectedAccount.symbol) }} {{ canSubscribe ? project.symbol : selectedAccount.symbol }}</dd></div>
             <div><dt>{{ t('newCoin.availableBalance') }}</dt><dd>{{ formatMoney(availableText, selectedAccount.symbol) }} {{ selectedAccount.symbol }}</dd></div>
           </dl>
-          <p v-if="error" class="entry-review__error" role="alert">{{ error }}</p>
-          <div class="entry-review__actions">
+          <p v-if="error" class="new-coin-entry-review__error" role="alert">{{ error }}</p>
+          <div class="new-coin-entry-review__actions">
             <button type="button" :disabled="submitting" data-dialog-cancel @click="closeReview">{{ t('common.cancel') }}</button>
             <button type="button" :disabled="submitting || !canSubmit" :aria-busy="submitting" @click="submit">
               {{ submitting ? t('common.submitting') : actionLabel }}
@@ -446,21 +454,21 @@ onMounted(() => { void load() })
   </main>
 </template>
 
-<style scoped>
+<style>
 .new-coin-detail-pencil {
   min-height: 100dvh;
   overflow-x: clip;
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-.new-coin-detail-pencil :deep(.pencil-page-header) {
+.new-coin-detail-pencil .pencil-page-header {
   background: var(--new-coin-detail-header);
   height: 56px;
   min-height: 56px;
   padding: 6px 16px;
 }
 
-.new-coin-detail-pencil :deep(.page-header__title) {
+.new-coin-detail-pencil .page-header__title {
   font-size: 21px;
   font-weight: 700;
   line-height: 30px;
@@ -482,7 +490,7 @@ onMounted(() => { void load() })
   min-width: 0;
 }
 
-.new-coin-detail-visual > header :deep(.asset-mark) {
+.new-coin-detail-visual > header .asset-mark {
   border-radius: 18px;
 }
 
@@ -963,7 +971,7 @@ onMounted(() => { void load() })
   padding: 0 18px;
 }
 
-.entry-review-mask {
+.new-coin-entry-review-mask {
   align-items: end;
   background: var(--overlay);
   display: grid;
@@ -972,7 +980,7 @@ onMounted(() => { void load() })
   z-index: var(--layer-overlay);
 }
 
-.entry-review {
+.new-coin-entry-review {
   background: var(--new-coin-detail-panel);
   border-radius: 24px 24px 0 0;
   box-sizing: border-box;
@@ -981,60 +989,60 @@ onMounted(() => { void load() })
   width: 100%;
 }
 
-.entry-review > header {
+.new-coin-entry-review > header {
   align-items: start;
   display: flex;
   justify-content: space-between;
 }
 
-.entry-review > header div {
+.new-coin-entry-review > header div {
   display: grid;
   gap: 4px;
 }
 
-.entry-review > header span,
-.entry-review > header small,
-.entry-review__summary dt {
+.new-coin-entry-review > header span,
+.new-coin-entry-review > header small,
+.new-coin-entry-review__summary dt {
   color: var(--new-coin-detail-muted);
   font-size: 9px;
 }
 
-.entry-review h2 {
+.new-coin-entry-review h2 {
   font-size: 18px;
   margin: 0;
 }
 
-.entry-review__summary {
+.new-coin-entry-review__summary {
   display: grid;
   gap: 10px;
   margin: 17px 0;
 }
 
-.entry-review__summary > div {
+.new-coin-entry-review__summary > div {
   align-items: center;
   display: flex;
   font-size: 10px;
   justify-content: space-between;
 }
 
-.entry-review__summary dd {
+.new-coin-entry-review__summary dd {
   font-family: var(--font-numeric);
   margin: 0;
   text-align: right;
 }
 
-.entry-review__error {
+.new-coin-entry-review__error {
   color: var(--negative);
   font-size: 11px;
 }
 
-.entry-review__actions {
+.new-coin-entry-review__actions {
   display: grid;
   gap: 10px;
   grid-template-columns: 1fr 1fr;
 }
 
-.entry-review__actions button {
+.new-coin-entry-review__actions button {
   background: var(--new-coin-detail-stage);
   border: 0;
   border-radius: 14px;
@@ -1042,7 +1050,7 @@ onMounted(() => { void load() })
   min-height: 48px;
 }
 
-.entry-review__actions button:last-child {
+.new-coin-entry-review__actions button:last-child {
   background: var(--new-coin-detail-action);
   color: var(--new-coin-detail-action-ink);
 }

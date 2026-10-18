@@ -18,6 +18,7 @@ axum = { version = "0.7", features = ["macros", "multipart", "ws"] }
 base64 = "0.22"
 bigdecimal = { version = "0.4", features = ["serde"] }
 chrono = { version = "0.4", features = ["serde"] }
+chrono-tz = "0.10"
 config = "0.14"
 dotenvy = "0.15"
 flate2 = "1"

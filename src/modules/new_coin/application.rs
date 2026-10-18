@@ -12,6 +12,8 @@
 //! 本层承担的是事务之前的业务校验与事务之后的通知编排。
 //! 所有用例的用户范围一律从会话 subject 解析，绝不接受请求参数传入的用户标识。
 
+pub(crate) mod issuance;
+
 use crate::{
     error::{AppError, AppResult},
     modules::{

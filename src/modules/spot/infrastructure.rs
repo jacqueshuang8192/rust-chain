@@ -12,7 +12,7 @@ mod read_models;
 mod trade_settlement;
 mod wallet_accounts;
 
-pub(crate) use common::is_duplicate_key_error;
+pub(crate) use common::{SYSTEM_SPOT_LIQUIDITY_EMAIL, is_duplicate_key_error};
 pub(crate) use fill_journal::insert_spot_fill_journal_in_tx;
 pub(crate) use market_prices::{
     latest_spot_market_price, triggered_limit_buy_order_ids, triggered_limit_sell_order_ids,

@@ -22,6 +22,8 @@ mod coin_applications;
 mod recharges;
 #[path = "agent_routes/team_orders.rs"]
 mod team_orders;
+#[path = "agent_routes/token_lifecycle.rs"]
+mod token_lifecycle;
 #[path = "agent_routes/wallet_records.rs"]
 mod wallet_records;
 

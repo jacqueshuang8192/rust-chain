@@ -54,6 +54,9 @@ importers:
       '@vue/compiler-sfc':
         specifier: ^3.5.0
         version: 3.5.43
+      terser:
+        specifier: ^5.49.0
+        version: 5.51.2
       typescript:
         specifier: ^5.4.0
         version: 5.4.2

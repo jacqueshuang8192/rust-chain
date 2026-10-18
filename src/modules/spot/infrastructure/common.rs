@@ -7,7 +7,7 @@ use crate::{
     modules::spot::{OrderSide, OrderStatus, OrderType, SpotOrder},
 };
 
-pub(super) const SYSTEM_SPOT_LIQUIDITY_EMAIL: &str = "__system_spot_liquidity@internal.local";
+pub(crate) const SYSTEM_SPOT_LIQUIDITY_EMAIL: &str = "__system_spot_liquidity@internal.local";
 
 impl sqlx::Type<sqlx::MySql> for crate::modules::spot::TriggerDirection {
     fn type_info() -> sqlx::mysql::MySqlTypeInfo {

@@ -17,12 +17,15 @@ use bigdecimal::BigDecimal;
 use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 
+pub mod issuance;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum LifecycleStatus {
     Preheat,
     Subscription,
     Distribution,
+    Purchase,
     Listed,
 }
 

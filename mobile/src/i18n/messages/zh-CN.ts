@@ -1967,6 +1967,9 @@ export default {
     emptyContent: '暂无正文内容。',
   },
   newCoin: {
+    fixedSubscription: '申购',
+    fixedSubscriptionPrice: '固定申购价',
+    livePurchase: '实时认购',
     title: '打新专区',
     bannerLabel: '新币发行横幅',
     primaryTabs: '新币分区',

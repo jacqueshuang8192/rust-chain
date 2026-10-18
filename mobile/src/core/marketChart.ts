@@ -17,7 +17,14 @@ export function resolveMarketChartPriceFormat(
       precision = Math.max(precision, Math.min(18, fraction - Number(exponent)))
     }
   }
-  return { type: 'price' as const, precision, minMove: 10 ** -precision, base: 10 ** precision }
+  const scale = { precision, minMove: 10 ** -precision, base: 10 ** precision }
+  // The chart library's built-in decimal formatter rejects more than 16
+  // fractional digits. Keep tiny-token ticks/OHLC intact with its custom API.
+  if (precision > 16) return {
+    type: 'custom' as const, ...scale,
+    formatter: (value: number) => value.toLocaleString('en-US', { useGrouping: false, maximumSignificantDigits: 12 }),
+  }
+  return { type: 'price' as const, ...scale }
 }
 
 export function normalizeMarketChartTimestamp(value: number): number {

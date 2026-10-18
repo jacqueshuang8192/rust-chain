@@ -22,8 +22,9 @@ const progress = computed(() => newCoinProjectProgress(props.project))
 const lifecycleLabel = computed(() => {
   const key = ({
     preheat: 'newCoin.preheat',
-    subscription: 'newCoin.subscriptionOpen',
+    subscription: props.project.issuancePolicy ? 'newCoin.fixedSubscription' : 'newCoin.subscriptionOpen',
     distribution: 'newCoin.waitingDistribution',
+    purchase: 'newCoin.livePurchase',
     listed: 'newCoin.listed',
     closed: 'newCoin.closed',
   } as Record<string, string>)[props.project.lifecycleStatus.toLowerCase()]
@@ -94,7 +95,7 @@ function financialValueClass(value: string): Record<string, boolean> {
 
       <span class="new-coin-project-card__stats">
         <span>
-          <small>{{ t('newCoin.issuePrice') }}</small>
+          <small>{{ t(project.issuancePolicy ? 'newCoin.fixedSubscriptionPrice' : 'newCoin.issuePrice') }}</small>
           <strong
             class="new-coin-project-card__issue-price"
             :class="financialValueClass(issuePriceDisplay)"

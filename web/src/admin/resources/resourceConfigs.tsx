@@ -1029,7 +1029,7 @@ export const resourceConfigs = {
     actions: ({ reload }) => <CreateNewCoinProjectAction onCreated={reload} />,
     endpoint: '/admin/api/v1/new-coins',
     responseKey: 'projects',
-    filters: [{ key: 'symbol', label: '项目币种' }, { key: 'lifecycle_status', label: '项目阶段', type: 'select', options: [{ value: 'preheat', label: '预热中' }, { value: 'subscription', label: '申购中' }, { value: 'distribution', label: '派发中' }, { value: 'listed', label: '已上市' }] }, statusFilter, limitFilter],
+    filters: [{ key: 'symbol', label: '项目币种' }, { key: 'lifecycle_status', label: '项目阶段', type: 'select', options: [{ value: 'preheat', label: '预热中' }, { value: 'subscription', label: '申购中' }, { value: 'distribution', label: '派发中' }, { value: 'purchase', label: '认购中' }, { value: 'listed', label: '已上市' }] }, statusFilter, limitFilter],
     rowActions: (record, helpers) => <NewCoinProjectRowActions helpers={helpers} record={record} />,
     columns: [
       { key: 'id', title: '项目ID' },

@@ -12,6 +12,7 @@ struct CoinApplicationInput {
     quote_asset_id: u64,
     /// Unix毫秒；计划时间不会触发实际上市。
     listed_at: i64,
+    issuance_policy: Option<super::token_issuance::IssuancePolicy>,
     reason: String,
     idempotency_key: String,
 }
@@ -28,6 +29,7 @@ struct CoinApplicationRecord {
     quote_asset_id: u64,
     quote_symbol: String,
     listed_at: i64,
+    issuance_policy: Option<super::token_issuance::IssuancePolicy>,
     reason: String,
     #[schema(pattern = "^(pending|approved|rejected)$")]
     status: String,

@@ -96,12 +96,12 @@ fn query(
     );
     let (columns, from) = match filter.kind {
         AgentOrderKind::NewCoinSubscription => (
-            "orders.project_id, projects.symbol, orders.quote_asset, assets.symbol AS quote_symbol, \
+            "CAST(IF(projects.issuance_policy IS NULL,1,2) AS UNSIGNED) AS issuance_version, projects.lifecycle_status AS project_lifecycle_status, base_assets.precision_scale AS base_asset_precision, assets.precision_scale AS quote_asset_precision, orders.project_id, projects.symbol, orders.quote_asset, assets.symbol AS quote_symbol, \
              orders.issue_price, orders.quote_amount, orders.settlement_mode, orders.frozen_quote_amount, \
              orders.settled_quote_amount, orders.refunded_quote_amount, orders.requested_quantity, \
              orders.allocated_quantity, orders.status, orders.created_at",
             "new_coin_subscriptions orders JOIN new_coin_projects projects ON projects.id = orders.project_id \
-             JOIN assets ON assets.id = orders.quote_asset",
+             JOIN assets ON assets.id = orders.quote_asset JOIN assets base_assets ON base_assets.id=projects.asset_id",
         ),
         AgentOrderKind::NewCoinPurchase => (
             "orders.project_id, projects.symbol, orders.quote_asset, assets.symbol AS quote_symbol, \

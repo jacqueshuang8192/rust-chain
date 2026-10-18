@@ -134,6 +134,8 @@ pub struct UnlockFeePaymentUpdate {
 
 #[derive(Debug, Clone)]
 pub(crate) struct NewCoinProjectRead {
+    pub(crate) issuance_policy: Option<crate::modules::new_coin::domain::issuance::IssuancePolicy>,
+
     pub(crate) id: u64,
     pub(crate) asset_id: u64,
     pub(crate) symbol: String,
@@ -158,6 +160,7 @@ pub(crate) struct NewCoinProjectRead {
     pub(crate) unlock_fee_asset: Option<u64>,
     pub(crate) post_listing_purchase_enabled: bool,
     pub(crate) post_listing_pair_id: Option<u64>,
+    pub(crate) post_listing_pair_symbol: Option<String>,
     pub(crate) status: String,
 }
 

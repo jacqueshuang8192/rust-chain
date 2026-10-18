@@ -74,7 +74,7 @@ pub(crate) async fn load_default_market_bootstrap_in_tx(
 pub(crate) async fn save_default_market_in_tx(
     tx: &mut Transaction<'_, MySql>,
     record: &DefaultMarketRecord,
-    admin_id: u64,
+    admin_id: Option<u64>,
 ) -> AppResult<()> {
     sqlx::query("INSERT INTO market_default_generators (pair_id, enabled, all_market_paused, initial_price, config_json, version, seed, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE enabled = VALUES(enabled), all_market_paused = VALUES(all_market_paused), initial_price = VALUES(initial_price), config_json = VALUES(config_json), version = VALUES(version), updated_by = VALUES(updated_by)")
         .bind(record.pair_id).bind(record.enabled).bind(record.all_market_paused).bind(&record.initial_price)

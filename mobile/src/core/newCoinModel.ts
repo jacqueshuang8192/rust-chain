@@ -1,3 +1,4 @@
+import { parseTokenPolicy, type TokenPolicy } from './tokenIssuance.ts'
 import {
   requiredDecimalText,
   type DecimalText,
@@ -22,6 +23,7 @@ export interface NewCoinProject {
   symbol: string
   name?: string
   logoUrl?: string
+  issuancePolicy?: TokenPolicy
   lifecycleStatus: string
   totalSupplyText: DecimalText
   issuePriceText: DecimalText
@@ -41,6 +43,7 @@ export interface NewCoinProject {
   unlockFeeAssetId?: number
   postListingPurchaseEnabled: boolean
   postListingPairId?: number
+  postListingPairSymbol?: string
   status: string
 }
 
@@ -113,6 +116,7 @@ export function mapNewCoinProject(raw: Record<string, unknown>): NewCoinProject 
     name: optionalText(raw.name, 'project.name'),
     logoUrl: optionalText(raw.logo_url, 'project.logo_url'),
     lifecycleStatus: requiredText(raw.lifecycle_status, 'project.lifecycle_status'),
+    issuancePolicy: raw.issuance_policy == null ? undefined : parseTokenPolicy(raw.issuance_policy),
     totalSupplyText: decimal(raw.total_supply, 'project.total_supply'),
     issuePriceText: decimal(raw.issue_price, 'project.issue_price'),
     quoteAssetId: optionalId(raw.quote_asset_id, 'project.quote_asset_id'),
@@ -134,6 +138,7 @@ export function mapNewCoinProject(raw: Record<string, unknown>): NewCoinProject 
       'project.post_listing_purchase_enabled',
     ),
     postListingPairId: optionalId(raw.post_listing_pair_id, 'project.post_listing_pair_id'),
+    postListingPairSymbol: optionalText(raw.post_listing_pair_symbol, 'project.post_listing_pair_symbol'),
     status: requiredText(raw.status, 'project.status'),
   }
 }

@@ -9,6 +9,7 @@ import {
 } from './backendAdapters'
 
 export interface IEOProject {
+  issuanceVersion?: number
   id: number
   title: string
   titleEN?: string

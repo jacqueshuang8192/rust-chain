@@ -1967,6 +1967,9 @@ export default {
     emptyContent: 'No content is available.',
   },
   newCoin: {
+    fixedSubscription: 'Subscription',
+    fixedSubscriptionPrice: 'Subscription price',
+    livePurchase: 'Live purchase',
     title: 'New Coin Zone',
     bannerLabel: 'New coin launch banner',
     primaryTabs: 'New coin sections',

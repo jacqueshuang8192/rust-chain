@@ -1,4 +1,6 @@
 .coin-applications-page { min-width: 0; }
+.coin-application-tabs .semi-tabs-content { padding-top: 20px; }
+.coin-application-tabs .semi-tabs-pane > p { margin: 0 0 20px; color: var(--semi-color-text-2); }
 .coin-applications-page h2 { font-size: 18px; margin: 24px 0 0; }
 .coin-application-form, .coin-application-detail { display: grid; gap: 16px; }
 .coin-application-form { padding: 24px; border: 1px solid var(--semi-color-border); border-radius: 12px; background: var(--semi-color-bg-2); }
@@ -18,3 +20,21 @@
 }
 .coin-application-detail > .semi-tag,
 .coin-application-detail > .semi-button { justify-self: start; }
+
+.issuance-section { display: grid; gap: 14px; padding: 20px 0; }
+.issuance-section h3, .issuance-section p { margin: 0; }
+.issuance-section p, .issuance-section small { color: var(--semi-color-text-2); line-height: 1.6; }
+.issuance-section h3 { font-size: 17px; }
+.issuance-timeline { display: grid; gap: 14px; }
+.issuance-node { display: grid; grid-template-columns: minmax(0, 1fr) 160px; align-items: end; gap: 20px; padding: 16px; background: var(--semi-color-fill-0); border-radius: 8px; }
+.issuance-node > label:first-child { display: grid; gap: 8px; }
+.issuance-switch { display: flex; align-items: center; gap: 10px; min-height: 36px; }
+.issuance-summary { display: grid; gap: 12px; min-width: 0; }
+.issuance-summary dl { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 12px; margin: 0; }
+.issuance-summary dt { color: var(--semi-color-text-2); }
+.issuance-summary dd { margin: 0; overflow-wrap: anywhere; }
+.issuance-summary-row { display: contents; }
+.token-projects { display: grid; gap: 20px; }
+.token-project-row { padding: 20px; background: var(--semi-color-bg-2); border-radius: 10px; display: grid; gap: 12px; }
+.token-project-row h3, .token-project-row p { margin: 0; }
+@media (max-width: 640px) { .issuance-node { grid-template-columns: minmax(0, 1fr); gap: 12px; } .issuance-summary dl { grid-template-columns: 95px minmax(0, 1fr); } }

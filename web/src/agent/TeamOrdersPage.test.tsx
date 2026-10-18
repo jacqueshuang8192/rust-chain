@@ -65,7 +65,8 @@ describe('AgentTeamOrdersPage', () => {
       expect(screen.getByText(label, { selector: 'dt' })).toBeInTheDocument();
     }
     expect(screen.getByText('后台派发')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /派发|退款|审核/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '预览本批派发' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /确认派发|确认退款|审核/ })).not.toBeInTheDocument();
   });
 
   it('submits draft filters, resets paging, and clears them on reset', async () => {

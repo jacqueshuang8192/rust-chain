@@ -120,6 +120,11 @@ async fn main() -> anyhow::Result<()> {
         });
     }
 
+    if state.mysql.is_some() {
+        tokio::spawn(exchange_api::workers::new_coin_lifecycle::run_loop(
+            state.clone(),
+        ));
+    }
     if state.settings.unlock_scanner_enabled && state.mysql.is_some() {
         let unlock_scanner_state = state.clone();
         let interval_seconds = state.settings.unlock_scanner_interval_seconds;

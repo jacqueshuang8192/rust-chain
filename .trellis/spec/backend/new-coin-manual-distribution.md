@@ -1,5 +1,9 @@
 # Manual New-Coin Subscription Distribution
 
+Version boundary: the legacy contracts below apply to NULL issuance policies.
+Explicit version 2 projects follow [Agent Token Issuance V2](token-issuance-v2.md),
+including realtime purchase, manual selected batches and atomic unlock-sale.
+
 ## 1. Scope / Trigger
 
 Applies to subscription creation, Admin order-linked distribution, subscription

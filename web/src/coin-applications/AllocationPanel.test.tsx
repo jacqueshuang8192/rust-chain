@@ -1,0 +1,55 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AllocationPanel } from './AllocationPanel';
+import { allocateTokens } from '../api/tokenIssuance';
+import { authStore } from '../auth/authStore';
+import type { AgentTeamOrder } from '../api/agentTeamOrders';
+vi.mock('../api/tokenIssuance', async original => ({ ...await original<typeof import('../api/tokenIssuance')>(), allocateTokens: vi.fn() }));
+const allocate = vi.mocked(allocateTokens);
+const row = (id: number): AgentTeamOrder => ({ id, user_id: id + 10, email: `buyer${id}@example.test`, owner_agent_id: 3, owner_agent_code: 'A', status: 'pending', created_at: 1800000000000, issuance_version: 2, project_lifecycle_status: 'distribution', settlement_mode: 'manual_distribution', base_asset_precision: 8, quote_asset_precision: 8, requested_quantity: '5000', issue_price: '0.2', quote_amount: '1000', symbol: 'N', quote_symbol: 'USDT' });
+beforeEach(() => {
+  vi.clearAllMocks();
+  authStore.setSession({ scope: 'agent', subject: 'agent:allocation-test', accessToken: 'token', refreshToken: 'refresh' });
+});
+describe('selected batch allocation', () => {
+  it('confirms selected orders at 50%, then permits a different batch at 80%', async () => {
+    const user = userEvent.setup(); const completed = vi.fn();
+    allocate.mockImplementation(async input => ({ idempotency_key: input.idempotency_key, results: input.subscription_ids.map(id => ({ subscription_id: id, quantity: '2500', settled_quote_amount: '500', refunded_quote_amount: '500', holding_id: id, status: 'held' })) }));
+    const view = render(<AllocationPanel rows={[row(1), row(2)]} onSuccess={completed} />);
+    fireEvent.change(screen.getByLabelText('本批派发比例'), { target: { value: '50' } });
+    await user.click(screen.getByRole('button', { name: '预览本批派发' }));
+    expect(screen.getAllByText(/派发 2500 N；实付 500 USDT；退款 500 USDT/)).toHaveLength(2);
+    fireEvent.change(screen.getByLabelText('派发说明'), { target: { value: 'First selected batch' } });
+    await user.click(screen.getByRole('button', { name: '确认派发' }));
+    await waitFor(() => expect(completed).toHaveBeenCalledTimes(1));
+    expect(allocate.mock.calls[0][0]).toMatchObject({ subscription_ids: [1, 2], percent: '50' });
+    view.rerender(<AllocationPanel rows={[row(3)]} onSuccess={completed} />);
+    fireEvent.change(screen.getByLabelText('本批派发比例'), { target: { value: '80' } });
+    await user.click(screen.getByRole('button', { name: '预览本批派发' }));
+    expect(screen.getByText(/派发 4000 N；实付 800 USDT；退款 200 USDT/)).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('派发说明'), { target: { value: 'Second selected batch' } });
+    await user.click(screen.getByRole('button', { name: '确认派发' }));
+    await waitFor(() => expect(completed).toHaveBeenCalledTimes(2));
+    expect(allocate.mock.calls[1][0]).toMatchObject({ subscription_ids: [3], percent: '80' });
+    expect(allocate.mock.calls[1][0].idempotency_key).not.toBe(allocate.mock.calls[0][0].idempotency_key);
+  });
+  it('restores the original batch after an uncertain result and refuses silent reselection', async () => {
+    const user = userEvent.setup(); allocate.mockRejectedValueOnce(new Error('Response lost'));
+    const first = render(<AllocationPanel rows={[row(7)]} onSuccess={() => {}} />);
+    fireEvent.change(screen.getByLabelText('本批派发比例'), { target: { value: '50' } });
+    await user.click(screen.getByRole('button', { name: '预览本批派发' }));
+    fireEvent.change(screen.getByLabelText('派发说明'), { target: { value: 'Original selected batch' } });
+    await user.click(screen.getByRole('button', { name: '确认派发' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: '按原批次重试' })).toBeEnabled());
+    const original = allocate.mock.calls[0][0]; first.unmount();
+    allocate.mockResolvedValueOnce({ idempotency_key: original.idempotency_key, results: [] });
+    render(<AllocationPanel rows={[row(99)]} onSuccess={() => {}} />);
+    expect(screen.getByLabelText('本批派发比例')).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: '核对原派发批次' }));
+    expect(screen.getByText(/buyer7@example.test/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: '按原批次重试' }));
+    await waitFor(() => expect(allocate).toHaveBeenCalledTimes(2));
+    expect(allocate.mock.calls[1][0]).toEqual(original);
+  });
+});

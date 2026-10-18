@@ -1,4 +1,6 @@
-import { Banner, Button, SideSheet, Space, Tag } from '@douyinfe/semi-ui';
+import { IssuancePolicySummary } from './IssuancePolicySummary';
+import { TokenProjects } from './TokenProjects';
+import { Banner, Button, SideSheet, Space, Tabs, Tag } from '@douyinfe/semi-ui';
 import type { ColumnProps } from '@douyinfe/semi-ui/lib/es/table';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Link } from 'react-router-dom';
@@ -101,6 +103,7 @@ function History({ scope, revision, canReview, session }: { scope: 'agent' | 'ad
             <dt>审核意见</dt><dd>{detail.review_reason ?? '等待管理员审核'}</dd><dt>审核时间</dt><dd><TimestampText value={detail.reviewed_at} /></dd>
             <dt>发布项目</dt><dd>{detail.project_id ? (scope === 'admin' ? <Link to={`/admin/new-coins/projects/${detail.project_id}`}>项目 {detail.project_id}</Link> : `项目 ${detail.project_id}`) : '尚未发布'}</dd>
           </dl>
+          {detail.issuance_policy ? <IssuancePolicySummary policy={detail.issuance_policy} quote={detail.quote_symbol} /> : null}
           {canReview && detail.status === 'pending' ? <><Banner type="info" description="通过后创建币种并发布预热项目，默认关闭充提与杠杆划转。实际认购、派发和上市仍在项目中心管理。" />
             <Space><ConfirmAction actionText="通过并发布" title={`通过 ${detail.symbol} 的发行申请`} description={`发行 ${detail.total_supply} ${detail.symbol}，价格 ${detail.issue_price} ${detail.quote_symbol}。此操作将创建正式预热项目。`}
               disabled={busy || uncertain} onConfirm={(reason) => review('approve', reason)} />
@@ -113,10 +116,20 @@ function History({ scope, revision, canReview, session }: { scope: 'agent' | 'ad
 function Content({ scope, session, canReview = false }: { scope: 'agent' | 'admin'; session: AuthSession; canReview?: boolean }) {
   const [revision, setRevision] = useState(0);
   return <main className="exchange-page coin-applications-page"><PageHeader title={scope === 'agent' ? '新币发行申请' : '代理发币审核'} />
-    {scope === 'agent' ? <CoinApplicationForm session={session} onSuccess={() => setRevision((v) => v + 1)} /> : !canReview ? <Banner type="info" description="当前账号仅可查看申请记录，无审核权限。" /> : null}
-    <h2>{scope === 'agent' ? '我的申请记录' : '发行申请记录'}</h2>
-    {scope === 'agent' ? <p>查看当前账号提交的发行资料、审核进度和驳回原因。</p> : null}
-    <History scope={scope} session={session} canReview={canReview} revision={revision} />
+    {scope === 'agent' ? <Tabs className="coin-application-tabs" defaultActiveKey="apply" keepDOM lazyRender tabPaneMotion={false}>
+      <Tabs.TabPane itemKey="apply" tab="新币发行申请">
+        <CoinApplicationForm session={session} onSuccess={() => setRevision((v) => v + 1)} />
+      </Tabs.TabPane>
+      <Tabs.TabPane itemKey="history" tab="我的申请记录">
+        <p>查看当前账号提交的发行资料、审核进度和驳回原因。</p>
+        <History scope={scope} session={session} canReview={canReview} revision={revision} />
+      </Tabs.TabPane>
+      <Tabs.TabPane itemKey="projects" tab="我的发行项目"><TokenProjects session={session} revision={revision} /></Tabs.TabPane>
+    </Tabs> : <>
+      {!canReview ? <Banner type="info" description="当前账号仅可查看申请记录，无审核权限。" /> : null}
+      <h2>发行申请记录</h2>
+      <History scope={scope} session={session} canReview={canReview} revision={revision} />
+    </>}
   </main>;
 }
 export function AgentCoinApplicationsPage() {

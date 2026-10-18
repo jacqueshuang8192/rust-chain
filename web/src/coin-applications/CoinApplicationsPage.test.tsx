@@ -35,11 +35,11 @@ beforeEach(() => {
   });
 });
 async function fill() {
-  await screen.findByRole('button', { name: '查看详情' });
-  for (const [label, value] of [['币种代码', 'nov'], ['币种名称', 'Nova'], ['资产精度', '18'], ['发行总量', row.total_supply], ['发行价格', row.issue_price], ['申请说明', row.reason]]) {
+  await waitFor(() => expect(request).toHaveBeenCalledWith(expect.stringContaining('/options'), expect.anything()));
+  for (const [label, value] of [['币种代码', 'nov'], ['币种名称', 'Nova'], ['资产精度', '18'], ['发行总量', row.total_supply], ['申购价格', row.issue_price], ['认购初价', '0.2'], ['上市参考价', '0.5'], ['申请说明', row.reason]]) {
     fireEvent.change(screen.getByRole('textbox', { name: label }), { target: { value } });
   }
-  fireEvent.change(screen.getByLabelText('计划上市时间'), { target: { value: '2030-01-01T12:00' } });
+  for (const [label, value] of [['申购开始', '2030-01-01T09:00'], ['进入派发', '2030-01-01T10:00'], ['认购开始', '2030-01-01T11:00'], ['认购结束并上市', '2030-01-01T12:00']]) fireEvent.change(screen.getByLabelText(label), { target: { value } });
   fireEvent.click(screen.getByRole('combobox', { name: '计价资产' }));
   const option = await screen.findByText('USDT（18 位小数）');
   fireEvent.mouseDown(option); fireEvent.mouseUp(option); fireEvent.click(option);
@@ -54,6 +54,7 @@ describe('coin issuance application workflow', () => {
     await screen.findByRole('button', { name: '按原申请重试' }); expect(writes()).toHaveLength(1);
     const original = JSON.parse(String(writes()[0][1]?.body));
     expect(original).toMatchObject({ symbol: 'NOV', total_supply: row.total_supply, issue_price: row.issue_price, precision_scale: 18, quote_asset_id: 1, reason: row.reason, idempotency_key: expect.any(String) });
+    expect(original.issuance_policy).toMatchObject({ version: 2, purchase_initial_price: '0.2', listing_reference_price: '0.5', subscription: { automatic: false }, distribution: { automatic: false }, purchase: { automatic: false }, listing: { automatic: false }, lock: { kind: 'on_listing' }, fee: { kind: 'none' } });
     expect(original).not.toHaveProperty('agent_id'); expect(original).not.toHaveProperty('status');
     view.unmount(); mountAgent();
     fireEvent.click(await screen.findByRole('button', { name: '核对原申请' }));
@@ -66,7 +67,16 @@ describe('coin issuance application workflow', () => {
     request.mockImplementation(async (path) => path.endsWith('/options') ? [] : path.endsWith('/7')
       ? { ...row, status: 'rejected', reviewed_by: 1, reviewed_at: row.created_at, review_reason: '需补充资料' }
       : { applications: [{ ...row, status: 'rejected', reviewed_by: 1, reviewed_at: row.created_at, review_reason: '需补充资料' }], total: 1 });
-    mountAgent(); expect(await screen.findByText('需补充资料')).toBeInTheDocument();
+    mountAgent();
+    expect(screen.getByRole('tabpanel', { name: '新币发行申请' })).toBeVisible();
+    fireEvent.change(screen.getByRole('textbox', { name: '币种名称' }), { target: { value: 'Draft coin' } });
+    fireEvent.click(screen.getByRole('tab', { name: '我的申请记录' }));
+    expect(screen.getAllByRole('tabpanel')).toHaveLength(1);
+    expect(screen.getByRole('tabpanel', { name: '我的申请记录' })).toBeVisible();
+    expect(await screen.findByText('需补充资料')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: '新币发行申请' }));
+    expect(screen.getByRole('textbox', { name: '币种名称' })).toHaveValue('Draft coin');
+    fireEvent.click(screen.getByRole('tab', { name: '我的申请记录' }));
     fireEvent.click(screen.getByRole('button', { name: '查看详情' }));
     expect(await screen.findByText('NOV · Nova')).toBeInTheDocument();
     expect(screen.getByText('尚未发布')).toBeInTheDocument();
@@ -97,7 +107,8 @@ describe('coin issuance application workflow', () => {
   it('discards old-session history responses', async () => {
     let resolve!: (v: unknown) => void;
     request.mockImplementation(async (path) => path.endsWith('/options') ? [] : new Promise((r) => { resolve = r; }));
-    mountAgent(); await waitFor(() => expect(request).toHaveBeenCalled());
+    mountAgent(); fireEvent.click(screen.getByRole('tab', { name: '我的申请记录' }));
+    await waitFor(() => expect(resolve).toBeTypeOf('function'));
     const old = resolve;
     act(() => authStore.setSession({ scope: 'agent', subject: 'agent:4', generation: 'new', accessToken: 'other', refreshToken: 'other' }));
     await act(async () => old({ applications: [row], total: 1 }));

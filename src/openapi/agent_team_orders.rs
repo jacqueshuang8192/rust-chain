@@ -46,6 +46,10 @@ struct AgentTeamEarnOrder {
 
 #[derive(ToSchema)]
 struct AgentTeamNewCoinSubscription {
+    issuance_version: u64,
+    project_lifecycle_status: String,
+    base_asset_precision: i32,
+    quote_asset_precision: i32,
     id: u64,
     user_id: u64,
     project_id: u64,

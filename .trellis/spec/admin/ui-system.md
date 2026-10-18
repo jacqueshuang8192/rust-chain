@@ -1299,7 +1299,11 @@ Correct: pair lock + current read; error/last_tick evidence; actionable expiry m
 ## Agent New-Coin Applications
 
 - Agent `/agent/coin-applications` combines issuance form and own-account
-  application history. Admin `/admin/agent-coin-applications` is a separately
+  application history in `新币发行申请` and `我的申请记录` tabs, defaulting to
+  the form. Keep visited panels mounted to preserve drafts and history state;
+  lazy-render history so its table is first measured while visible. Submission
+  feedback points to the records tab and success refreshes its data.
+  Admin `/admin/agent-coin-applications` is a separately
   permissioned review queue; keep exact `.read` / `.review` mappings aligned.
 - Use shared DataTable, status filters, server pagination, TimestampText and
   detail SideSheet. Show complete input, submission time, decision/rejection
@@ -1348,3 +1352,15 @@ Correct: pair lock + current read; error/last_tick evidence; actionable expiry m
   Historical available status remains accepted and labeled 已到账（历史）.
 - Only row user ownership defines agent visibility. No approval, allocation,
   refund or lock release controls are added to these reporting pages.
+
+## Version 2 Issuance Controls
+
+New applications expose fixed subscription price, market seed/reference prices,
+four independent local-time node switches and immutable lock/exit-fee policy.
+Review shows the full contract. Approved version 2 projects show five stages
+and no legacy configuration/grant forms. Own issued projects use ID cursors;
+selected-batch allocation uses buyer-subtree orders independent of issuer.
+Each batch has an exact percent/payment/refund preview, reason, saved retry key
+and explicit confirmation. A lost response restores the original batch even
+when the table selection has changed. No automatic allocation option exists.
+See [the backend version boundary](../backend/token-issuance-v2.md).

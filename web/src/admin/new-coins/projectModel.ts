@@ -2,6 +2,7 @@ import { apiRequest, ContractError } from '../../api/client';
 import { authStore } from '../../auth/authStore';
 import type { ApiRecord } from '../../api/types';
 import { canonicalDecimalText } from '../../shared/decimal';
+import { validatePolicy, type IssuancePolicy } from '../../coin-applications/issuancePolicy';
 
 export type NewCoinProject = ApiRecord & {
   id: number; asset_id: number; symbol: string; lifecycle_status: string; status: string;
@@ -11,6 +12,7 @@ export type NewCoinProject = ApiRecord & {
   relative_unlock_seconds: number | null; unlock_fee_enabled: boolean;
   unlock_fee_rate: string | null; unlock_fee_basis: string | null; unlock_fee_asset: number | null;
   post_listing_purchase_enabled: boolean; post_listing_pair_id: number | null;
+  issuance_policy?: IssuancePolicy | null; actual_purchase_at?: number | null;
 };
 export type ProjectCenter = {
   configuration_version: string; project: NewCoinProject; subscription_count: number; pending_manual_count: number;
@@ -20,6 +22,7 @@ export const stages = [
   { value: 'preheat', label: '预热中', action: '开始申购' },
   { value: 'subscription', label: '申购中', action: '结束申购' },
   { value: 'distribution', label: '派发中', action: '确认上市' },
+  { value: 'purchase', label: '认购中', action: '结束认购并转入现货' },
   { value: 'listed', label: '已上市', action: '' }
 ];
 export const projectPath = (id: string | number) => `/admin/new-coins/projects/${encodeURIComponent(id)}`;
@@ -40,6 +43,7 @@ export async function loadProjectCenter(id: string, signal?: AbortSignal): Promi
   for (const key of ['id', 'asset_id']) if (!Number.isSafeInteger(p[key]) || Number(p[key]) <= 0) return fail();
   for (const key of ['symbol', 'lifecycle_status', 'status', 'unlock_type']) if (typeof p[key] !== 'string') return fail();
   if (!stages.some(s => s.value === p.lifecycle_status)) return fail();
+  if (p.issuance_policy != null) { try { validatePolicy(p.issuance_policy); } catch { return fail(); } }
   for (const key of ['total_supply', 'issue_price', 'reserved_supply', 'allocated_supply', 'remaining_supply']) {
     if (typeof p[key] !== 'string' || canonicalDecimalText(p[key]) === null) return fail();
   }

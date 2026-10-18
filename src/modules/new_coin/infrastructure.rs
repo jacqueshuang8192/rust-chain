@@ -33,6 +33,7 @@ use bigdecimal::BigDecimal;
 use chrono::Utc;
 use sqlx::{MySql, Pool, Transaction};
 
+pub(crate) mod issuance;
 mod subscription_freeze;
 mod unlock;
 mod unlock_eligibility;
@@ -225,10 +226,11 @@ impl NewCoinReadRepository for MySqlNewCoinReadRepository {
                       projects.unlock_fee_enabled, projects.unlock_fee_rate,
                       projects.unlock_fee_basis, projects.unlock_fee_asset,
                       projects.post_listing_purchase_enabled, projects.post_listing_pair_id,
-                      projects.status
+                      projects.status, projects.issuance_policy, purchase_pair.symbol AS post_listing_pair_symbol
                FROM new_coin_projects AS projects
                LEFT JOIN assets AS project_asset ON project_asset.id = projects.asset_id
                LEFT JOIN assets AS quote_asset ON quote_asset.id = projects.quote_asset_id
+               LEFT JOIN trading_pairs AS purchase_pair ON purchase_pair.id = projects.post_listing_pair_id AND purchase_pair.base_asset = projects.asset_id AND purchase_pair.quote_asset = projects.quote_asset_id
                WHERE projects.status = 'active'
                ORDER BY projects.id DESC
                LIMIT ?"#,
@@ -261,10 +263,11 @@ impl NewCoinReadRepository for MySqlNewCoinReadRepository {
                       projects.unlock_fee_enabled, projects.unlock_fee_rate,
                       projects.unlock_fee_basis, projects.unlock_fee_asset,
                       projects.post_listing_purchase_enabled, projects.post_listing_pair_id,
-                      projects.status
+                      projects.status, projects.issuance_policy, purchase_pair.symbol AS post_listing_pair_symbol
                FROM new_coin_projects AS projects
                LEFT JOIN assets AS project_asset ON project_asset.id = projects.asset_id
                LEFT JOIN assets AS quote_asset ON quote_asset.id = projects.quote_asset_id
+               LEFT JOIN trading_pairs AS purchase_pair ON purchase_pair.id = projects.post_listing_pair_id AND purchase_pair.base_asset = projects.asset_id AND purchase_pair.quote_asset = projects.quote_asset_id
                WHERE projects.symbol = ? AND projects.status = 'active'
                LIMIT 1"#,
         )
@@ -528,6 +531,13 @@ impl NewCoinOrderRepository for MySqlNewCoinReadRepository {
             return Ok(replay.into_outcome(false));
         }
         let locked_project = lock_order_project_in_tx(&mut tx, order.project.id).await?;
+        if issuance::lock_project(&mut tx, order.project.id)
+            .await?
+            .issuance_policy
+            .is_some()
+        {
+            return Err(AppError::Conflict("新版认购请先获取实时行情报价".into()));
+        }
         ensure_active_project(&locked_project)?;
         ensure_project_supply_invariant(&locked_project)?;
         if lifecycle_status(&locked_project.lifecycle_status)? != LifecycleStatus::Listed {
@@ -1462,6 +1472,9 @@ async fn insert_new_coin_wallet_ledger(
 
 #[derive(Debug, sqlx::FromRow)]
 struct NewCoinProjectReadRow {
+    issuance_policy:
+        Option<sqlx::types::Json<crate::modules::new_coin::domain::issuance::IssuancePolicy>>,
+
     id: u64,
     asset_id: u64,
     symbol: String,
@@ -1486,6 +1499,7 @@ struct NewCoinProjectReadRow {
     unlock_fee_asset: Option<u64>,
     post_listing_purchase_enabled: bool,
     post_listing_pair_id: Option<u64>,
+    post_listing_pair_symbol: Option<String>,
     status: String,
 }
 
@@ -1631,6 +1645,7 @@ impl From<NewCoinProjectReadRow> for NewCoinProjectRead {
     /// 由上层按解禁类型自行判断哪些组合有效，例如相对周期解禁才关心 `relative_unlock_seconds`。
     fn from(row: NewCoinProjectReadRow) -> Self {
         Self {
+            issuance_policy: row.issuance_policy.map(|p| p.0),
             id: row.id,
             asset_id: row.asset_id,
             symbol: row.symbol,
@@ -1655,6 +1670,7 @@ impl From<NewCoinProjectReadRow> for NewCoinProjectRead {
             unlock_fee_asset: row.unlock_fee_asset,
             post_listing_purchase_enabled: row.post_listing_purchase_enabled,
             post_listing_pair_id: row.post_listing_pair_id,
+            post_listing_pair_symbol: row.post_listing_pair_symbol,
             status: row.status,
         }
     }

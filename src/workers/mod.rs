@@ -25,3 +25,5 @@ pub mod seconds_contract_settlement;
 pub mod synthetic_market;
 pub mod unlock_scanner;
 pub mod wallet_chain;
+
+pub mod new_coin_lifecycle;

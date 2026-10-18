@@ -11,6 +11,7 @@ import { requiredNewCoinLocalDateTimeMillis } from '../newCoinDateTime';
 import { UnsavedChangesGuard } from '../settings/UnsavedChangesGuard';
 import { AdminReferenceSelect, useAdminReferenceOptions } from '../referenceOptions';
 import { projectLocalTime, type ProjectCenter } from './projectModel';
+import { IssuancePolicySummary } from '../../coin-applications/IssuancePolicySummary';
 
 type Section = 'issuance' | 'unlock-rule' | 'unlock-fee-rule' | 'post-listing-purchase';
 const sections = [
@@ -25,7 +26,15 @@ function initial(data: ProjectCenter) {
     purchaseEnabled: p.post_listing_purchase_enabled, pairId: String(p.post_listing_pair_id ?? '') };
 }
 
-export function NewCoinProjectSettings({ data, onSaved, onDirty }: { data: ProjectCenter; onSaved: () => Promise<unknown>; onDirty: (dirty: boolean) => void }) {
+type SettingsProps = { data: ProjectCenter; onSaved: () => Promise<unknown>; onDirty: (dirty: boolean) => void };
+export function NewCoinProjectSettings(props: SettingsProps) {
+  return props.data.project.issuance_policy ? <Card bordered={false}>
+    <Typography.Title heading={4}>已审核发行规则</Typography.Title>
+    <Typography.Text>发行与持仓规则按审核合同执行；各批派发比例由代理对所选下级订单单独确认。</Typography.Text>
+    <IssuancePolicySummary policy={props.data.project.issuance_policy} />
+  </Card> : <LegacyProjectSettings {...props} />;
+}
+function LegacyProjectSettings({ data, onSaved, onDirty }: SettingsProps) {
   const [section, setSection] = useState<Section>('issuance');
   const [form, setForm] = useState(() => initial(data));
   const [version] = useState(data.configuration_version);

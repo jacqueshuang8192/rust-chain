@@ -183,6 +183,12 @@ impl PresentationLayer for UpsertNewCoinConvertRuleRequest {}
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub(crate) struct NewCoinProjectResponse {
+    pub(crate) issuance_policy:
+        Option<sqlx::types::Json<crate::modules::new_coin::domain::issuance::IssuancePolicy>>,
+    pub(crate) issuer_agent_id: Option<u64>,
+    #[serde(default, with = "option_unix_millis")]
+    pub(crate) actual_purchase_at: Option<DateTime<Utc>>,
+
     pub(crate) id: u64,
     pub(crate) asset_id: u64,
     pub(crate) symbol: String,

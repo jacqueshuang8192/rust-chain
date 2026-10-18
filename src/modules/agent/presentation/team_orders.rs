@@ -84,6 +84,10 @@ pub(crate) struct AgentTeamEarnOrderResponse {
 /// 新币申购仅返回原始结算快照；历史未知扣款与退款保留空值，不执行派发。
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub(crate) struct AgentTeamNewCoinSubscriptionResponse {
+    pub(crate) issuance_version: u64,
+    pub(crate) project_lifecycle_status: String,
+    pub(crate) base_asset_precision: i32,
+    pub(crate) quote_asset_precision: i32,
     pub(crate) id: u64,
     pub(crate) user_id: u64,
     pub(crate) project_id: u64,

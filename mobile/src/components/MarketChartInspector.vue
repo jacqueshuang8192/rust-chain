@@ -13,10 +13,12 @@ const props = defineProps<{
 defineEmits<{ zoom: [factor: number]; latest: []; averages: [visible: boolean]; volume: [visible: boolean] }>()
 const { t, locale } = useI18n()
 const point = computed(() => props.points.find((row) => row.time === props.time) ?? props.points.at(-1))
-const precision = computed(() => resolveMarketChartPriceFormat(props.points).precision)
+const priceFormat = computed(() => resolveMarketChartPriceFormat(props.points))
 function price(value?: number): string {
-  return value === undefined ? '--' : value.toLocaleString(locale.value, {
-    minimumFractionDigits: precision.value, maximumFractionDigits: precision.value,
+  if (value === undefined) return '--'
+  if (priceFormat.value.type === 'custom') return priceFormat.value.formatter(value)
+  return value.toLocaleString(locale.value, {
+    minimumFractionDigits: priceFormat.value.precision, maximumFractionDigits: priceFormat.value.precision,
   })
 }
 const timestamp = computed(() => point.value

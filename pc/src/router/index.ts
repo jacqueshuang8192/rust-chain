@@ -75,6 +75,11 @@ const router = createRouter({
           component: () => import('@/views/Launchpad.vue')
         },
         {
+          path: 'launchpad/project/:symbol',
+          name: 'TokenProject',
+          component: () => import('@/views/TokenProject.vue')
+        },
+        {
           path: 'launchpad/trade/:symbol?',
           name: 'LaunchpadTrade',
           component: () => import('@/views/LaunchpadTrade.vue')

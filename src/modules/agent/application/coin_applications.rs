@@ -100,6 +100,7 @@ pub(crate) async fn submit(
             || row.listed_at != req.listed_at
             || row.reason != req.reason
             || row.idempotency_key != req.idempotency_key.as_bytes()
+            || row.issuance_policy.as_ref().map(|p| &p.0) != req.issuance_policy.as_ref()
         {
             return Err(AppError::Conflict("该请求标识已用于不同申请".into()));
         }
@@ -111,6 +112,17 @@ pub(crate) async fn submit(
         return Err(AppError::Validation("新币不能与计价资产相同".into()));
     }
     ensure_new_coin_amount_precision(&req.issue_price, precision, "issue_price")?;
+    if let Some(policy) = &req.issuance_policy {
+        policy.validate(precision)?;
+        crate::modules::market::domain::ValidatedMarketSymbol::from_raw(&format!(
+            "{}{symbol}",
+            req.symbol
+        ))
+        .map_err(|_| AppError::Validation("新币与计价资产组合后的交易对代码不能超过32位".into()))?;
+        if req.listed_at != policy.listing.at {
+            return Err(AppError::Validation("计划上市时间与发行合同不一致".into()));
+        }
+    }
     let id = store::insert(&mut tx, actor, scope.agent_id, &symbol, &req).await?;
     safe_id(id)?;
     let row = store::lock(&mut tx, id).await?;
@@ -219,6 +231,9 @@ pub(crate) async fn review(
     let project = if req.decision == "approve" {
         let (_, precision) = store::quote_asset(&mut tx, row.quote_asset_id).await?;
         ensure_new_coin_amount_precision(&row.issue_price, precision, "issue_price")?;
+        if let Some(policy) = &row.issuance_policy {
+            policy.validate(precision)?;
+        }
         let asset = insert_admin_asset_in_tx(
             &mut tx,
             AdminAssetInsert {
@@ -267,6 +282,10 @@ pub(crate) async fn review(
     } else {
         None
     };
+    if let (Some(project_id), Some(policy)) = (project, &row.issuance_policy) {
+        store::publish_policy(&mut tx, project_id, row.agent_id, admin, policy).await?;
+        crate::modules::spot::infrastructure::ensure_spot_liquidity_user_in_tx(&mut tx).await?;
+    }
     store::finish(&mut tx, id, admin, project, &req.reason).await?;
     let after = store::lock(&mut tx, id).await?;
     insert_admin_audit_log_entry_in_tx(

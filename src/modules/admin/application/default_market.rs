@@ -132,7 +132,7 @@ pub(super) async fn save_default_market_configuration_in_tx(
             .map_or_else(|| default_market_seed(pair_id), |v| v.seed.clone()),
         updated_at: Utc::now(),
     };
-    save_default_market_in_tx(tx, &record, admin_id).await?;
+    save_default_market_in_tx(tx, &record, Some(admin_id)).await?;
     if !record.enabled && runtime.active_source == "default" {
         invalidate_default_market_runtime_in_tx(tx, pair_id).await?;
     }
@@ -180,7 +180,7 @@ pub(crate) async fn pause_admin_default_market(
         },
     );
     guard.ensure_owned().await?;
-    save_default_market_in_tx(&mut tx, &record, admin_id).await?;
+    save_default_market_in_tx(&mut tx, &record, Some(admin_id)).await?;
     if record.all_market_paused {
         invalidate_default_market_runtime_in_tx(&mut tx, pair_id).await?;
     }

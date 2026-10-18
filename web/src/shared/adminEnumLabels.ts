@@ -173,6 +173,8 @@ export const ADMIN_FIELD_VALUE_LABELS: Record<string, Record<string, string>> = 
     preheat: '预热中',
     subscription: '申购中',
     distribution: '派发中',
+    purchase: '认购中',
+    held: '持有中',
     listed: '已上市'
   },
   margin_mode: {

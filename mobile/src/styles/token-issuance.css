@@ -1,0 +1,18 @@
+
+.token-surface { padding: 20px 16px; min-width: 0; color: var(--text); }
+.token-surface > h2, .token-surface > header > h2 { font-size: 18px; margin: 0 0 12px; }
+.token-surface > h3, .token-confirm > h3 { font-size: 16px; margin-block: 20px 12px; }
+:where(.token-surface, .token-confirm, .token-subscribe > div, .token-chart) > p { font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+:where(.token-surface, .token-holding, .token-confirm) > dl > div > dt { color: var(--muted); font-size: 13px; }
+:where(.token-surface, .token-holding, .token-confirm) > dl, .token-surface > form, .token-surface > form > label { display: grid; gap: 12px; }
+:where(.token-surface, .token-holding, .token-confirm) > dl > div { display: grid; grid-template-columns: minmax(100px,1fr) minmax(0,1.5fr); gap: 12px; }
+:where(.token-surface, .token-holding, .token-confirm) > dl > div > dd { margin: 0; text-align: right; overflow-wrap: anywhere; font-size: 14px; font-variant-numeric: tabular-nums; }
+:where(.token-surface, .token-surface > header, .token-surface > form, .token-surface > form > label, .token-surface > nav, .token-holding, .token-confirm, .token-subscribe > div) > :is(button,input) { min-width: 0; min-height: 44px; border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; color: var(--text); background: var(--surface-2); }
+:where(.token-surface, .token-surface > header, .token-surface > form, .token-surface > nav, .token-holding, .token-confirm, .token-subscribe > div) > button { margin: 8px 8px 0 0; cursor: pointer; }
+:where(.token-surface, .token-surface > header, .token-surface > form, .token-surface > nav, .token-holding, .token-confirm, .token-subscribe > div) > button:disabled { opacity: .45; cursor: default; }
+:where(.token-surface, .token-surface > header, .token-surface > form, .token-surface > form > label, .token-surface > nav, .token-holding, .token-confirm, .token-subscribe > div) > :is(button,input):focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.token-trading > header, .token-holding > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.token-holding { padding-block: 18px; border-bottom: 1px solid var(--line); }
+.token-holding button { width: 100%; }
+.token-confirm { margin-block: 18px; padding: 16px; border-radius: 12px; background: var(--surface-2); }
+.token-chart { margin-block: 16px; }

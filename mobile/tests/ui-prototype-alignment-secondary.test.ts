@@ -191,7 +191,7 @@ test('组合输入把焦点、错误和禁用反馈放在完整字段容器', ()
 
 test('全部二级页面遵守窄屏、主题变量、无固定宽屏溢出和 Lucide 合同', () => {
   for (const [name, source] of Object.entries(sources)) {
-    const styles = source.match(/<style scoped>([\s\S]*?)<\/style>/)?.[1] || ''
+    const styles = source.match(/<style(?: scoped)?>([\s\S]*?)<\/style>/)?.[1] || ''
     const contracts = pencilSelectedViews.has(name) ? `${styles}\n${selectedCss}` : styles
     assert.match(contracts, /@media \(max-width: 340px\)/, `${name} missing 340px layout`)
     if (prototypeManagedContent.has(name) && !pencilSelectedViews.has(name)) {

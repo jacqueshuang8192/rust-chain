@@ -1689,3 +1689,45 @@ async fn openapi_documents_coin_application_review_and_own_history() {
     assert!(fields.get("review_reason").is_some());
     assert!(fields.get("project_id").is_some());
 }
+
+#[tokio::test]
+async fn openapi_documents_versioned_issuance_quotes_and_paged_holdings() {
+    for alias in ["/openapi.json", "/api/openapi.json"] {
+        let doc = request_json(alias).await;
+        for (path, method) in [
+            ("/agent/api/v1/token-projects", "get"),
+            ("/agent/api/v1/token-projects/{id}/stage", "post"),
+            ("/agent/api/v1/new-coin-allocations", "post"),
+            ("/api/v1/new-coins/holdings", "get"),
+            ("/api/v1/new-coins/{symbol}/quotes", "post"),
+            ("/api/v1/new-coins/quotes/{id}/confirm", "post"),
+        ] {
+            assert!(doc["paths"][path][method]["security"].is_array(), "{path}");
+        }
+        for schema in ["TokenProjects", "HoldingsPage"] {
+            assert!(
+                doc["components"]["schemas"][schema]["properties"]
+                    .get("next_before_id")
+                    .is_some()
+            );
+        }
+        let policy = &doc["components"]["schemas"]["IssuancePolicy"]["properties"];
+        for key in [
+            "timezone",
+            "purchase_initial_price",
+            "listing_reference_price",
+            "subscription",
+            "distribution",
+            "purchase",
+            "listing",
+            "lock",
+            "fee",
+        ] {
+            assert!(policy.get(key).is_some(), "{key}");
+        }
+        assert_eq!(
+            doc["components"]["schemas"]["AllocationInput"]["properties"]["percent"]["type"],
+            "string"
+        );
+    }
+}

@@ -558,6 +558,9 @@ export interface PcFinanceOrder {
 }
 
 export interface BackendNewCoinProject {
+  issuance_policy?: { version: number } | null
+  quote_asset_id?: number | null
+  quote_asset_symbol?: string | null
   id: number
   asset_id: number
   symbol: string
@@ -580,6 +583,7 @@ export interface BackendNewCoinProjectsResponse {
 }
 
 export interface PcIEOProject {
+  issuanceVersion?: number
   id: number
   title: string
   titleEN?: string
@@ -1810,6 +1814,7 @@ function mapNewCoinProjectToPcActivity(project: BackendNewCoinProject): PcIEOPro
     id: project.id,
     title: project.symbol,
     detail: project.lifecycle_status,
+    issuanceVersion: project.issuance_policy?.version,
     smallImageUrl: '',
     bannerImageUrl: '',
     status: project.status === 'active' ? 1 : 0,
@@ -1823,8 +1828,8 @@ function mapNewCoinProjectToPcActivity(project: BackendNewCoinProject): PcIEOPro
     price: toNumber(project.issue_price),
     priceScale: 8,
     unit: project.symbol,
-    acceptUnit: 'USDT',
-    acceptAssetId: project.asset_id,
+    acceptUnit: project.quote_asset_symbol || 'USDT',
+    acceptAssetId: project.quote_asset_id ?? project.asset_id,
     amountScale: 8,
     maxLimitAmout: 0,
     minLimitAmout: 0,
@@ -1848,6 +1853,7 @@ function newCoinStatusToPcStep(status: string): number {
   if (normalized === 'preheat' || normalized.includes('draft') || normalized.includes('pending') || normalized.includes('upcoming')) return 0
   if (normalized === 'subscription' || normalized.includes('open') || normalized.includes('sale')) return 1
   if (normalized === 'distribution' || normalized.includes('distribut')) return 2
+  if (normalized === 'purchase') return 4
   return 3
 }
 

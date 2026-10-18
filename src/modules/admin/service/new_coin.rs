@@ -210,6 +210,7 @@ pub(crate) fn lifecycle_status_value(status: LifecycleStatus) -> &'static str {
         LifecycleStatus::Subscription => "subscription",
         LifecycleStatus::Distribution => "distribution",
         LifecycleStatus::Listed => "listed",
+        LifecycleStatus::Purchase => "purchase",
     }
 }
 
@@ -278,6 +279,9 @@ pub(crate) fn new_coin_project_audit_json(project: &NewCoinProjectResponse) -> V
         "remaining_supply": project.remaining_supply,
         "listed_at": project.listed_at.map(|value| value.timestamp_millis()),
         "actual_listed_at": project.actual_listed_at.map(|value| value.timestamp_millis()),
+        "issuance_policy": project.issuance_policy,
+        "issuer_agent_id": project.issuer_agent_id,
+        "actual_purchase_at": project.actual_purchase_at.map(|value| value.timestamp_millis()),
         "unlock_type": project.unlock_type,
         "fixed_unlock_at": project.fixed_unlock_at.map(|value| value.timestamp_millis()),
         "relative_unlock_seconds": project.relative_unlock_seconds,
@@ -459,6 +463,7 @@ fn parse_lifecycle_status(value: &str) -> AppResult<LifecycleStatus> {
         "subscription" => Ok(LifecycleStatus::Subscription),
         "distribution" => Ok(LifecycleStatus::Distribution),
         "listed" => Ok(LifecycleStatus::Listed),
+        "purchase" => Ok(LifecycleStatus::Purchase),
         _ => Err(AppError::Validation(
             "unsupported new coin lifecycle_status".to_owned(),
         )),

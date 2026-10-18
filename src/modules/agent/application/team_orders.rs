@@ -112,7 +112,7 @@ fn normalize_filter(kind: &str, query: AgentTeamOrdersQuery) -> AppResult<AgentT
                     "available",
                 ]
             } else {
-                &["pending", "locked", "available"]
+                &["pending", "locked", "available", "held"]
             };
             if status
                 .as_ref()

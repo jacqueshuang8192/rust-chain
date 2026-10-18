@@ -45,6 +45,7 @@ const statusLabels: Record<string, string> = {
 
 const lifecycleLabels: Record<string, string> = {
   distribution: '派发中',
+  purchase: '认购中',
   listed: '已上市',
   preheat: '预热',
   subscription: '申购中'

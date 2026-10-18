@@ -15,7 +15,7 @@ import type {
 } from './newCoinModel.ts'
 import type { MarketTicker } from './types.ts'
 
-export type NewCoinLifecycleFilter = 'all' | 'preheat' | 'subscription' | 'distribution' | 'listed'
+export type NewCoinLifecycleFilter = 'all' | 'preheat' | 'subscription' | 'distribution' | 'purchase' | 'listed'
 export type NewCoinOpportunityFilter = 'all' | 'upcoming' | 'listedToday' | 'hotGains'
 export type NewCoinRecordKind = 'subscription' | 'distribution' | 'purchase' | 'unlock'
 export type NewCoinRecordTypeFilter = 'all' | `${NewCoinRecordKind}s`

@@ -1014,7 +1014,7 @@ fn admin_new_coin_project_query() -> QueryBuilder<'static, MySql> {
         r#"SELECT projects.id, projects.asset_id, projects.symbol, projects.lifecycle_status,
                   projects.total_supply, projects.issue_price, projects.quote_asset_id,
                   projects.reserved_supply, projects.allocated_supply, projects.remaining_supply,
-                  projects.listed_at, projects.actual_listed_at,
+                  projects.listed_at, projects.actual_listed_at, projects.issuance_policy, projects.issuer_agent_id, projects.actual_purchase_at,
                   projects.unlock_type, projects.fixed_unlock_at, projects.relative_unlock_seconds,
                   projects.unlock_fee_enabled, projects.unlock_fee_rate, projects.unlock_fee_basis,
                   projects.unlock_fee_asset, projects.status, projects.post_listing_purchase_enabled,

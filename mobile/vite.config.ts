@@ -1,6 +1,7 @@
 import { fileURLToPath, URL } from 'node:url'
 import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import { minify } from 'terser'
 import { VitePWA } from 'vite-plugin-pwa'
 import { normalizeBackendApiPrefix, resolveBackendDevProxyTarget } from './src/config/backend'
 
@@ -116,6 +117,25 @@ export default defineConfig(({ mode }) => {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url)),
         tailwindcss: fileURLToPath(new URL('./src/styles/tailwind-source-reset.css', import.meta.url)),
+      },
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          experimentalMinChunkSize: 4_000,
+          plugins: [{
+            name: 'compact-mobile-output',
+            renderChunk: {
+              order: 'post',
+              async handler(code) {
+                // ES module compression preserves side effects and runs before chunk hashing.
+                const result = await minify(code, { module: true, compress: { passes: 3 }, sourceMap: true })
+                if (!result.code) throw new Error('Mobile output compression failed')
+                return { code: result.code, map: result.map as string }
+              },
+            },
+          }],
+        },
       },
     },
     clearScreen: false,

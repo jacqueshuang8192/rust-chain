@@ -1,5 +1,9 @@
 # Admin New-Coin Project Center
 
+Version boundary: the legacy contracts below apply to NULL issuance policies.
+Explicit version 2 projects follow [Agent Token Issuance V2](token-issuance-v2.md),
+including realtime purchase, manual selected batches and atomic unlock-sale.
+
 ## Scope
 
 Admin-only reads/configuration, preserving public and historical settlement

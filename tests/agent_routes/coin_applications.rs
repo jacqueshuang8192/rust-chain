@@ -1,6 +1,6 @@
 use super::*;
 
-fn token(agent: AgentFixture) -> String {
+pub(super) fn token(agent: AgentFixture) -> String {
     issue_token(
         &test_settings(),
         format!("agent:{}", agent.admin_user_id),
@@ -9,7 +9,7 @@ fn token(agent: AgentFixture) -> String {
     )
     .unwrap()
 }
-async fn request(
+pub(super) async fn request(
     app: &axum::Router,
     token: &str,
     method: &str,
@@ -39,7 +39,7 @@ async fn request(
             .unwrap_or_else(|_| json!({"body":String::from_utf8_lossy(&bytes)})),
     )
 }
-fn ok(result: (StatusCode, Value)) -> Value {
+pub(super) fn ok(result: (StatusCode, Value)) -> Value {
     assert_eq!(result.0, StatusCode::OK, "{}", result.1);
     result.1
 }

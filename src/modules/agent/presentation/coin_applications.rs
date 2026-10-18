@@ -18,6 +18,7 @@ pub(crate) struct CoinApplicationRequest {
     pub listed_at: DateTime<Utc>,
     pub reason: String,
     pub idempotency_key: String,
+    pub issuance_policy: Option<crate::modules::new_coin::domain::issuance::IssuancePolicy>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -45,6 +46,8 @@ pub(crate) struct CoinApplication {
     pub precision_scale: i32,
     pub total_supply: BigDecimal,
     pub issue_price: BigDecimal,
+    pub issuance_policy:
+        Option<sqlx::types::Json<crate::modules::new_coin::domain::issuance::IssuancePolicy>>,
     pub quote_asset_id: u64,
     pub quote_symbol: String,
     #[serde(with = "crate::time::unix_millis")]

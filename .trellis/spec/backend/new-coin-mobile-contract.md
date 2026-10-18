@@ -1,5 +1,9 @@
 # New Coin Mobile Contract
 
+Version boundary: the legacy contracts below apply to NULL issuance policies.
+Explicit version 2 projects follow [Agent Token Issuance V2](token-issuance-v2.md),
+including realtime purchase, manual selected batches and atomic unlock-sale.
+
 ## Scenario: User New-Coin Lifecycle on Mobile
 
 ### 1. Scope / Trigger

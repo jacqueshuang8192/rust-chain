@@ -9,3 +9,10 @@
   .agent-team-orders .admin-filter-fields { grid-template-columns: minmax(0, 1fr); }
   .agent-team-orders .admin-filter-actions { flex-wrap: wrap; }
 }
+
+.allocation-panel { display: grid; gap: 12px; margin: 20px 0; padding: 20px; background: var(--semi-color-fill-0); border-radius: 10px; }
+.allocation-controls { display: flex; gap: 20px; align-items: end; flex-wrap: wrap; }
+.allocation-controls label { display: grid; gap: 6px; width: 190px; }
+.allocation-panel p { margin: 0; }
+.allocation-preview { max-height: 320px; overflow: auto; display: grid; gap: 12px; margin-bottom: 20px; }
+.allocation-preview > div { padding: 12px; background: var(--semi-color-fill-0); overflow-wrap: anywhere; }

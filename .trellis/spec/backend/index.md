@@ -54,6 +54,7 @@ the feature contract for the business context being modified.
 | [Synthetic Market and K-line Recovery Contracts](./synthetic-market-kline.md) | Deterministic strategy ticker/K-line generation, active-version leases, authoritative 1m aggregation, and admin-only historical recovery | Active |
 | [Business Governance Audit Contracts](./business-governance-audits.md) | Financial idempotency, market health/recovery, new-coin reconciliation, Admin permission/audit parity, and CI dependency gates | Active |
 | [Default Platform Market Generation](./default-market-generation.md) | Pair-scoped baseline generation, coordinated handoff, immutable parameters, pause-all and default-source capability | Active |
+| [Agent Token Issuance V2](./token-issuance-v2.md) | Immutable policy, scoped batches, realtime purchase, continuous spot handoff and atomic buyback | Active |
 | [New Coin Mobile Contract](./new-coin-mobile-contract.md) | Public project purchase-pair exposure and authenticated mobile lifecycle actions | Active |
 | [Manual New Coin Distribution](./new-coin-manual-distribution.md) | Subscription freeze, final Admin allocation, partial refunds, replay and listing readiness | Active |
 | [Admin New-Coin Project Center](./new-coin-project-center.md) | Exact-ID read, guarded preheat issuance, config concurrency and stage readiness | Active |

@@ -1,3 +1,4 @@
+import { AllocationPanel, canAllocate } from '../coin-applications/AllocationPanel';
 import { IconFilter, IconRefresh } from '@douyinfe/semi-icons';
 import { Banner, Button, Tooltip } from '@douyinfe/semi-ui';
 import type { ColumnProps } from '@douyinfe/semi-ui/lib/es/table';
@@ -97,6 +98,7 @@ export function AgentTeamOrdersPage() {
 }
 
 function TeamOrders({ kind }: { kind: AgentOrderKind }) {
+  const [allocationIds, setAllocationIds] = useState<Array<string | number>>([]);
   const [filters, setFilters] = useState<FilterValues>({});
   const [expandedFilters, setExpandedFilters] = useState(false);
   const [page, setPage] = useState(1);
@@ -110,6 +112,7 @@ function TeamOrders({ kind }: { kind: AgentOrderKind }) {
   const key = JSON.stringify([filters, page, pageSize, revision]);
   const current = state.key === key ? state : { orders: [], total: 0, loading: true, error: null };
   const columns = useMemo(() => columnsFor(kind, setSelected), [kind]);
+  useEffect(() => setAllocationIds([]), [key]);
   const advancedCount = Object.keys(filters).filter(field => !primaryFilters.has(field)).length;
   useEffect(() => {
     let active = true;
@@ -136,11 +139,12 @@ function TeamOrders({ kind }: { kind: AgentOrderKind }) {
       icon={<IconRefresh />} aria-label="刷新订单" disabled={current.loading}
       onClick={() => { setSelected(null); setRevision(value => value + 1); }} /></Tooltip>
     </>} />
-    {kind === 'new-coin-purchases' ? <p className="muted">查看团队用户上市后购买新币的认购记录。</p> : null}
+    {kind === 'new-coin-purchases' ? <p className="muted">查看团队用户的新币认购成交记录，包括认购阶段实时行情成交与历史上市后购买。</p> : null}
     <FilterBar fields={teamOrderFilters(kind).filter(field => expandedFilters || primaryFilters.has(field.key))}
       value={filters} onChange={applyFilters} loading={current.loading} />
     {filterError ? <Banner type="danger" description={filterError} /> : null}
-    <DataTable columns={columns} data={current.orders} error={current.error} loading={current.loading} rowKey="id"
+    {kind === 'new-coin-subscriptions' ? <AllocationPanel rows={current.orders.filter(v => allocationIds.includes(v.id))} onSuccess={() => { setAllocationIds([]); setRevision(v => v + 1); }} /> : null}
+    <DataTable rowSelection={kind === 'new-coin-subscriptions' ? { selectedRowKeys: allocationIds, onChange: keys => setAllocationIds(keys ?? []), getCheckboxProps: row => ({ disabled: !row || !canAllocate(row) }) } : undefined} columns={columns} data={current.orders} error={current.error} loading={current.loading} rowKey="id"
       pagination={{ currentPage: page, pageSize, total: current.total, onPageChange: next => {
         if ((next - 1) * pageSize > 100_000) { setFilterError('查询范围过大，请缩小时间或用户范围'); return; }
         setSelected(null); setPage(next);

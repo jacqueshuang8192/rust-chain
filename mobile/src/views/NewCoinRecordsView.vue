@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import TokenTradingPanel from '@/components/TokenTradingPanel.vue'
 import { computed, onMounted, ref } from 'vue'
 import { CheckCircle2, CircleAlert, LoaderCircle, PackageOpen, RefreshCw, SlidersHorizontal, X } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
@@ -241,6 +242,7 @@ onMounted(() => { void load() })
 
     <LoginRequiredState v-if="!session.isAuthenticated" :description="t('newCoin.recordLoginDescription')" />
     <template v-else>
+      <TokenTradingPanel />
       <nav class="new-coin-record-status-filters" :aria-label="t('newCoin.recordStatusFilters')">
         <button
           v-for="filter in statusFilters"
@@ -344,27 +346,27 @@ onMounted(() => { void load() })
   </main>
 </template>
 
-<style scoped>
+<style>
 .new-coin-records-page {
   min-height: 100dvh;
   overflow-x: clip;
   padding-bottom: calc(20px + env(safe-area-inset-bottom));
 }
 
-.new-coin-records-page :deep(.pencil-page-header) {
+.new-coin-records-page .pencil-page-header {
   background: var(--new-coin-record-header);
   height: 58px;
   min-height: 58px;
   padding: 7px 16px;
 }
 
-.new-coin-records-page :deep(.page-header__title) {
+.new-coin-records-page .page-header__title {
   font-size: 22px;
   font-weight: 700;
   line-height: 32px;
 }
 
-.new-coin-records-page :deep(.new-coin-records-filter-button) {
+.new-coin-records-page .new-coin-records-filter-button {
   background: transparent !important;
   height: 44px !important;
   min-height: 44px !important;
@@ -372,7 +374,7 @@ onMounted(() => { void load() })
   width: 44px !important;
 }
 
-.new-coin-records-page :deep(.new-coin-records-filter-button > span) {
+.new-coin-records-page .new-coin-records-filter-button > span {
   align-items: center;
   background: var(--new-coin-record-filter-face);
   border-radius: 50%;

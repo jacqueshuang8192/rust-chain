@@ -411,7 +411,7 @@ pub(crate) async fn change_agent_password(
 /// 依次完成三件事：从主体串取出代理管理员主键，取出 MySQL 连接池，再按管理员查出代理主键、根节点与物化路径。
 /// 该查询同时校验管理员账号、自身节点及全部祖先节点均为启用状态，任一环节不满足都返回未授权。
 /// 返回的路径是后续 SQL 的唯一边界来源，调用方不得改用请求参数中的代理 ID，否则会形成越权查询。
-async fn agent_context(
+pub(crate) async fn agent_context(
     mysql: Option<Pool<MySql>>,
     subject: &str,
 ) -> AppResult<(Pool<MySql>, AgentAccessScope)> {

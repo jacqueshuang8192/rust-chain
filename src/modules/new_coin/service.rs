@@ -522,6 +522,7 @@ pub(crate) fn lifecycle_status(value: &str) -> AppResult<LifecycleStatus> {
         "subscription" => Ok(LifecycleStatus::Subscription),
         "distribution" => Ok(LifecycleStatus::Distribution),
         "listed" => Ok(LifecycleStatus::Listed),
+        "purchase" => Ok(LifecycleStatus::Purchase),
         _ => Err(AppError::Validation(
             "unsupported lifecycle_status".to_owned(),
         )),

@@ -1,8 +1,9 @@
+import { policyIdentity, validatePolicy, type IssuancePolicy } from '../coin-applications/issuancePolicy';
 import { apiRequest, ContractError } from './client';
 import { compareDecimalText, decimalFitsPrecision, decimalFitsStorage, isPositiveDecimalText } from '../shared/decimal';
 import { isUnixMillis, requiredSafeInteger } from '../shared/integer';
 
-export type CoinInput = { symbol: string; name: string; precision_scale: number; total_supply: string; issue_price: string; quote_asset_id: number; listed_at: number; reason: string };
+export type CoinInput = { issuance_policy?: IssuancePolicy | null; symbol: string; name: string; precision_scale: number; total_supply: string; issue_price: string; quote_asset_id: number; listed_at: number; reason: string };
 export type CoinStatus = 'pending' | 'approved' | 'rejected';
 export type CoinApplication = CoinInput & Record<string, unknown> & {
   id: number; agent_id: number; agent_admin_id: number; quote_symbol: string; status: CoinStatus;
@@ -25,6 +26,7 @@ export function validateCoinInput(input: CoinInput): CoinInput {
   if (!decimalFitsPrecision(input.total_supply, input.precision_scale)) throw new Error('发行总量超过新币精度');
   if (!isUnixMillis(input.listed_at)) throw new Error('请选择有效的计划上市时间');
   if (!reason || [...reason].length > 500) throw new Error('申请说明需为 1 至 500 字');
+  if (input.issuance_policy) { validatePolicy(input.issuance_policy); if (input.issuance_policy.listing.at !== input.listed_at) throw new Error("计划上市时间与发行规则不一致"); }
   return { ...input, symbol, name, reason };
 }
 export function parseCoinApplication(value: unknown): CoinApplication {
@@ -40,6 +42,7 @@ export function parseCoinApplication(value: unknown): CoinApplication {
   assert(value.status === 'pending'
     ? value.reviewed_by === null && value.review_reason === null && value.reviewed_at === null
     : integer(value.reviewed_by) && typeof value.review_reason === 'string' && value.review_reason.trim() && isUnixMillis(value.reviewed_at));
+  if (value.issuance_policy != null) validatePolicy(value.issuance_policy);
   return value as CoinApplication;
 }
 export async function coinOptions(signal?: AbortSignal): Promise<CoinAsset[]> {
@@ -63,7 +66,7 @@ export async function submitCoin(input: CoinInput, key: string): Promise<CoinApp
   const row = parseCoinApplication(await apiRequest(coinPath('agent'), { authScope: 'agent', method: 'POST', body: JSON.stringify({ ...payload, idempotency_key: key }) }));
   assert(row.symbol === payload.symbol && row.name === payload.name && row.precision_scale === payload.precision_scale &&
     row.quote_asset_id === payload.quote_asset_id && row.listed_at === payload.listed_at && row.reason === payload.reason &&
-    compareDecimalText(row.total_supply, payload.total_supply) === 0 && compareDecimalText(row.issue_price, payload.issue_price) === 0);
+    compareDecimalText(row.total_supply, payload.total_supply) === 0 && compareDecimalText(row.issue_price, payload.issue_price) === 0 && policyIdentity(row.issuance_policy) === policyIdentity(payload.issuance_policy));
   return row;
 }
 export async function reviewCoin(id: number, decision: 'approve' | 'reject', reason: string): Promise<CoinApplication> {

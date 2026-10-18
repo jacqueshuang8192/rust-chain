@@ -1,0 +1,30 @@
+{
+  "id": "agent-token-lifecycle",
+  "name": "agent-token-lifecycle",
+  "title": "Agent token issuance lifecycle and atomic unlock sale",
+  "description": "",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "rust-chain",
+  "assignee": "rust-chain",
+  "createdAt": "2026-10-19",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "Implementation and verification complete; documented pre-existing Web JS budget failure. User explicitly authorized commit and push on 2026-10-19. Preparing the approved manifest for origin/main; production deployment and migrations are excluded.",
+  "meta": {
+    "verification": "complete_with_documented_web_budget_exception",
+    "delivery": "delivery.md",
+    "commit_plan": "commit-plan.md"
+  }
+}

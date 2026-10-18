@@ -49,7 +49,7 @@ const purchaseContract: AgentFinancialRowContract = {
   requiredFields: [...newCoinCommon.requiredFields, 'pair_id', 'base_asset', 'price', 'quantity', 'lock_position_id'],
   integerFields: [...newCoinCommon.integerFields, 'pair_id', 'base_asset'],
   decimalFields: ['quote_amount', 'price', 'quantity'],
-  enumFields: { status: ['pending', 'locked', 'available'] }
+  enumFields: { status: ['pending', 'locked', 'available', 'held'] }
 };
 
 const contracts: Record<AgentOrderKind, AgentFinancialRowContract> = {

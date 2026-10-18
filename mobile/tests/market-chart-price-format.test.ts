@@ -42,3 +42,17 @@ test('实时更细的价格会提高精度，切换数据集重新计算，空�
   assert.equal(resolveMarketChartPriceFormat([]).precision, 2)
   assert.equal(resolveMarketChartPriceFormat([{ open: NaN, high: Infinity, low: 0, close: -1 }]).precision, 2)
 })
+
+test('极小代币和浮点尾数使用自定义格式，避开图表内置16位限制且不修改价格', () => {
+  for (const price of [1e-18, 0.30000000000000004]) {
+    const point = { open: price, high: price, low: price, close: price }
+    const before = structuredClone(point)
+    const format = resolveMarketChartPriceFormat([point])
+    assert.equal(format.type, 'custom')
+    if (format.type !== 'custom') throw new Error('Expected custom format')
+    assert.equal(format.formatter(price), price === 1e-18 ? '0.000000000000000001' : '0.3')
+    assert.notEqual(format.formatter(price), '0')
+    assert.equal(format.formatter(0), '0')
+    assert.deepEqual(point, before)
+  }
+})

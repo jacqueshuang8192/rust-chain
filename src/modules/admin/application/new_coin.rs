@@ -382,6 +382,30 @@ pub(crate) async fn update_admin_new_coin_lifecycle(
     project_id: u64,
     request: UpdateNewCoinLifecycleRequest,
 ) -> AppResult<NewCoinProjectResponse> {
+    if request.lifecycle_status != "purchase" {
+        parse_lifecycle_status_from_request(&request.lifecycle_status)?;
+    }
+    let pool = admin_mysql_pool(pool)?;
+    let hint =
+        crate::modules::new_coin::infrastructure::issuance::project(&pool, project_id).await?;
+    if hint.issuance_policy.is_some() {
+        if request.listed_at.is_some() {
+            return Err(AppError::Validation("实际上市时间由服务端记录".into()));
+        }
+        crate::modules::new_coin::application::issuance::admin_stage(
+            pool.clone(),
+            admin_id,
+            project_id,
+            &request.lifecycle_status,
+            request.expected_config.as_deref(),
+            request.reason.as_deref().unwrap_or(""),
+        )
+        .await?;
+        let mut tx = pool.begin().await?;
+        let after = load_admin_new_coin_project_in_tx(&mut tx, project_id).await?;
+        tx.commit().await?;
+        return Ok(after);
+    }
     let target_status = parse_lifecycle_status_from_request(&request.lifecycle_status)?;
     if request.listed_at.is_some() {
         return Err(AppError::Validation(
@@ -389,7 +413,6 @@ pub(crate) async fn update_admin_new_coin_lifecycle(
                 .into(),
         ));
     }
-    let pool = admin_mysql_pool(pool)?;
 
     // 生命周期流转必须先锁定项目行，再校验当前状态到目标状态的单向流转规则。
     let mut tx = pool.begin().await?;
@@ -444,6 +467,11 @@ pub(crate) async fn update_admin_new_coin_unlock_rule(
     // 锁定项目后再更新规则，避免后台并发修改导致审计 before/after 失真。
     let mut tx = pool.begin().await?;
     let before = lock_admin_new_coin_project_in_tx(&mut tx, project_id).await?;
+    if before.issuance_policy.is_some() {
+        return Err(AppError::Conflict(
+            "新版发行合同已审核固化，不能通过旧配置入口修改".into(),
+        ));
+    }
     ensure_active_new_coin_project(&before)?;
     ensure_new_coin_config_version(&before, request.expected_config.as_deref())?;
     let unlock_type = request.unlock_type.trim().to_owned();
@@ -494,6 +522,11 @@ pub(crate) async fn update_admin_new_coin_unlock_fee_rule(
     // 矿工费关闭时同步清空费率、计费依据和费用资产，避免旧配置被后续解禁误用。
     let mut tx = pool.begin().await?;
     let before = lock_admin_new_coin_project_in_tx(&mut tx, project_id).await?;
+    if before.issuance_policy.is_some() {
+        return Err(AppError::Conflict(
+            "新版发行合同已审核固化，不能通过旧配置入口修改".into(),
+        ));
+    }
     ensure_active_new_coin_project(&before)?;
     ensure_new_coin_config_version(&before, request.expected_config.as_deref())?;
     ensure_unlock_fee_asset_matches_quote_asset(
@@ -564,6 +597,11 @@ pub(crate) async fn update_admin_new_coin_post_listing_purchase(
     // 锁定新币项目和目标交易对，确保认购开关、交易对启用和审计一致提交。
     let mut tx = pool.begin().await?;
     let before = lock_admin_new_coin_project_in_tx(&mut tx, project_id).await?;
+    if before.issuance_policy.is_some() {
+        return Err(AppError::Conflict(
+            "新版发行合同已审核固化，不能通过旧配置入口修改".into(),
+        ));
+    }
     ensure_active_new_coin_project(&before)?;
     ensure_new_coin_config_version(&before, request.expected_config.as_deref())?;
     ensure_post_listing_purchase_lifecycle(&before)?;
@@ -620,8 +658,19 @@ pub(crate) async fn distribute_admin_new_coin(
     let idempotency_key = request.idempotency_key.trim().to_owned();
     let pool = admin_mysql_pool(pool)?;
 
-    // 派发会同时影响申购单、钱包余额、锁仓明细、生命周期事件和后台审计，必须放入同一事务。
+    // 新合同先锁用户再锁项目，与代理派发和用户成交保持一致；合同版本在审批后不可变。
+    let versioned = crate::modules::new_coin::infrastructure::issuance::project(&pool, project_id)
+        .await?
+        .issuance_policy
+        .is_some();
     let mut tx = pool.begin().await?;
+    if versioned {
+        crate::modules::new_coin::infrastructure::issuance::trading::lock_user(
+            &mut tx,
+            request.user_id,
+        )
+        .await?;
+    }
     let project = lock_admin_new_coin_project_in_tx(&mut tx, project_id).await?;
     if let Some(replay) = find_admin_new_coin_distribution_in_tx(&mut tx, &idempotency_key).await? {
         if replay.project_id != project_id
@@ -635,6 +684,58 @@ pub(crate) async fn distribute_admin_new_coin(
         }
         tx.commit().await?;
         return Ok(replay);
+    }
+    if project.issuance_policy.is_some() {
+        use crate::modules::new_coin::infrastructure::issuance::{self as v2, allocation, trading};
+        let p = v2::lock_project(&mut tx, project_id).await?;
+        let order = allocation::hint_in_tx(
+            &mut tx,
+            request
+                .subscription_id
+                .ok_or_else(|| AppError::Validation("新版发行只能派发已申购订单".into()))?,
+        )
+        .await?;
+        if order.project_id != project_id || order.user_id != request.user_id {
+            return Err(AppError::NotFound);
+        }
+        let treasury = trading::treasury(&mut tx).await?;
+        trading::lock_money(&mut tx, &p, &[request.user_id, treasury]).await?;
+        let result = allocation::allocate(
+            &mut tx,
+            &p,
+            &order,
+            &BigDecimal::from(0),
+            &idempotency_key,
+            Some(&request.quantity),
+        )
+        .await?;
+        v2::operation(
+            &mut tx,
+            project_id,
+            ("admin", Some(admin_id)),
+            "new_coin.allocate",
+            result,
+            request.reason.as_deref().unwrap_or(""),
+        )
+        .await?;
+        let response = find_admin_new_coin_distribution_in_tx(&mut tx, &idempotency_key)
+            .await?
+            .ok_or(AppError::NotFound)?;
+        insert_admin_audit_log_entry_in_tx(
+            &mut tx,
+            admin_id,
+            AdminAuditLogEntry {
+                action: "new_coin_distribution.create",
+                target_type: "new_coin_distribution",
+                target_id: response.id,
+                before_json: None,
+                after_json: Some(new_coin_distribution_audit_json(&response)),
+                reason: request.reason,
+            },
+        )
+        .await?;
+        tx.commit().await?;
+        return Ok(response);
     }
     ensure_active_new_coin_project(&project)?;
     ensure_distribution_lifecycle(&project)?;
@@ -913,15 +1014,21 @@ pub(crate) async fn get_admin_new_coin_project_center(
     let (subscription_count, pending_manual_count) =
         new_coin_project_order_counts_in_tx(&mut tx, project_id).await?;
     let issuance_editable = new_coin_issuance_editable(&project, subscription_count);
-    let next = match project.lifecycle_status.as_str() {
-        "preheat" => Some("subscription"),
-        "subscription" => Some("distribution"),
-        "distribution" => Some("listed"),
-        _ => None,
+    let next = if let Some(policy) = &project.issuance_policy {
+        policy
+            .next(&project.lifecycle_status)
+            .map(|(stage, _)| stage)
+    } else {
+        match project.lifecycle_status.as_str() {
+            "preheat" => Some("subscription"),
+            "subscription" => Some("distribution"),
+            "distribution" => Some("listed"),
+            _ => None,
+        }
     };
     let lifecycle_block_reason = if project.status != "active" {
         Some("项目未启用".to_owned())
-    } else if next == Some("listed") && pending_manual_count > 0 {
+    } else if matches!(next, Some("listed" | "purchase")) && pending_manual_count > 0 {
         Some("仍有待派发或待退款申购，请先完成结算".to_owned())
     } else {
         None
@@ -941,7 +1048,8 @@ pub(crate) async fn get_admin_new_coin_project_center(
 }
 
 fn new_coin_issuance_editable(project: &NewCoinProjectResponse, order_count: i64) -> bool {
-    project.status == "active"
+    project.issuance_policy.is_none()
+        && project.status == "active"
         && project.lifecycle_status == "preheat"
         && order_count == 0
         && project.reserved_supply == 0
@@ -965,6 +1073,11 @@ pub(crate) async fn update_admin_new_coin_issuance(
     let pool = admin_mysql_pool(pool)?;
     let mut tx = pool.begin().await?;
     let before = lock_admin_new_coin_project_in_tx(&mut tx, project_id).await?;
+    if before.issuance_policy.is_some() {
+        return Err(AppError::Conflict(
+            "新版发行合同已审核固化，不能通过旧配置入口修改".into(),
+        ));
+    }
     let (count, _) = new_coin_project_order_counts_in_tx(&mut tx, project_id).await?;
     if !new_coin_issuance_editable(&before, count) {
         return Err(AppError::Conflict(

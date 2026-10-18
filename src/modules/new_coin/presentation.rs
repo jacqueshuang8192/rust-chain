@@ -9,6 +9,8 @@
 //! 因此响应中的精度与数据库中存放的精度一致。
 //! 可空字段的空值语义在转换中被完整保留，具体含义见各转换函数的说明。
 
+pub(crate) mod issuance;
+
 use crate::{
     modules::new_coin::repository::{
         NewCoinDistributionRead, NewCoinProjectRead, NewCoinPurchaseRead, NewCoinSubscriptionRead,
@@ -26,6 +28,8 @@ pub(crate) struct ListQuery {
 
 #[derive(Debug, Serialize)]
 pub(crate) struct NewCoinProjectResponse {
+    pub(crate) issuance_policy: Option<crate::modules::new_coin::domain::issuance::IssuancePolicy>,
+
     pub(crate) id: u64,
     pub(crate) asset_id: u64,
     pub(crate) symbol: String,
@@ -52,6 +56,7 @@ pub(crate) struct NewCoinProjectResponse {
     pub(crate) unlock_fee_asset: Option<u64>,
     pub(crate) post_listing_purchase_enabled: bool,
     pub(crate) post_listing_pair_id: Option<u64>,
+    pub(crate) post_listing_pair_symbol: Option<String>,
     pub(crate) status: String,
 }
 
@@ -206,6 +211,7 @@ impl From<NewCoinProjectRead> for NewCoinProjectResponse {
     /// 未开启收费的项目无费率、基准与支付资产，转换不为它们编造零值或默认值。
     fn from(read: NewCoinProjectRead) -> Self {
         Self {
+            issuance_policy: read.issuance_policy,
             id: read.id,
             asset_id: read.asset_id,
             symbol: read.symbol,
@@ -230,6 +236,7 @@ impl From<NewCoinProjectRead> for NewCoinProjectResponse {
             unlock_fee_asset: read.unlock_fee_asset,
             post_listing_purchase_enabled: read.post_listing_purchase_enabled,
             post_listing_pair_id: read.post_listing_pair_id,
+            post_listing_pair_symbol: read.post_listing_pair_symbol,
             status: read.status,
         }
     }

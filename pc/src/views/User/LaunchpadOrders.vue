@@ -1,5 +1,6 @@
 <template>
   <div class="flex flex-col gap-5">
+    <TokenTradingPanel />
     <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
       <div>
         <h2 class="text-2xl font-bold text-foreground">{{ t('launchpad.records_title') }}</h2>
@@ -152,6 +153,7 @@
 </template>
 
 <script setup lang="ts">
+import TokenTradingPanel from '@/components/TokenTradingPanel.vue'
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from 'vue-toastification'

@@ -45,8 +45,11 @@ use axum::{
 /// 全部使用 POST 且由应用层通过幂等键控制重复提交，路由层本身不做去重。
 /// 路径中的 `:symbol` 是项目符号，`:id` 是解禁记录的幂等键而非自增主键。
 /// 本函数只声明路由表，不注册中间件、不设限流、也不在此处绑定任何数据库连接。
+mod issuance;
+
 pub fn user_routes() -> Router<AppState> {
     Router::new()
+        .merge(issuance::routes())
         .route("/new-coins", get(list_projects))
         .route("/new-coins/:symbol", get(project_detail))
         .route(

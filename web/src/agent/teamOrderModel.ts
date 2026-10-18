@@ -10,7 +10,7 @@ export const teamOrderPrefixes: Record<AgentOrderKind, string> = { seconds: 'SC'
 const options = (values: Record<string, string>) => Object.entries(values).map(([value, label]) => ({ value, label }));
 export const teamOrderStatuses = {
   'new-coin-subscriptions': { pending: '待配售', allocated: '已全额配售', partial_allocated: '已部分配售', refunded: '已全额退款', available: '已到账（历史）' },
-  'new-coin-purchases': { pending: '待处理', locked: '已锁仓', available: '已到账' },
+  'new-coin-purchases': { held: '持仓中', pending: '待处理', locked: '已锁仓', available: '已到账' },
   seconds: { opened: '进行中', settled: '已结算', manual_review: '人工复核', refunded: '已退还本金' },
   margin: { pending: '待成交', opened: '持仓中', closed: '已平仓', canceled: '已取消', liquidated: '已强平' },
   earn: { subscribed: '持有中', redeemed: '已赎回' },

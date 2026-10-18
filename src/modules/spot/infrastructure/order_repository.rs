@@ -206,6 +206,14 @@ pub(crate) async fn insert_spot_order_in_tx(
             crate::numeric::ensure_amount_storage(value, label)?;
         }
     }
+    // 认购行情先行运行，现货仅在真实上市后开放；锁内判定防止通用下单绕过项目阶段。
+    let stage: Option<String> = sqlx::query_scalar("SELECT lifecycle_status FROM new_coin_projects WHERE post_listing_pair_id=? AND issuance_policy IS NOT NULL FOR SHARE")
+        .bind(pair_db_id).fetch_optional(&mut **tx).await?;
+    if stage.is_some_and(|stage| stage != "listed") {
+        return Err(AppError::Conflict(
+            "项目仍处于发行阶段，请使用新币认购入口".into(),
+        ));
+    }
     // 下单记录和钱包冻结必须同事务提交；ON DUPLICATE KEY 会串行化同键竞争，
     // 避免多个失败 INSERT 持有外键共享锁后再升级订单锁所形成的死锁环。
     let user_id = new_order

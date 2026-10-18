@@ -9,9 +9,9 @@ import type { MarketKlineInterval } from '@/api/marketSocketProtocol'
 import { publicMarketWebSocketUrl } from '@/config/app'
 import { createSecondsChartSession, type SecondsChartSnapshot } from '@/core/secondsChartSession'
 
-const props = defineProps<{ symbol: string }>()
+const props = defineProps<{ symbol: string; initiallyExpanded?: boolean }>()
 const { t } = useI18n()
-const expanded = ref(false)
+const expanded = ref(props.initiallyExpanded ?? false)
 const interval = ref<MarketKlineInterval>('1m')
 const snapshot = shallowRef<SecondsChartSnapshot>({ points: [], loading: false, failed: false })
 const session = createSecondsChartSession({
@@ -25,7 +25,7 @@ function reload(): void {
 watch(() => [expanded.value, props.symbol, interval.value], () => {
   if (expanded.value && props.symbol) reload()
   else session.stop()
-}, { flush: 'sync' })
+}, { flush: 'sync', immediate: true })
 onBeforeUnmount(() => session.stop())
 </script>
 
