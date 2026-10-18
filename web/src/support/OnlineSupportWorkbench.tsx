@@ -1,5 +1,6 @@
 import { adminErrorMessage } from '../shared/adminErrorMessage';
 import {
+  IconArrowLeft,
   IconBellStroked,
   IconLockStroked,
   IconRefresh,
@@ -9,12 +10,11 @@ import {
   IconUnlockStroked
 } from '@douyinfe/semi-icons';
 import {
-  Badge,
   Banner,
   Button,
-  Card,
   Empty,
   Input,
+  Pagination,
   Space,
   Spin,
   Tag,
@@ -22,7 +22,6 @@ import {
   Toast,
   Typography
 } from '@douyinfe/semi-ui';
-import type { ColumnProps } from '@douyinfe/semi-ui/lib/es/table';
 import {
   type FormEvent,
   useCallback,
@@ -42,8 +41,9 @@ import {
   type SupportReplyInput
 } from '../api/support';
 import { PageHeader } from '../layouts/PageHeader';
-import { DataTable, DEFAULT_PAGE_SIZE } from '../shared/DataTable';
+import { DEFAULT_PAGE_SIZE } from '../shared/DataTable';
 import { TimestampText } from '../shared/TimestampText';
+import './onlineSupport.css';
 
 const { Text, Title } = Typography;
 
@@ -198,6 +198,7 @@ export function OnlineSupportWorkbench({
     hasMore: false,
     nextBeforeId: null as number | null
   });
+  const [mobileConversationOpen, setMobileConversationOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<SupportQueueStatusFilter>('open');
   const [assignmentFilter, setAssignmentFilter] = useState<SupportAssignmentFilter>('all');
   const [unreadOnly, setUnreadOnly] = useState(false);
@@ -400,94 +401,6 @@ export function OnlineSupportWorkbench({
   const visibleUnreadCount = visibleConversations.filter((conversation) => conversation.staff_unread_count > 0).length;
   const visibleUnassignedCount = visibleConversations.filter((conversation) => conversation.assigned_agent_id == null).length;
 
-  const queueColumns = useMemo<Array<ColumnProps<SupportConversation>>>(() => [
-    {
-      dataIndex: 'user_id',
-      key: 'customer',
-      title: '客户',
-      width: 190,
-      render: (_value, conversation) => (
-        <span className="support-customer-cell">
-          <Text strong>用户 {conversation.user_id}</Text>
-          <Text className="support-cell-ellipsis" title={contactLabel(conversation)} type="tertiary">
-            {contactLabel(conversation)}
-          </Text>
-        </span>
-      )
-    },
-    {
-      dataIndex: 'assigned_agent_id',
-      key: 'assignment',
-      title: '当前归属代理',
-      width: 180,
-      render: (_value, conversation) => (
-        <Text className={conversation.assigned_agent_id == null ? 'support-unassigned-label' : undefined}>
-          {supportAssignmentLabel(conversation)}
-        </Text>
-      )
-    },
-    {
-      dataIndex: 'status',
-      key: 'status',
-      title: '会话状态',
-      width: 110,
-      render: (_value, conversation) => supportStatusTag(conversation.status)
-    },
-    {
-      dataIndex: 'staff_unread_count',
-      key: 'unread',
-      title: '客服未读',
-      width: 110,
-      render: (_value, conversation) => conversation.staff_unread_count > 0
-        ? (
-            <Badge count={conversation.staff_unread_count} overflowCount={99} type="danger">
-              <span className="support-unread-anchor">新消息</span>
-            </Badge>
-          )
-        : <Text type="tertiary">无未读</Text>
-    },
-    {
-      dataIndex: 'last_message_preview',
-      key: 'preview',
-      title: '最近消息',
-      width: 220,
-      render: (_value, conversation) => (
-        <Text
-          className="support-cell-ellipsis"
-          title={conversation.last_message_preview?.trim() || '暂无消息摘要'}
-          type={conversation.last_message_preview ? 'primary' : 'tertiary'}
-        >
-          {conversation.last_message_preview?.trim() || '暂无消息摘要'}
-        </Text>
-      )
-    },
-    {
-      dataIndex: 'last_message_at',
-      key: 'last_message_at',
-      title: '最近消息时间',
-      width: 180,
-      render: (_value, conversation) => <TimestampText value={conversation.last_message_at} />
-    },
-    {
-      dataIndex: 'id',
-      key: 'actions',
-      title: '操作',
-      width: 120,
-      fixed: 'right',
-      render: (_value, conversation) => (
-        <Button
-          aria-label={`打开用户 ${conversation.user_id} 会话`}
-          onClick={() => setSelectedConversationId(conversation.id)}
-          size="small"
-          theme={selectedConversationId === conversation.id ? 'solid' : 'borderless'}
-          type="primary"
-        >
-          {selectedConversationId === conversation.id ? '当前会话' : '打开会话'}
-        </Button>
-      )
-    }
-  ], [selectedConversationId]);
-
   function submitKeyword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setKeyword(keywordDraft.trim());
@@ -660,11 +573,11 @@ export function OnlineSupportWorkbench({
   }
 
   const pageDescription = scope === 'admin'
-    ? '查看全部客户会话并处理未分配队列；消息以服务端持久记录为准。'
-    : '仅显示精确分配给当前代理的客户会话；上级代理不会自动看到下级代理会话。';
+    ? '集中处理客户咨询，跟进未读消息与未分配会话。'
+    : '处理分配给您的客户咨询，不包含下级代理的会话。';
 
   return (
-    <main className={`exchange-page support-workbench-page ${scope === 'admin' ? 'support-workbench-page--admin' : ''}`}>
+    <main className={`exchange-page support-workbench-page ${scope === 'admin' ? 'support-workbench-page--admin' : ''} ${mobileConversationOpen ? 'support-workbench-page--conversation' : ''}`}>
       <PageHeader
         actions={
           <Button
@@ -679,112 +592,41 @@ export function OnlineSupportWorkbench({
         title="在线客服"
       />
 
-      <Card bordered={false} className="support-queue-card" shadows="always">
-        <div className={`support-queue-toolbar ${scope === 'admin' ? 'support-queue-toolbar--admin' : ''}`}>
-          <div className="support-filter-section">
-            <Text className="support-filter-label" strong>会话状态</Text>
-            <div aria-label="会话状态筛选" className="support-filter-actions-row" role="group">
-              {([
-                ['open', '进行中'],
-                ['closed', '已关闭'],
-                ['all', '全部']
-              ] as const).map(([value, label]) => (
-                <Button
-                  aria-pressed={statusFilter === value}
-                  key={value}
-                  onClick={() => {
-                    setStatusFilter(value);
-                    setQueuePage(1);
-                  }}
-                  theme={statusFilter === value ? 'solid' : 'light'}
-                  type="primary"
-                >
-                  {label}
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          {scope === 'admin' ? (
-            <div className="support-filter-section">
-              <Text className="support-filter-label" strong>归属范围</Text>
-              <div aria-label="会话归属筛选" className="support-filter-actions-row" role="group">
-                {([
-                  ['all', '全部客户'],
-                  ['unassigned', '未分配客户']
-                ] as const).map(([value, label]) => (
-                  <Button
-                    aria-pressed={assignmentFilter === value}
-                    key={value}
-                    onClick={() => {
-                      setAssignmentFilter(value);
-                      setQueuePage(1);
-                    }}
-                    theme={assignmentFilter === value ? 'solid' : 'light'}
-                    type="tertiary"
-                  >
-                    {label}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          {scope === 'admin' ? (
-            <div className="support-filter-section">
-              <Text className="support-filter-label" strong>快速筛选</Text>
-              <div aria-label="客服快捷筛选" className="support-filter-actions-row" role="group">
-                <Button
-                  aria-pressed={unreadOnly}
-                  icon={<IconBellStroked aria-hidden="true" />}
-                  onClick={() => {
-                    setUnreadOnly((current) => !current);
-                    setQueuePage(1);
-                  }}
-                  theme={unreadOnly ? 'solid' : 'light'}
-                  type="primary"
-                >
-                  仅未读
-                </Button>
-              </div>
-            </div>
-          ) : null}
-
+      <div className="support-workspace">
+      <aside aria-label="客户会话列表" className="support-queue-card">
+        <div className="support-inbox-heading"><h3>客户会话</h3><span>{conversationTotal} 条</span></div>
+        <div className="support-queue-toolbar">
           <form className="support-search-form" onSubmit={submitKeyword}>
             <label className="support-search-label">
               <span>当前页关键词</span>
-              <Input
-                aria-label="搜索会话"
-                onChange={(value) => setKeywordDraft(String(value))}
-                placeholder="筛选当前页的用户、代理或消息"
-                prefix={<IconSearch aria-hidden="true" />}
-                showClear
-                value={keywordDraft}
-              />
+              <Input aria-label="搜索会话" onChange={(value) => setKeywordDraft(String(value))}
+                placeholder="用户、联系方式或消息" prefix={<IconSearch aria-hidden="true" />} showClear value={keywordDraft} />
             </label>
-            <Button htmlType="submit" icon={<IconSearch aria-hidden="true" />} theme="solid" type="primary">
-              搜索
-            </Button>
+            <Button htmlType="submit" aria-label="搜索" icon={<IconSearch aria-hidden="true" />} type="tertiary" />
           </form>
-        </div>
-
-        <div className="support-queue-summary">
-          <div className="support-queue-summary-main">
-            <Text type="tertiary">
-              服务端共 {conversationTotal} 条，当前页筛选后显示 {visibleConversations.length} 条
-            </Text>
-            {scope === 'admin' ? (
-              <div className="support-queue-summary-metrics">
-                <Tag color={visibleUnreadCount > 0 ? 'red' : 'grey'}>当前页未读 {visibleUnreadCount}</Tag>
-                <Tag color={visibleUnassignedCount > 0 ? 'orange' : 'grey'}>当前页未分配 {visibleUnassignedCount}</Tag>
-              </div>
-            ) : null}
+          <div aria-label="会话状态筛选" className="support-status-filters" role="group">
+            {([['open', '进行中'], ['closed', '已关闭'], ['all', '全部']] as const).map(([value, label]) => (
+              <Button aria-pressed={statusFilter === value} key={value}
+                onClick={() => { setStatusFilter(value); setQueuePage(1); }}
+                theme="borderless" type="tertiary">{label}</Button>
+            ))}
           </div>
-          <Text className="support-queue-sync-status" type="tertiary">
-            {lastReconciledAt ? <>最近同步：<TimestampText value={lastReconciledAt} /></> : '等待首次同步'}
-          </Text>
+          {scope === 'admin' ? <div className="support-admin-filters">
+            <div aria-label="会话归属筛选" className="support-assignment-filters" role="group">
+              {([['all', '全部客户'], ['unassigned', '未分配客户']] as const).map(([value, label]) => (
+                <Button aria-pressed={assignmentFilter === value} key={value} size="small"
+                  onClick={() => { setAssignmentFilter(value); setQueuePage(1); }}
+                  theme="borderless" type="tertiary">{label}</Button>
+              ))}
+            </div>
+            <Button aria-pressed={unreadOnly} icon={<IconBellStroked aria-hidden="true" />} size="small"
+              onClick={() => { setUnreadOnly((current) => !current); setQueuePage(1); }}
+              theme="borderless" type="tertiary">仅未读</Button>
+          </div> : null}
         </div>
-
+        {scope === 'admin' ? <div className="support-queue-summary-metrics">
+          <span>当前页未读 {visibleUnreadCount}</span><span>当前页未分配 {visibleUnassignedCount}</span>
+        </div> : null}
         {queueError && conversations.length > 0 ? (
           <Banner
             description={
@@ -797,30 +639,48 @@ export function OnlineSupportWorkbench({
           />
         ) : null}
 
-        <DataTable
-          columns={queueColumns}
-          data={visibleConversations}
-          error={conversations.length === 0 ? queueError : null}
-          loading={queueLoading}
-          pagination={{
-            currentPage: queuePage,
-            onPageChange: setQueuePage,
-            onPageSizeChange: (nextPageSize) => {
-              setQueuePageSize(nextPageSize);
-              setQueuePage(1);
-            },
-            pageSize: queuePageSize,
-            total: conversationTotal
-          }}
-          rowKey="id"
-        />
-      </Card>
+        <div aria-busy={queueLoading} className="support-inbox-list">
+          {queueLoading && conversations.length === 0 ? <div className="support-detail-state" role="status"><Spin tip="正在加载会话" /></div>
+            : queueError && conversations.length === 0 ? <div className="support-detail-state" role="alert">
+              <Text type="danger">会话加载失败：{adminErrorMessage(queueError)}</Text><Button onClick={() => void loadQueue()}>重新加载</Button>
+            </div> : visibleConversations.length === 0 ? <div className="support-detail-state" role="status">
+              <h3>{keyword || unreadOnly ? '没有匹配的会话' : '暂无会话'}</h3><p>可调整筛选条件，或稍后同步查看。</p>
+            </div> : <ul>
+              {visibleConversations.map((conversation) => <li key={conversation.id}>
+                <button type="button" className="support-inbox-item" aria-label={`打开用户 ${conversation.user_id} 会话`}
+                  aria-pressed={selectedConversationId === conversation.id} disabled={replySending || conversationAction !== null}
+                  onClick={() => { setSelectedConversationId(conversation.id); setMobileConversationOpen(true); }}>
+                  <span className="support-customer-avatar" aria-hidden="true">{conversation.email?.trim().slice(0, 1).toUpperCase() || '客'}</span>
+                  <span className="support-inbox-item-content">
+                    <span className="support-inbox-item-heading"><strong>用户 {conversation.user_id}</strong>
+                      {conversation.staff_unread_count > 0 ? <span className="support-unread-count" aria-label={`${conversation.staff_unread_count} 条未读`}>{conversation.staff_unread_count > 99 ? '99+' : conversation.staff_unread_count}</span> : null}
+                    </span>
+                    <span className="support-cell-ellipsis support-inbox-contact" title={contactLabel(conversation)}>{contactLabel(conversation)}</span>
+                    <span className="support-inbox-preview">{conversation.last_message_preview?.trim() || '暂无消息摘要'}</span>
+                    <span className="support-inbox-item-footer"><span title={supportAssignmentLabel(conversation)}>{supportAssignmentLabel(conversation)}</span><span>{conversation.status === 'closed' ? '已关闭' : '进行中'}</span></span>
+                    <span className="support-inbox-time"><TimestampText value={conversation.last_message_at} /></span>
+                  </span>
+                </button>
+              </li>)}
+            </ul>}
+        </div>
+        <footer className="support-queue-footer">
+          <span>共 {conversationTotal} 条，当前页显示 {visibleConversations.length} 条</span>
+          <Pagination currentPage={queuePage} pageSize={queuePageSize} total={conversationTotal} size="small"
+            showSizeChanger pageSizeOpts={[10, 20, 50, 100]} onPageChange={setQueuePage}
+            onPageSizeChange={(size) => { setQueuePageSize(size); setQueuePage(1); }} />
+          <span className="support-queue-sync-status">{lastReconciledAt ? <>最近同步 <TimestampText value={lastReconciledAt} /></> : '等待首次同步'}</span>
+        </footer>
+      </aside>
 
-      <Card bordered={false} className="support-chat-card" shadows="always">
+      <section aria-label="客户会话" className="support-chat-card">
+        <Button className="support-back-button" aria-label="返回会话列表" icon={<IconArrowLeft />} theme="borderless" type="tertiary" onClick={() => setMobileConversationOpen(false)}>会话列表</Button>
         {!selectedConversation ? (
           <div aria-live="polite" className="support-detail-state support-detail-empty" role="status">
-            <Empty description="请选择一条会话" />
-            <Text type="tertiary">打开队列中的会话后，可查看完整消息并处理客户问题。</Text>
+            <div className="support-empty-mark" aria-hidden="true"><IconSend /></div>
+            <h3>从一条会话开始</h3>
+            <p>在左侧选择客户，查看历史消息并回复。</p>
+            <span>未读消息会在会话列表中标记，方便及时跟进。</span>
           </div>
         ) : (
           <>
@@ -833,9 +693,7 @@ export function OnlineSupportWorkbench({
                     {supportAssignmentLabel(selectedConversation)}
                   </Tag>
                   {selectedConversation.staff_unread_count > 0 ? (
-                    <Badge count={selectedConversation.staff_unread_count} overflowCount={99} type="danger">
-                      <span className="support-unread-anchor">客服未读</span>
-                    </Badge>
+                    <span className="support-conversation-unread">{selectedConversation.staff_unread_count} 条未读</span>
                   ) : null}
                 </Space>
                 <Text type="tertiary">联系方式：{contactLabel(selectedConversation)}</Text>
@@ -960,13 +818,12 @@ export function OnlineSupportWorkbench({
             <form className="support-composer" onSubmit={submitReply}>
               <TextArea
                 aria-label="回复内容"
-                autosize={{ minRows: 3, maxRows: 7 }}
+                autosize={{ minRows: 2, maxRows: 4 }}
                 disabled={!canWrite || selectedConversation.status === 'closed' || replySending}
                 getValueLength={scalarLength}
-                maxCount={2000}
                 onChange={(value) => setComposerDraft(truncateScalars(value, 2000))}
                 placeholder={selectedConversation.status === 'closed' ? '请先重新打开会话' : '输入回复内容'}
-                showCounter
+                showCounter={false}
                 value={composerDraft}
               />
               <div className="support-composer-footer">
@@ -989,7 +846,8 @@ export function OnlineSupportWorkbench({
             </form>
           </>
         )}
-      </Card>
+      </section>
+      </div>
     </main>
   );
 }

@@ -210,6 +210,33 @@ describe('OnlineSupportWorkbench', () => {
     await waitFor(() => expect(api.setStatus).toHaveBeenCalledWith(11, 'closed'));
   });
 
+  it.each(['agent', 'admin'] as const)('preserves the selected reply when returning to the %s inbox', async (scope) => {
+    const api = supportApi([conversation()]);
+    const { container } = render(<OnlineSupportWorkbench api={api} pollIntervalMs={0} scope={scope} />);
+    const open = await screen.findByRole('button', { name: '打开用户 101 会话' });
+    fireEvent.click(open);
+    fireEvent.change(await screen.findByRole('textbox', { name: '回复内容' }), { target: { value: '正在核实，请稍候' } });
+    expect(container.querySelector('.support-workbench-page--conversation')).toBeInTheDocument();
+    fireEvent.click(container.querySelector('.support-back-button')!);
+    expect(container.querySelector('.support-workbench-page--conversation')).not.toBeInTheDocument();
+    fireEvent.click(open);
+    expect(screen.getByRole('textbox', { name: '回复内容' })).toHaveValue('正在核实，请稍候');
+    expect(open).toHaveAttribute('aria-pressed', 'true');
+    expect(api.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('keeps read-only conversations readable while disabling all mutations', async () => {
+    const api = supportApi([conversation()]);
+    render(<OnlineSupportWorkbench api={api} canWrite={false} pollIntervalMs={0} scope="admin" />);
+    fireEvent.click(await screen.findByRole('button', { name: '打开用户 101 会话' }));
+    expect(await screen.findByText('请帮我核实充值记录')).toBeInTheDocument();
+    for (const name of ['标记已读', '关闭会话', '发送回复']) expect(screen.getByRole('button', { name })).toBeDisabled();
+    expect(screen.getByRole('textbox', { name: '回复内容' })).toBeDisabled();
+    expect(api.sendMessage).not.toHaveBeenCalled();
+    expect(api.markRead).not.toHaveBeenCalled();
+    expect(api.setStatus).not.toHaveBeenCalled();
+  });
+
   it('cleans up the REST reconciliation interval on unmount', async () => {
     const api = supportApi([conversation()]);
     const setIntervalSpy = vi.spyOn(window, 'setInterval');

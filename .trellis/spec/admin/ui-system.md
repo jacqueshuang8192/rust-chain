@@ -861,8 +861,8 @@ Pages never concatenate an alternate staff identity or agent ID into a route.
 - The admin route/nav requires `support.conversations.read`; mutation controls
   require `support.conversations.write`. Read-only roles can inspect history
   while reply, read, and status actions remain visibly disabled.
-- Queue status and admin-unassigned filters execute server queries. `DataTable`
-  uses controlled server pagination: page/page-size map to
+- Queue status and admin-unassigned filters execute server queries. The inbox
+  uses controlled Semi Pagination: page/page-size map to
   `offset=(page-1)*pageSize` and `limit=pageSize`; changing a server filter
   resets to page 1. Never page only the first fixed 100 rows against a larger
   backend `total`.
@@ -873,11 +873,18 @@ Pages never concatenate an alternate staff identity or agent ID into a route.
   global totals.
 - Any keyword filter that is not implemented by the backend must be labelled as
   a current-page filter and must not claim global result coverage.
-- On desktop, the admin workbench keeps the queue and selected conversation in
-  a stable two-column surface; the message history owns bounded vertical
-  scrolling and the composer remains visible. At narrow widths, the columns
-  stack, filter/search controls and conversation actions wrap vertically, and
-  the document must not acquire horizontal overflow.
+- Both scopes share an inbox/chat split with neutral surfaces and scoped styles
+  in `support/onlineSupport.css`. Inbox rows expose complete customer context
+  without a horizontally scrolling resource table; the selected row uses
+  `aria-pressed`. Queue and message history scroll independently.
+- At <=900px, selecting a conversation shows the chat and a return-to-list
+  action. Returning preserves selection, reply draft and failed retry intent;
+  opening another conversation retains the existing draft-reset behavior.
+  Keep the return action available even if the selected detail is unavailable.
+  The composer must remain reachable in short viewports and error states;
+  do not clip stacked errors, and avoid document-level horizontal overflow.
+- Disable switching conversations while a reply or read/status mutation is
+  pending so its response cannot update another conversation's visible state.
 - Opening a conversation loads its current metadata and newest message page.
   “Load older” uses `next_before_id`, keeps existing messages on failure,
   deduplicates immutable IDs, and preserves chronological order.
@@ -921,8 +928,9 @@ Pages never concatenate an alternate staff identity or agent ID into a route.
   semantics, admin unread filtering, older-history merge/retry, unread/status
   actions, same-ID reply retry, stale request suppression, and polling cleanup.
 - Route/navigation/access tests prove the admin read permission and agent route
-  registration; browser checks cover 1280px, empty/error/long-message states,
-  resizable queue columns, no action wrapping, and zero document overflow.
+  registration; browser checks cover desktop/narrow layouts, empty/error/long-message
+  states, list/chat navigation, draft preservation, reachable actions and zero
+  document overflow.
 
 ### 7. Wrong vs Correct
 
@@ -930,11 +938,9 @@ Pages never concatenate an alternate staff identity or agent ID into a route.
 // Wrong: local pagination can never reach rows after the first fetch.
 <DataTable data={firstHundred} />
 
-// Correct: the table controls backend offset/limit.
-<DataTable
-  data={currentPageRows}
-  pagination={{ currentPage, pageSize, total, onPageChange, onPageSizeChange }}
-/>
+// Correct: render currentPageRows and drive backend offset/limit with pagination.
+<Pagination currentPage={currentPage} pageSize={pageSize} total={total}
+  onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
 ```
 
 Backend ownership, persistence, and exact-agent authorization remain defined by
