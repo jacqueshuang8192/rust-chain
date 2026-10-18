@@ -38,7 +38,7 @@ Implement the nine user requirements (2026-10-19) across agent application/revie
 Deploying production changes, editing applied migrations, changing unrelated products, or including unrelated leftover Tabs work without explicit accounting.
 
 ## Current Status
-Implementation and functional verification complete. See delivery.md for evidence, the pre-existing Web bundle-budget failure, and rollout requirements. On 2026-10-19 the user explicitly authorized committing the documented manifest and pushing to origin/main. Commit/push execution is in progress; no production deployment or migration is included.
+Implementation and functional verification complete. See delivery.md for evidence, the pre-existing Web bundle-budget failure, and rollout requirements. On 2026-10-19 the user explicitly authorized committing the documented manifest and pushing to origin/main. Business commit ec781e2 and prior downline-record commit 11e5c40 were pushed successfully; remote main matched local archive commit 04f5e35. The task is archived. No production deployment or migration was performed.
 
 ## Confirmed Decisions
 - 2026-10-19: direct platform buyback, valid engine quote, deduct fee from proceeds, atomic unlock/sell/credit.

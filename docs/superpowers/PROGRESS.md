@@ -9810,3 +9810,10 @@
 - 修改文件：`.trellis/tasks/10-19-agent-token-lifecycle/{commit-plan.md,prd.md,task.json,delivery.md}`及本进度文件；业务内容沿用前述已验收版本。
 - 验证结果：git fetch成功；main领先origin/main一个下级记录提交11e5c40，无落后或分叉；git diff --check和清单集合校验通过。本轮未修改业务代码，不重复已完成的业务验收。
 - 后续事项：执行业务提交、任务归档、普通推送和远端哈希核对，并记录实际结果；未部署。
+
+## 2026-10-19 05:25 - 新币全生命周期提交推送完成
+
+- 完成内容：按用户授权生成业务提交ec781e2，包含新币全生命周期和此前申请/记录Tabs的138个清单文件；归档当前任务生成04f5e35；与下级记录提交11e5c40一并普通推送origin/main。按Trellis收尾记录日志，既有.vite缓存未提交。
+- 修改文件：本次业务提交清单见`.trellis/tasks/archive/2026-10/10-19-agent-token-lifecycle/commit-plan.md`；本切片更新该任务的PRD/交付/提交结果/task.json、本进度文件及Trellis会话日志。
+- 验证结果：清单与工作区精确一致、git diff --cached --check通过；push成功，git ls-remote确认远端main与本地完整哈希04f5e3599dc5c67762075b82175e2bc636fe6420一致。业务源码未再变更，沿用前述Rust/Web/Mobile/PC测试和浏览器验收；收尾记录提交后再次推送并核对远端。
+- 后续事项：未部署。上线仍需0152/0153迁移及按现有审计流程配置平台回购资金；Web既有总JS预算2699820 > 2600000仍待单独处理，未放宽阈值。
