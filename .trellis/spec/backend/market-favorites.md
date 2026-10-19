@@ -17,11 +17,13 @@ DELETE /api/v1/user/market-favorites/:symbol
 - Every endpoint requires `UserAuth` and operates only on the authenticated
   user ID.
 - `:symbol` is parsed with the existing market-symbol validator and resolved
-  only against an active trading pair.
+  only against an active trading pair eligible for spot: any associated v2 issuance
+  must be listed with non-null `actual_listed_at`.
 - PUT is idempotent: adding an existing `(user_id, trading_pair_id)` succeeds
   without creating a duplicate.
 - DELETE is idempotent: deleting an absent favorite succeeds.
-- GET returns only favorites whose trading pair is still active.
+- GET returns only favorites whose trading pair is still active and eligible for
+  spot under the same v2 listing rule. Historical hidden favorites are retained.
 
 ## Persistence Contract
 

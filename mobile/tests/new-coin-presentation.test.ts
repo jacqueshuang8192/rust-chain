@@ -97,6 +97,17 @@ test('trading opportunities require the configured pair id and never infer by sy
   assert.deepEqual(buildNewCoinOpportunities(projects, tickers, 'hotGains', now).map(({ project: item }) => item.id), [3, 1])
 })
 
+test('purchase charts and stale market rows never create ordinary spot opportunities', () => {
+  for (const lifecycleStatus of ['preheat', 'subscription', 'distribution', 'purchase', 'closed']) {
+    const candidate = project({ lifecycleStatus, postListingPairId: 41, listedAt: Date.now() - 1 })
+    for (const filter of ['all', 'upcoming', 'listedToday', 'hotGains'] as const) {
+      assert.deepEqual(buildNewCoinOpportunities([candidate], [ticker()], filter), [])
+    }
+  }
+  const listed = project({ lifecycleStatus: 'listed', postListingPairId: 41 })
+  assert.equal(buildNewCoinOpportunities([listed], [ticker()], 'all').length, 1)
+})
+
 test('supported backend unlock enums map symmetrically and unknown values stay available as fallbacks', () => {
   assert.equal(newCoinUnlockTypeTranslationKey('immediate_on_listing'), 'newCoin.immediateUnlock')
   assert.equal(newCoinUnlockTypeTranslationKey('fixed_time'), 'newCoin.fixedUnlock')

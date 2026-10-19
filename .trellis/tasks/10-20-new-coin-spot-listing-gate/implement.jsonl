@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/token-issuance-v2.md", "reason": "Actual listing versus live purchase feeds"}
+{"file": ".trellis/spec/backend/market-favorites.md", "reason": "Spot discovery and favorites consistency"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Transaction checks and real database regression"}
+{"file": ".trellis/spec/mobile/backend-integration.md", "reason": "REST-owned client market membership"}

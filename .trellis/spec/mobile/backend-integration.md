@@ -2402,7 +2402,7 @@ if (directory.state === 'loaded') {
 - Project and record prices, quantities, supply counters, balances, and fees stay `DecimalText` through formatting and mutations. Number conversion is limited to bounded progress geometry and market presentation fields whose shared model is numeric.
 - The project `quoteAssetId` selects the wallet account for subscription and post-listing purchase. Never fall back to a wallet symbol, `USDT`, or the first account. The configured `postListingPairId` is the only market join key and trade target.
 - Post-listing purchase percentage, review, and payload calculations use the project's exact `issuePriceText`, matching the backend write invariant. Shared ticker values remain presentation-only and cannot become a client-selected execution price.
-- New Coin Activities filters follow `preheat`, `subscription`, `distribution`, `purchase`, `listed`, in that order. Distribution is labelled distribution, never pending listing. The six filters (including All) form one horizontally scrollable row with 44px targets. Legacy detail retains four milestones without a synthetic purchase stage. Trading Opportunities require only an authoritative `postListingPairId` and a shared-store ticker whose numeric ID exactly matches that pair; `postListingPurchaseEnabled` gates the direct-purchase mutation, not navigation to ordinary Spot Trade.
+- New Coin Activities filters follow `preheat`, `subscription`, `distribution`, `purchase`, `listed`, in that order. Distribution is labelled distribution, never pending listing. The six filters (including All) form one horizontally scrollable row with 44px targets. Legacy detail retains four milestones without a synthetic purchase stage. Trading Opportunities require `lifecycleStatus=listed`, an authoritative `postListingPairId`, and a shared-store ticker whose numeric ID exactly matches that pair; live purchase prices or planned listing dates never authorize spot navigation; `postListingPurchaseEnabled` gates the direct-purchase mutation, not navigation to ordinary Spot Trade.
 - Backend unlock enums `immediate_on_listing`, `fixed_time`, and `relative_period` map to symmetric localized labels on cards and detail rules. Unknown future values remain visible as their raw backend text instead of being mislabeled.
 - The New Coin surface performs one shared market refresh, owns a stable consumer lease only while needed, and releases that exact consumer on tab exit/unmount. Local tab/filter changes do not refetch project or record directories.
 - Public project/detail and market reads use the explicit public-request marker, which strips even a stale stored Bearer token and never expires or redirects the session on a public 401. The Zone starts the market cold load only when Trading Opportunities is opened; wallet and four record-directory reads stay behind an authenticated-session guard, so a guest can always remain on the public Zone/Opportunity routes.
@@ -2488,3 +2488,15 @@ bundle thresholds. Never weaken the release gate to add a feature.
   tails do not consume the axis. The inspector uses the same display function.
   Tiny values such as `1e-18` remain nonzero. Exact financial quote text is
   independent of this chart-only presentation rule.
+
+## Spot Catalog Membership During Token Issuance
+
+`GET /markets` owns ordinary spot membership. The server excludes v2 projects
+without both listed lifecycle and actual listing evidence while keeping direct
+symbol ticker/K-line reads available for the new-coin purchase workspace.
+Mobile accepts a successful empty catalog and removes old ticker rows; malformed
+catalogs or a nonempty catalog with no usable quotes remain refresh failures.
+PC live frames may update existing catalog entries only, never insert unknown or
+removed symbols. Listing discovery comes from the next REST catalog refresh.
+Regression tests execute the real adapters/stores for empty-catalog removal,
+quote/contract errors, unknown/late frames, and listed-only new-coin opportunities.

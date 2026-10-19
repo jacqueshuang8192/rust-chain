@@ -81,12 +81,8 @@ export const useMarketStore = defineStore('market', () => {
         zone: finiteNumber(ticker.zone, current.zone),
         chg: typeof ticker.chg === 'number' ? ticker.chg : (open ? ((close - open) / open * 100) : 0),
       }
-    } else {
-        // Calculate chg for new ticker
-        const newTicker = { ...ticker }
-        newTicker.chg = typeof newTicker.chg === 'number' ? newTicker.chg : (newTicker.open ? ((newTicker.close - newTicker.open) / newTicker.open * 100)  : 0)
-        tickers.value.push(newTicker)
     }
+    // REST owns spot membership; purchase-stage or late frames cannot add pairs.
   }
 
   return {

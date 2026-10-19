@@ -183,6 +183,26 @@ where
     Ok(row.map(SpotIdempotentOrderRecord::from))
 }
 
+/// 在建单事务内共享锁定发行项目，认购行情可用不等于现货可交易。
+/// 普通交易对与旧版发行保持原行为；任一关联新版项目未实际上市则失败，不写订单或钱包。
+pub(super) async fn ensure_spot_listing_in_tx(
+    tx: &mut Transaction<'_, MySql>,
+    pair_db_id: u64,
+) -> AppResult<()> {
+    let listed: Vec<bool> = sqlx::query_scalar(
+        "SELECT lifecycle_status = 'listed' AND actual_listed_at IS NOT NULL FROM new_coin_projects WHERE post_listing_pair_id = ? AND issuance_policy IS NOT NULL FOR SHARE",
+    )
+    .bind(pair_db_id)
+    .fetch_all(&mut **tx)
+    .await?;
+    if listed.iter().any(|listed| !listed) {
+        return Err(AppError::Conflict(
+            "项目尚未上市，请使用新币认购入口".into(),
+        ));
+    }
+    Ok(())
+}
+
 /// 在调用方事务中插入并锁定现货订单；订单保留资产与金额必须已按交易对和订单类型计算完成。
 /// 唯一幂等键命中时仅允许同一用户且请求价、参考价和保留金额完全一致的重放，并返回既有订单而不触发第二次冻结。
 /// 本函数不提交事务且不写钱包；新订单返回 `is_new_order=true` 后，调用方必须在同一事务内完成冻结再提交。
@@ -206,14 +226,7 @@ pub(crate) async fn insert_spot_order_in_tx(
             crate::numeric::ensure_amount_storage(value, label)?;
         }
     }
-    // 认购行情先行运行，现货仅在真实上市后开放；锁内判定防止通用下单绕过项目阶段。
-    let stage: Option<String> = sqlx::query_scalar("SELECT lifecycle_status FROM new_coin_projects WHERE post_listing_pair_id=? AND issuance_policy IS NOT NULL FOR SHARE")
-        .bind(pair_db_id).fetch_optional(&mut **tx).await?;
-    if stage.is_some_and(|stage| stage != "listed") {
-        return Err(AppError::Conflict(
-            "项目仍处于发行阶段，请使用新币认购入口".into(),
-        ));
-    }
+    ensure_spot_listing_in_tx(tx, pair_db_id).await?;
     // 下单记录和钱包冻结必须同事务提交；ON DUPLICATE KEY 会串行化同键竞争，
     // 避免多个失败 INSERT 持有外键共享锁后再升级订单锁所形成的死锁环。
     let user_id = new_order

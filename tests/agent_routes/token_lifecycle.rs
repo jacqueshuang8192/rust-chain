@@ -35,7 +35,7 @@ async fn ticker(
     age: i64,
 ) {
     let now = chrono::Utc::now();
-    let payload = json!({"symbol":symbol,"last_price":price,"provider":"strategy","source":"default","observed_at":(now-chrono::Duration::seconds(age)).timestamp_millis()});
+    let payload = json!({"symbol":symbol,"last_price":price,"volume_24h":"0","provider":"strategy","source":"default","observed_at":(now-chrono::Duration::seconds(age)).timestamp_millis()});
     redis
         .clone()
         .set::<_, _, ()>(
@@ -59,6 +59,24 @@ async fn wallet(pool: &MySqlPool, user: u64, asset: u64) -> (BigDecimal, BigDeci
 }
 fn decimal(value: &Value) -> BigDecimal {
     BigDecimal::from_str(value.as_str().unwrap()).unwrap()
+}
+
+async fn assert_spot_discovery(app: &axum::Router, token: &str, pair: u64, visible: bool) {
+    for (path, field, id_key) in [
+        ("/api/v1/markets", "markets", "id"),
+        ("/api/v1/user/market-favorites", "favorites", "market_id"),
+    ] {
+        let response = ok(request(app, token, "GET", path, json!(null)).await);
+        assert_eq!(
+            response[field]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|row| row[id_key] == pair),
+            visible,
+            "{path}: pair {pair} visibility"
+        );
+    }
 }
 
 #[tokio::test]
@@ -518,9 +536,189 @@ async fn token_lifecycle_scopes_allocations_quotes_buyback_and_continuous_spot_h
         .0,
         StatusCode::CONFLICT
     );
-    // General spot cannot bypass the purchase phase, even though the chart's pair is active.
-    let spot=request(&app,&bt,"POST","/api/v1/spot/orders",json!({"pair_id":pair_symbol,"side":"sell","order_type":"limit","price":"0.4","quantity":"1","idempotency_key":"prelisting-spot"})).await;
-    assert!(!spot.0.is_success());
+    // A separately funded user proves stage rejection, not insufficient balances.
+    let spot_user = create_user(&pool, "prelisting-spot").await;
+    let spot_token = utoken(spot_user);
+    for asset_id in [asset, quote] {
+        sqlx::query("INSERT INTO wallet_accounts(user_id,asset_id,available) VALUES (?,?,100)")
+            .bind(spot_user)
+            .bind(asset_id)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+    sqlx::query("INSERT INTO user_market_favorites(user_id,trading_pair_id) VALUES (?,?)")
+        .bind(spot_user)
+        .bind(pair)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let spot_repo = exchange_api::modules::spot::MySqlSpotRepository::new(pool.clone());
+    for phase in [
+        "preheat",
+        "subscription",
+        "distribution",
+        "purchase",
+        "listed",
+    ] {
+        // Keep the feed active to catch accidental publication through an active pair;
+        // even a listed label without actual listing evidence must stay hidden.
+        sqlx::query("UPDATE new_coin_projects SET lifecycle_status=? WHERE id=?")
+            .bind(phase)
+            .bind(project)
+            .execute(&pool)
+            .await
+            .unwrap();
+        assert_spot_discovery(&app, &spot_token, pair, false).await;
+        let favorite = request(
+            &app,
+            &spot_token,
+            "PUT",
+            &format!("/api/v1/user/market-favorites/{pair_symbol}"),
+            json!({}),
+        )
+        .await;
+        assert_eq!(favorite.0, StatusCode::BAD_REQUEST, "{favorite:?}");
+        assert!(
+            !spot_repo
+                .load_pair_rule_async(&pair.to_string())
+                .await
+                .unwrap()
+                .enabled
+        );
+    }
+    sqlx::query("UPDATE new_coin_projects SET lifecycle_status='purchase' WHERE id=?")
+        .bind(project)
+        .execute(&pool)
+        .await
+        .unwrap();
+    // Legacy projects keep their existing active-pair contract.
+    sqlx::query("UPDATE new_coin_projects SET issuance_policy=NULL WHERE id=?")
+        .bind(project)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_spot_discovery(&app, &spot_token, pair, true).await;
+    assert!(
+        spot_repo
+            .load_pair_rule_async(&pair_symbol)
+            .await
+            .unwrap()
+            .enabled
+    );
+    sqlx::query("UPDATE new_coin_projects SET issuance_policy=? WHERE id=?")
+        .bind(sqlx::types::Json(policy()))
+        .bind(project)
+        .execute(&pool)
+        .await
+        .unwrap();
+    // A timestamp alone cannot authorize a project that is still in purchase.
+    sqlx::query("UPDATE new_coin_projects SET actual_listed_at=UTC_TIMESTAMP(6) WHERE id=?")
+        .bind(project)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_spot_discovery(&app, &spot_token, pair, false).await;
+    assert!(
+        !spot_repo
+            .load_pair_rule_async(&pair_symbol)
+            .await
+            .unwrap()
+            .enabled
+    );
+    sqlx::query("UPDATE new_coin_projects SET actual_listed_at=NULL WHERE id=?")
+        .bind(project)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let quote_before = wallet(&pool, spot_user, quote).await;
+    let base_before = wallet(&pool, spot_user, asset).await;
+    for pair_id in [&pair_symbol, &pair.to_string()] {
+        for side in ["buy", "sell"] {
+            for kind in ["limit", "market", "stop_limit"] {
+                let mut input = json!({"pair_id":pair_id,"side":side,"order_type":kind,"quantity":"10",
+                    "idempotency_key":format!("prelisting-{pair_id}-{side}-{kind}")});
+                if kind == "market" {
+                    input["reference_price"] = json!("0.4");
+                } else {
+                    input["price"] = json!("0.4");
+                }
+                if kind == "stop_limit" {
+                    input["trigger_price"] = json!("0.4");
+                    input["trigger_direction"] = json!("rising");
+                }
+                let rejected =
+                    request(&app, &spot_token, "POST", "/api/v1/spot/orders", input).await;
+                assert_eq!(rejected.0, StatusCode::BAD_REQUEST, "{rejected:?}");
+                assert!(
+                    rejected.1.to_string().contains("TradingPairDisabled"),
+                    "{rejected:?}"
+                );
+            }
+        }
+    }
+    // The compatibility writer cannot bypass the transaction-level gate either.
+    use exchange_api::modules::spot::{NewOrder, OrderSide, OrderStatus, OrderType};
+    let rejected = spot_repo
+        .insert_order_async(
+            NewOrder {
+                user_id: spot_user.to_string(),
+                pair_id: pair_symbol.clone(),
+                side: OrderSide::Buy,
+                order_type: OrderType::Limit,
+                price: Some(BigDecimal::from_str("0.4").unwrap()),
+                trigger_price: None,
+                trigger_direction: None,
+                triggered_at: None,
+                quantity: BigDecimal::from(10),
+                filled_quantity: BigDecimal::from(0),
+                status: OrderStatus::Pending,
+            },
+            Some("compatibility-prelisting"),
+        )
+        .await
+        .unwrap_err();
+    assert!(format!("{rejected:?}").contains("项目尚未上市"));
+    assert_eq!(wallet(&pool, spot_user, quote).await, quote_before);
+    assert_eq!(wallet(&pool, spot_user, asset).await, base_before);
+    for table in ["spot_orders", "wallet_ledger"] {
+        let count: i64 =
+            sqlx::query_scalar(&format!("SELECT COUNT(*) FROM {table} WHERE user_id=?"))
+                .bind(spot_user)
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(count, 0);
+    }
+    let live = ok(request(
+        &app,
+        &spot_token,
+        "GET",
+        &format!("/api/v1/markets/{pair_symbol}/ticker"),
+        json!(null),
+    )
+    .await);
+    assert_eq!(
+        decimal(&live["last_price"]),
+        BigDecimal::from_str("0.4").unwrap()
+    );
+    // No Mongo is installed in this fixture; the chart request must nevertheless
+    // pass market visibility and reach the unchanged history storage boundary.
+    let history = request(
+        &app,
+        &spot_token,
+        "GET",
+        &format!("/api/v1/markets/{pair_symbol}/klines?interval=1m"),
+        json!(null),
+    )
+    .await;
+    assert_eq!(history.0, StatusCode::INTERNAL_SERVER_ERROR);
+    assert!(
+        history
+            .1
+            .to_string()
+            .contains("mongo database is not configured")
+    );
     let buy = ok(request(
         &app,
         &bt,
@@ -647,6 +845,41 @@ async fn token_lifecycle_scopes_allocations_quotes_buyback_and_continuous_spot_h
     .await
     .unwrap();
     stage(&app, &ct, project, "purchase", "listed").await;
+    assert_spot_discovery(&app, &spot_token, pair, true).await;
+    assert!(
+        spot_repo
+            .load_pair_rule_async(&pair_symbol)
+            .await
+            .unwrap()
+            .enabled
+    );
+    ok(request(
+        &app,
+        &spot_token,
+        "PUT",
+        &format!("/api/v1/user/market-favorites/{pair_symbol}"),
+        json!({}),
+    )
+    .await);
+    for side in ["buy", "sell"] {
+        let input = json!({"pair_id":pair.to_string(),"side":side,"order_type":"market",
+            "reference_price":"0.42","quantity":"10","idempotency_key":format!("listed-{side}")});
+        let traded = ok(request(
+            &app,
+            &spot_token,
+            "POST",
+            "/api/v1/spot/orders",
+            input.clone(),
+        )
+        .await);
+        assert_eq!(traded["status"], "filled");
+        assert_eq!(
+            ok(request(&app, &spot_token, "POST", "/api/v1/spot/orders", input).await),
+            traded
+        );
+    }
+    assert_eq!(wallet(&pool, spot_user, quote).await, quote_before);
+    assert_eq!(wallet(&pool, spot_user, asset).await, base_before);
     let listed_logo: Option<String> =
         sqlx::query_scalar("SELECT logo_url FROM trading_pairs WHERE id=?")
             .bind(pair)

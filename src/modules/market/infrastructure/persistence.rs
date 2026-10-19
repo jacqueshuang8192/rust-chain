@@ -120,8 +120,8 @@ async fn list_one_minute_kline_open_times_with_filter(
     Ok(open_times)
 }
 
-/// 从 MySQL 返回全部 active 交易对及 base/quote 资产 Logo、精度和最小下单额，按 symbol 升序排列。
-/// 查询失败原样返回数据库错误，不把故障伪装为空市场列表。
+/// 从 MySQL 返回已开放现货的 active 交易对及 base/quote 资产 Logo、精度和最小下单额，按 symbol 升序排列。
+/// 新版发行项目必须已上市且有实际上市时间；认购行情保持运行但不进入现货目录。查询失败原样返回数据库错误。
 /// 资产表使用内连接，因此基础或计价资产缺失的交易对不会出现在结果中；最小下单额转成字符串输出以保留精度。
 pub(crate) async fn list_active_markets(pool: &Pool<MySql>) -> AppResult<Vec<MarketResponse>> {
     let markets = sqlx::query_as::<_, MarketResponse>(
@@ -141,6 +141,12 @@ pub(crate) async fn list_active_markets(pool: &Pool<MySql>) -> AppResult<Vec<Mar
            INNER JOIN assets base ON base.id = pairs.base_asset
            INNER JOIN assets quote ON quote.id = pairs.quote_asset
            WHERE pairs.status = 'active'
+             AND NOT EXISTS (
+                 SELECT 1 FROM new_coin_projects project
+                 WHERE project.post_listing_pair_id = pairs.id
+                   AND project.issuance_policy IS NOT NULL
+                   AND (project.lifecycle_status <> 'listed' OR project.actual_listed_at IS NULL)
+             )
            ORDER BY pairs.symbol ASC"#,
     )
     .fetch_all(pool)
@@ -150,7 +156,7 @@ pub(crate) async fn list_active_markets(pool: &Pool<MySql>) -> AppResult<Vec<Mar
 }
 
 /// 查询用户仍处于 active 状态的自选交易对，按收藏创建时间和记录 ID 稳定排序。
-/// 已下架交易对不会出现在结果中；查询只读且不修复历史收藏记录。
+/// 已下架或尚未实际上市的新版发行交易对不会出现在结果中；查询只读且不修复历史收藏记录。
 /// 返回的交易对已在 SQL 内去掉分隔符并转为大写，与公开行情接口的写法一致，前端无需再做二次转换。
 pub(crate) async fn list_user_market_favorites(
     pool: &Pool<MySql>,
@@ -170,6 +176,12 @@ pub(crate) async fn list_user_market_favorites(
            INNER JOIN assets quote ON quote.id = pairs.quote_asset
            WHERE favorites.user_id = ?
              AND pairs.status = 'active'
+             AND NOT EXISTS (
+                 SELECT 1 FROM new_coin_projects project
+                 WHERE project.post_listing_pair_id = pairs.id
+                   AND project.issuance_policy IS NOT NULL
+                   AND (project.lifecycle_status <> 'listed' OR project.actual_listed_at IS NULL)
+             )
            ORDER BY favorites.created_at ASC, favorites.id ASC"#,
     )
     .bind(user_id)
@@ -228,7 +240,7 @@ pub(crate) async fn remove_user_market_favorite(
 
 /// 按规范化交易对取出唯一一条 active 交易对，并组装自选响应所需的市场 ID、Logo 与基础/计价资产。
 /// SQL 内先对配置中的 symbol 去分隔符并转大写再比较，命中多条时用 LIMIT 1 取首条而非报错。
-/// 交易对不存在或已下架返回 `None`，由调用方转成校验错误；本查询只读，不写入任何自选记录。
+/// 交易对不存在、已下架或新版发行尚未实际上市返回 `None`，由调用方转成校验错误；本查询只读，不写入任何自选记录。
 async fn load_active_market_favorite(
     pool: &Pool<MySql>,
     symbol: &str,
@@ -245,6 +257,12 @@ async fn load_active_market_favorite(
            INNER JOIN assets base ON base.id = pairs.base_asset
            INNER JOIN assets quote ON quote.id = pairs.quote_asset
            WHERE pairs.status = 'active'
+             AND NOT EXISTS (
+                 SELECT 1 FROM new_coin_projects project
+                 WHERE project.post_listing_pair_id = pairs.id
+                   AND project.issuance_policy IS NOT NULL
+                   AND (project.lifecycle_status <> 'listed' OR project.actual_listed_at IS NULL)
+             )
              AND REPLACE(REPLACE(REPLACE(UPPER(pairs.symbol), '-', ''), '/', ''), '_', '') = ?
            LIMIT 1"#,
     )
@@ -254,8 +272,8 @@ async fn load_active_market_favorite(
     .map_err(AppError::from)
 }
 
-/// 判断规范化交易对是否对应至少一条 active MySQL 交易对记录，供自选与公共行情入口做上架校验。
-/// 以计数是否大于零判断而不取行，因此重复配置同一交易对也只得到一个布尔结果。
+/// 判断规范化交易对是否对应 active MySQL 行情记录，仅用于按 symbol 读取行情，不代表现货已上市。
+/// 认购阶段需要此入口读取行情；现货目录、自选和下单必须额外校验真实上市，不能复用此布尔值作为交易许可。
 /// 查询失败按数据库错误上抛而不会被当成未上架；结果不区分交易对不存在与已下架两种情况。
 pub(crate) async fn market_symbol_is_listed(pool: &Pool<MySql>, symbol: &str) -> AppResult<bool> {
     let listed = sqlx::query_as::<_, (i64,)>(

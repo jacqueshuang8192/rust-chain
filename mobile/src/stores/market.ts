@@ -27,7 +27,6 @@ export const useMarketStore = defineStore('mobile-market', () => {
   const lifecycle = createSharedMarketLifecycle({
     load: async () => {
       const next = await fetchMarketTickers()
-      if (!next.length) throw new Error('market list is empty')
       tickers.value = mergeMarketTickerSnapshots(tickers.value, next)
     },
     hasData: () => tickers.value.length > 0,

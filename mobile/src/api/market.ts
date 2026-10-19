@@ -75,7 +75,8 @@ export async function fetchMarketTickers(): Promise<MarketTicker[]> {
     requestUrl('/markets'),
     publicApiRequestConfig(),
   )
-  const markets = Array.isArray(response.data.markets) ? response.data.markets : []
+  if (!Array.isArray(response.data.markets)) throw new Error('invalid market catalog')
+  const markets = response.data.markets
   const results = await Promise.allSettled(
     markets.map((market) => client.get<BackendTicker>(
       requestUrl(`/markets/${encodeURIComponent(normalizeSymbol(market.symbol))}/ticker`),
@@ -83,13 +84,17 @@ export async function fetchMarketTickers(): Promise<MarketTicker[]> {
     )),
   )
 
-  return markets
+  const tickers = markets
     .map((market, index) => {
       const result = results[index]
       return result?.status === 'fulfilled' ? mapMarketTicker(market, result.value.data) : null
     })
     .filter((ticker): ticker is MarketTicker => Boolean(ticker && ticker.lastPrice > 0))
     .sort((left, right) => right.volume - left.volume)
+  // An empty catalog removes delisted rows. Failed quotes must not masquerade as
+  // an authoritative empty catalog and discard the last usable snapshot.
+  if (markets.length && !tickers.length) throw new Error('market quotes unavailable')
+  return tickers
 }
 
 export async function fetchKlines(

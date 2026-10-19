@@ -26,6 +26,20 @@ test('PC store keeps price and provenance together across initial REST, late RES
   assert.equal(store.tickers[0]!.close, 12)
 })
 
+test('PC live prices cannot publish a pair absent from the spot catalog or resurrect a removed pair', () => {
+  setActivePinia(createPinia())
+  const store = useMarketStore()
+  const candidate: Ticker = { symbol: 'NEW/USDT', icon: '', open: 1, high: 1, low: 1, close: 1, volume: 2, turnover: 2, time: 1790000000000, chg: 0, zone: 0 }
+  store.updateTicker(candidate)
+  assert.deepEqual(store.tickers, [])
+  store.setTickers([candidate])
+  store.updateTicker({ ...candidate, symbol: 'NEWUSDT', close: 2, time: candidate.time + 1000 })
+  assert.equal(store.tickers[0]!.close, 2)
+  store.setTickers([])
+  store.updateTicker({ ...candidate, time: candidate.time + 2000 })
+  assert.deepEqual(store.tickers, [])
+})
+
 test('PC REST adapters retain evidence for generated, external and platform rows', () => {
   for (const [source, provider] of [['platform', 'platform'], ['external', 'htx'], ['strategy', 'strategy'], ['default', 'strategy'], ['generated', 'strategy'], ['unknown', 'future']]) {
     const trade = mapMarketTradeToPcTrade({ id: '7', price: '12', amount: '2', time: 1790000000000, source, provider })

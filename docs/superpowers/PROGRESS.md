@@ -9922,3 +9922,17 @@
 - 修改文件：`mobile/src/views/NewCoinDetailView.vue`、`mobile/src/components/TokenTradingPanel.vue`、`mobile/src/styles/token-issuance.css`、`.trellis/spec/mobile/backend-integration.md`、`.trellis/tasks/10-20-new-coin-detail-live-ui/`及本记录。
 - 验证结果：`npm --prefix mobile run release:gate`退出0，871/871测试及类型、PWA/Tauri构建、制品、包体和治理门禁通过；差异检查通过。Ego隔离本地夹具确认无需点击刷新即可派发→认购→上市、持仓估值/收益与解禁状态自动变化，实际WebSocket订阅收到K线后图表收盘价更新至0.4；12组中英/明暗/320至448px布局无横溢，三处内容隐藏且持仓标题保留，截图已查看。夹具写请求为0，未操作生产资金。
 - 后续事项：按工作流保存本地提交并归档；未推送或部署。关闭任务Ego空间29与5187预览服务，保留既有服务及`.vite/`缓存。
+
+## 2026-10-20 04:48 - 新币认购与现货上市边界修复
+
+- 完成内容：现货目录、自选及规则读取排除未实际上市的新版发行项目，财务和兼容建单在事务内再次检查；认购交易对保持 active 以保留行情。Mobile 空目录清除旧行、异常目录/全失败报价仍报错，交易机会限定已上市；PC 行情帧只能更新目录内交易对。
+- 修改文件：`src/modules/market/{application.rs,infrastructure/persistence.rs}`、`src/modules/spot/infrastructure/{read_models,order_repository}.rs`、`mobile/src/{api/market.ts,stores/market.ts,core/newCoinPresentation.ts}`、`pc/src/stores/market.ts`、相关前后端测试与三份规范、`.trellis/tasks/10-20-new-coin-spot-listing-gate/`。
+- 验证结果：隔离 MySQL 9.3 与专属 Redis 首轮发行生命周期 2/2 通过，含有资余额的双方向×三种类型×名称/ID共12种订单拒绝、目录/自选过滤、兼容写入拒绝、钱包/流水/订单不变、真实上市后成交与幂等重放。Mobile release:gate 874/874、全部构建/制品/预算/治理通过；PC type-check/build及123/123通过；git diff --check通过。
+- 后续事项：补充旧版项目与单独上市时间兼容断言后复跑生命周期，完成市场/自选/现货/旧新币与架构回归、Clippy和交付整理。未操作生产数据，未推送或部署；本地无 Mongo，K线只验证可通过阶段校验到达历史存储边界，未执行真实历史读取。
+
+## 2026-10-20 04:48 - 新币现货上市门槛最终验收
+
+- 完成内容：完成新币行情与现货权限分离；新版项目必须 listed 且有 actual_listed_at 才进入现货、自选并允许下单。补齐旧版兼容、上市标签缺证据、仅时间戳、锁内兼容写入及客户端目录权威性回归；规范、研究和交付记录已同步。
+- 修改文件：本任务前述源码和测试、`.trellis/spec/backend/{market-favorites,token-issuance-v2}.md`、`.trellis/spec/mobile/backend-integration.md`、`.trellis/tasks/10-20-new-coin-spot-listing-gate/`和本记录。
+- 验证结果：最终生命周期2/2；市场路由实际执行13项通过、1项因无Mongo跳过；自选鉴权3/3、现货65/65、钱包仓储2/2、旧新币11/11、架构11/11、文档1/1、OpenAPI18/18通过。Mobile完整门禁874/874、PC类型/构建与123/123通过；严格Clippy all-targets、fmt、git diff和任务上下文检查通过。资金回归使用隔离MySQL9.3和专属Redis，未触及生产。
+- 后续事项：保存本地提交并归档，未推送、部署或新增迁移。Mongo历史K线实读和浏览器/原生设备未验证；本轮没有布局变更，前端行为通过真实模块执行回归。清理本任务测试库和Redis，保留原有服务及`.vite/`缓存。

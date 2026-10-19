@@ -99,7 +99,7 @@ export function buildNewCoinOpportunities(
       .map((ticker) => [ticker.id, ticker]),
   )
   const opportunities = projects.flatMap((project) => {
-    if (!project.postListingPairId) return []
+    if (project.lifecycleStatus !== 'listed' || !project.postListingPairId) return []
     const ticker = tickerById.get(project.postListingPairId)
     return ticker ? [{ project, ticker }] : []
   })

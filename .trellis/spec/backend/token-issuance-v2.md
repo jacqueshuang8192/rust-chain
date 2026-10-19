@@ -345,3 +345,54 @@ Wrong: recreate the pair at listing to install a Logo, or silently accept change
 Logo metadata on an existing idempotency key. Correct: update image metadata on
 the existing pair in the listing transaction and compare the full original
 application/creation intent on retry.
+
+## Spot Visibility and Admission
+
+### 1. Scope / Trigger
+Purchase-stage v2 charts must not publish or authorize an ordinary spot market.
+
+### 2. Signatures
+`GET /api/v1/markets`, `GET/PUT /api/v1/user/market-favorites[/:symbol]`,
+`POST /api/v1/spot/orders`; DB `post_listing_pair_id`, `issuance_policy`,
+`lifecycle_status`, `actual_listed_at`; no payload or schema changes.
+
+### 3. Contracts
+- A v2 project's pair can be active during purchase solely to run the market
+  generator. Active is not evidence of spot listing. Keep symbol-specific ticker,
+  depth, trade and K-line reads available to the token purchase workspace.
+- `GET /markets`, market-favorite reads/additions and spot pair rules exclude any
+  associated v2 project unless `lifecycle_status = listed` and
+  `actual_listed_at IS NOT NULL`. Planned dates cannot open spot trading.
+  Ordinary pairs and legacy (`issuance_policy IS NULL`) behavior stay unchanged.
+- Both financial and compatibility spot order insertion recheck listing under a
+  shared project-row lock before writing. Successful financial idempotent replay
+  remains before current-rule admission. Numeric pair IDs and symbols obey the
+  same rule for buys/sells and market/limit/stop-limit orders.
+- Listing keeps the same pair/generator/price/history. No migration, disabling of
+  purchase feeds, automatic sale or release of locked holdings is implied.
+
+### 4. Validation & Error Matrix
+| State / request | Outcome |
+| --- | --- |
+| Active v2 purchase pair, or listed label without actual timestamp | Omit from market/favorites; favorite PUT returns 400 |
+| Unlisted pair by numeric ID or symbol, any spot order type | 400 TradingPairDisabled; no financial writes |
+| Unlisted compatibility writer / transaction race | Listing conflict before insertion |
+| Listed plus actual timestamp, active pair | Discoverable and eligible for ordinary spot rules |
+| Successful order retry | Original response, no duplicate settlement |
+
+### 5. Good / Base / Bad Cases
+Good: live purchase ticker is readable while spot discovery is empty; listing
+publishes that same pair. Base: ordinary and legacy active markets stay visible.
+Bad: a planned date, active feed, or timestamp without listed stage opens spot.
+
+### 6. Tests Required
+Real MySQL/Redis lifecycle tests must prove hidden directories and saved
+  favorites, rejection of favorite creation, funded order denial with unchanged
+  wallets/ledger/order counts, and actual-listing visibility and spot settlement.
+  Include a listed label lacking actual evidence and a compatibility-writer
+  attempt, plus ordinary/legacy route regressions.
+
+### 7. Wrong vs Correct
+Wrong: disable the purchase pair or treat every active ticker as a spot listing.
+Correct: retain active feed reads, gate spot discovery/admission on both actual
+listing fields, and let REST catalogs own client market membership.

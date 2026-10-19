@@ -126,15 +126,21 @@ impl MySqlSpotRepository {
     }
 
     /// 从 MySQL 持久化数据读取交易对规则，保持现货既有归属过滤、可见性及排序条件。
-    /// 通过仓储适配器读取现货交易对规则；不存在返回领域仓储错误。
+    /// 新版发行只有 listed 且具备实际上市时间才启用现货规则；此处提前拒绝，建单事务仍需锁内复核。
     pub async fn load_pair_rule_async(
         &self,
         pair_id: &str,
     ) -> Result<crate::modules::spot::TradingPairRule, crate::modules::spot::SpotServiceError> {
-        let row = sqlx::query_as::<_, (u64, String, i32, i32, BigDecimal, String)>(
-            r#"SELECT id, symbol, price_precision, qty_precision, min_order_value, status
-               FROM trading_pairs
-               WHERE symbol = ? OR id = ?
+        let row = sqlx::query_as::<_, (u64, String, i32, i32, BigDecimal, bool)>(
+            r#"SELECT pairs.id, pairs.symbol, pairs.price_precision, pairs.qty_precision, pairs.min_order_value,
+                      pairs.status = 'active' AND NOT EXISTS (
+                          SELECT 1 FROM new_coin_projects project
+                          WHERE project.post_listing_pair_id = pairs.id
+                            AND project.issuance_policy IS NOT NULL
+                            AND (project.lifecycle_status <> 'listed' OR project.actual_listed_at IS NULL)
+                      ) AS enabled
+               FROM trading_pairs pairs
+               WHERE pairs.symbol = ? OR pairs.id = ?
                LIMIT 1"#,
         )
         .bind(pair_id)
@@ -148,7 +154,7 @@ impl MySqlSpotRepository {
             ))
         })?;
 
-        let (_id, symbol, price_precision, quantity_precision, min_order_value, status) = row;
+        let (_id, symbol, price_precision, quantity_precision, min_order_value, enabled) = row;
         if !(0..=18).contains(&price_precision) || !(0..=18).contains(&quantity_precision) {
             return Err(crate::modules::spot::SpotServiceError::Repository(
                 "invalid trading pair precision".to_owned(),
@@ -159,7 +165,7 @@ impl MySqlSpotRepository {
             price_precision: u32::try_from(price_precision).expect("validated precision"),
             quantity_precision: u32::try_from(quantity_precision).expect("validated precision"),
             min_order_value,
-            enabled: status == "active",
+            enabled,
         })
     }
 
@@ -198,6 +204,11 @@ impl MySqlSpotRepository {
             })?;
         let user_id = parse_spot_u64_identifier("user_id", &new_order.user_id)?;
         let pair_db_id = resolve_pair_id(&self.pool, &new_order.pair_id).await?;
+        super::order_repository::ensure_spot_listing_in_tx(&mut tx, pair_db_id)
+            .await
+            .map_err(|error| {
+                crate::modules::spot::SpotServiceError::Repository(error.to_string())
+            })?;
         let result = sqlx::query(
             r#"INSERT INTO spot_orders
                (user_id, pair_id, side, order_type, price, trigger_price, quantity, filled_quantity, status, idempotency_key, trigger_direction, triggered_at)

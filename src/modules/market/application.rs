@@ -23,7 +23,7 @@ use mongodb::Database;
 use redis::aio::ConnectionManager;
 use sqlx::{MySql, Pool};
 
-/// 返回 MySQL 中启用的交易对元数据；未配置 MySQL 时返回内置公开交易对目录。
+/// 返回 MySQL 中已开放现货的交易对元数据；新版发行需有真实上市记录，未配置 MySQL 时返回内置目录。
 /// 本用例不读取或合并 Redis 行情，也不创建资金事务或改变市场状态。
 pub(crate) async fn list_markets(mysql: Option<Pool<MySql>>) -> AppResult<MarketsResponse> {
     let Some(pool) = mysql else {
@@ -36,7 +36,7 @@ pub(crate) async fn list_markets(mysql: Option<Pool<MySql>>) -> AppResult<Market
     Ok(MarketsResponse { markets })
 }
 
-/// 按认证用户读取仍启用的收藏交易对，禁止暴露其他用户或下架记录。
+/// 按认证用户读取仍开放现货的收藏交易对，禁止暴露其他用户、下架或尚未上市的新版发行记录。
 /// 未配置 MySQL 时直接按内部错误失败，自选没有兜底目录可用；结果按收藏创建时间稳定排序。
 /// 纯只读操作，不会清理指向已下架交易对的历史收藏，也不读取任何行情缓存。
 pub(crate) async fn list_user_market_favorites(
@@ -172,8 +172,8 @@ pub(crate) async fn list_market_klines(
     Ok(rows)
 }
 
-/// 在读取任何行情之前确认交易对已上架：有 MySQL 时查 active 交易对，否则退回内置兜底目录判断。
-/// 未命中一律返回 `AppError::Validation`，因此未知或已下架交易对不会继续走到 Redis、Mongo 查询。
+/// 在读取行情之前确认行情已启用：有 MySQL 时查 active 交易对，否则退回内置兜底目录判断。
+/// 此校验允许新版认购行情，不代表现货已上市；未命中返回校验错误，不继续读取 Redis、Mongo。
 /// 数据库查询错误按原错误上抛，不会被误判成“未上架”；本函数只读，也不缓存判定结果。
 async fn ensure_listed_market_symbol(pool: Option<&Pool<MySql>>, symbol: &str) -> AppResult<()> {
     let listed = if let Some(pool) = pool {
