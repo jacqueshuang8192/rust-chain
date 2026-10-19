@@ -40,7 +40,7 @@
 
 ## Delivery state
 
-Implementation and validation complete. Business commit `d467cf4` created; remote push pending. No deployment.
+Implementation and validation complete. Business commit `d467cf4` created; pushed to `origin/main`. No deployment.
 Existing `.vite/` cache is excluded. Task space 26 and the task-owned 5187 Vite
 server were closed; pre-existing development servers were preserved. Ego Lite
 reported an available update; it was not installed.
@@ -52,3 +52,5 @@ the configured listing node remains manual.
 ## Commit result
 
 Business commit `d467cf4eca9d8c76be731b2d7801e151a3b1c598` is recorded. Task archive and journal follow before a normal remote push. Latest combined Mobile gate passed 871/871; no business source changed during submission.
+
+Remote verification: normal push to `origin/main` succeeded; `git ls-remote` matched local HEAD `ead6af5e0b6ba20e941f2fc8e05beaed14d06cfb`. This final delivery record is committed and pushed afterward. No deployment.

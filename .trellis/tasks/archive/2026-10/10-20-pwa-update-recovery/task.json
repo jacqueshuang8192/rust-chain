@@ -31,6 +31,6 @@
     "mobile/tests/pwa-prompt-behavior.test.ts",
     ".trellis/spec/mobile/pwa-and-shell.md"
   ],
-  "notes": "Implementation and verification complete; business commit 8ef0a37. Final combined Mobile release gate passed 871/871; browser verification recorded in delivery.md. Archiving this session task before normal origin/main push. No deployment; .vite cache excluded.",
+  "notes": "Completed and archived. Business commit 8ef0a37 pushed to origin/main with the other verified mobile fix. Remote HEAD verified as ead6af5e0b6ba20e941f2fc8e05beaed14d06cfb before final delivery-note commit. Combined Mobile gate 871/871; no deployment; .vite cache excluded.",
   "meta": {}
 }
