@@ -904,6 +904,11 @@ createTurnstileLifecycle(options?: TurnstileLifecycleOptions): {
   `.home-market-list` must finish above the fixed Dock without horizontal
   overflow. Do not solve an internal section overflow by increasing only the
   page's bottom padding.
+- Home market empty state shares the 162px three-row list footprint. Keep
+  `.root-market-empty-state` inside that list, including its padding; a 350px
+  page-level empty state overflows the 290px section and hides copy behind the
+  Dock. Verify title, hint, and decorative icon at 320/390/448px in both themes
+  and Chinese/English, including the empty-to-populated tab transition.
 - Root trade chooser pass: at 390x844 assert the exact `X0ux9F` mask, path,
   358x300 surface, four 330x58 rows without an active selection state, 54px Close and 4px
   path-to-Dock gap. Repeat at 320x720 and 448x900 in both themes for safe-area,

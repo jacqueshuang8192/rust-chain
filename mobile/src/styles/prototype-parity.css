@@ -662,21 +662,38 @@ body,
 
 .prototype-root-view .root-market-empty-state {
   align-content: center;
+  box-sizing: border-box;
   color: var(--muted);
   display: grid;
-  gap: 9px;
+  gap: 6px;
   justify-items: center;
-  min-height: 350px;
+  min-height: 162px;
+  padding: 16px 20px;
   text-align: center;
 }
 
-.prototype-root-view .root-market-empty-state strong {
-  color: var(--text);
-  font-size: 13px;
+.prototype-root-view .root-market-empty-icon {
+  background: var(--surface-2);
+  border-radius: 50%;
+  display: grid;
+  height: 44px;
+  margin-bottom: 6px;
+  place-items: center;
+  width: 44px;
 }
 
-.prototype-root-view .root-market-empty-state span {
-  font-size: 10px;
+.prototype-root-view .root-market-empty-state > strong {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.prototype-root-view .root-market-empty-state > span {
+  font-size: 12px;
+  line-height: 1.6;
+  max-width: 28ch;
+  text-wrap: pretty;
 }
 
 .prototype-root-view .sparkline.neutral {

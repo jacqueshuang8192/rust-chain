@@ -795,8 +795,10 @@ watch([carouselSlides, carouselPaused], restartCarouselTimer)
             </span>
           </button>
 
-          <div v-if="!visibleTickers.length" class="root-market-empty-state">
-            <Search :size="24" aria-hidden="true" />
+          <div v-if="!visibleTickers.length" class="root-market-empty-state" role="status">
+            <div class="root-market-empty-icon" aria-hidden="true">
+              <Search :size="22" :stroke-width="1.75" />
+            </div>
             <strong>{{ t('markets.noResults') }}</strong>
             <span>{{ t('rootPrototype.noMarketHint') }}</span>
           </div>

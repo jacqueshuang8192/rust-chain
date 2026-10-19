@@ -9901,3 +9901,10 @@
 - 修改文件：`mobile/src/components/TokenIssuanceRules.vue`、`mobile/src/core/tokenIssuanceMessages.ts`、`.trellis/tasks/10-20-new-coin-rule-copy/`及本记录。
 - 验证结果：`npm --prefix mobile run release:gate`退出0，871/871测试、生产/测试类型检查、PWA/Tauri构建和制品检查、包体/源码/测试质量门禁通过；未放宽预算。差异核对确认业务源码仅四个中英标签替换及一行展示删除，git diff --check通过。纯文案调整未新增测试或单独进行浏览器验收。
 - 后续事项：按项目工作流保存本地提交并归档；本轮未推送或部署，`.vite/`缓存排除。
+
+## 2026-10-20 03:32 - 首页行情空状态样式优化
+
+- 完成内容：`root-market-empty-state`从350px收敛到三行行情列表的162px高度，修复内容溢出行情区并被底栏遮挡的问题；增加44px浅底圆形图标容器，优化标题、说明字号与行距，保留原文案和行情逻辑，补充状态语义。
+- 修改文件：`mobile/src/views/HomeView.vue`、`mobile/src/styles/prototype-parity.css`、`.trellis/spec/mobile/pwa-and-shell.md`、`.trellis/tasks/10-20-mobile-market-empty-state/`及本记录。
+- 验证结果：`npm --prefix mobile run release:gate`退出0，871/871测试、类型检查、PWA/Tauri构建及制品、包体和治理门禁全部通过；`git diff --check`通过。Ego本地浏览器12组中英/明暗/320至448px检查通过，空状态高度162px、无横溢、图标居中、滚动到底后不被底栏遮挡，说明文字对比度浅色6.52/深色7.87；自选/热门切换与加载/错误状态验证通过，截图已查看。纯样式改动未新增实现镜像测试。
+- 后续事项：按项目工作流保存本地提交并归档；未推送或部署。任务Ego空间28关闭，既有服务与`.vite/`缓存保留。
