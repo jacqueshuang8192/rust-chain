@@ -171,3 +171,36 @@ Shipped admin v2 direct issuance, holdings/buybacks/operations and pinned market
 ### Next Steps
 
 - None - task complete
+
+
+## Session 64: Mobile new coin copy and logo propagation
+
+**Date**: 2026-10-20
+**Task**: Mobile new coin copy and logo propagation
+**Branch**: `main`
+
+### Summary
+
+Simplified Mobile issuance copy; added admin/agent logo uploads, immutable application metadata and spot handoff synchronization. Mobile 854 and Web 1130 tests passed; 11 isolated DB route cases and Rust quality checks passed. Existing Web bundle budget failure documented. Migration 0155 required before deployment. No push or deployment.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d61919b` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
