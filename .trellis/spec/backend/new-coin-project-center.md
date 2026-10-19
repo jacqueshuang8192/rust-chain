@@ -238,8 +238,9 @@ and `/:id/review` (POST). Admin read and review independently require
   duplicate-symbol failure rolls everything back and leaves pending unchanged.
   Identical reviewer/decision/trimmed-reason replay returns the original receipt;
   other terminal writes conflict. Detail GET recovers an uncertain outcome.
-- Deploy migration before API/Admin. Existing administrator direct project
-  creation and historical settlement behavior remain unchanged.
+- Deploy migration before API/Admin. The legacy direct-creation API and historical
+  settlement remain unchanged. The default Admin creation UI now uses the v2
+  endpoint described in [token-issuance-v2.md](./token-issuance-v2.md).
 
 Validation: `coin_applications_enforce_ownership_and_atomic_publication` uses
 real MySQL for portal isolation, immutable replay, pending invisibility, terminal

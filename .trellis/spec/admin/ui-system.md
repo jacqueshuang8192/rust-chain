@@ -1343,7 +1343,7 @@ Correct: pair lock + current read; error/last_tick evidence; actionable expiry m
 
 - `/agent/orders/new-coin-subscriptions` (新币申购) and
   `/agent/orders/new-coin-purchases` (新币认购) reuse the read-only team order page.
-  Purchase context explicitly means post-listing purchases, matching Admin.
+  Purchase records include v2 realtime recognition and historical post-listing purchases; Admin labels them `认购订单`.
 - Project ID replaces product ID; coin symbol replaces trading pair; direction
   and result filters are absent. Preserve server paging, query/session stale
   response guards, resizable contained tables and read-only detail drawers.
@@ -1364,3 +1364,48 @@ Each batch has an exact percent/payment/refund preview, reason, saved retry key
 and explicit confirmation. A lost response restores the original batch even
 when the table selection has changed. No automatic allocation option exists.
 See [the backend version boundary](../backend/token-issuance-v2.md).
+
+
+## Administrator V2 Issuance Management
+
+- Project creation uses `CreateTokenProject` and
+  `POST /admin/api/v1/new-coins/issuance`, selecting existing active assets.
+  Reuse shared issuance node/lock/fee controls and summaries. Start in preheat;
+  forbid manual initial stage selection. The historical creation component/API
+  remains separately tested for compatibility and is not the default UI entry.
+- Persist the complete intent/key under administrator subject/session generation
+  before POST. Unknown failures and contract mismatch keep it locked across
+  remounts. Validate asset IDs, canonical supply/price and `policyIdentity` before
+  reporting success. Storage failure before sending performs zero requests;
+  late results from another generation cannot call completion callbacks.
+  Definitive 400/422 or `409 TOKEN_ISSUANCE_EXISTS` permits correction; generic
+  409 and transport failures require original-intent recovery.
+- Project center shows issuer, actual purchase, next automatic node and persisted
+  blocked/retry status. Manual phase actions lock while in flight and after an
+  uncertain result; only a successful authoritative reload clears that state.
+  V2 uses the read-only `发行合同` tab and project-scoped holdings/buyback/operation
+  links. V1 retains the original settings/grant and asset-scoped lock links.
+- `持仓与锁仓规则` and `解锁回购记录` reuse strict resource response validation,
+  server pagination/filtering, contained resizable tables, exact CSV and detail
+  drawers. Show buyer ownership independently from issuer. Holdings explain that
+  maturity never automatically sells; original policy remains inspectable.
+  Buybacks show cost, gross, deducted fee, net and quote unit, no estimated profits.
+  Register holdings/buybacks/operations in `SERVER_PAGED_ENDPOINTS`; otherwise
+  `ResourcePage` silently uses local paging. Regression tests must cross the
+  50-row boundary and retain `project_id` with `limit=50&offset=50`.
+  Set `csvFileName` and export only the loaded page; empty/error states disable
+  export. Put explanatory copy in `ResourceConfig.notice`, rendered inside the
+  resource page below its header. Import `coinApplications.css` when rendering
+  shared issuance summaries outside application pages, including lazy modals.
+  Buyback detail metadata labels the quote source/version without changing the
+  underlying evidence or relabeling unrelated resources.
+- `发行操作记录` requires audit read; preserve actual executor roles and raw JSON
+  evidence. Legacy release pages remain under `历史锁仓与解禁`.
+- V2 market setup pins pair and seed. An older saved draft with a different seed
+  hydrates to the contract seed as an unsaved correction, retaining revision/CAS.
+  Read-only users cannot save it. Actual purchase is required before publishing;
+  listing preserves the same market history. Initial-price input is disabled.
+- Test `CreateTokenProject`, `TokenRecordsPage`, `NewCoinProjectPage` and
+  `NewCoinMarketSetup`, plus resource/nav/permission contracts. Browser checks
+  include full creation confirmation/retry, record empty/error/rules, fixed seed,
+  and desktop/390/320 layouts. See backend v2 spec for transaction and rollout.

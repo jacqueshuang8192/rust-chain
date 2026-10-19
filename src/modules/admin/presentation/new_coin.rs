@@ -186,6 +186,14 @@ pub(crate) struct NewCoinProjectResponse {
     pub(crate) issuance_policy:
         Option<sqlx::types::Json<crate::modules::new_coin::domain::issuance::IssuancePolicy>>,
     pub(crate) issuer_agent_id: Option<u64>,
+    pub(crate) issuer_agent_code: Option<String>,
+    pub(crate) quote_symbol: Option<String>,
+    pub(crate) post_listing_pair_symbol: Option<String>,
+    #[serde(with = "option_unix_millis")]
+    pub(crate) next_transition_at: Option<DateTime<Utc>>,
+    #[serde(with = "option_unix_millis")]
+    pub(crate) next_transition_attempt_at: Option<DateTime<Utc>>,
+    pub(crate) transition_error: Option<String>,
     #[serde(default, with = "option_unix_millis")]
     pub(crate) actual_purchase_at: Option<DateTime<Utc>>,
 

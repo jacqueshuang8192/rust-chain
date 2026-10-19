@@ -1015,12 +1015,17 @@ fn admin_new_coin_project_query() -> QueryBuilder<'static, MySql> {
                   projects.total_supply, projects.issue_price, projects.quote_asset_id,
                   projects.reserved_supply, projects.allocated_supply, projects.remaining_supply,
                   projects.listed_at, projects.actual_listed_at, projects.issuance_policy, projects.issuer_agent_id, projects.actual_purchase_at,
+                  issuer.agent_code AS issuer_agent_code, quote.symbol AS quote_symbol,
+                  post_listing_pair.symbol AS post_listing_pair_symbol, projects.next_transition_at,
+                  projects.next_transition_attempt_at, projects.transition_error,
                   projects.unlock_type, projects.fixed_unlock_at, projects.relative_unlock_seconds,
                   projects.unlock_fee_enabled, projects.unlock_fee_rate, projects.unlock_fee_basis,
                   projects.unlock_fee_asset, projects.status, projects.post_listing_purchase_enabled,
                   projects.post_listing_pair_id, post_listing_pair.status AS post_listing_pair_status
            FROM new_coin_projects projects
-           LEFT JOIN trading_pairs post_listing_pair ON post_listing_pair.id = projects.post_listing_pair_id"#,
+           LEFT JOIN trading_pairs post_listing_pair ON post_listing_pair.id = projects.post_listing_pair_id
+           LEFT JOIN agents issuer ON issuer.id = projects.issuer_agent_id
+           LEFT JOIN assets quote ON quote.id = projects.quote_asset_id"#,
     )
 }
 

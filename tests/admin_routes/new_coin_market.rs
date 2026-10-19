@@ -1,6 +1,6 @@
 use super::*;
 
-async fn call(
+pub(super) async fn call(
     app: &axum::Router,
     token: &str,
     method: &str,

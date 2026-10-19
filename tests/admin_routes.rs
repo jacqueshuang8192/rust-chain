@@ -38,6 +38,8 @@ use uuid::Uuid;
 mod new_coin_market;
 #[path = "admin_routes/numeric_safety.rs"]
 mod numeric_safety;
+#[path = "admin_routes/token_issuance.rs"]
+mod token_issuance;
 
 use wiremock::{
     Mock, MockServer, ResponseTemplate,

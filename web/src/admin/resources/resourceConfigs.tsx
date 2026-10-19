@@ -39,7 +39,7 @@ const SpotFillAction = lazy(async () => ({ default: (await import('./actions/spo
 const CreateMarketStrategyAction = lazy(async () => ({ default: (await import('./actions/marketStrategy/actions')).CreateMarketStrategyAction }));
 
 const MarketStrategyRowActions = lazy(async () => ({ default: (await import('./actions/marketStrategy/actions')).MarketStrategyRowActions }));
-const CreateNewCoinProjectAction = lazy(async () => ({ default: (await import('./actions/newCoins')).CreateNewCoinProjectAction }));
+const CreateNewCoinProjectAction = lazy(async () => ({ default: (await import('../new-coins/CreateTokenProject')).CreateTokenProject }));
 const NewCoinSubscriptionRowActions = lazy(async () => ({ default: (await import('../actions/NewCoinManualDistribution')).NewCoinSubscriptionRowActions }));
 const NewCoinProjectRowActions = lazy(async () => ({ default: (await import('./actions/newCoins')).NewCoinProjectRowActions }));
 const AdminNewsRowActions = lazy(async () => ({ default: (await import('./actions/news')).AdminNewsRowActions }));
@@ -76,6 +76,7 @@ export type ResourceConfig = {
   rowActions?: React.ComponentProps<typeof AdminResourcePage<ApiRecord>>['rowActions'];
   showJsonAction?: boolean;
   title: string;
+  notice?: string;
   toolbarFilters?: FilterField[];
 };
 
@@ -1037,8 +1038,10 @@ export const resourceConfigs = {
       { key: 'symbol', title: '币种' },
       { key: 'lifecycle_status', title: '生命周期', type: 'status' },
       { key: 'total_supply', title: '总量', type: 'amount' },
-      { key: 'issue_price', title: '发行价', type: 'amount' },
-      { key: 'unlock_type', title: '解禁类型' },
+      { key: 'issue_price', title: '申购价格', type: 'amount' },
+      { key: 'issuer_agent_id', title: '发行代理ID', render: row => row.issuer_agent_id == null ? (row.issuance_policy ? '平台直接发行' : '历史项目') : String(row.issuer_agent_id) },
+      { key: 'issuer_agent_code', title: '发行代理' },
+      { key: 'issuance_policy', title: '发行规则', type: 'json', render: row => row.issuance_policy ? '新版发行合同' : '历史规则' },
       { key: 'listed_at', title: '计划上市时间', type: 'timestamp' },
       { key: 'actual_listed_at', title: '实际上市时间', type: 'timestamp' },
       { key: 'status', title: '状态', type: 'status' }
@@ -1086,7 +1089,7 @@ export const resourceConfigs = {
     ]
   },
   newCoinPurchases: {
-    title: '上市后购买',
+    title: '认购订单',
     endpoint: '/admin/api/v1/new-coins/purchases',
     responseKey: 'purchases',
     filters: [projectFilter, userFilter, emailFilter, statusFilter, limitFilter],
@@ -1418,6 +1421,9 @@ const SERVER_PAGED_ENDPOINTS = new Set([
   '/admin/api/v1/market-strategies',
   '/admin/api/v1/new-coins',
   '/admin/api/v1/new-coins/distributions',
+  '/admin/api/v1/new-coins/holdings',
+  '/admin/api/v1/new-coins/buybacks',
+  '/admin/api/v1/new-coins/operations',
   '/admin/api/v1/new-coins/lock-positions',
   '/admin/api/v1/new-coins/purchases',
   '/admin/api/v1/new-coins/subscriptions',

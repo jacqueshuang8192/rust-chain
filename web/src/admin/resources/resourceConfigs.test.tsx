@@ -8,7 +8,7 @@ import { listAdminResource } from '../../api/adminResources';
 import { apiRequest } from '../../api/client';
 import { authStore } from '../../auth/authStore';
 import { batchStatusSummary } from './actions/agents';
-import { isNewCoinProjectCreatable } from './actions/newCoins';
+import { CreateNewCoinProjectAction, isNewCoinProjectCreatable } from './actions/newCoins';
 import { buildAdminResourceRowContract } from './AdminResourcePage';
 import { ResourcePage, resourceConfigs, type ResourceConfig } from './resourceConfigs';
 
@@ -2225,7 +2225,8 @@ describe('resourceConfigs create actions', () => {
     });
     riskPage.unmount();
 
-    const newCoinPage = render(<ResourcePage config={resourceConfigs.newCoinProjects} />);
+    // Retain the historical v1 form contract; the resource now uses the separate v2 creation workflow.
+    const newCoinPage = render(<CreateNewCoinProjectAction />);
     await user.click(await screen.findByRole('button', { name: '添加新币项目' }));
     dialog = await findActionSheet('添加新币项目');
     expectCreateModalSize(dialog, 'extra-wide');

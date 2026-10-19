@@ -87,6 +87,7 @@ mod new_coin_settlement;
 mod news;
 mod risk_security;
 mod system_config;
+pub(crate) mod token_issuance;
 mod users;
 mod wallet_assets;
 

@@ -89,7 +89,7 @@ describe('AdminLayout', () => {
       { group: '现货交易', children: ['现货订单', '现货成交'] },
       {
         group: '新币管理',
-        children: ['项目管理', '申购与配售', '派发与退款记录', '上市后购买', '锁仓与解禁']
+        children: ['项目管理', '申购与配售', '派发与退款记录', '认购订单', '持仓与锁仓规则', '解锁回购记录', '发行操作记录', '历史锁仓与解禁']
       },
       { group: '行情市场', children: ['交易对配置', '行情策略', '行情订阅'] },
       { group: '闪兑管理', children: ['闪兑交易对', '闪兑订单'] },
@@ -139,7 +139,7 @@ describe('AdminLayout', () => {
 
   it('keeps unified locks navigation available to an unlock-only role', () => {
     renderAdminLayout('/admin/new-coins/unlocks', {...fullAccess,permissions:['new_coin.unlocks.read'],is_super_admin:false});
-    expect(screen.getByRole('menuitem', {name:'锁仓与解禁'})).toHaveClass('semi-navigation-item-selected');
+    expect(screen.getByRole('menuitem', {name:'历史锁仓与解禁'})).toHaveClass('semi-navigation-item-selected');
     expect(screen.queryByRole('menuitem', {name:'项目管理'})).not.toBeInTheDocument();
     expect(screen.queryByRole('menuitem', {name:'生命周期动作'})).not.toBeInTheDocument();
   });

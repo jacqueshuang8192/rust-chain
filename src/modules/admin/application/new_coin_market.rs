@@ -29,7 +29,11 @@ pub(crate) async fn get_new_coin_market_setup(
     let pool = admin_mysql_pool(pool)?;
     let mut tx = pool.begin().await?;
     let project = load_admin_new_coin_project_in_tx(&mut tx, project_id).await?;
-    let pairs = new_coin_market_pairs(&mut tx, project.asset_id, project.quote_asset_id).await?;
+    let mut pairs =
+        new_coin_market_pairs(&mut tx, project.asset_id, project.quote_asset_id).await?;
+    if project.issuance_policy.is_some() {
+        pairs.retain(|pair| Some(pair.id) == project.post_listing_pair_id);
+    }
     let draft = load_new_coin_market_draft(&mut tx, project_id)
         .await?
         .map(NewCoinMarketDraftRecord::response)
@@ -73,6 +77,13 @@ pub(crate) async fn save_new_coin_market_setup(
             .map_err(|_| AppError::Validation("数量精度无效".into()))?,
     )?;
     validate_default_market_initial_price(request.initial_price.as_ref(), pair.price_precision)?;
+    if let Some(policy) = &project.issuance_policy
+        && request.initial_price.as_ref() != Some(&policy.purchase_initial_price)
+    {
+        return Err(AppError::Validation(
+            "认购初价已随发行合同固定，行情草稿必须保留原初价".into(),
+        ));
+    }
     validate_default_market_reference(&mut tx, pair.id, &request.config, true).await?;
     let before = old.map(NewCoinMarketDraftRecord::response).transpose()?;
     save_new_coin_market_draft(&mut tx, project_id, admin_id, revision, &request).await?;
@@ -131,6 +142,23 @@ pub(crate) async fn publish_new_coin_market_setup(
     }
     let pair = lock_admin_trading_pair_in_tx(&mut tx, draft.pair_id).await?;
     validate_project_pair(&project, &pair)?;
+    if project.issuance_policy.is_some()
+        && (!matches!(project.lifecycle_status.as_str(), "purchase" | "listed")
+            || project.actual_purchase_at.is_none())
+    {
+        return Err(AppError::Conflict(
+            "尚未实际进入认购，行情由项目认购节点启动".into(),
+        ));
+    }
+    if project
+        .issuance_policy
+        .as_ref()
+        .is_some_and(|policy| draft.initial_price.as_ref() != Some(&policy.purchase_initial_price))
+    {
+        return Err(AppError::Conflict(
+            "草稿初价与发行合同不一致，请重新保存".into(),
+        ));
+    }
     let before = json!(draft);
     guard.ensure_owned().await?;
     let result = save_default_market_configuration_in_tx(
@@ -189,6 +217,11 @@ fn validate_project_pair(
     if project.status != "active" {
         return Err(AppError::Validation(
             "项目已停用，不能配置或发布行情".into(),
+        ));
+    }
+    if project.issuance_policy.is_some() && project.post_listing_pair_id != Some(pair.id) {
+        return Err(AppError::Validation(
+            "新版发行只能配置审核固定的交易对".into(),
         ));
     }
     if pair.base_asset_id != project.asset_id || Some(pair.quote_asset_id) != project.quote_asset_id

@@ -36,7 +36,7 @@ export function NewCoinMarketSetup({ project, onDirty }: { project: NewCoinProje
     enabled: canRead, retry: false, refetchOnWindowFocus: false, refetchOnReconnect: false,
   });
   const setup = query.data;
-  const selectedId = selected || String(setup?.draft?.pair_id ?? '');
+  const selectedId = project.issuance_policy ? String(project.post_listing_pair_id ?? '') : selected || String(setup?.draft?.pair_id ?? '');
   const pair = setup?.pairs.find(item => String(item.id) === selectedId);
   const writable = canWriteProject && canWriteMarket && project.status === 'active';
   const changed = useCallback((value: boolean) => { setDirty(value); onDirty(value); }, [onDirty]);
@@ -56,10 +56,11 @@ export function NewCoinMarketSetup({ project, onDirty }: { project: NewCoinProje
       <h3>{project.symbol} · 行情</h3>
       <Button aria-label="重新加载项目行情" title="重新加载项目行情" icon={<IconRefresh />} disabled={dirty || query.isFetching} onClick={() => void reload().catch(() => undefined)} />
     </div>
+    {project.issuance_policy ? <p>行情使用发行合同固定的交易对和认购初价；认购节点启动后可调整生成参数，上市延续价格与历史 K 线。</p> : null}
     {!writable ? <p role="status">当前项目状态或权限下仅可查看。</p> : null}
     {!project.quote_asset_id ? <p role="alert">项目未配置计价资产，暂不能关联行情。</p> : null}
     <div className="new-coin-market-pair">
-      <DefaultMarketSelect label="行情交易对" disabled={dirty || query.isFetching} value={selectedId}
+      <DefaultMarketSelect label="行情交易对" disabled={Boolean(project.issuance_policy) || dirty || query.isFetching} value={selectedId}
         placeholder="选择项目资产对应的交易对" optionList={setup.pairs.map(item => ({
           value: String(item.id), label: `${item.symbol} · ${item.market_type === 'external' ? '外部真实行情' : item.status === 'active' ? '已启用' : '未启用'}`,
         }))} onChange={setSelected} />
@@ -77,10 +78,11 @@ function MarketWorkspace({ project, pair, saved, writable, onDirty, onReload }: 
   project: NewCoinProject; pair: MarketPair; saved: MarketDraft | null; writable: boolean;
   onDirty: (value: boolean) => void; onReload: () => Promise<void>;
 }) {
-  const state = useNewCoinMarket(project.id, pair, saved);
+  const state = useNewCoinMarket(project.id, pair, saved, project.issuance_policy?.purchase_initial_price);
   const [step, setStep] = useState(1);
   const references = useDefaultMarketReferences(writable && state.draft?.mode === 'follow');
   const { draft, live } = state;
+  const beforePurchase = Boolean(project.issuance_policy) && (!['purchase', 'listed'].includes(project.lifecycle_status) || !project.actual_purchase_at);
   const blocked = !writable || state.loading || state.busy || state.conflict || state.uncertain;
   const referenceError = draft ? validateDefaultMarketReference(draft, String(pair.id), references, true) : '';
   const invalid = state.invalid || referenceError;
@@ -89,7 +91,7 @@ function MarketWorkspace({ project, pair, saved, writable, onDirty, onReload }: 
   if (state.loading) return <p role="status">正在读取行情配置</p>;
   if (!draft || !live) return <p role="alert">{state.error || '行情配置不可用，请重新加载'}</p>;
   const field = (key: 'initial_price' | 'price_min' | 'price_max' | 'follow_multiplier' | 'follow_max_move_ratio' | 'follow_stale_after_seconds', label: string) =>
-    <label>{label}<AdminTextInput ariaLabel={label} value={draft[key]} disabled={blocked} onChange={value => state.edit(key, value)} /></label>;
+    <label>{label}<AdminTextInput ariaLabel={label} value={draft[key]} disabled={blocked || (key === 'initial_price' && Boolean(project.issuance_policy))} onChange={value => state.edit(key, value)} /></label>;
   return <>
     <UnsavedChangesGuard enabled={state.dirty || state.busy} />
     <section className="new-coin-market-status" aria-label="行情运行状态">
@@ -130,7 +132,7 @@ function MarketWorkspace({ project, pair, saved, writable, onDirty, onReload }: 
         </li>)}
     </ol>
     {step === 0 ? <section><h4>关联交易对</h4><p>{pair.symbol} · 价格精度 {pair.price_precision} 位 · 数量精度 {pair.qty_precision} 位</p>
-      <p>行情关联独立于上市后购买，不改变项目上市状态或交易开关。</p></section> : null}
+      <p>{project.issuance_policy ? '交易对随发行合同固定，认购与上市使用同一行情。' : '行情关联独立于上市后购买，不改变项目上市状态或交易开关。'}</p></section> : null}
     {step === 1 ? <section><h4>选择行情模式</h4>
       <RadioGroup type="button" aria-label="行情模式" value={draft.mode} disabled={blocked} onChange={event => state.edit('mode', event.target.value as 'independent' | 'follow')}>
         <Radio value="independent">独立生成</Radio><Radio value="follow">跟随参考行情</Radio>
@@ -150,7 +152,7 @@ function MarketWorkspace({ project, pair, saved, writable, onDirty, onReload }: 
       </> : null}
     </div>
       <p>初始价只在没有历史价格时使用；已有行情按引擎规则续接，不以发行价重置。</p>
-      {writable && !draft.initial_price && !live.runtime.last_price ? <Button disabled={blocked}
+      {writable && !project.issuance_policy && !draft.initial_price && !live.runtime.last_price ? <Button disabled={blocked}
         onClick={() => state.edit('initial_price', project.issue_price)}>填入发行价 {project.issue_price}</Button> : null}
       <details className="new-coin-market-advanced"><summary>高级参数</summary>
         <DefaultMarketForm draft={draft} edit={state.edit} disabled={blocked} pricePrecision={pair.price_precision} qtyPrecision={pair.qty_precision} hideEnable hidePriceFields />
@@ -163,7 +165,7 @@ function MarketWorkspace({ project, pair, saved, writable, onDirty, onReload }: 
         {marketChanges(live, draft).map(change => <div key={change.label}><dt>{change.label}</dt><dd>{change.before} → {change.after}</dd></div>)}
       </dl>
       <p>手工策略优先；全部暂停时发布不会自动恢复。生成价格可能影响现货触发、杠杆估值和秒合约取价，实际依赖需在业务记录中核对。</p>
-      {pair.status !== 'active' ? <p role="alert">交易对未启用，可以保存和预览；发布前需在交易对管理中单独确认启用。</p> : null}
+      {beforePurchase ? <p role="status">尚未进入认购，可以保存与预览；行情由认购节点启动，无需提前启用交易对。</p> : pair.status !== 'active' ? <p role="alert">交易对未启用，可以保存和预览；发布前需在交易对管理中单独确认启用。</p> : null}
       <Button disabled={blocked || Boolean(invalid)} loading={state.busy} onClick={safePreview}>生成行情预览</Button>
       {state.preview ? <DefaultMarketPreview preview={state.preview} requestedMode={draft.mode} /> : null}
     </section> : null}
@@ -181,7 +183,7 @@ function MarketWorkspace({ project, pair, saved, writable, onDirty, onReload }: 
           }} />
         {step === 3 ? <ConfirmAction key="publish" actionText="确认发布行情" title={`发布 ${pair.symbol} 默认行情 V${state.baseVersion + 1}`}
           description="将启用并更新默认生成器。手工策略和全部暂停仍优先；不更改真实订单、历史K线、交易对状态或上市后购买开关。"
-          disabled={blocked || Boolean(invalid) || state.dirty || !state.preview || !state.saved || state.saved.pair_id !== pair.id || state.saved.published_version !== null || pair.status !== 'active'}
+          disabled={blocked || beforePurchase || Boolean(invalid) || state.dirty || !state.preview || !state.saved || state.saved.pair_id !== pair.id || state.saved.published_version !== null || pair.status !== 'active'}
           onConfirm={reason => { if (blocked || invalid) throw new Error(invalid || '当前不可发布'); return state.publish(reason); }} /> : null}
       </Space> : null}
     </div>

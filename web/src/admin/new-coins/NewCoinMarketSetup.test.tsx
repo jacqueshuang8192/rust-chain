@@ -6,7 +6,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { ApiError, apiRequest } from '../../api/client';
 import { AdminAccessProvider } from '../access';
 import { NewCoinMarketSetup } from './NewCoinMarketSetup';
-import { center } from './__tests__/fixtures';
+import { center, tokenCenter } from './__tests__/fixtures';
 import { marketDraft, marketLive, marketPair, marketPreview } from './__tests__/marketFixtures';
 import type { MarketDraft } from './marketSetupModel';
 
@@ -14,7 +14,7 @@ vi.mock('../../api/client', async () => ({ ...await vi.importActual<typeof impor
 const request = vi.mocked(apiRequest);
 const endpoint = '/admin/api/v1/new-coins/7/market-setup';
 
-function mount(saved: MarketDraft | null = marketDraft(), permissions = ['*'], saveError?: Error, initialLive = marketLive()) {
+function mount(saved: MarketDraft | null = marketDraft(), permissions = ['*'], saveError?: Error, initialLive = marketLive(), project = center().project) {
   let draft = saved;
   const live = initialLive;
   request.mockImplementation(async (path, options) => {
@@ -36,7 +36,7 @@ function mount(saved: MarketDraft | null = marketDraft(), permissions = ['*'], s
     throw new Error(`Unexpected request ${path}`);
   });
   const dirty = vi.fn();
-  const router = createMemoryRouter([{ path: '/', element: <NewCoinMarketSetup project={center().project} onDirty={dirty} /> }, { path: '/other', element: <p>Other</p> }]);
+  const router = createMemoryRouter([{ path: '/', element: <NewCoinMarketSetup project={project} onDirty={dirty} /> }, { path: '/other', element: <p>Other</p> }]);
   render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
     <AdminAccessProvider access={{ admin_id: 1, username: 'operator', role_id: 1, role_name: 'operator', permissions, is_super_admin: false }}>
       <RouterProvider router={router} />
@@ -138,4 +138,17 @@ it('keeps a read-only operator on read-only controls', async () => {
   expect(screen.getByLabelText('初始价格')).toBeDisabled();
   expect(screen.queryByRole('button', { name: '保存草稿' })).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '暂停全部行情' })).not.toBeInTheDocument();
+});
+
+
+it('pins v2 pair and repairs an old draft seed while preventing premature publication',async()=>{
+  const project=tokenCenter('preheat').project;
+  mount(marketDraft(),['*'],undefined,marketLive(),project);
+  await parameters();
+  expect(screen.getByLabelText('初始价格')).toHaveValue('0.3');
+  expect(screen.getByLabelText('初始价格')).toBeDisabled();
+  await confirm('保存草稿');
+  const call=request.mock.calls.find(([,options])=>options?.method==='PATCH');
+  expect(JSON.parse(String(call?.[1]?.body))).toMatchObject({pair_id:11,initial_price:'0.3'});
+  expect(request.mock.calls.some(([path])=>path.endsWith('/publish'))).toBe(false);
 });

@@ -21,6 +21,7 @@ mod new_coin_reconciliation;
 mod news;
 mod risk_security;
 mod system_config;
+pub(crate) mod token_issuance;
 mod users;
 mod wallet_assets;
 

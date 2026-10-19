@@ -15,6 +15,7 @@ use utoipa_swagger_ui::SwaggerUi;
 
 use crate::{HealthResponse, error::ErrorResponse, state::AppState};
 
+mod admin_token_issuance;
 mod agent_portal;
 mod agent_recharges;
 mod agent_team_orders;
@@ -63,6 +64,7 @@ pub fn routes() -> Router<AppState> {
     document.merge(agent_recharges::AgentRechargesApiDoc::openapi());
     document.merge(coin_applications::CoinApplicationsApiDoc::openapi());
     document.merge(token_issuance::TokenIssuanceApiDoc::openapi());
+    document.merge(admin_token_issuance::AdminTokenIssuanceApiDoc::openapi());
     document.merge(agent_team_orders::AgentTeamOrdersApiDoc::openapi());
     document.merge(registration_legal::RegistrationLegalApiDoc::openapi());
     let docs: Router<AppState> = SwaggerUi::new("/docs")

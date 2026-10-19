@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiRequest, ApiError } from '../../api/client';
 import { AdminAccessProvider } from '../access';
 import { NewCoinProjectPage } from './NewCoinProjectPage';
-import { center } from './__tests__/fixtures';
+import { center, tokenCenter } from './__tests__/fixtures';
 import { loadProjectCenter, projectLocalTime, type ProjectCenter } from './projectModel';
 vi.mock('../../api/client',async()=>({...await vi.importActual<typeof import('../../api/client')>('../../api/client'),apiRequest:vi.fn()}));
 const request=vi.mocked(apiRequest);
@@ -118,4 +118,28 @@ it('does not invent a historic listing event and preserves exact planned millise
 it('fails closed if the actual listing field is absent',async()=>{
  const data=center();delete (data.project as Record<string,unknown>).actual_listed_at;request.mockResolvedValue(data);
  await expect(loadProjectCenter('7')).rejects.toThrow('新币项目配置响应不完整');
+});
+
+
+it('shows v2 issuer, node recovery and project-scoped holdings without legacy release links', async()=>{
+ const data=tokenCenter();mount(data);await screen.findByText('HIP · 项目中心');
+ expect(screen.getByText(/AGENT-A/)).toBeInTheDocument();expect(screen.getByText(/自动节点尚未完成/)).toBeInTheDocument();
+ expect(screen.getByRole('button',{name:'开始实时认购'})).toBeEnabled();
+ await userEvent.click(screen.getByRole('tab',{name:'关联记录'}));
+ expect(screen.getByRole('link',{name:'项目持仓与原始锁仓规则'})).toHaveAttribute('href','/admin/new-coins/holdings?project_id=7');
+ expect(screen.getByRole('link',{name:'解锁回购与净到账记录'})).toHaveAttribute('href','/admin/new-coins/buybacks?project_id=7');
+ expect(screen.getByRole('link',{name:'阶段、派发与成交操作记录'})).toHaveAttribute('href','/admin/new-coins/operations?project_id=7');
+ expect(screen.queryByRole('link',{name:/该资产解禁记录/})).not.toBeInTheDocument();
+ await userEvent.click(screen.getByRole('tab',{name:'发行合同'}));
+ expect(screen.queryByRole('button',{name:'保存当前配置'})).not.toBeInTheDocument();
+});
+it('keeps an unknown phase result locked until a successful authoritative reload',async()=>{
+ const data=tokenCenter();mount(data);await screen.findByText('HIP · 项目中心');
+ request.mockImplementation(async(_path,options)=>{if(options?.method==='PATCH')throw new Error('response lost');return data;});
+ await userEvent.click(screen.getByRole('button',{name:'开始实时认购'}));await userEvent.type(screen.getByLabelText('操作原因'),'start purchase');await userEvent.click(screen.getByRole('button',{name:'确认'}));
+ await screen.findByText('操作结果待核对，请刷新项目后继续。');await userEvent.click(screen.getByLabelText('取消'));
+ expect(screen.getByRole('button',{name:'开始实时认购'})).toBeDisabled();
+ request.mockRejectedValueOnce(new Error('read unavailable'));await userEvent.click(screen.getByRole('button',{name:'刷新项目'}));
+ await screen.findByText('read unavailable');await userEvent.click(screen.getByRole('button',{name:'重新加载项目'}));
+ await waitFor(()=>expect(screen.getByRole('button',{name:'开始实时认购'})).toBeEnabled());
 });

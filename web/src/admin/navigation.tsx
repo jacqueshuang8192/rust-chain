@@ -96,8 +96,11 @@ export const adminNavItems: AdminNavItem[] = [
       { path: '/admin/new-coins/projects', label: '项目管理' },
       { path: '/admin/new-coins/subscriptions', label: '申购与配售' },
       { path: '/admin/new-coins/distributions', label: '派发与退款记录' },
-      { path: '/admin/new-coins/purchases', label: '上市后购买' },
-      { path: '/admin/new-coins/lock-positions', relatedPaths: ['/admin/new-coins/unlocks'], label: '锁仓与解禁' }
+      { path: '/admin/new-coins/purchases', label: '认购订单' },
+      { path: '/admin/new-coins/holdings', label: '持仓与锁仓规则' },
+      { path: '/admin/new-coins/buybacks', label: '解锁回购记录' },
+      { path: '/admin/new-coins/operations', label: '发行操作记录' },
+      { path: '/admin/new-coins/lock-positions', relatedPaths: ['/admin/new-coins/unlocks'], label: '历史锁仓与解禁' }
     ]
   },
   {

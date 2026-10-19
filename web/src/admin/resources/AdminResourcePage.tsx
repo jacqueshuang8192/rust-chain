@@ -78,6 +78,7 @@ type AdminResourcePageProps<T extends ApiRecord> = {
   serverPaged?: boolean;
   showJsonAction?: boolean;
   title: string;
+  notice?: string;
   toolbarFilters?: FilterField[];
 };
 
@@ -226,6 +227,7 @@ export function AdminResourcePage<T extends ApiRecord>({
   serverPaged = false,
   showJsonAction = true,
   title,
+  notice,
   toolbarFilters
 }: AdminResourcePageProps<T>) {
   const [error, setError] = useState<Error | null>(null);
@@ -471,6 +473,7 @@ export function AdminResourcePage<T extends ApiRecord>({
         description={`共 ${recordCount} 条记录，${activeFilterCount > 0 ? `已启用 ${activeFilterCount} 个筛选` : '未启用筛选'}`}
         title={title}
       />
+      {notice ? <Typography.Paragraph type="secondary" style={{ margin: 0 }}>{notice}</Typography.Paragraph> : null}
       <Card bordered={false} className="admin-resource-shell">
         <div className="admin-resource-toolbar">
           <div className="admin-resource-toolbar-primary">

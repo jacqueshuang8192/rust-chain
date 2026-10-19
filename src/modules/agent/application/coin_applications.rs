@@ -283,7 +283,14 @@ pub(crate) async fn review(
         None
     };
     if let (Some(project_id), Some(policy)) = (project, &row.issuance_policy) {
-        store::publish_policy(&mut tx, project_id, row.agent_id, admin, policy).await?;
+        crate::modules::new_coin::infrastructure::issuance::publish_policy(
+            &mut tx,
+            project_id,
+            Some(row.agent_id),
+            admin,
+            policy,
+        )
+        .await?;
         crate::modules::spot::infrastructure::ensure_spot_liquidity_user_in_tx(&mut tx).await?;
     }
     store::finish(&mut tx, id, admin, project, &req.reason).await?;

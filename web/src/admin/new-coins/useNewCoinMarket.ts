@@ -5,7 +5,7 @@ import { defaultMarketPayload, validateDefaultMarketDraft } from '../resources/a
 import type { DefaultMarketDraft, DefaultMarketPreview, DefaultMarketResponse } from '../resources/actions/defaultMarket/types';
 import { checkLiveMarket, checkMarketDraft, checkMarketPreview, hydrateMarketDraft, type MarketDraft, type MarketPair } from './marketSetupModel';
 
-export function useNewCoinMarket(projectId: number, pair: MarketPair, initialSaved: MarketDraft | null) {
+export function useNewCoinMarket(projectId: number, pair: MarketPair, initialSaved: MarketDraft | null, fixedInitialPrice?: string) {
   const endpoint = `/admin/api/v1/new-coins/${projectId}/market-setup`;
   const marketEndpoint = `/admin/api/v1/market-pairs/${pair.id}/default-generator`;
   const [live, setLive] = useState<DefaultMarketResponse | null>(null);
@@ -36,13 +36,15 @@ export function useNewCoinMarket(projectId: number, pair: MarketPair, initialSav
       if (!active) return;
       const own = initialSaved?.pair_id === pair.id && initialSaved.published_version === null ? initialSaved : null;
       const next = hydrateMarketDraft(value, own);
-      setLive(value); setCheckedAt(Date.now()); setDraft(next); setBaseline(JSON.stringify(next));
+      const original = JSON.stringify(next);
+      if (fixedInitialPrice) next.initial_price = fixedInitialPrice;
+      setLive(value); setCheckedAt(Date.now()); setDraft(next); setBaseline(original);
       setBaseVersion(own && own.published_version === null ? own.base_version : value.version);
       setConflict(Boolean(own && own.published_version === null && own.base_version !== value.version));
     }).catch(cause => { if (active) setError(adminErrorMessage(cause, '行情加载失败')); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; epoch.current += 1; controller.abort(); };
-  }, [initialSaved, pair.id, readLive]);
+  }, [initialSaved, pair.id, readLive, fixedInitialPrice]);
 
   function edit<K extends keyof DefaultMarketDraft>(key: K, value: DefaultMarketDraft[K]) {
     if (singleFlight.current) return;
@@ -117,6 +119,7 @@ export function useNewCoinMarket(projectId: number, pair: MarketPair, initialSav
   function startFromLive() {
     if (!live || singleFlight.current || uncertain) return;
     const next = hydrateMarketDraft(live, null);
+    if (fixedInitialPrice) next.initial_price = fixedInitialPrice;
     epoch.current += 1; setPreview(null); setDraft(next); setBaseVersion(live.version);
     // Explicitly adopting live values creates a new draft, even when the parameters are equal.
     setBaseline(''); setConflict(false); setError(''); setNotice('');

@@ -186,3 +186,104 @@ spot liquidity account through the platform's audited operational process;
 approval creates identity and wallets, not funds. Keep approved application
 snapshots, receipts and migrations immutable. This task does not deploy, fund
 production wallets, or migrate production data.
+
+
+## Administrator Direct Issuance and Records
+
+### 1. Scope / Trigger
+
+Administrator creation now publishes the same v2 contract as agent approval.
+Historical `POST /admin/api/v1/new-coins` remains a v1 compatibility endpoint;
+the Admin UI creates v2 through the distinct endpoint below. Migration `0154`
+adds the immutable admin creation receipt; do not modify it after application.
+
+### 2. Signatures
+
+```text
+POST /admin/api/v1/new-coins/issuance
+GET  /admin/api/v1/new-coins/holdings
+GET  /admin/api/v1/new-coins/buybacks
+GET  /admin/api/v1/new-coins/operations
+admin_token_issuance_receipts PK(admin_id, idempotency_key VARBINARY(128))
+```
+
+### 3. Contracts
+
+- Creation requires `new_coin.projects.write`. Body: existing active `asset_id`,
+  distinct `quote_asset_id`, Decimal-text `total_supply` and `issue_price`,
+  `issuance_policy`, nonblank `reason`, `idempotency_key`. No caller-selected
+  issuer, starting stage or legacy lock fields. Prices/supply respect storage
+  and authoritative asset precision. Existing assets are selected, not minted.
+- Lock the active administrator row, read canonical intent/receipt, then lock
+  assets by increasing ID. Amount formatting and trimmed reason/key canonicalize
+  before comparison. Same admin/key/intent returns the original project's current
+  snapshot even after a stage change. Changed intent conflicts. A new project,
+  its fixed pair, disabled generator, liquidity identity, zero base wallets,
+  lifecycle/operation/admin audits and receipt commit atomically.
+- `issuer_agent_id=null` means platform direct issuance. Agent approval calls
+  the same `publish_policy` helper with its original agent ID. Both paths retain
+  the contract seed and never create available funds.
+- Holdings require `new_coin.locks.read`; buybacks require
+  `new_coin.unlocks.read`; operations require `audit.logs.read`. Their counts and
+  rows share predicates and a read transaction. Limit 1..100, offset <=100000.
+  IDs must be positive; unknown query fields fail. No read endpoint mutates funds.
+- Holdings/buybacks independently filter `project_id`, `user_id`, `email`,
+  `agent_id` (buyer's direct referral agent), `issuer_agent_id`, and `status`.
+  Holdings preserve immutable policy/cost/acquisition and held/sold status;
+  effective stage unlock uses actual purchase/listing, never planned dates.
+- Buybacks always require `side=sell AND status=executed`; gross, fee and net
+  come from that receipt with explicit quote symbol and observed/executed times.
+  Quoted sells and executed buys cannot affect the result or total.
+- Operations filter exact project/actor type/actor ID/action and preserve real
+  admin/agent/scheduler/user identity (scheduler ID may be null).
+- Project DTO adds issuer code, quote/pair symbols, actual purchase,
+  next-transition/next-attempt timestamps and transition_error. All timestamps
+  are UTC Unix milliseconds, all monetary amounts are strings.
+- Project market setup returns only the published pair for v2. Saving a draft
+  requires its original `purchase_initial_price`; first publication requires
+  actual purchase evidence and purchase/listed stage. Published revision replay
+  still returns its receipt without restarting a paused market.
+
+### 4. Validation & Error Matrix
+
+| Input/state | Result |
+|---|---|
+| Missing permission | 403, no side effects |
+| Numeric JSON amount or unknown create field | 422 |
+| Invalid policy, inactive/same asset, precision, paging | 400 |
+| Same key with changed canonical intent | 409, retain original intent |
+| Project/pair unique collision | 409 `TOKEN_ISSUANCE_EXISTS`, entire attempt rolled back |
+| Final audit/storage failure | 500, no partial project/pair/wallet/receipt |
+| V2 different pair/seed draft | 400 |
+| V2 publication before actual purchase | 409 |
+
+### 5. Good / Base / Bad Cases
+
+Good: concurrent identical creation produces one project and one receipt;
+`0.20` and `0.2` replay the same intent. A B-owned buyer in an A-issued project
+appears under buyer agent B and issuer A filters. A 1,000 gross / 100 fee / 900
+net sale is visible only after execution. Base: a preheat project has a disabled
+pair and null actual purchase. Bad: use an unexecuted quote as settlement proof.
+
+### 6. Tests Required
+
+`admin_routes::token_issuance` uses isolated MySQL for canonical/concurrent
+replay, permission denial, precision, audit rollback, zero wallets, ownership,
+pagination/count/empty pages, readonly ledgers, actual-event unlocks, executed
+sell filtering and seed/stage protection. Regress existing Admin new-coin and
+`agent_routes::token_lifecycle` tests; update OpenAPI schemas and both document
+aliases. UI tests cover durable retries, session replacement, response-contract
+identity, malformed amounts, original rules and post-failure authoritative reads.
+
+### 7. Wrong vs Correct
+
+Wrong: clear the key after an unknown creation result, silently change the
+contract seed, or read v2 holdings from legacy `asset_lock_positions`.
+Correct: persist the full session-scoped intent before sending, compare returned
+policy/amounts/asset IDs, retry that intent, and read `new_coin_holdings`.
+
+### Rollout
+
+Apply migration 0154 after 0152/0153 before exposing Admin v2 creation. It creates
+only receipt storage. Funding the buyback account remains a separate audited
+operational procedure; the creation API never fabricates treasury balances.

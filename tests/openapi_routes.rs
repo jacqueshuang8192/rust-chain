@@ -1731,3 +1731,53 @@ async fn openapi_documents_versioned_issuance_quotes_and_paged_holdings() {
         );
     }
 }
+
+#[tokio::test]
+async fn documents_admin_token_creation_and_readonly_record_contracts() {
+    for url in ["/openapi.json", "/api/openapi.json"] {
+        let doc = request_json(url).await;
+        for (route, method) in [
+            ("issuance", "post"),
+            ("holdings", "get"),
+            ("buybacks", "get"),
+            ("operations", "get"),
+        ] {
+            let path = format!("/admin/api/v1/new-coins/{route}");
+            let operation = &doc["paths"][path][method];
+            assert!(operation["security"].is_array());
+            assert!(
+                operation["responses"]["200"]["content"]["application/json"]["schema"].is_object()
+            );
+            assert!(operation["responses"]["403"].is_object());
+        }
+        let schemas = &doc["components"]["schemas"];
+        assert_eq!(
+            schemas["CreateAdminTokenIssuance"]["additionalProperties"],
+            false
+        );
+        for key in ["total_supply", "issue_price"] {
+            assert_eq!(
+                schemas["CreateAdminTokenIssuance"]["properties"][key]["type"],
+                "string"
+            );
+        }
+        for key in ["quantity", "price", "cost", "gross", "fee", "net"] {
+            assert_eq!(
+                schemas["AdminTokenBuyback"]["properties"][key]["type"],
+                "string"
+            );
+        }
+        assert_eq!(
+            schemas["AdminTokenBuyback"]["properties"]["executed_at"]["type"],
+            "integer"
+        );
+        for key in [
+            "owner_agent_id",
+            "issuer_agent_id",
+            "policy_json",
+            "unlock_at",
+        ] {
+            assert!(schemas["AdminTokenHolding"]["properties"][key].is_object());
+        }
+    }
+}

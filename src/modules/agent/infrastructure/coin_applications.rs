@@ -114,51 +114,6 @@ pub(crate) async fn insert(
     Ok(result.last_insert_id())
 }
 
-/// 批准事务发布完整不可变规则和下一自动节点；此处只排程，既不派发也不出售持仓。
-pub(crate) async fn publish_policy(
-    tx: &mut Transaction<'_, MySql>,
-    project_id: u64,
-    agent_id: u64,
-    admin_id: u64,
-    policy: &crate::modules::new_coin::domain::issuance::IssuancePolicy,
-) -> AppResult<()> {
-    let (base, quote, symbol, quote_symbol, quantity_precision, price_precision): (u64,u64,String,String,i32,i32) = sqlx::query_as("SELECT p.asset_id,p.quote_asset_id,p.symbol,q.symbol,a.precision_scale,q.precision_scale FROM new_coin_projects p JOIN assets a ON a.id=p.asset_id JOIN assets q ON q.id=p.quote_asset_id WHERE p.id=?")
-        .bind(project_id).fetch_one(&mut **tx).await?;
-    let pair_symbol = crate::modules::market::domain::ValidatedMarketSymbol::from_raw(&format!(
-        "{symbol}{quote_symbol}"
-    ))
-    .map_err(|_| AppError::Validation("新币与计价资产组合后的交易对代码不能超过32位".into()))?;
-    let pair_id = sqlx::query("INSERT INTO trading_pairs (base_asset,quote_asset,symbol,price_precision,qty_precision,min_order_value,status,market_type) VALUES (?,?,?,?,?,0,'disabled','internal')")
-        .bind(base).bind(quote).bind(pair_symbol.as_str()).bind(price_precision).bind(quantity_precision)
-        .execute(&mut **tx).await?.last_insert_id();
-    // 新交易对尚未提交、没有运行中的生成器；只在审批事务创建停用版本，不需要排空外部写入者。
-    crate::modules::admin::infrastructure::save_default_market_in_tx(
-        tx,
-        &crate::modules::admin::infrastructure::DefaultMarketRecord {
-            pair_id,
-            enabled: false,
-            all_market_paused: false,
-            initial_price: Some(policy.purchase_initial_price.clone()),
-            config_json: sqlx::types::Json(serde_json::json!(
-                crate::modules::market::synthetic_default::DefaultMarketParameters::default()
-            )),
-            version: 1,
-            seed: format!("issuance:{project_id}:{pair_id}"),
-            updated_at: chrono::Utc::now(),
-        },
-        Some(admin_id),
-    )
-    .await?;
-    let due = policy
-        .subscription
-        .automatic
-        .then_some(policy.subscription.at);
-    sqlx::query("UPDATE new_coin_projects SET issuance_policy=?,issuer_agent_id=?,next_transition_at=?,next_transition_attempt_at=?,post_listing_pair_id=? WHERE id=? AND issuance_policy IS NULL")
-        .bind(sqlx::types::Json(policy)).bind(agent_id).bind(due).bind(due).bind(pair_id).bind(project_id)
-        .execute(&mut **tx).await?;
-    Ok(())
-}
-
 /// 审核锁定唯一申请行，保证并发批准/驳回只有一条终态；缺失记录统一返回404。
 pub(crate) async fn lock(tx: &mut Transaction<'_, MySql>, id: u64) -> AppResult<CoinApplication> {
     sqlx::query_as("SELECT * FROM agent_new_coin_applications WHERE id=? FOR UPDATE")

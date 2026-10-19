@@ -20,6 +20,7 @@ mod new_coin_convert;
 mod new_coin_market;
 mod risk_security;
 mod system_config;
+mod token_issuance;
 mod users_agents;
 mod wallet_assets;
 
@@ -259,6 +260,7 @@ pub fn routes() -> Router<AppState> {
         .merge(financial_reconciliation::routes())
         .merge(market_trading::routes())
         .merge(new_coin_convert::routes())
+        .merge(token_issuance::routes())
         .merge(new_coin_market::routes())
 }
 

@@ -13,6 +13,9 @@ export type NewCoinProject = ApiRecord & {
   unlock_fee_rate: string | null; unlock_fee_basis: string | null; unlock_fee_asset: number | null;
   post_listing_purchase_enabled: boolean; post_listing_pair_id: number | null;
   issuance_policy?: IssuancePolicy | null; actual_purchase_at?: number | null;
+  issuer_agent_id?: number | null; issuer_agent_code?: string | null; quote_symbol?: string | null;
+  post_listing_pair_symbol?: string | null; next_transition_at?: number | null;
+  next_transition_attempt_at?: number | null; transition_error?: string | null;
 };
 export type ProjectCenter = {
   configuration_version: string; project: NewCoinProject; subscription_count: number; pending_manual_count: number;
@@ -43,7 +46,16 @@ export async function loadProjectCenter(id: string, signal?: AbortSignal): Promi
   for (const key of ['id', 'asset_id']) if (!Number.isSafeInteger(p[key]) || Number(p[key]) <= 0) return fail();
   for (const key of ['symbol', 'lifecycle_status', 'status', 'unlock_type']) if (typeof p[key] !== 'string') return fail();
   if (!stages.some(s => s.value === p.lifecycle_status)) return fail();
-  if (p.issuance_policy != null) { try { validatePolicy(p.issuance_policy); } catch { return fail(); } }
+  if (p.issuance_policy != null) {
+    try { validatePolicy(p.issuance_policy); } catch { return fail(); }
+    for (const key of ['actual_purchase_at', 'next_transition_at', 'next_transition_attempt_at', 'issuer_agent_id']) {
+      if (p[key] !== null && (!Number.isSafeInteger(p[key]) || Number(p[key]) <= 0)) return fail();
+    }
+    for (const key of ['issuer_agent_code', 'quote_symbol', 'post_listing_pair_symbol', 'transition_error']) {
+      if (p[key] !== null && typeof p[key] !== 'string') return fail();
+    }
+    if (!Number.isSafeInteger(p.post_listing_pair_id) || Number(p.post_listing_pair_id) <= 0 || typeof p.post_listing_pair_symbol !== 'string' || !p.post_listing_pair_symbol || typeof p.quote_symbol !== 'string' || !p.quote_symbol) return fail();
+  }
   for (const key of ['total_supply', 'issue_price', 'reserved_supply', 'allocated_supply', 'remaining_supply']) {
     if (typeof p[key] !== 'string' || canonicalDecimalText(p[key]) === null) return fail();
   }
