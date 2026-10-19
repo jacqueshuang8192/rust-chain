@@ -9908,3 +9908,10 @@
 - 修改文件：`mobile/src/views/HomeView.vue`、`mobile/src/styles/prototype-parity.css`、`.trellis/spec/mobile/pwa-and-shell.md`、`.trellis/tasks/10-20-mobile-market-empty-state/`及本记录。
 - 验证结果：`npm --prefix mobile run release:gate`退出0，871/871测试、类型检查、PWA/Tauri构建及制品、包体和治理门禁全部通过；`git diff --check`通过。Ego本地浏览器12组中英/明暗/320至448px检查通过，空状态高度162px、无横溢、图标居中、滚动到底后不被底栏遮挡，说明文字对比度浅色6.52/深色7.87；自选/热门切换与加载/错误状态验证通过，截图已查看。纯样式改动未新增实现镜像测试。
 - 后续事项：按项目工作流保存本地提交并归档；未推送或部署。任务Ego空间28关闭，既有服务与`.vite/`缓存保留。
+
+## 2026-10-20 03:37 - 新币规则文案与行情空状态推送完成
+
+- 完成内容：按用户授权将新币规则文案提交`3e4cb7c`、行情空状态优化提交`fde478d`及对应任务归档和日志共6个提交普通推送到`origin/main`。
+- 修改文件：本轮仅追加`docs/superpowers/PROGRESS.md`；业务源码沿用前述已验收提交。
+- 验证结果：fetch确认推送前本地领先6个提交、无落后或分叉；push成功，`git ls-remote`确认远端main与本地完整哈希`7c8b7f380230bf51c1990c8f5531de1abb326ade`一致。源码未改动，沿用871/871测试及12组浏览器检查；本结果记录随后提交推送并再次核对。
+- 后续事项：未部署；保留既有未跟踪`.vite/`缓存。
