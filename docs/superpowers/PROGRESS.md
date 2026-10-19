@@ -9936,3 +9936,10 @@
 - 修改文件：本任务前述源码和测试、`.trellis/spec/backend/{market-favorites,token-issuance-v2}.md`、`.trellis/spec/mobile/backend-integration.md`、`.trellis/tasks/10-20-new-coin-spot-listing-gate/`和本记录。
 - 验证结果：最终生命周期2/2；市场路由实际执行13项通过、1项因无Mongo跳过；自选鉴权3/3、现货65/65、钱包仓储2/2、旧新币11/11、架构11/11、文档1/1、OpenAPI18/18通过。Mobile完整门禁874/874、PC类型/构建与123/123通过；严格Clippy all-targets、fmt、git diff和任务上下文检查通过。资金回归使用隔离MySQL9.3和专属Redis，未触及生产。
 - 后续事项：保存本地提交并归档，未推送、部署或新增迁移。Mongo历史K线实读和浏览器/原生设备未验证；本轮没有布局变更，前端行为通过真实模块执行回归。清理本任务测试库和Redis，保留原有服务及`.vite/`缓存。
+
+## 2026-10-20 04:55 - 新币详情与现货上市限制推送完成
+
+- 完成内容：按用户授权将新币详情精简`c33aef7`、认购与现货上市分离`fcb123c`及对应归档/日志共6个提交普通推送到`origin/main`。
+- 修改文件：本轮仅追加`docs/superpowers/PROGRESS.md`；业务源码沿用已验收提交。
+- 验证结果：fetch确认无落后或分叉，git diff --check通过；push成功，git ls-remote确认远端main完整哈希`7b653f4ec6653e437051ad3bbc3fa3dfd745f82f`与本地一致。源码未变化，沿用Mobile874/874、PC123/123和后端实库/Clippy检查；本结果记录提交后再次普通推送并核对。
+- 后续事项：未部署。上线需同步后端和前端；保留未跟踪`.vite/`缓存。Mongo历史K线实读未验证的限制沿用前次记录。
