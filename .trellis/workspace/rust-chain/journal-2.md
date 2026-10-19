@@ -337,3 +337,36 @@ Removed the mobile stage note/manual refresh, token trading header and chart-ref
 ### Next Steps
 
 - None - task complete
+
+
+## Session 69: Keep purchase-stage tokens out of spot
+
+**Date**: 2026-10-20
+**Task**: Keep purchase-stage tokens out of spot
+**Branch**: `main`
+
+### Summary
+
+Separated active purchase feeds from actual spot listing across catalog/favorites and locked order admission; fixed Mobile and PC catalog membership. Isolated lifecycle 2/2, spot 65/65, legacy/market/repository regressions, Mobile 874/874 and PC 123/123, strict Clippy/fmt passed. One Mongo-backed history test unavailable. Test DB/Redis cleaned; no push or deployment.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `fcb123c` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
