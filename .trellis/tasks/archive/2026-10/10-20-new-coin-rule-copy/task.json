@@ -3,7 +3,7 @@
   "name": "new-coin-rule-copy",
   "title": "Simplify mobile new coin issuance labels",
   "description": "",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": "frontend",
   "scope": "mobile",
   "package": null,
@@ -11,11 +11,11 @@
   "creator": "rust-chain",
   "assignee": "rust-chain",
   "createdAt": "2026-10-20",
-  "completedAt": null,
+  "completedAt": "2026-10-20",
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
-  "commit": null,
+  "commit": "3e4cb7c411c6e45ce7cd26d6f8bd7e98cc9043fd",
   "pr_url": null,
   "subtasks": [],
   "children": [],
@@ -24,6 +24,6 @@
     "mobile/src/components/TokenIssuanceRules.vue",
     "mobile/src/core/tokenIssuanceMessages.ts"
   ],
-  "notes": "All acceptance criteria passed. Mobile release:gate exited 0 with 871/871 tests, type checks, PWA/Tauri builds, artifacts and budgets. Only display labels/row changed. No pricing, unlock or policy-data changes. Preparing local commit; no remote push or deployment.",
+  "notes": "All acceptance criteria passed. Mobile release:gate exited 0 with 871/871 tests, type checks, PWA/Tauri builds, artifacts and budgets. Only display labels/row changed. No pricing, unlock or policy-data changes. Local business commit 3e4cb7c created; no remote push or deployment.",
   "meta": {}
 }
