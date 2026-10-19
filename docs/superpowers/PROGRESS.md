@@ -9894,3 +9894,10 @@
 - 修改文件：业务范围见归档任务`10-20-new-coin-pending-listing`与`10-20-pwa-update-recovery`的提交清单；本切片追加任务提交/推送结果与本记录。
 - 验证结果：fetch确认推送前无落后或分叉；两个业务暂存区分别精确匹配24/22文件清单；diff检查通过。业务代码未修改，沿用最终Mobile门禁871/871、PWA/Tauri制品与包体检查及已记录浏览器验收。push成功，`git ls-remote`确认远端与本地完整哈希`ead6af5e0b6ba20e941f2fc8e05beaed14d06cfb`一致；本结果记录随后提交推送并再次核对。
 - 后续事项：未部署。线上`sw.js`的4小时强缓存仍需发布时按README调整；KHB进入认购仍须完成派发/退款，上市仍遵循项目手动设置。
+
+## 2026-10-20 03:24 - 新币发行规则展示文案调整
+
+- 完成内容：手机端新币页面“行情初始价”改为“发行价”，“锁仓规则”改为“解禁规则”，隐藏“上市参考价（不重置行情）”整行；同步英文标签。价格仍读取原purchase_initial_price，策略数据和解禁逻辑保持不变。
+- 修改文件：`mobile/src/components/TokenIssuanceRules.vue`、`mobile/src/core/tokenIssuanceMessages.ts`、`.trellis/tasks/10-20-new-coin-rule-copy/`及本记录。
+- 验证结果：`npm --prefix mobile run release:gate`退出0，871/871测试、生产/测试类型检查、PWA/Tauri构建和制品检查、包体/源码/测试质量门禁通过；未放宽预算。差异核对确认业务源码仅四个中英标签替换及一行展示删除，git diff --check通过。纯文案调整未新增测试或单独进行浏览器验收。
+- 后续事项：按项目工作流保存本地提交并归档；本轮未推送或部署，`.vite/`缓存排除。
