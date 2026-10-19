@@ -52,6 +52,6 @@ Task database `codex_admin_tokens_20261019` was dropped, dedicated Redis on `127
 
 ## Commit status
 
-Implementation and verification are complete. User explicitly authorized commit and push on 2026-10-19. The exact approved 54-path file list is in `commit-plan.md`; work commit, current-task archive, journal and normal push are now being executed. No deployment or unrelated historical task is included.
+User authorized commit and push on 2026-10-19. Work commit `9dde7acfa626acd1e103139f346f152635a552b6` contains the approved 54 paths; `.vite/` was excluded. This task alone was archived by `8aba54e3fe1ad4ed4419141d0be44556e0cc586b`. Both were pushed normally to `origin/main`, whose full hash was verified against local HEAD.
 
-Work commit created: `9dde7acfa626acd1e103139f346f152635a552b6`. Current-task archive and push receipts follow in the session journal and progress log.
+The final session journal and push receipt are recorded as the separate Trellis bookkeeping commit. No deployment or production migration was performed.

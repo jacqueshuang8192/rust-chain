@@ -81,3 +81,7 @@ The full JavaScript budget is still above the existing threshold (2,712,495 > 2,
 - Work commit: `9dde7acfa626acd1e103139f346f152635a552b6`.
 - Exactly 54 approved paths committed; `.vite/` excluded.
 - User authorized normal push to origin/main; archive and journal are part of this delivery.
+
+- Archive commit: `8aba54e3fe1ad4ed4419141d0be44556e0cc586b`.
+- Work and archive commits pushed to origin/main; remote full hash verified as `8aba54e3fe1ad4ed4419141d0be44556e0cc586b`.
+- Final journal/progress receipt follows in the separate bookkeeping commit. No deployment.

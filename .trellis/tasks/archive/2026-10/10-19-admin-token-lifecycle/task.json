@@ -21,7 +21,7 @@
   "children": [],
   "parent": null,
   "relatedFiles": [],
-  "notes": "Work commit 9dde7ac created from the approved 54-path manifest. Implementation and checks complete; archiving current task and recording journal before authorized normal push. Existing JS bundle budget remains over limit; no deployment.",
+  "notes": "Completed and archived. Work commit 9dde7ac and archive 8aba54e pushed to origin/main and remote hash verified on 2026-10-19. Web 1124/1124 and isolated DB regressions pass; JS budget 2712495 > 2600000 remains documented. No deployment or production migration.",
   "meta": {
     "delivery": "delivery.md",
     "commit_plan": "commit-plan.md"
