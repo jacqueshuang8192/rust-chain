@@ -1,0 +1,326 @@
+[
+  {
+    "locale": "zh-CN",
+    "theme": "light",
+    "width": 320,
+    "overflow": false,
+    "stages": [
+      "预热中",
+      "申购",
+      "派发",
+      "实时认购",
+      "已上市"
+    ],
+    "active": "派发",
+    "plannedLabels": 4,
+    "hiddenCopyVisible": false,
+    "targets": [
+      {
+        "height": 44.5,
+        "width": 126
+      },
+      {
+        "height": 44.5,
+        "width": 174
+      }
+    ],
+    "overlay": false
+  },
+  {
+    "locale": "zh-CN",
+    "theme": "light",
+    "width": 390,
+    "overflow": false,
+    "stages": [
+      "预热中",
+      "申购",
+      "派发",
+      "实时认购",
+      "已上市"
+    ],
+    "active": "派发",
+    "plannedLabels": 4,
+    "hiddenCopyVisible": false,
+    "targets": [
+      {
+        "height": 44.5,
+        "width": 126
+      },
+      {
+        "height": 44.5,
+        "width": 174
+      }
+    ],
+    "overlay": false
+  },
+  {
+    "locale": "zh-CN",
+    "theme": "light",
+    "width": 448,
+    "overflow": false,
+    "stages": [
+      "预热中",
+      "申购",
+      "派发",
+      "实时认购",
+      "已上市"
+    ],
+    "active": "派发",
+    "plannedLabels": 4,
+    "hiddenCopyVisible": false,
+    "targets": [
+      {
+        "height": 44.5,
+        "width": 126
+      },
+      {
+        "height": 44.5,
+        "width": 174
+      }
+    ],
+    "overlay": false
+  },
+  {
+    "locale": "zh-CN",
+    "theme": "dark",
+    "width": 320,
+    "overflow": false,
+    "stages": [
+      "预热中",
+      "申购",
+      "派发",
+      "实时认购",
+      "已上市"
+    ],
+    "active": "派发",
+    "plannedLabels": 4,
+    "hiddenCopyVisible": false,
+    "targets": [
+      {
+        "height": 44.5,
+        "width": 126
+      },
+      {
+        "height": 44.5,
+        "width": 174
+      }
+    ],
+    "overlay": false
+  },
+  {
+    "locale": "zh-CN",
+    "theme": "dark",
+    "width": 390,
+    "overflow": false,
+    "stages": [
+      "预热中",
+      "申购",
+      "派发",
+      "实时认购",
+      "已上市"
+    ],
+    "active": "派发",
+    "plannedLabels": 4,
+    "hiddenCopyVisible": false,
+    "targets": [
+      {
+        "height": 44.5,
+        "width": 126
+      },
+      {
+        "height": 44.5,
+        "width": 174
+      }
+    ],
+    "overlay": false
+  },
+  {
+    "locale": "zh-CN",
+    "theme": "dark",
+    "width": 448,
+    "overflow": false,
+    "stages": [
+      "预热中",
+      "申购",
+      "派发",
+      "实时认购",
+      "已上市"
+    ],
+    "active": "派发",
+    "plannedLabels": 4,
+    "hiddenCopyVisible": false,
+    "targets": [
+      {
+        "height": 44.5,
+        "width": 126
+      },
+      {
+        "height": 44.5,
+        "width": 174
+      }
+    ],
+    "overlay": false
+  },
+  {
+    "locale": "en",
+    "theme": "light",
+    "width": 320,
+    "overflow": false,
+    "stages": [
+      "Preheat",
+      "Subscription",
+      "Distribution",
+      "Live purchase",
+      "Listed"
+    ],
+    "active": "Distribution",
+    "plannedLabels": 4,
+    "hiddenCopyVisible": false,
+    "targets": [
+      {
+        "height": 44,
+        "width": 186.7265625
+      },
+      {
+        "height": 63,
+        "width": 280
+      }
+    ],
+    "overlay": false
+  },
+  {
+    "locale": "en",
+    "theme": "light",
+    "width": 390,
+    "overflow": false,
+    "stages": [
+      "Preheat",
+      "Subscription",
+      "Distribution",
+      "Live purchase",
+      "Listed"
+    ],
+    "active": "Distribution",
+    "plannedLabels": 4,
+    "hiddenCopyVisible": false,
+    "targets": [
+      {
+        "height": 44,
+        "width": 186.7265625
+      },
+      {
+        "height": 44,
+        "width": 336.4375
+      }
+    ],
+    "overlay": false
+  },
+  {
+    "locale": "en",
+    "theme": "light",
+    "width": 448,
+    "overflow": false,
+    "stages": [
+      "Preheat",
+      "Subscription",
+      "Distribution",
+      "Live purchase",
+      "Listed"
+    ],
+    "active": "Distribution",
+    "plannedLabels": 4,
+    "hiddenCopyVisible": false,
+    "targets": [
+      {
+        "height": 44,
+        "width": 186.7265625
+      },
+      {
+        "height": 44,
+        "width": 336.4375
+      }
+    ],
+    "overlay": false
+  },
+  {
+    "locale": "en",
+    "theme": "dark",
+    "width": 320,
+    "overflow": false,
+    "stages": [
+      "Preheat",
+      "Subscription",
+      "Distribution",
+      "Live purchase",
+      "Listed"
+    ],
+    "active": "Distribution",
+    "plannedLabels": 4,
+    "hiddenCopyVisible": false,
+    "targets": [
+      {
+        "height": 44,
+        "width": 186.7265625
+      },
+      {
+        "height": 63,
+        "width": 280
+      }
+    ],
+    "overlay": false
+  },
+  {
+    "locale": "en",
+    "theme": "dark",
+    "width": 390,
+    "overflow": false,
+    "stages": [
+      "Preheat",
+      "Subscription",
+      "Distribution",
+      "Live purchase",
+      "Listed"
+    ],
+    "active": "Distribution",
+    "plannedLabels": 4,
+    "hiddenCopyVisible": false,
+    "targets": [
+      {
+        "height": 44,
+        "width": 186.7265625
+      },
+      {
+        "height": 44,
+        "width": 336.4375
+      }
+    ],
+    "overlay": false
+  },
+  {
+    "locale": "en",
+    "theme": "dark",
+    "width": 448,
+    "overflow": false,
+    "stages": [
+      "Preheat",
+      "Subscription",
+      "Distribution",
+      "Live purchase",
+      "Listed"
+    ],
+    "active": "Distribution",
+    "plannedLabels": 4,
+    "hiddenCopyVisible": false,
+    "targets": [
+      {
+        "height": 44,
+        "width": 186.7265625
+      },
+      {
+        "height": 44,
+        "width": 336.4375
+      }
+    ],
+    "overlay": false
+  }
+]

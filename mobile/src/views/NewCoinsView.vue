@@ -39,8 +39,8 @@ const lifecycleFilters: ReadonlyArray<{ key: NewCoinLifecycleFilter; label: stri
   { key: 'all', label: 'common.all' },
   { key: 'preheat', label: 'newCoin.preheat' },
   { key: 'subscription', label: 'newCoin.fixedSubscription' },
+  { key: 'distribution', label: 'newCoin.distributionStage' },
   { key: 'purchase', label: 'newCoin.livePurchase' },
-  { key: 'distribution', label: 'newCoin.pendingListing' },
   { key: 'listed', label: 'newCoin.listed' },
 ]
 const opportunityFilters: ReadonlyArray<{ key: NewCoinOpportunityFilter; label: string }> = [
@@ -309,10 +309,10 @@ onBeforeUnmount(() => {
 
 .new-coins-lifecycle-filters {
   align-items: center;
-  display: grid;
+  display: flex;
   gap: 8px;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  height: 36px;
+  min-height: 44px;
+  overflow-x: auto;
   padding: 3px 16px;
 }
 
@@ -325,7 +325,8 @@ onBeforeUnmount(() => {
   font-size: 12px;
   height: 44px;
   justify-content: center;
-  min-width: 0;
+  min-width: 44px;
+  flex: 0 0 auto;
   padding: 7px 0;
 }
 

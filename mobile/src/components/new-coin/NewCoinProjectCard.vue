@@ -55,6 +55,7 @@ const actionLabel = computed(() => props.project.lifecycleStatus.toLowerCase() =
   ? t('newCoin.subscribeNow')
   : t('newCoin.viewDetails'))
 const timing = computed(() => {
+  if (props.project.issuancePolicy) return formatDateTime(props.project.issuancePolicy.listing.at)
   if (!props.project.listedAt) return t('newCoin.pendingSchedule')
   const remainingSeconds = Math.max(0, Math.ceil((props.project.listedAt - props.now) / 1000))
   if (!remainingSeconds) return formatDateTime(props.project.listedAt)
@@ -64,6 +65,14 @@ const timing = computed(() => {
   return t('newCoin.listingCountdown', { days, hours, minutes })
 })
 const unlockLabel = computed(() => {
+  const lock = props.project.issuancePolicy?.lock
+  if (lock) {
+    if (lock.kind === 'weeks' || lock.kind === 'months') return t(lock.kind === 'weeks' ? 'newCoin.lockWeeks' : 'newCoin.lockMonths', { count: lock.count })
+    if (lock.kind === 'fixed') return formatDateTime(lock.at)
+    if (lock.kind === 'none') return t('newCoin.noLock')
+    if (lock.kind === 'on_purchase') return t('newCoin.purchaseUnlock')
+    return t('newCoin.immediateUnlock')
+  }
   if (props.project.fixedUnlockAt) return formatDateTime(props.project.fixedUnlockAt)
   if (props.project.relativeUnlockSeconds !== undefined) {
     return t('newCoin.days', { days: Math.ceil(props.project.relativeUnlockSeconds / 86400) })
@@ -120,7 +129,7 @@ function financialValueClass(value: string): Record<string, boolean> {
       </span>
 
       <span class="new-coin-project-card__countdown">
-        <small>{{ t('newCoin.listingTime') }}</small>
+        <small>{{ t('newCoin.plannedListingTime') }}</small>
         <strong>{{ timing }}</strong>
       </span>
 

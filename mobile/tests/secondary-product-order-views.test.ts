@@ -93,8 +93,8 @@ test('新币三页保留项目路由、认购购买、四类记录、手续费�
   assert.match(newCoinsSource, /router\.push\(\{ name: 'new-coin-detail', params: \{ symbol: project\.symbol \} \}\)/)
   assert.match(newCoinsSource, /router\.push\(\{ name: 'new-coin-records' \}\)/)
 
-  assert.match(newCoinDetailSource, /fetchNewCoinProject\(props\.symbol\)/)
-  assert.match(newCoinDetailSource, /fetchWalletAccounts\(\)/)
+  assert.match(newCoinDetailSource, /useNewCoinProject\(\s*\(\) => props\.symbol/)
+  assert.match(newCoinDetailSource, /request: fetchWalletAccounts/)
   assert.match(newCoinDetailSource, /account\.assetId === project\.value\?\.quoteAssetId/)
   assert.match(newCoinDetailSource, /project\.value\?\.issuePriceText \|\| null/)
   assert.doesNotMatch(newCoinDetailSource, /fetchMarketTickers|useMarketStore|<select|symbol === 'USDT'/)

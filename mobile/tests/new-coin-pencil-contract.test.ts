@@ -60,7 +60,8 @@ test('guest zone and opportunities stay public while account and record reads re
   assert.match(api, /publicApiRequestConfig\(\{ params: \{ limit \} \}\)/)
   assert.match(api, /fetchNewCoinProject[\s\S]*?publicApiRequestConfig\(\)/)
   assert.match(marketApi, /fetchMarketTickers[\s\S]*?publicApiRequestConfig\(\)/)
-  assert.match(detail, /session\.isAuthenticated \? await fetchWalletAccounts\(\) : \[\]/)
+  assert.match(detail, /sessionKey: \(\) => session\.isAuthenticated && project\.value && !project\.value\.issuancePolicy/)
+  assert.match(detail, /request: fetchWalletAccounts/)
   assert.match(records, /async function load\(\): Promise<void> \{\s*if \(!session\.isAuthenticated\) return/)
   assert.doesNotMatch(api.slice(api.indexOf('export async function subscribeNewCoin')), /publicApiRequestConfig/)
   assert.doesNotMatch(walletApi, /publicApiRequestConfig/)
@@ -108,7 +109,7 @@ test('records merge four sources chronologically and retain typed filtering and 
 })
 
 test('selected geometry, responsive containment, and dark palettes remain route scoped', () => {
-  assert.match(zone, /height: 54px[\s\S]*?height: 148px[\s\S]*?height: 50px[\s\S]*?height: 36px/)
+  assert.match(zone, /height: 54px[\s\S]*?height: 148px[\s\S]*?height: 50px[\s\S]*?min-height: 44px/)
   assert.match(zone, /\.new-coins-project-content \{\s*padding: 8px 16px 18px;\s*\}/)
   assert.match(zone, /\.new-coins-project-content > h2 \{[\s\S]*?height: 36px;[\s\S]*?margin: 0 0 12px;/)
   assert.match(projectCard, /\.new-coin-project-card \{[\s\S]*?border-radius: 22px;[\s\S]*?height: 300px/)

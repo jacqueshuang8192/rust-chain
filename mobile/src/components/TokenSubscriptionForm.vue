@@ -5,7 +5,7 @@ import { useSessionStore } from '@/stores/session'
 import { subscribeToken, type TokenSubscriptionIntent } from '@/api/tokenIssuance'
 import { tokenDecimal, tokenMultiply } from '@/core/tokenIssuance'
 import { tokenIssuanceMessages } from '@/core/tokenIssuanceMessages'
-const props = defineProps<{ projectId: number; symbol: string; quoteSymbol: string; quoteAssetId: number; price: string }>()
+const props = withDefaults(defineProps<{ projectId: number; symbol: string; quoteSymbol: string; quoteAssetId: number; price: string; subscriptionOpen?: boolean }>(), { subscriptionOpen: true })
 const emit = defineEmits<{ completed: [] }>()
 const { t } = useI18n({ useScope: 'local', messages: tokenIssuanceMessages })
 const session = useSessionStore()
@@ -17,7 +17,7 @@ let generation = 0
 const storageKey = () => `token-subscription:${owner.value}:${props.projectId}`
 function save() { sessionStorage.setItem(storageKey(), JSON.stringify({ intent: intent.value, uncertain: uncertain.value })) }
 function review() {
-  if (recoveryBlocked.value) return
+  if (recoveryBlocked.value || !props.subscriptionOpen) return
   try {
     const q = tokenDecimal(quantity.value.trim()); if (!/[1-9]/.test(q)) throw new Error()
     const cost = tokenMultiply(q, props.price); tokenDecimal(cost)
@@ -30,7 +30,7 @@ function cancel() {
   sessionStorage.removeItem(storageKey()); intent.value = null; error.value = ''
 }
 async function submit() {
-  if (!intent.value || busy.value || !owner.value) return
+  if (!intent.value || busy.value || !owner.value || (!props.subscriptionOpen && !uncertain.value)) return
   const g = generation
   try { uncertain.value = true; save() } catch { error.value = t('token.unavailableStorage'); return }
   busy.value = true; error.value = ''
@@ -53,10 +53,11 @@ watch(() => [owner.value, props.projectId], () => {
 onBeforeUnmount(() => { generation++ })
 </script>
 <template>
-  <section v-if="owner" class="token-surface token-subscribe">
+  <section v-if="owner && (subscriptionOpen || intent || recoveryBlocked || success)" class="token-surface token-subscribe">
     <h2>{{ t('token.subscribe') }} · {{ symbol }}</h2><p>{{ t('token.fixedPrice') }}: {{ price }} {{ quoteSymbol }}</p>
     <p v-if="error" role="alert">{{ error }}</p><p v-if="success" role="status">{{ t('token.subscribed') }}</p>
-    <form v-if="!intent" @submit.prevent="review"><label>{{ t('token.quantity') }}<input v-model="quantity" inputmode="decimal" required /></label><button type="submit" :disabled="recoveryBlocked">{{ t('token.review') }}</button></form>
-    <div v-else aria-live="polite"><p>{{ intent.quantity }} {{ symbol }} · {{ t('token.freeze') }}: {{ intent.quote_amount }} {{ quoteSymbol }}</p><p>{{ t('token.subscriptionNote') }}</p><button :disabled="busy" type="button" @click="submit">{{ t(busy ? 'token.processing' : uncertain ? 'token.retry' : 'token.confirm') }}</button><button :disabled="busy || uncertain" type="button" @click="cancel">{{ t('token.cancel') }}</button></div>
+    <p v-if="!subscriptionOpen && intent && !uncertain">{{ t('token.subscriptionClosed') }}</p>
+    <form v-if="!intent && subscriptionOpen" @submit.prevent="review"><label>{{ t('token.quantity') }}<input v-model="quantity" inputmode="decimal" required /></label><button type="submit" :disabled="recoveryBlocked">{{ t('token.review') }}</button></form>
+    <div v-if="intent" aria-live="polite"><p>{{ intent.quantity }} {{ symbol }} · {{ t('token.freeze') }}: {{ intent.quote_amount }} {{ quoteSymbol }}</p><p>{{ t('token.subscriptionNote') }}</p><button :disabled="busy || (!subscriptionOpen && !uncertain)" type="button" @click="submit">{{ t(busy ? 'token.processing' : uncertain ? 'token.retry' : 'token.confirm') }}</button><button :disabled="busy || uncertain" type="button" @click="cancel">{{ t('token.cancel') }}</button></div>
   </section>
 </template>

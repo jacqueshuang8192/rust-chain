@@ -9866,3 +9866,10 @@
 - 修改文件：业务内容沿用既有已验收提交；本切片仅追加本进度记录。
 - 验证结果：git fetch确认本地领先3个提交、无落后或分叉；git diff --check通过；push成功，git ls-remote确认远端main完整哈希为`5273eea4f248d8dcfc9312fc1e81c9f86d1b1185`，与本地一致。业务源码未改动，沿用既有完整验证及本会话20/20定向复核结果；本记录提交后再次普通推送核对。
 - 后续事项：未部署或迁移生产库；发布前须执行0155迁移。既有Web包体预算超限保留记录，未放宽门槛。
+
+## 2026-10-20 01:44 - 新币前端阶段文案与刷新衔接修复
+
+- 完成内容：只读核对线上 KHB（ID 2）为新版派发阶段，预留100、派发0，认购自动节点已到而上市为手动。按用户要求统一手机端派发文案与阶段顺序，增加当前阶段说明、刷新项目及查看记录入口，明确计划时间；详情可见时定时刷新并防旧请求回写，保留跨阶段未确认申购的原单重试，关闭阶段禁止新申购。修正新版卡片读取旧锁仓字段导致固定解禁显示为上市释放的问题，统一申购进度与新币记录文案。
+- 修改文件：`mobile/src/views/{NewCoinDetailView,NewCoinsView}.vue`、`mobile/src/composables/useNewCoinProject.ts`、`mobile/src/components/{TokenIssuanceRules,TokenSubscriptionForm}.vue`、`mobile/src/components/new-coin/NewCoinProjectCard.vue`、`mobile/src/core/tokenIssuanceMessages.ts`、中英语言资源、相关3个测试文件；`.trellis/spec/mobile/backend-integration.md`、`.trellis/tasks/10-20-new-coin-pending-listing/`及本记录。
+- 验证结果：最终 `npm --prefix mobile run release:gate` 退出0，860/860测试、生产/测试类型检查、PWA/Tauri构建与制品、包体/源码/测试质量门禁通过；未放宽预算。浏览器内存夹具验证派发→认购→上市自动刷新、认购表单与现货入口切换，12组语言/主题/320至448px详情无横向溢出，最终320px列表筛选顺序与固定解禁显示、旧版四阶段兼容通过，截图已查看、夹具零写请求。`git diff --check`通过。
+- 后续事项：本地实现与验证完成，未提交、推送或部署；真实KHB仍需完成派发/退款，上市保留原手动设置。Ego空间26和本任务5187预览服务已关闭，既有服务与`.vite/`缓存保留；未操作生产资金。

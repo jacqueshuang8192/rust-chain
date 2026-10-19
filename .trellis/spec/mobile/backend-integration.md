@@ -2402,7 +2402,7 @@ if (directory.state === 'loaded') {
 - Project and record prices, quantities, supply counters, balances, and fees stay `DecimalText` through formatting and mutations. Number conversion is limited to bounded progress geometry and market presentation fields whose shared model is numeric.
 - The project `quoteAssetId` selects the wallet account for subscription and post-listing purchase. Never fall back to a wallet symbol, `USDT`, or the first account. The configured `postListingPairId` is the only market join key and trade target.
 - Post-listing purchase percentage, review, and payload calculations use the project's exact `issuePriceText`, matching the backend write invariant. Shared ticker values remain presentation-only and cannot become a client-selected execution price.
-- New Coin Activities filters exactly `preheat`, `subscription`, `distribution`, and `listed`. Trading Opportunities require only an authoritative `postListingPairId` and a shared-store ticker whose numeric ID exactly matches that pair; `postListingPurchaseEnabled` gates the direct-purchase mutation, not navigation to ordinary Spot Trade.
+- New Coin Activities filters follow `preheat`, `subscription`, `distribution`, `purchase`, `listed`, in that order. Distribution is labelled distribution, never pending listing. The six filters (including All) form one horizontally scrollable row with 44px targets. Legacy detail retains four milestones without a synthetic purchase stage. Trading Opportunities require only an authoritative `postListingPairId` and a shared-store ticker whose numeric ID exactly matches that pair; `postListingPurchaseEnabled` gates the direct-purchase mutation, not navigation to ordinary Spot Trade.
 - Backend unlock enums `immediate_on_listing`, `fixed_time`, and `relative_period` map to symmetric localized labels on cards and detail rules. Unknown future values remain visible as their raw backend text instead of being mislabeled.
 - The New Coin surface performs one shared market refresh, owns a stable consumer lease only while needed, and releases that exact consumer on tab exit/unmount. Local tab/filter changes do not refetch project or record directories.
 - Public project/detail and market reads use the explicit public-request marker, which strips even a stale stored Bearer token and never expires or redirects the session on a public 401. The Zone starts the market cold load only when Trading Opportunities is opened; wallet and four record-directory reads stay behind an authenticated-session guard, so a guest can always remain on the public Zone/Opportunity routes.
@@ -2446,6 +2446,34 @@ exclusive `new-coin-*` classes without repeated Vue scope attributes. Build
 compression runs on ES module chunks before hashing, with unsafe transforms
 left disabled; tiny-chunk merging and direct Terser dependency preserve fixed
 bundle thresholds. Never weaken the release gate to add a feature.
+
+### Project phase refresh and scheduled-time presentation
+
+- `useNewCoinProject(symbol, paused)` owns the public project read, refreshes
+  every 10 seconds while visible and on focus/visibility return, and supports
+  explicit refresh. Reuse `createSessionRequestLifecycle` for latest-read,
+  symbol-change and unmount invalidation. Background reads are single-flight;
+  a manual/post-mutation read supersedes an older read. Failures retain the last
+  project and expose a retryable error; they never synthesize a later phase.
+- Suspend background reads and application of their results during a legacy
+  confirmation/submission. Wallet reconciliation is separate, authenticated,
+  account/project scoped and unnecessary for the v2 project summary.
+- `issuance_policy.*.at` and the card's listing date are planned times. Never
+  use a countdown or local clock to claim an actual v2 purchase/listing event.
+  Phase hints state prerequisites without pretending to know a user's pending
+  allocation from project aggregate supply. Distribution exposes a records
+  action; purchase/chart and spot actions use the refreshed backend stage.
+- Cards read v2 lock rules from `issuancePolicy.lock`, including fixed, weeks,
+  months, none and actual purchase/listing unlock. Legacy compatibility columns
+  cannot describe a v2 project's lock. NULL-policy cards keep the v1 mapping.
+- Keep `TokenSubscriptionForm` mounted per project and pass `subscriptionOpen`.
+  A closed phase rejects new review/submission, but an uncertain existing intent
+  remains visible and retryable with its original key and payload. Refresh must
+  not unmount that receipt or erase a successful subscription acknowledgement.
+- Regression coverage executes the real composable/SFC setup for phase refresh,
+  stale/hidden/paused/error reads, closed-phase receipt recovery and all lock
+  kinds. Browser checks cover distribution→purchase→listed, v1 compatibility,
+  localized planned labels, preserved hidden rule copy and narrow filter rows.
 
 - Token styles must select their owned direct children; a `.token-surface dl`
   or generic descendant button/input rule reaches the embedded chart inspector

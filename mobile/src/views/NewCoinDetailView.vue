@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import {
   ArrowRight,
   CheckCircle2,
@@ -27,10 +27,10 @@ import TokenIssuanceRules from '@/components/TokenIssuanceRules.vue'
 import { apiErrorMessage } from '@/api/client'
 import {
   createNewCoinPurchase,
-  fetchNewCoinProject,
   subscribeNewCoin,
-  type NewCoinProject,
 } from '@/api/newCoin'
+import { useNewCoinProject } from '@/composables/useNewCoinProject'
+import { createSessionRequestLifecycle } from '@/core/sessionRequest'
 import { fetchWalletAccounts } from '@/api/wallet'
 import {
   decimalCompare,
@@ -58,17 +58,22 @@ const props = defineProps<{ symbol: string }>()
 const router = useRouter()
 const { locale, t } = useI18n()
 const session = useSessionStore()
-const project = ref<NewCoinProject | null>(null)
 const accounts = ref<WalletAccount[]>([])
 const amount = ref('')
 const selectedPercentage = ref<25 | 50 | 75 | 100 | null>(null)
-const loading = ref(false)
 const submitting = ref(false)
 const error = ref('')
 const success = ref('')
 const shareFeedback = ref('')
 const reviewOpen = ref(false)
 const reviewDialog = ref<HTMLElement | null>(null)
+const { project, refreshing, error: projectError, refresh: refreshProject } = useNewCoinProject(
+  () => props.symbol,
+  () => reviewOpen.value || submitting.value,
+)
+const loading = computed(() => !project.value && refreshing.value)
+const pageError = computed(() => error.value || (projectError.value
+  ? apiErrorMessage(projectError.value, t('newCoin.projectLoadFailed')) : ''))
 
 const { trapFocus: trapReviewFocus } = useModalDialog(reviewOpen, reviewDialog, '[data-dialog-cancel]')
 const lifecycle = computed(() => project.value?.lifecycleStatus.toLowerCase() || '')
@@ -117,10 +122,20 @@ const progressText = computed(() => progress.value
 const stageItems = computed(() => [
   { key: 'preheat', label: t('newCoin.preheat'), icon: Flame },
   { key: 'subscription', label: t(project.value?.issuancePolicy ? 'newCoin.fixedSubscription' : 'newCoin.subscribe'), icon: TicketCheck },
-  { key: 'distribution', label: t(project.value?.issuancePolicy ? 'newCoin.waitingDistribution' : 'newCoin.pendingListing'), icon: PackageCheck },
+  { key: 'distribution', label: t('newCoin.distributionStage'), icon: PackageCheck },
   ...(project.value?.issuancePolicy ? [{ key: 'purchase', label: t('newCoin.livePurchase'), icon: LineChart }] : []),
   { key: 'listed', label: t('newCoin.listed'), icon: LineChart },
 ])
+const stageGuidance = computed(() => {
+  const keys: Record<string, string> = {
+    preheat: 'newCoin.preheatHint',
+    subscription: 'newCoin.subscriptionHint',
+    distribution: project.value?.issuancePolicy ? 'newCoin.distributionHint' : 'newCoin.legacyDistributionHint',
+    purchase: 'newCoin.purchaseHint',
+    listed: project.value?.issuancePolicy ? 'newCoin.listedHint' : 'newCoin.legacyListedHint',
+  }
+  return keys[lifecycle.value] ? t(keys[lifecycle.value]!) : ''
+})
 const unlockSummary = computed(() => {
   const current = project.value
   if (!current) return t('newCoin.unavailableValue')
@@ -170,19 +185,27 @@ function unlockTypeLabel(type: string): string {
   return key ? t(key) : type || t('newCoin.unlockPending')
 }
 
-async function load(): Promise<void> {
-  loading.value = !project.value
-  error.value = ''
-  try {
-    const nextProject = await fetchNewCoinProject(props.symbol)
-    project.value = nextProject
-    accounts.value = session.isAuthenticated ? await fetchWalletAccounts() : []
-  } catch (reason) {
-    error.value = apiErrorMessage(reason, t('newCoin.projectLoadFailed'))
-  } finally {
-    loading.value = false
-  }
+const accountRequests = createSessionRequestLifecycle({
+  sessionKey: () => session.isAuthenticated && project.value && !project.value.issuancePolicy
+    ? `${session.identityScope}:${project.value.id}` : '',
+  request: fetchWalletAccounts,
+})
+async function loadAccounts(): Promise<void> {
+  const result = await accountRequests.load()
+  if (result.state === 'loaded') accounts.value = result.value
+  else if (result.state === 'guest') accounts.value = []
+  else if (result.state === 'error') error.value = apiErrorMessage(result.error, t('newCoin.projectLoadFailed'))
 }
+async function load(): Promise<void> { error.value = ''; await refreshProject(); await loadAccounts() }
+watch(() => [project.value?.id, session.identityScope], () => {
+  accounts.value = []
+  void loadAccounts()
+})
+watch(() => props.symbol, () => {
+  reviewOpen.value = false
+  amount.value = ''; selectedPercentage.value = null; error.value = ''; success.value = ''
+})
+onBeforeUnmount(() => { accountRequests.stop() })
 
 function setAmount(percentage: 25 | 50 | 75 | 100): void {
   selectedPercentage.value = percentage
@@ -277,7 +300,6 @@ function handleReviewKeydown(event: KeyboardEvent): void {
   trapReviewFocus(event, closeReview)
 }
 
-onMounted(() => { void load() })
 </script>
 
 <template>
@@ -296,14 +318,14 @@ onMounted(() => { void load() })
     <div v-if="loading" class="new-coin-detail-state" aria-live="polite">
       <LoaderCircle :size="24" class="spin" /><span>{{ t('newCoin.loadingProject') }}</span>
     </div>
-    <div v-else-if="error && !project && !reviewOpen" class="new-coin-detail-state" role="alert">
-      <CircleAlert :size="24" /><span>{{ error }}</span>
+    <div v-else-if="pageError && !project && !reviewOpen" class="new-coin-detail-state" role="alert">
+      <CircleAlert :size="24" /><span>{{ pageError }}</span>
       <button type="button" @click="load"><RefreshCw :size="17" />{{ t('common.retry') }}</button>
     </div>
 
     <template v-else-if="project">
-      <div v-if="error && !reviewOpen" class="new-coin-detail-feedback new-coin-detail-feedback--error" role="alert">
-        <CircleAlert :size="17" /><span>{{ error }}</span>
+      <div v-if="pageError && !reviewOpen" class="new-coin-detail-feedback new-coin-detail-feedback--error" role="alert">
+        <CircleAlert :size="17" /><span>{{ pageError }}</span>
       </div>
 
       <section class="new-coin-detail-visual">
@@ -349,17 +371,23 @@ onMounted(() => { void load() })
         </ol>
       </section>
 
-      <TokenTradingPanel v-if="project.issuancePolicy" :project-id="project.id" :symbol="project.symbol" :quote-symbol="project.quoteAssetSymbol" :pair-symbol="project.postListingPairSymbol" :stage="project.lifecycleStatus" />
+      <section class="token-surface new-coin-detail-stage-note" aria-live="polite">
+        <p v-if="stageGuidance">{{ stageGuidance }}</p>
+        <button type="button" :disabled="refreshing || reviewOpen || submitting" @click="load">{{ t('newCoin.refreshProject') }}</button>
+        <button v-if="lifecycle === 'distribution'" type="button" @click="router.push({ name: 'new-coin-records' })">{{ t('newCoin.viewAllocationRecords') }}</button>
+      </section>
+
+      <TokenTradingPanel v-if="project.issuancePolicy" :key="project.id" :project-id="project.id" :symbol="project.symbol" :quote-symbol="project.quoteAssetSymbol" :pair-symbol="project.postListingPairSymbol" :stage="project.lifecycleStatus" />
       <section v-else class="new-coin-detail-rules">
         <header><h2>{{ t('newCoin.rules') }}</h2><ChevronRight :size="19" aria-hidden="true" /></header>
         <dl>
           <div><dt>{{ t('newCoin.paymentAsset') }}</dt><dd>{{ quoteSymbol }}</dd></div>
-          <div><dt>{{ t('newCoin.listingTime') }}</dt><dd>{{ project.listedAt ? formatDateTime(project.listedAt) : t('newCoin.pendingSchedule') }}</dd></div>
+          <div><dt>{{ t('newCoin.plannedListingTime') }}</dt><dd>{{ project.listedAt ? formatDateTime(project.listedAt) : t('newCoin.pendingSchedule') }}</dd></div>
           <div><dt>{{ t('newCoin.unlockMethod') }}</dt><dd :title="`${unlockSummary} · ${unlockFeeSummary}`">{{ unlockSummary }}</dd></div>
         </dl>
       </section>
 
-      <TokenSubscriptionForm v-if="project.issuancePolicy && canSubscribe && project.quoteAssetId" :project-id="project.id" :symbol="project.symbol" :quote-symbol="quoteSymbol" :quote-asset-id="project.quoteAssetId" :price="project.issuePriceText" @completed="load" />
+      <TokenSubscriptionForm v-if="project.issuancePolicy && project.quoteAssetId" :key="project.id" :subscription-open="canSubscribe" :project-id="project.id" :symbol="project.symbol" :quote-symbol="quoteSymbol" :quote-asset-id="project.quoteAssetId" :price="project.issuePriceText" @completed="load" />
       <TokenIssuanceRules v-if="project.issuancePolicy" :policy="project.issuancePolicy" :quote-symbol="project.quoteAssetSymbol" />
       <section v-if="!project.issuancePolicy" class="new-coin-detail-entry">
         <h2>{{ t(canPurchase ? 'newCoin.purchaseTitle' : 'newCoin.subscribeTitle') }}</h2>
