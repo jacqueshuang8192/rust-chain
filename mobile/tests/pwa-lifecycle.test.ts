@@ -53,6 +53,14 @@ class FakeWorker extends EventTarget {
   }
 }
 
+class FakeController extends EventTarget {
+  controller: FakeWorker | null = new FakeWorker()
+  activate(worker: FakeWorker): void {
+    this.controller = worker
+    this.dispatchEvent(new Event('controllerchange'))
+  }
+}
+
 class FakeRegistration extends EventTarget {
   installing: FakeWorker | null = null
   waiting: FakeWorker | null
@@ -66,7 +74,7 @@ class FakeRegistration extends EventTarget {
 }
 
 function updateHarness(options: {
-  controller: EventTarget
+  controller: FakeController
   timer: FakeTimer
   waiting: FakeWorker | null
   update?: () => Promise<ServiceWorkerRegistration>
@@ -75,11 +83,15 @@ function updateHarness(options: {
   const errors: boolean[] = []
   const failures: PwaUpdateFailureReason[] = []
   let reloads = 0
+  let current = 0
+  const loadedController = options.controller.controller as unknown as ServiceWorker | null
 
   const registration = new FakeRegistration(options.waiting, options.update)
   const run = () => runPwaUpdate({
     registration: registration as unknown as ServiceWorkerRegistration,
     controllerTarget: options.controller as unknown as ServiceWorkerContainer,
+    loadedController,
+    onNoUpdate: () => { current += 1 },
     timeoutMs: 100,
     timer: options.timer,
     onBusyChange: (value) => busy.push(value),
@@ -88,14 +100,14 @@ function updateHarness(options: {
     reload: () => { reloads += 1 },
   })
 
-  return { busy, errors, failures, registration, reloads: () => reloads, run }
+  return { busy, errors, failures, registration, current: () => current, reloads: () => reloads, run }
 }
 
 test('PWA update waits for controllerchange, clears busy, and reloads once', async () => {
-  const controller = new EventTarget()
+  const controller = new FakeController()
   const timer = new FakeTimer()
   const worker = new FakeWorker()
-  worker.onPostMessage = () => controller.dispatchEvent(new Event('controllerchange'))
+  worker.onPostMessage = () => controller.activate(worker)
   const harness = updateHarness({ controller, timer, waiting: worker })
 
   assert.equal(await harness.run(), true)
@@ -107,7 +119,7 @@ test('PWA update waits for controllerchange, clears busy, and reloads once', asy
 })
 
 test('PWA update times out without controllerchange, recovers busy, and retries successfully', async () => {
-  const controller = new EventTarget()
+  const controller = new FakeController()
   const timer = new FakeTimer()
   const worker = new FakeWorker()
   const harness = updateHarness({ controller, timer, waiting: worker })
@@ -121,7 +133,7 @@ test('PWA update times out without controllerchange, recovers busy, and retries 
   assert.deepEqual(harness.failures, ['activation-timeout'])
   assert.equal(harness.reloads(), 0)
 
-  worker.onPostMessage = () => controller.dispatchEvent(new Event('controllerchange'))
+  worker.onPostMessage = () => controller.activate(worker)
   assert.equal(await harness.run(), true)
   assert.equal(worker.messages.length, 2)
   assert.deepEqual(harness.busy, [true, false, true, false])
@@ -129,8 +141,8 @@ test('PWA update times out without controllerchange, recovers busy, and retries 
   assert.equal(harness.reloads(), 1)
 })
 
-test('PWA update check has its own deadline and never leaves busy set', async () => {
-  const controller = new EventTarget()
+test('PWA update check is bounded and never leaves busy set', async () => {
+  const controller = new FakeController()
   const timer = new FakeTimer()
   const harness = updateHarness({
     controller,
@@ -147,7 +159,7 @@ test('PWA update check has its own deadline and never leaves busy set', async ()
 })
 
 test('PWA update recovers when the waiting worker rejects activation or becomes redundant', async () => {
-  const throwingController = new EventTarget()
+  const throwingController = new FakeController()
   const throwingTimer = new FakeTimer()
   const throwingWorker = new FakeWorker()
   throwingWorker.onPostMessage = () => { throw new Error('fixture postMessage failure') }
@@ -161,7 +173,7 @@ test('PWA update recovers when the waiting worker rejects activation or becomes 
   assert.deepEqual(throwingHarness.busy, [true, false])
   assert.deepEqual(throwingHarness.failures, ['post-message-failed'])
 
-  const redundantController = new EventTarget()
+  const redundantController = new FakeController()
   const redundantTimer = new FakeTimer()
   const redundantWorker = new FakeWorker()
   redundantWorker.onPostMessage = () => {
@@ -179,21 +191,22 @@ test('PWA update recovers when the waiting worker rejects activation or becomes 
   assert.deepEqual(redundantHarness.failures, ['worker-redundant'])
 })
 
-test('PWA update reports a recoverable failure when an update check yields no waiting worker', async () => {
+test('PWA update clears a stale notice when the checked registration has no new worker', async () => {
   const harness = updateHarness({
-    controller: new EventTarget(),
+    controller: new FakeController(),
     timer: new FakeTimer(),
     waiting: null,
   })
 
   assert.equal(await harness.run(), false)
   assert.deepEqual(harness.busy, [true, false])
-  assert.deepEqual(harness.errors, [false, true])
-  assert.deepEqual(harness.failures, ['no-waiting-worker'])
+  assert.deepEqual(harness.errors, [false])
+  assert.deepEqual(harness.failures, [])
+  assert.equal(harness.current(), 1)
 })
 
 test('PWA update waits for a newly installing worker before requesting activation', async () => {
-  const controller = new EventTarget()
+  const controller = new FakeController()
   const timer = new FakeTimer()
   const worker = new FakeWorker()
   worker.state = 'installing'
@@ -209,7 +222,7 @@ test('PWA update waits for a newly installing worker before requesting activatio
     },
   })
   registration = harness.registration
-  worker.onPostMessage = () => controller.dispatchEvent(new Event('controllerchange'))
+  worker.onPostMessage = () => controller.activate(worker)
 
   const result = harness.run()
   await Promise.resolve()
@@ -273,4 +286,141 @@ test('install value actions are explicit business routes rather than every route
   for (const route of ['home', 'markets', 'login', 'register', undefined]) {
     assert.equal(isPwaInstallValueRoute(route), false, String(route))
   }
+})
+
+test('retry recovers a worker activated by another tab or after an earlier timeout', async () => {
+  const controller = new FakeController()
+  const timer = new FakeTimer()
+  const worker = new FakeWorker()
+  const harness = updateHarness({ controller, timer, waiting: worker })
+  const first = harness.run()
+  timer.advance(100)
+  assert.equal(await first, false)
+  harness.registration.waiting = null
+  controller.activate(worker)
+  assert.equal(harness.reloads(), 0, 'late controller events cannot reload the interactive page')
+  assert.equal(await harness.run(), true)
+  assert.equal(harness.reloads(), 1)
+  assert.equal(worker.messages.length, 1, 'retry does not message an already activated worker')
+})
+
+test('controller loss and unchanged controllerchange events never authorize reload', async () => {
+  const controller = new FakeController()
+  const timer = new FakeTimer()
+  const worker = new FakeWorker()
+  const harness = updateHarness({ controller, timer, waiting: worker })
+  const result = harness.run()
+  controller.dispatchEvent(new Event('controllerchange'))
+  controller.controller = null
+  controller.dispatchEvent(new Event('controllerchange'))
+  assert.equal(harness.reloads(), 0)
+  timer.advance(100)
+  assert.equal(await result, false)
+  harness.registration.waiting = null
+  assert.equal(await harness.run(), false)
+  assert.deepEqual(harness.failures, ['activation-timeout', 'controller-unavailable'])
+})
+
+test('one total deadline covers checking, download and activation, with no late side effects', async () => {
+  const controller = new FakeController()
+  const timer = new FakeTimer()
+  const worker = new FakeWorker()
+  worker.state = 'installing'
+  let checked!: (registration: ServiceWorkerRegistration) => void
+  const harness = updateHarness({
+    controller, timer, waiting: null,
+    update: () => new Promise((resolve) => { checked = resolve }),
+  })
+  const result = harness.run()
+  timer.advance(40)
+  harness.registration.installing = worker
+  harness.registration.dispatchEvent(new Event('updatefound'))
+  checked(harness.registration as unknown as ServiceWorkerRegistration)
+  await Promise.resolve()
+  timer.advance(40)
+  worker.state = 'installed'
+  worker.dispatchEvent(new Event('statechange'))
+  assert.deepEqual(worker.messages, [{ type: 'SKIP_WAITING' }])
+  timer.advance(20)
+  assert.equal(await result, false)
+  assert.deepEqual(harness.failures, ['activation-timeout'])
+  controller.activate(worker)
+  worker.dispatchEvent(new Event('statechange'))
+  harness.registration.dispatchEvent(new Event('updatefound'))
+  assert.equal(harness.reloads(), 0)
+  assert.equal(worker.messages.length, 1)
+  assert.deepEqual(harness.busy, [true, false])
+})
+
+test('download finishing after the deadline cannot activate itself', async () => {
+  const worker = new FakeWorker()
+  worker.state = 'installing'
+  const timer = new FakeTimer()
+  const harness = updateHarness({ controller: new FakeController(), timer, waiting: null })
+  harness.registration.installing = worker
+  const result = harness.run()
+  timer.advance(100)
+  assert.equal(await result, false)
+  worker.state = 'installed'
+  worker.dispatchEvent(new Event('statechange'))
+  assert.deepEqual(worker.messages, [])
+  assert.deepEqual(harness.failures, ['update-check-timeout'])
+})
+
+test('update check rejection unlocks controls and retry can find the new worker', async () => {
+  const controller = new FakeController()
+  const timer = new FakeTimer()
+  const harness = updateHarness({
+    controller, timer, waiting: null, update: async () => { throw new Error('offline') },
+  })
+  assert.equal(await harness.run(), false)
+  assert.deepEqual(harness.failures, ['update-check-failed'])
+  const worker = new FakeWorker()
+  harness.registration.waiting = worker
+  worker.onPostMessage = () => controller.activate(worker)
+  assert.equal(await harness.run(), true)
+  assert.deepEqual(harness.busy, [true, false, true, false])
+})
+
+test('a missing registration is recovered within the same deadline', async () => {
+  const controller = new FakeController()
+  const loadedController = controller.controller as unknown as ServiceWorker
+  const worker = new FakeWorker()
+  worker.onPostMessage = () => controller.activate(worker)
+  const registration = new FakeRegistration(worker)
+  let registrations = 0
+  let reloads = 0
+  const busy: boolean[] = []
+  assert.equal(await runPwaUpdate({
+    controllerTarget: controller as unknown as ServiceWorkerContainer,
+    loadedController, registration: null,
+    recoverRegistration: async () => { registrations++; return registration as unknown as ServiceWorkerRegistration },
+    reload: () => { reloads++ }, onBusyChange: (value) => busy.push(value), onErrorChange: () => {},
+  }), true)
+  assert.equal(registrations, 1)
+  assert.equal(reloads, 1)
+  assert.deepEqual(busy, [true, false])
+})
+
+test('a registration resolving after the deadline cannot activate a worker', async () => {
+  const controller = new FakeController()
+  const timer = new FakeTimer()
+  const worker = new FakeWorker()
+  const registration = new FakeRegistration(worker)
+  let registered!: (registration: ServiceWorkerRegistration) => void
+  const failures: PwaUpdateFailureReason[] = []
+  const result = runPwaUpdate({
+    controllerTarget: controller as unknown as ServiceWorkerContainer,
+    loadedController: controller.controller as unknown as ServiceWorker,
+    registration: null, timer, timeoutMs: 100,
+    recoverRegistration: () => new Promise((resolve) => { registered = resolve }),
+    reload: () => assert.fail('must not reload'), onBusyChange: () => {}, onErrorChange: () => {},
+    onFailure: (reason) => failures.push(reason),
+  })
+  timer.advance(100)
+  assert.equal(await result, false)
+  registered(registration as unknown as ServiceWorkerRegistration)
+  await Promise.resolve()
+  assert.deepEqual(worker.messages, [])
+  assert.deepEqual(failures, ['update-check-timeout'])
 })

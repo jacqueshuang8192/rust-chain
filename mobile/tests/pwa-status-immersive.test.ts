@@ -52,7 +52,7 @@ test('PWA 真实状态保留安全路由、离线并列与安装失败可见优�
   assert.match(source, /const showUpdate = computed\(\(\) => promptSafeRoute\.value && pwaState\.needRefresh/)
   assert.match(source, /const showInstall = computed\(\(\) => \([\s\S]*?!pwaState\.installError/)
   assert.match(source, /const showInstallDialog = computed\(\(\) => \([\s\S]*?pwaState\.isOnline[\s\S]*?primaryState\.value === 'install'/)
-  assert.match(source, /const showStatusIsland = computed\(\(\) => pwaState\.enabled && \([\s\S]*?!pwaState\.isOnline/)
+  assert.match(source, /const showStatusIsland = computed\(\(\) => pwaState\.enabled && !showDialog\.value && \([\s\S]*?!pwaState\.isOnline/)
 
   assertOrdered(source, [
     'if (showUpdate.value)',
@@ -62,10 +62,10 @@ test('PWA 真实状态保留安全路由、离线并列与安装失败可见优�
     'if (showPwaError.value)',
   ])
   assert.match(templateSource, /v-if="!pwaState\.isOnline"/)
-  assert.match(templateSource, /v-if="primaryState === 'update'"/)
-  assert.match(templateSource, /v-else-if="primaryState === 'ready'"/)
+  assert.match(templateSource, /v-if="showDialog"/)
+  assert.match(templateSource, /v-if="primaryState === 'ready'"/)
   assert.match(templateSource, /v-else-if="primaryState === 'error'"/)
-  assert.equal((templateSource.match(/class="pwa-status__panel"/g) || []).length, 4)
+  assert.equal((templateSource.match(/class="pwa-status__panel"/g) || []).length, 3)
   assert.doesNotMatch(templateSource, /pwa-status__card--install/)
 
   for (const sensitiveRoute of ['trade', 'seconds', 'withdraw', 'kyc', 'security', 'login-two-factor']) {
@@ -81,13 +81,13 @@ test('PWA 真实状态保留安全路由、离线并列与安装失败可见优�
   ]) {
     assert.match(source, new RegExp(`\\b${action}\\b`))
   }
-  assert.match(source, /watch\(showInstallDialog,[\s\S]*?markPwaInstallOfferShown\(\)/)
+  assert.match(source, /watch\(\(\) => showDialog\.value && !isUpdateDialog\.value,[\s\S]*?markPwaInstallOfferShown\(\)/)
 })
 
-test('非安装态继续使用原双层玻璃浮岛、语义色和非阻塞指针边界', () => {
+test('离线、就绪及注册错误保留原浮岛，更新改为共享安装弹窗', () => {
   assert.match(templateSource, /<Transition name="pwa-status-reveal">/)
   assert.match(templateSource, /class="pwa-status__ambient" aria-hidden="true"/)
-  assert.match(templateSource, /data-tone="accent"/)
+  assert.doesNotMatch(templateSource, /pwa-status__card--update/)
   assert.match(templateSource, /data-tone="positive"/)
   assert.match(templateSource, /data-tone="negative"/)
   assert.match(templateSource, /role="alert"/)
@@ -123,10 +123,10 @@ test('Pencil NROQD/Tcgl6 安装弹窗保留全部指定结构、HIPPO 本地品�
     'class="pwa-install__primary"',
     'class="pwa-install__later"',
   ])
-  assert.equal((installTemplate.match(/class="pwa-install__benefit"/g) || []).length, 3)
+  assert.equal((installTemplate.match(/class="pwa-install__benefit"/g) || []).length, 1)
   assert.match(installTemplate, /<img :src="brandLogo" alt="" \/>/)
   for (const icon of ['Zap', 'Maximize', 'BellRing', 'Info', 'Download', 'X']) {
-    assert.match(installTemplate, new RegExp(`<${icon}\\b`))
+    assert.match(source, new RegExp(`\\b${icon}\\b`))
   }
   assert.doesNotMatch(installTemplate, /<svg\b|https?:\/\//)
   assert.doesNotMatch(source, /\p{Extended_Pictographic}/u)
@@ -160,7 +160,7 @@ test('390px Pencil 基准锁定 540px Sheet 及 82/44/146/42/54/38 关键几何'
   assert.match(cssBlock('.pwa-install__hint'), /border-radius:\s*12px[\s\S]*?gap:\s*8px[\s\S]*?height:\s*42px[\s\S]*?padding:\s*0 12px/)
   assert.match(cssBlock('.pwa-install__primary'), /border-radius:\s*16px[\s\S]*?gap:\s*8px[\s\S]*?height:\s*54px/)
   assert.match(installTemplate, /<X :size="19"/)
-  assert.match(installTemplate, /<Download :size="19"/)
+  assert.match(installTemplate, /<component :is="isUpdateDialog \? RefreshCw : Download" :size="19"/)
 
   assert.match(cssBlock('.pwa-install__sheet'), /box-shadow:\s*0 -8px 28px #00000024/)
   assert.match(cssBlock('.pwa-install__primary'), /box-shadow:\s*0 6px 16px #18d38d2e/)
@@ -245,18 +245,18 @@ test('稍后按钮的最终级联尺寸覆盖全局 44px min-height 而保留 44
 
 test('安装 Sheet 复用共享模态生命周期并覆盖关闭、遮罩、Escape、Tab、滚动锁与焦点恢复', () => {
   assert.match(source, /import \{ useModalDialog \} from '@\/core\/modalDialog'/)
-  assert.match(source, /useModalDialog\([\s\S]*?showInstallDialog,[\s\S]*?installDialog,[\s\S]*?'\[data-pwa-install-close\]'/)
+  assert.match(source, /useModalDialog\(showDialog, promptDialog, '\[data-pwa-prompt-close\]'/)
   assert.match(installTemplate, /<Teleport to="body">/)
   assert.match(installTemplate, /role="dialog"/)
   assert.match(installTemplate, /aria-modal="true"/)
-  assert.match(installTemplate, /aria-labelledby="pwa-install-title"/)
-  assert.match(installTemplate, /aria-describedby="pwa-install-description pwa-install-hint"/)
-  assert.match(installTemplate, /:aria-busy="installing"/)
-  assert.match(installTemplate, /@keydown="handleInstallDialogKeydown"/)
-  assert.match(installTemplate, /@click\.self="closeInstallDialog"/)
-  assert.equal((installTemplate.match(/@click="closeInstallDialog"/g) || []).length, 2)
-  assert.match(source, /trapInstallFocus\(event, closeInstallDialog\)/)
-  assert.match(source, /function closeInstallDialog\(\): void \{[\s\S]*?if \(installing\.value\) return[\s\S]*?dismissPwaInstall\(\)/)
+  assert.match(installTemplate, /:aria-labelledby="`\$\{dialogId\}-title`"/)
+  assert.match(installTemplate, /:aria-describedby="`\$\{dialogId\}-description \$\{dialogId\}-hint`"/)
+  assert.match(installTemplate, /:aria-busy="dialogBusy"/)
+  assert.match(installTemplate, /@keydown="handleDialogKeydown"/)
+  assert.match(installTemplate, /@click\.self="closeDialog"/)
+  assert.equal((installTemplate.match(/@click="closeDialog"/g) || []).length, 2)
+  assert.match(source, /trapFocus\(event, closeDialog\)/)
+  assert.match(source, /function closeDialog\(\): void \{[\s\S]*?if \(dialogBusy\.value\) return[\s\S]*?dismissPwaInstall\(\)/)
   assert.match(modalHelperSource, /event\.key === 'Escape'/)
   assert.match(modalHelperSource, /event\.key !== 'Tab'/)
   assert.match(modalHelperSource, /document\.body\.style\.overflow = 'hidden'/)
@@ -271,11 +271,11 @@ test('Android/Chromium 主操作保留原生安装，iOS 主操作聚焦始终�
   assert.match(source, /if \(installing\.value\) return/)
   assert.match(source, /if \(pwaState\.iosInstallAvailable && !pwaState\.installAvailable\) \{[\s\S]*?installHint\.value\?\.focus\(\)[\s\S]*?return/)
   assert.match(source, /if \(!pwaState\.installAvailable\) return[\s\S]*?await promptPwaInstall\(\)/)
-  assert.match(installTemplate, /id="pwa-install-hint"[\s\S]*?ref="installHint"[\s\S]*?role="note"[\s\S]*?tabindex="-1"/)
-  assert.match(installTemplate, /\{\{ t\('pwa\.iosInstallDescription'\) \}\}/)
+  assert.match(installTemplate, /:id="`\$\{dialogId\}-hint`"[\s\S]*?ref="installHint"[\s\S]*?tabindex="-1"/)
+  assert.match(source, /return 'pwa\.iosInstallDescription'/)
   assert.match(cssBlock('.pwa-install__hint'), /height:\s*42px/)
   assert.match(styleSource, /\.pwa-install__hint:focus\s*\{[\s\S]*?outline:/)
-  assert.match(installTemplate, /class="pwa-install__primary"[\s\S]*?:disabled="installing"[\s\S]*?@click="install"/)
+  assert.match(installTemplate, /class="pwa-install__primary"[\s\S]*?:disabled="dialogBusy \|\| !pwaState\.isOnline"[\s\S]*?@click="confirmDialog"/)
 })
 
 test('320–448px 响应式与短屏可滚动，出入场只动 opacity/transform 且尊重低动态', () => {
@@ -317,7 +317,7 @@ test('安装弹窗中英文案完整对称，中文与 Pencil 真值逐项一致
   for (const key of keys) {
     assert.ok(zhCN.pwa[key], `zh-CN missing pwa.${key}`)
     assert.ok(en.pwa[key], `en missing pwa.${key}`)
-    assert.match(installTemplate, new RegExp(`pwa\\.${key}`))
+    assert.match(source, new RegExp(`pwa\\.${key}`))
   }
   assert.deepEqual({
     title: zhCN.pwa.installTitle,

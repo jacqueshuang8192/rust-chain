@@ -9873,3 +9873,17 @@
 - 修改文件：`mobile/src/views/{NewCoinDetailView,NewCoinsView}.vue`、`mobile/src/composables/useNewCoinProject.ts`、`mobile/src/components/{TokenIssuanceRules,TokenSubscriptionForm}.vue`、`mobile/src/components/new-coin/NewCoinProjectCard.vue`、`mobile/src/core/tokenIssuanceMessages.ts`、中英语言资源、相关3个测试文件；`.trellis/spec/mobile/backend-integration.md`、`.trellis/tasks/10-20-new-coin-pending-listing/`及本记录。
 - 验证结果：最终 `npm --prefix mobile run release:gate` 退出0，860/860测试、生产/测试类型检查、PWA/Tauri构建与制品、包体/源码/测试质量门禁通过；未放宽预算。浏览器内存夹具验证派发→认购→上市自动刷新、认购表单与现货入口切换，12组语言/主题/320至448px详情无横向溢出，最终320px列表筛选顺序与固定解禁显示、旧版四阶段兼容通过，截图已查看、夹具零写请求。`git diff --check`通过。
 - 后续事项：本地实现与验证完成，未提交、推送或部署；真实KHB仍需完成派发/退款，上市保留原手动设置。Ego空间26和本任务5187预览服务已关闭，既有服务与`.vite/`缓存保留；未操作生产资金。
+
+## 2026-10-20 01:58 - PWA 更新恢复与统一弹窗
+
+- 完成内容：区分更新失败与注册失败文案；更新全程共用15秒截止时间，识别已启用的新控制器、清除过期更新提示、缺失注册时恢复注册，防控制器丢失和迟到事件误刷新。更新与安装共用品牌底部弹窗及模态生命周期，保留安全路由、安装频控和离线限制；补充忙碌状态焦点保持。
+- 修改文件：`mobile/src/pwa/{index,update}.ts`、`mobile/src/components/PwaStatus.vue`、中英语言资源、PWA生命周期/弹窗测试、`.trellis/spec/mobile/pwa-and-shell.md`与`.trellis/tasks/10-20-pwa-update-recovery/`。
+- 验证结果：首轮Mobile完整release:gate退出0，871/871测试及类型、PWA/Tauri构建/制品、包体和治理门禁通过。真实浏览器本地Service Worker验证更新成功刷新、15秒启用超时、恢复后重试成功、过期通知清理与Tab/Escape/焦点返回；线上只读检查125个发布资源正常，sw.js响应仍为max-age=14400，未复现历史故障。忙碌焦点补丁后待最终门禁和主题/尺寸复验。
+- 后续事项：完成最终门禁与浏览器矩阵，整理交付；未提交、推送或部署，保留此前新币改动。发布时需按现有README排除入口文件CDN强缓存；未修改服务器设置或生产业务数据。
+
+## 2026-10-20 02:02 - PWA 更新弹窗最终验收
+
+- 完成内容：完成更新失败分类与恢复、安装/更新共享底部弹窗、初次显示与忙碌状态焦点保持；更新规范、诊断、交付及提交清单。清理任务本地Service Worker并关闭Ego空间27和5187预览服务，保留既有服务及新币改动。
+- 修改文件：PWA源码、语言资源与3份相关测试、`.trellis/spec/mobile/pwa-and-shell.md`、`.trellis/tasks/10-20-pwa-update-recovery/`及本记录，精确范围见任务提交清单。
+- 验证结果：最终`npm --prefix mobile run release:gate`退出0，871/871及生产/测试类型检查、PWA/Tauri构建与制品、JS/CSS包体、源码/测试质量门禁全部通过，未放宽预算。Ego真实本地Worker完成启用刷新、15秒超时、重试恢复与过期提示清理；32组更新/安装×中英×明暗×320/390/448/横屏布局无横溢，错误文案完整、短屏可滚动；Tab/Escape/焦点恢复、忙碌焦点锁定、离线禁用、低动态加载反馈与保留安装事件单次调用通过，最终截图已查看。git diff --check与任务校验通过。
+- 后续事项：实现验收完成，未提交、推送或部署。线上Worker的4小时强缓存需发布时依既有README调整；历史故障未在线复现，实体手机安装态未验证。Ego更新提示未执行升级，`.vite/`缓存不纳入提交。

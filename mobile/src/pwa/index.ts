@@ -2,7 +2,7 @@ import { reactive, readonly } from 'vue'
 import { isTauriRuntime } from '@/core/platform'
 import { createPwaInstallEligibilitySession } from './eligibility'
 import { isIosBrowser, isStandaloneDisplay, resolveServiceWorkerLocation } from './runtime'
-import { runPwaUpdate } from './update'
+import { runPwaUpdate, type PwaUpdateFailureReason } from './update'
 import { preparePwaStartup } from './startup'
 
 interface BeforeInstallPromptEvent extends Event {
@@ -30,6 +30,7 @@ const state = reactive({
   registrationError: false,
   updateDismissed: false,
   updateError: false,
+  updateFailure: null as PwaUpdateFailureReason | null,
   updating: false,
 })
 
@@ -40,6 +41,7 @@ let installEligibility = createPwaInstallEligibilitySession()
 let installEligibilityTimer: number | null = null
 let registration: ServiceWorkerRegistration | null = null
 let initializePromise: Promise<boolean> | null = null
+let loadedController: ServiceWorker | null = null
 let reloadTriggered = false
 let updatePromise: Promise<boolean> | null = null
 let updateGeneration = 0
@@ -159,8 +161,8 @@ async function waitForWindowLoad(): Promise<void> {
   })
 }
 
-async function registerServiceWorker(): Promise<void> {
-  if (!__PWA_ENABLED__ || isTauriRuntime() || !('serviceWorker' in navigator)) return
+async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
+  if (!__PWA_ENABLED__ || isTauriRuntime() || !('serviceWorker' in navigator)) return null
 
   const location = resolveServiceWorkerLocation(import.meta.env.BASE_URL, window.location.origin)
 
@@ -172,9 +174,9 @@ async function registerServiceWorker(): Promise<void> {
     state.registrationError = false
     observeRegistration(registration)
   } catch {
-    registration = null
     state.registrationError = true
   }
+  return registration
 }
 
 async function checkForUpdate(): Promise<void> {
@@ -207,6 +209,7 @@ function bindRuntimeEvents(): void {
 
 async function initializeBrowserPwa(): Promise<boolean> {
   installEligibility = createPwaInstallEligibilitySession(Date.now())
+  loadedController = navigator.serviceWorker?.controller || null
   state.enabled = true
   state.isOnline = navigator.onLine
   state.initialized = true
@@ -272,6 +275,7 @@ export function dismissOfflineReady(): void {
 export function dismissPwaUpdate(): void {
   state.updateDismissed = true
   state.updateError = false
+  state.updateFailure = null
 }
 
 export function markPwaInstallValueAction(): void {
@@ -289,24 +293,27 @@ export function markPwaInstallOfferShown(): void {
 
 export function applyPwaUpdate(): Promise<boolean> {
   if (updatePromise) return updatePromise
-  if (!registration || !navigator.serviceWorker) {
-    state.updating = false
-    state.updateError = true
-    return Promise.resolve(false)
-  }
+  if (!state.isOnline || !navigator.serviceWorker) return Promise.resolve(false)
 
-  state.registrationError = false
-  const currentRegistration = registration
+  state.updateFailure = null
   const attempt = runPwaUpdate({
-    registration: currentRegistration,
+    registration,
+    recoverRegistration: registerServiceWorker,
     controllerTarget: navigator.serviceWorker,
+    loadedController,
     onBusyChange: (busy) => {
       state.updating = busy
     },
     onErrorChange: (error) => {
       state.updateError = error
     },
-    onFailure: () => {
+    onNoUpdate: () => {
+      state.needRefresh = false
+      state.registrationError = false
+      state.updateFailure = null
+    },
+    onFailure: (reason) => {
+      state.updateFailure = reason
       state.needRefresh = true
       state.updateDismissed = false
     },

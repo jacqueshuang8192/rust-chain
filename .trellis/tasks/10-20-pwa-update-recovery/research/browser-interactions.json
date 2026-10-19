@@ -1,0 +1,23 @@
+{
+  "busy": {
+    "focus": "pwa-update-dialog",
+    "dialog": true,
+    "disabled": true
+  },
+  "motion": {
+    "spinner": "functional-spinner"
+  },
+  "offline": {
+    "disabled": true,
+    "hint": "网络已断开，重新连接后可继续更新。"
+  },
+  "closed": {
+    "focus": "trigger",
+    "overflow": ""
+  },
+  "install": {
+    "calls": 1,
+    "focus": "pwa-install-dialog",
+    "disabled": true
+  }
+}

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
@@ -33,7 +33,8 @@ const { t } = useI18n()
 const route = useRoute()
 const installing = ref(false)
 const retrying = ref(false)
-const installDialog = ref<HTMLElement | null>(null)
+const mounted = ref(false)
+const promptDialog = ref<HTMLElement | null>(null)
 const installHint = ref<HTMLElement | null>(null)
 
 const SAFE_PROMPT_ROUTES = new Set([
@@ -65,21 +66,56 @@ const primaryState = computed<'update' | 'install' | 'ready' | 'error' | null>((
   return null
 })
 const showInstallDialog = computed(() => (
-  pwaState.enabled
-  && pwaState.isOnline
-  && primaryState.value === 'install'
+  pwaState.enabled && pwaState.isOnline && primaryState.value === 'install'
 ))
-const showStatusIsland = computed(() => pwaState.enabled && (
-  !pwaState.isOnline
-  || primaryState.value === 'update'
-  || primaryState.value === 'ready'
-  || primaryState.value === 'error'
+const showDialog = computed(() => mounted.value && pwaState.enabled && (
+  primaryState.value === 'update' || showInstallDialog.value
 ))
-const { trapFocus: trapInstallFocus } = useModalDialog(
-  showInstallDialog,
-  installDialog,
-  '[data-pwa-install-close]',
-)
+const isUpdateDialog = computed(() => primaryState.value === 'update')
+const dialogId = computed(() => isUpdateDialog.value ? 'pwa-update' : 'pwa-install')
+const dialogBusy = computed(() => pwaState.updating || installing.value)
+const dialogCopy = computed(() => isUpdateDialog.value ? {
+  title: 'pwa.updateTitle', subtitle: 'pwa.updateSubtitle', description: 'pwa.updateDescription',
+  benefits: 'pwa.updateStepsLabel', close: 'pwa.updateClose', later: 'pwa.updateLater',
+  action: pwaState.updating ? 'pwa.updating' : pwaState.updateError ? 'pwa.retry' : 'pwa.updateNow',
+} : {
+  title: 'pwa.installTitle', subtitle: 'pwa.installSubtitle', description: 'pwa.installDescription',
+  benefits: 'pwa.installBenefitsLabel', close: 'pwa.installClose', later: 'pwa.installLater',
+  action: installing.value ? 'pwa.installing' : 'pwa.installAction',
+})
+const dialogBenefits = computed(() => isUpdateDialog.value ? [
+  { icon: Download, title: 'pwa.updateCheckTitle', description: 'pwa.updateCheckDescription' },
+  { icon: RefreshCw, title: 'pwa.updateApplyTitle', description: 'pwa.updateApplyDescription' },
+  { icon: CloudCheck, title: 'pwa.updateReturnTitle', description: 'pwa.updateReturnDescription' },
+] : [
+  { icon: Zap, title: 'pwa.installFastTitle', description: 'pwa.installFastDescription' },
+  { icon: Maximize, title: 'pwa.installImmersiveTitle', description: 'pwa.installImmersiveDescription' },
+  { icon: BellRing, title: 'pwa.installNotifyTitle', description: 'pwa.installNotifyDescription' },
+])
+const dialogHint = computed(() => {
+  if (!isUpdateDialog.value) return 'pwa.iosInstallDescription'
+  if (!pwaState.isOnline) return 'pwa.updateOffline'
+  if (pwaState.updating) return 'pwa.updateInProgress'
+  if (!pwaState.updateError) return 'pwa.updateHint'
+  switch (pwaState.updateFailure) {
+    case 'activation-timeout':
+    case 'controller-unavailable':
+    case 'post-message-failed': return 'pwa.updateActivationFailed'
+    case 'update-check-timeout': return 'pwa.updateTimedOut'
+    case 'registration-unavailable': return 'pwa.updateRegistrationFailed'
+    default: return 'pwa.updateFailed'
+  }
+})
+const showStatusIsland = computed(() => pwaState.enabled && !showDialog.value && (
+  !pwaState.isOnline || primaryState.value === 'ready' || primaryState.value === 'error'
+))
+const { trapFocus } = useModalDialog(showDialog, promptDialog, '[data-pwa-prompt-close]')
+onMounted(() => { mounted.value = true })
+watch([showDialog, dialogBusy], async ([shown, busy]) => {
+  if (!shown || !busy) return
+  await nextTick()
+  if (showDialog.value && dialogBusy.value) promptDialog.value?.focus()
+})
 
 watch(() => route.fullPath, (currentPath, previousPath) => {
   if ((previousPath === undefined || currentPath !== previousPath) && isPwaInstallValueRoute(route.name)) {
@@ -87,17 +123,18 @@ watch(() => route.fullPath, (currentPath, previousPath) => {
   }
 }, { immediate: true })
 
-watch(showInstallDialog, (shown) => {
+watch(() => showDialog.value && !isUpdateDialog.value, (shown) => {
   if (shown) markPwaInstallOfferShown()
 }, { immediate: true })
 
-function closeInstallDialog(): void {
-  if (installing.value) return
-  dismissPwaInstall()
+function closeDialog(): void {
+  if (dialogBusy.value) return
+  if (isUpdateDialog.value) dismissPwaUpdate()
+  else dismissPwaInstall()
 }
 
-function handleInstallDialogKeydown(event: KeyboardEvent): void {
-  trapInstallFocus(event, closeInstallDialog)
+function handleDialogKeydown(event: KeyboardEvent): void {
+  trapFocus(event, closeDialog)
 }
 
 async function install(): Promise<void> {
@@ -116,11 +153,14 @@ async function install(): Promise<void> {
   }
 }
 
-async function update(): Promise<void> {
-  await applyPwaUpdate()
+async function confirmDialog(): Promise<void> {
+  if (dialogBusy.value || !pwaState.isOnline) return
+  if (isUpdateDialog.value) await applyPwaUpdate()
+  else await install()
 }
 
 async function retry(): Promise<void> {
+  if (retrying.value || !pwaState.isOnline) return
   retrying.value = true
   try {
     await retryPwaRegistration()
@@ -154,37 +194,7 @@ async function retry(): Promise<void> {
       </section>
 
       <section
-        v-if="primaryState === 'update'"
-        class="pwa-status__card pwa-status__card--update"
-        data-tone="accent"
-        :role="pwaState.updateError ? 'alert' : 'status'"
-        :aria-busy="pwaState.updating"
-      >
-        <div class="pwa-status__panel">
-          <span class="pwa-status__icon" aria-hidden="true">
-            <RefreshCw :size="22" :stroke-width="1.7" :class="{ 'is-spinning': pwaState.updating }" />
-          </span>
-          <div class="pwa-status__body">
-            <span class="pwa-status__kicker"><i aria-hidden="true" />{{ t('pwa.statusLabel') }}</span>
-            <strong>{{ t('pwa.updateTitle') }}</strong>
-            <p>{{ t(pwaState.updateError ? 'pwa.registrationFailed' : 'pwa.updateDescription') }}</p>
-            <div class="pwa-status__actions">
-              <button class="pwa-status__button pwa-status__button--primary" type="button" :disabled="pwaState.updating" @click="update">
-                <span>{{ pwaState.updating ? t('pwa.updating') : t('pwa.updateNow') }}</span>
-                <span class="pwa-status__button-icon" aria-hidden="true">
-                  <RefreshCw :size="15" :stroke-width="1.8" :class="{ 'is-spinning': pwaState.updating }" />
-                </span>
-              </button>
-              <button class="pwa-status__button pwa-status__button--secondary" type="button" :disabled="pwaState.updating" @click="dismissPwaUpdate">
-                {{ t('pwa.updateLater') }}
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section
-        v-else-if="primaryState === 'ready'"
+        v-if="primaryState === 'ready'"
         class="pwa-status__card pwa-status__card--ready"
         data-tone="positive"
         role="status"
@@ -223,7 +233,7 @@ async function retry(): Promise<void> {
               <button
                 class="pwa-status__button pwa-status__button--secondary"
                 type="button"
-                :disabled="retrying"
+                :disabled="retrying || !pwaState.isOnline"
                 @click="retry"
               >
                 <span>{{ retrying ? t('pwa.retrying') : t('pwa.retry') }}</span>
@@ -241,22 +251,23 @@ async function retry(): Promise<void> {
   <Teleport to="body">
     <Transition name="pwa-install-modal">
       <div
-        v-if="showInstallDialog"
+        v-if="showDialog"
         class="pwa-install"
+        :class="{ 'pwa-install--update': isUpdateDialog }"
         data-pencil-source="NROQD FwXCx Tcgl6 V04kP"
-        @click.self="closeInstallDialog"
+        @click.self="closeDialog"
       >
         <section
-          id="pwa-install-dialog"
-          ref="installDialog"
+          :id="`${dialogId}-dialog`"
+          ref="promptDialog"
           class="pwa-install__sheet"
           role="dialog"
           aria-modal="true"
-          aria-labelledby="pwa-install-title"
-          aria-describedby="pwa-install-description pwa-install-hint"
-          :aria-busy="installing"
+          :aria-labelledby="`${dialogId}-title`"
+          :aria-describedby="`${dialogId}-description ${dialogId}-hint`"
+          :aria-busy="dialogBusy"
           tabindex="-1"
-          @keydown="handleInstallDialogKeydown"
+          @keydown="handleDialogKeydown"
         >
           <span class="pwa-install__grabber" aria-hidden="true" />
 
@@ -265,17 +276,17 @@ async function retry(): Promise<void> {
               <img :src="brandLogo" alt="" />
             </span>
             <div class="pwa-install__heading">
-              <h2 id="pwa-install-title">{{ t('pwa.installTitle') }}</h2>
-              <span>{{ t('pwa.installSubtitle') }}</span>
+              <h2 :id="`${dialogId}-title`">{{ t(dialogCopy.title) }}</h2>
+              <span>{{ t(dialogCopy.subtitle) }}</span>
             </div>
             <button
               class="pwa-install__close"
               type="button"
-              data-pwa-install-close
-              :disabled="installing"
-              :aria-label="t('pwa.installClose')"
-              :title="t('pwa.installClose')"
-              @click="closeInstallDialog"
+              data-pwa-prompt-close
+              :disabled="dialogBusy"
+              :aria-label="t(dialogCopy.close)"
+              :title="t(dialogCopy.close)"
+              @click="closeDialog"
             >
               <span class="pwa-install__close-face">
                 <X :size="19" :stroke-width="1.8" aria-hidden="true" />
@@ -283,68 +294,51 @@ async function retry(): Promise<void> {
             </button>
           </header>
 
-          <p id="pwa-install-description" class="pwa-install__description">
-            {{ t('pwa.installDescription') }}
+          <p :id="`${dialogId}-description`" class="pwa-install__description">
+            {{ t(dialogCopy.description) }}
           </p>
 
-          <ul class="pwa-install__benefits" :aria-label="t('pwa.installBenefitsLabel')">
-            <li class="pwa-install__benefit">
+          <ul class="pwa-install__benefits" :aria-label="t(dialogCopy.benefits)">
+            <li v-for="benefit in dialogBenefits" :key="benefit.title" class="pwa-install__benefit">
               <span class="pwa-install__benefit-icon" aria-hidden="true">
-                <Zap :size="16" :stroke-width="1.8" />
+                <component :is="benefit.icon" :size="16" :stroke-width="1.8" />
               </span>
               <span class="pwa-install__benefit-copy">
-                <strong>{{ t('pwa.installFastTitle') }}</strong>
-                <span>{{ t('pwa.installFastDescription') }}</span>
-              </span>
-            </li>
-            <li class="pwa-install__benefit">
-              <span class="pwa-install__benefit-icon" aria-hidden="true">
-                <Maximize :size="16" :stroke-width="1.8" />
-              </span>
-              <span class="pwa-install__benefit-copy">
-                <strong>{{ t('pwa.installImmersiveTitle') }}</strong>
-                <span>{{ t('pwa.installImmersiveDescription') }}</span>
-              </span>
-            </li>
-            <li class="pwa-install__benefit">
-              <span class="pwa-install__benefit-icon" aria-hidden="true">
-                <BellRing :size="16" :stroke-width="1.8" />
-              </span>
-              <span class="pwa-install__benefit-copy">
-                <strong>{{ t('pwa.installNotifyTitle') }}</strong>
-                <span>{{ t('pwa.installNotifyDescription') }}</span>
+                <strong>{{ t(benefit.title) }}</strong>
+                <span>{{ t(benefit.description) }}</span>
               </span>
             </li>
           </ul>
 
           <p
-            id="pwa-install-hint"
+            :id="`${dialogId}-hint`"
             ref="installHint"
             class="pwa-install__hint"
-            role="note"
+            :role="isUpdateDialog && pwaState.updateError ? 'alert' : 'note'"
+            aria-live="polite"
             tabindex="-1"
           >
             <Info :size="16" :stroke-width="1.8" aria-hidden="true" />
-            <span>{{ t('pwa.iosInstallDescription') }}</span>
+            <span>{{ t(dialogHint) }}</span>
           </p>
 
           <button
             class="pwa-install__primary"
             type="button"
-            :disabled="installing"
-            @click="install"
+            :disabled="dialogBusy || !pwaState.isOnline"
+            @click="confirmDialog"
           >
-            <Download :size="19" :stroke-width="2" aria-hidden="true" />
-            <span>{{ installing ? t('pwa.installing') : t('pwa.installAction') }}</span>
+            <component :is="isUpdateDialog ? RefreshCw : Download" :size="19" :stroke-width="2" :class="{ 'is-spinning': pwaState.updating }" aria-hidden="true" />
+            <span>{{ t(dialogCopy.action) }}</span>
           </button>
 
           <button
             class="pwa-install__later"
             type="button"
-            :disabled="installing"
-            @click="closeInstallDialog"
+            :disabled="dialogBusy"
+            @click="closeDialog"
           >
-            {{ t('pwa.installLater') }}
+            {{ t(dialogCopy.later) }}
           </button>
         </section>
       </div>
@@ -436,11 +430,6 @@ async function retry(): Promise<void> {
 .pwa-status__card--ready {
   --pwa-tone: var(--positive);
   --pwa-tone-soft: var(--positive-soft);
-}
-
-.pwa-status__card--update {
-  --pwa-tone: var(--accent);
-  --pwa-tone-soft: var(--accent-soft);
 }
 
 .pwa-status__panel {
@@ -585,21 +574,6 @@ async function retry(): Promise<void> {
     0 5px 14px color-mix(in srgb, var(--dark-surface) 9%, transparent);
 }
 
-.pwa-status__button--primary {
-  background:
-    radial-gradient(circle at 18% 16%, color-mix(in srgb, white 28%, transparent), transparent 36%),
-    var(--pwa-tone);
-  border-color: color-mix(in srgb, var(--pwa-tone) 74%, var(--line));
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, white 34%, transparent),
-    inset 0 -2px 0 color-mix(in srgb, var(--dark-surface) 16%, transparent),
-    0 9px 22px color-mix(in srgb, var(--pwa-tone) 22%, transparent);
-  color: var(--on-accent);
-  justify-content: space-between;
-  min-width: 142px;
-  padding: 0 7px 0 16px;
-}
-
 .pwa-status__button-icon {
   align-items: center;
   background: color-mix(in srgb, var(--surface) 15%, transparent);
@@ -738,7 +712,6 @@ async function retry(): Promise<void> {
   .pwa-status__icon::after,
   .pwa-status__button,
   .pwa-status__dismiss,
-  .is-spinning,
   .pwa-status-reveal-enter-active,
   .pwa-status-reveal-leave-active {
     animation: none;
@@ -1077,6 +1050,21 @@ async function retry(): Promise<void> {
 .pwa-install__later:disabled {
   cursor: wait;
   opacity: .58;
+}
+
+.pwa-install--update .pwa-install__sheet {
+  grid-template-rows: 82px auto 146px auto 54px 38px;
+}
+
+.pwa-install--update .pwa-install__description,
+.pwa-install--update .pwa-install__hint {
+  height: auto;
+  min-height: 44px;
+}
+
+.pwa-install--update .pwa-install__hint > span {
+  overflow: visible;
+  white-space: normal;
 }
 
 :global(html[data-theme='dark'] .pwa-install) {

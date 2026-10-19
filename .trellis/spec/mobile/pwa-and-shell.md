@@ -27,7 +27,7 @@ Runtime and theme signatures:
 
 ```ts
 isTauriRuntime(globalObject?: object): boolean
-initializePwa(): Promise<void>
+initializePwa(): Promise<boolean>
 promptPwaInstall(): Promise<'accepted' | 'dismissed' | 'unavailable'>
 applyPwaUpdate(): Promise<boolean>
 resolveServiceWorkerLocation(base: string, origin: string): {
@@ -158,13 +158,13 @@ createTurnstileLifecycle(options?: TurnstileLifecycleOptions): {
 - `PwaStatus` is mounted exactly once in `App.vue`. Install and update prompts
   appear only on explicitly allowed safe routes; offline and registration
   errors may remain global.
-- Only the eligible install branch of `PwaStatus` is the body-Teleported Pencil
-  modal `NROQD/FwXCx` and `Tcgl6/V04kP`. Update, offline, offline-ready, and
-  registration/install-error feedback remain the existing non-modal system
-  island. That island starts below the 64px application Header plus the top
-  safe area, stays within the 448px application canvas, leaves detached side
-  margins, and keeps `pointer-events: none`; only each visible status card and
-  its controls restore pointer events.
+- Eligible install and update prompts share one body-Teleported Pencil modal
+  surface (`NROQD/FwXCx`, `Tcgl6/V04kP`) and one `useModalDialog` lifecycle.
+  The update variant keeps the same brand, palette, corners and actions; only
+  its copy, step list and recovery hint differ. Offline, offline-ready and
+  registration/install errors retain the system island when no modal is open.
+  The island remains below the Header within the 448px canvas, with only its
+  cards receiving pointer events.
 - The install modal covers the application canvas, anchors a full-width bottom
   sheet, and reuses `useModalDialog` for initial Close focus, Tab containment,
   Escape/backdrop/Close/later dismissal, body scroll lock, and focus return.
@@ -173,7 +173,12 @@ createTurnstileLifecycle(options?: TurnstileLifecycleOptions): {
   final 38px later-button face explicitly overrides the global 44px button
   `min-height`; its `::before` expands the pointer target to 44px without
   changing painted geometry. At shorter heights the sheet itself scrolls, and
-  320–448px layouts never widen the document.
+  320–448px layouts never widen the document. The update variant uses content-
+  sized description/hint tracks and wrapped recovery copy. Gate shared modal
+  visibility on `onMounted` so initially available updates still acquire focus
+  and scroll locking; switching install/update content must not create a second
+  lock or restore focus behind the open sheet. When all busy controls disable,
+  focus the dialog container so Tab/Escape remain contained until completion.
 - The install modal maps the exact Pencil palette in-place on theme changes:
   light overlay/sheet are `#07110C80/#FFFFFF`; dark node `AgFcl` and sheet are
   `#000000B8/#101A15`. Both sheets use `0 -8px 28px #00000024`; the primary
@@ -199,15 +204,16 @@ createTurnstileLifecycle(options?: TurnstileLifecycleOptions): {
   `data-pencil-source="tFcTH FBdqS"` boundary. Theme changes update those CSS
   variables in place without remounting or replaying a queued result. Reduced
   motion removes the reveal transition while preserving final geometry.
-- Each non-install PWA state uses the same double-bezel structure: an outer
+- Each island PWA state uses the same double-bezel structure: an outer
   `.pwa-status__card` supplies semantic ambient light and an inner
   `.pwa-status__panel` supplies the translucent, blurred surface and inset
   highlight. Use existing theme tokens with `color-mix`, Lucide icons, and the
-  state mapping accent=update, positive=offline-ready, and
+  state mapping positive=offline-ready and
   negative=offline/error. Do not reintroduce the retired `#0b1811` family,
   remote art, emoji, or a second icon library.
 - The island live region remains polite and non-atomic. Offline may render
-  together with exactly one non-install primary card. Update stays highest;
+  together with one primary island card. An open update modal owns its offline
+  hint and disables update until reconnection. Update stays highest;
   an install failure then outranks the stale install offer and offline-ready so
   its existing error feedback is observable; otherwise install eligibility,
   offline-ready, and registration error retain their established order. The
@@ -220,7 +226,9 @@ createTurnstileLifecycle(options?: TurnstileLifecycleOptions): {
   horizontally. Under `prefers-reduced-motion`, entry and decorative breathing
   motion are disabled; functional busy feedback remains truthful.
 - Updates after application mount stay user-controlled: a waiting worker receives `SKIP_WAITING`, then
-  the page reloads on `controllerchange`.
+  the page reloads only for a changed non-null controller relative to the one
+  that served the page. A previous timeout or another tab may already have
+  activated it; explicit retry must recognize this before seeking a waiting worker.
 - The root theme is `data-theme="light|dark"` on `<html>`, persists through
   `hippo_mobile_theme`, updates `color-scheme` and every `theme-color` meta tag,
   and defaults to `dark` when storage is absent or invalid. A valid stored
@@ -1643,7 +1651,15 @@ PWA_INSTALL_FREQUENCY_CAP_MS = 7 * 24 * 60 * 60 * 1000
   Legacy cached clients need one explicit update before this policy executes.
 - An update races one 15-second deadline, always releases timers/listeners, and
   leaves an explicit retry/recovery state after timeout, worker rejection, or
-  controller loss. It never reloads indefinitely.
+  controller loss. Registration recovery, check, download and activation all use
+  this one deadline. Late events cannot activate/reload. Missing registration
+  retries registration within the same attempt. A successful check with no new
+  worker clears a stale notice without an error; a lost controller is a failure.
+  `loadedController: ServiceWorker | null` is captured once at initialization,
+  not at each retry. `onNoUpdate()` clears `needRefresh`; `onFailure(reason)`
+  retains a retryable prompt. `updateFailure` drives localized download,
+  activation and registration-service errors; never map `updateError` to the
+  generic `registrationFailed` key. Concurrent calls share `updatePromise`.
 - The install prompt is eligible only after the session delay, on a value route,
   outside standalone mode, with a real deferred install event, and outside the
   seven-day frequency cap. Dismissal never blocks update status.
@@ -1665,6 +1681,10 @@ PWA_INSTALL_FREQUENCY_CAP_MS = 7 * 24 * 60 * 60 * 1000
 | Condition | Required behavior |
 |-----------|-------------------|
 | Update exceeds 15 seconds | Unlock UI, preserve retry, no automatic reload loop |
+| New controller already active before retry | Reload once on explicit user action |
+| Unchanged/null controllerchange | Do not reload; preserve bounded recovery |
+| No worker after successful check | Clear stale notice, no registration error |
+| Offline with update prompt | Keep sheet, show reconnect hint, disable update |
 | No deferred install event or non-value route | Do not display install prompt |
 | PWA worker appears in Tauri output | Fail artifact check |
 | Stage image enters PWA precache | Fail artifact check |
@@ -1700,7 +1720,10 @@ await updateServiceWorker(true)
 showInstallPrompt.value = Boolean(deferredPrompt)
 
 // Correct: bounded update plus centralized eligibility.
-await runPwaUpdate({ updateServiceWorker, timeoutMs: PWA_UPDATE_TIMEOUT_MS })
+await runPwaUpdate({
+  registration, controllerTarget: navigator.serviceWorker, loadedController,
+  onBusyChange, onErrorChange, onFailure, onNoUpdate, reload,
+})
 const install = createPwaInstallEligibilitySession({ routeName, now, storage })
 showInstallPrompt.value = install.evaluate({ deferredPrompt, standalone }).eligible
 ```
