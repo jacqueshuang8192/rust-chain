@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 65
+- **Total Sessions**: 66
 - **Last Active**: 2026-10-20
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~240 | Active |
+| `journal-2.md` | ~273 | Active |
 | `journal-1.md` | ~1985 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 66 | 2026-10-20 | Simplify mobile new coin rule copy | `3e4cb7c` | `main` |
 | 65 | 2026-10-20 | Submit mobile new-coin phase and PWA update fixes | `d467cf4`, `8ef0a37` | `main` |
 | 64 | 2026-10-20 | Mobile new coin copy and logo propagation | `d61919b` | `main` |
 | 63 | 2026-10-19 | Complete admin v2 token issuance management | `9dde7ac` | `main` |

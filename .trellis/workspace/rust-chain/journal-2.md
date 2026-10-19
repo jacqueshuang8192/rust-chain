@@ -238,3 +238,36 @@ Committed verified new-coin phase guidance/refresh and PWA update recovery/share
 ### Next Steps
 
 - None - task complete
+
+
+## Session 66: Simplify mobile new coin rule copy
+
+**Date**: 2026-10-20
+**Task**: Simplify mobile new coin rule copy
+**Branch**: `main`
+
+### Summary
+
+Renamed market seed price to issue price and lock rule to unlock rules in Chinese/English; removed the listing-reference display row only. Existing policy values and business logic unchanged. Mobile release gate passed 871/871 with all builds/artifacts/budgets. Local commit only; no push/deployment; .vite excluded.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3e4cb7c` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
