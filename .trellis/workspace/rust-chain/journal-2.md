@@ -204,3 +204,37 @@ Simplified Mobile issuance copy; added admin/agent logo uploads, immutable appli
 ### Next Steps
 
 - None - task complete
+
+
+## Session 65: Submit mobile new-coin phase and PWA update fixes
+
+**Date**: 2026-10-20
+**Task**: Submit mobile new-coin phase and PWA update fixes
+**Branch**: `main`
+
+### Summary
+
+Committed verified new-coin phase guidance/refresh and PWA update recovery/shared prompt separately; archived only these two session tasks. Combined Mobile release gate passed 871/871 and recorded browser checks passed. Excluded local .vite cache; normal remote push follows; no deployment.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d467cf4` | (see git log) |
+| `8ef0a37` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
