@@ -11,7 +11,7 @@
 :where(.token-surface, .token-surface > header, .token-surface > form, .token-surface > nav, .token-holding, .token-confirm, .token-subscribe > div) > button { margin: 8px 8px 0 0; cursor: pointer; }
 :where(.token-surface, .token-surface > header, .token-surface > form, .token-surface > nav, .token-holding, .token-confirm, .token-subscribe > div) > button:disabled { opacity: .45; cursor: default; }
 :where(.token-surface, .token-surface > header, .token-surface > form, .token-surface > form > label, .token-surface > nav, .token-holding, .token-confirm, .token-subscribe > div) > :is(button,input):focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.token-trading > header, .token-holding > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.token-holding > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .token-holding { padding-block: 18px; border-bottom: 1px solid var(--line); }
 .token-holding button { width: 100%; }
 .token-confirm { margin-block: 18px; padding: 16px; border-radius: 12px; background: var(--surface-2); }

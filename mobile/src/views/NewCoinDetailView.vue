@@ -126,16 +126,6 @@ const stageItems = computed(() => [
   ...(project.value?.issuancePolicy ? [{ key: 'purchase', label: t('newCoin.livePurchase'), icon: LineChart }] : []),
   { key: 'listed', label: t('newCoin.listed'), icon: LineChart },
 ])
-const stageGuidance = computed(() => {
-  const keys: Record<string, string> = {
-    preheat: 'newCoin.preheatHint',
-    subscription: 'newCoin.subscriptionHint',
-    distribution: project.value?.issuancePolicy ? 'newCoin.distributionHint' : 'newCoin.legacyDistributionHint',
-    purchase: 'newCoin.purchaseHint',
-    listed: project.value?.issuancePolicy ? 'newCoin.listedHint' : 'newCoin.legacyListedHint',
-  }
-  return keys[lifecycle.value] ? t(keys[lifecycle.value]!) : ''
-})
 const unlockSummary = computed(() => {
   const current = project.value
   if (!current) return t('newCoin.unavailableValue')
@@ -369,12 +359,6 @@ function handleReviewKeydown(event: KeyboardEvent): void {
             <strong>{{ stage.label }}</strong>
           </li>
         </ol>
-      </section>
-
-      <section class="token-surface new-coin-detail-stage-note" aria-live="polite">
-        <p v-if="stageGuidance">{{ stageGuidance }}</p>
-        <button type="button" :disabled="refreshing || reviewOpen || submitting" @click="load">{{ t('newCoin.refreshProject') }}</button>
-        <button v-if="lifecycle === 'distribution'" type="button" @click="router.push({ name: 'new-coin-records' })">{{ t('newCoin.viewAllocationRecords') }}</button>
       </section>
 
       <TokenTradingPanel v-if="project.issuancePolicy" :key="project.id" :project-id="project.id" :symbol="project.symbol" :quote-symbol="project.quoteAssetSymbol" :pair-symbol="project.postListingPairSymbol" :stage="project.lifecycleStatus" />

@@ -9915,3 +9915,10 @@
 - 修改文件：本轮仅追加`docs/superpowers/PROGRESS.md`；业务源码沿用前述已验收提交。
 - 验证结果：fetch确认推送前本地领先6个提交、无落后或分叉；push成功，`git ls-remote`确认远端main与本地完整哈希`7c8b7f380230bf51c1990c8f5531de1abb326ade`一致。源码未改动，沿用871/871测试及12组浏览器检查；本结果记录随后提交推送并再次核对。
 - 后续事项：未部署；保留既有未跟踪`.vite/`缓存。
+
+## 2026-10-20 04:33 - 新币详情说明精简与自动刷新验证
+
+- 完成内容：移除`new-coin-detail-stage-note`整块说明与手动刷新入口、`token-trading`顶部标题/刷新按钮，以及“平台生成行情 · 图表用于参考，成交以确认报价为准。”提示；删除不再使用的阶段说明计算和标题样式选择器。保留阶段/持仓10秒自动刷新、行情WebSocket、持仓标题和交易确认流程。
+- 修改文件：`mobile/src/views/NewCoinDetailView.vue`、`mobile/src/components/TokenTradingPanel.vue`、`mobile/src/styles/token-issuance.css`、`.trellis/spec/mobile/backend-integration.md`、`.trellis/tasks/10-20-new-coin-detail-live-ui/`及本记录。
+- 验证结果：`npm --prefix mobile run release:gate`退出0，871/871测试及类型、PWA/Tauri构建、制品、包体和治理门禁通过；差异检查通过。Ego隔离本地夹具确认无需点击刷新即可派发→认购→上市、持仓估值/收益与解禁状态自动变化，实际WebSocket订阅收到K线后图表收盘价更新至0.4；12组中英/明暗/320至448px布局无横溢，三处内容隐藏且持仓标题保留，截图已查看。夹具写请求为0，未操作生产资金。
+- 后续事项：按工作流保存本地提交并归档；未推送或部署。关闭任务Ego空间29与5187预览服务，保留既有服务及`.vite/`缓存。

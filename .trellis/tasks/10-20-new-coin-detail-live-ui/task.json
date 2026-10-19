@@ -1,0 +1,32 @@
+{
+  "id": "new-coin-detail-live-ui",
+  "name": "new-coin-detail-live-ui",
+  "title": "Simplify new coin detail sections and verify automatic refresh",
+  "description": "Remove new coin detail stage note, trading header and chart disclaimer while preserving existing polling and WebSocket updates.",
+  "status": "in_progress",
+  "dev_type": "frontend",
+  "scope": "mobile",
+  "package": "mobile",
+  "priority": "P2",
+  "creator": "rust-chain",
+  "assignee": "rust-chain",
+  "createdAt": "2026-10-20",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "mobile/src/views/NewCoinDetailView.vue",
+    "mobile/src/components/TokenTradingPanel.vue",
+    "mobile/src/styles/token-issuance.css",
+    ".trellis/spec/mobile/backend-integration.md",
+    "docs/superpowers/PROGRESS.md"
+  ],
+  "notes": "Completed: 871/871 release gate; twelve localized/theme/viewport checks; timer-driven phase/holdings changes and actual chart WebSocket message verified in an isolated local fixture. No push or deployment.",
+  "meta": {}
+}

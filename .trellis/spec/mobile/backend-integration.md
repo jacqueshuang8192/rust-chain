@@ -2460,9 +2460,12 @@ bundle thresholds. Never weaken the release gate to add a feature.
   account/project scoped and unnecessary for the v2 project summary.
 - `issuance_policy.*.at` and the card's listing date are planned times. Never
   use a countdown or local clock to claim an actual v2 purchase/listing event.
-  Phase hints state prerequisites without pretending to know a user's pending
-  allocation from project aggregate supply. Distribution exposes a records
-  action; purchase/chart and spot actions use the refreshed backend stage.
+  Phase indicators, purchase/chart and spot actions use the refreshed backend
+  stage. The detail omits the stage guidance/manual-refresh block; the token
+  trading panel omits its title/refresh header and chart-reference paragraph.
+  Preserve project polling, the holdings 10-second refresh outside pending
+  trades, and the chart WebSocket subscription independently of those removed
+  controls. Keep holding headers and transaction confirmation details intact.
 - Cards read v2 lock rules from `issuancePolicy.lock`, including fixed, weeks,
   months, none and actual purchase/listing unlock. Legacy compatibility columns
   cannot describe a v2 project's lock. NULL-policy cards keep the v1 mapping.
