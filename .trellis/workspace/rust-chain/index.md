@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 67
+- **Total Sessions**: 68
 - **Last Active**: 2026-10-20
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~306 | Active |
+| `journal-2.md` | ~339 | Active |
 | `journal-1.md` | ~1985 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 68 | 2026-10-20 | Simplify live new coin detail | `c33aef7` | `main` |
 | 67 | 2026-10-20 | Polish mobile home market empty state | `fde478d` | `main` |
 | 66 | 2026-10-20 | Simplify mobile new coin rule copy | `3e4cb7c` | `main` |
 | 65 | 2026-10-20 | Submit mobile new-coin phase and PWA update fixes | `d467cf4`, `8ef0a37` | `main` |

@@ -304,3 +304,36 @@ Contained the empty state within the 162px list footprint, refined icon and typo
 ### Next Steps
 
 - None - task complete
+
+
+## Session 68: Simplify live new coin detail
+
+**Date**: 2026-10-20
+**Task**: Simplify live new coin detail
+**Branch**: `main`
+
+### Summary
+
+Removed the mobile stage note/manual refresh, token trading header and chart-reference copy. Preserved phase/holding polling and chart streaming; full mobile gate passed 871 tests. Verified automatic distribution-to-purchase-to-listed transitions, holding valuation changes, WebSocket candle updates and twelve localized/theme/viewport layouts in an isolated fixture with zero writes. Local commit only; task browser and 5187 server closed, existing services and .vite preserved.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c33aef7` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
