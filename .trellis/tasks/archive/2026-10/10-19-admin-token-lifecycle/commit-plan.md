@@ -75,3 +75,9 @@ Exact file list (54 paths):
 Stage exactly the paths listed in `commit-files.txt`, inspect the staged diff and create the work commit above without amend. Then use the normal Trellis archive and journal steps for this task only; those create their separate bookkeeping commits. Do not include older unarchived tasks. Do not push unless the user explicitly authorizes this delivery's push.
 
 The full JavaScript budget is still above the existing threshold (2,712,495 > 2,600,000 bytes); build and functional checks pass. No production deployment or migration is included.
+
+## Execution receipt
+
+- Work commit: `9dde7acfa626acd1e103139f346f152635a552b6`.
+- Exactly 54 approved paths committed; `.vite/` excluded.
+- User authorized normal push to origin/main; archive and journal are part of this delivery.
