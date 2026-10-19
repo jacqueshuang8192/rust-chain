@@ -271,3 +271,36 @@ Renamed market seed price to issue price and lock rule to unlock rules in Chines
 ### Next Steps
 
 - None - task complete
+
+
+## Session 67: Polish mobile home market empty state
+
+**Date**: 2026-10-20
+**Task**: Polish mobile home market empty state
+**Branch**: `main`
+
+### Summary
+
+Contained the empty state within the 162px list footprint, refined icon and typography, and retained existing copy/data flows. Mobile release gate passed with 871 tests; twelve localized/theme/viewport browser checks and tab/loading/error checks passed. Local commit only, no push or deployment; existing .vite cache and services preserved.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `fde478d` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
