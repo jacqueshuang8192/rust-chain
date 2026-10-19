@@ -40,3 +40,7 @@ Publish the API and both client bundles together. No new migration is required.
 Existing 0152/0153+ issuance schema is assumed. Refresh the client catalog to remove
 previously exposed purchase rows. This task does not deploy, modify production,
 or push remotely. Prior local detail-UI commits remain on main.
+
+## Local completion
+Work committed as `fcb123c`. Dedicated test database and Redis process removed;
+existing services and `.vite/` cache retained. No remote push or deployment.
