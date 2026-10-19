@@ -3,7 +3,7 @@
   "name": "pwa-update-recovery",
   "title": "PWA update recovery and shared install-style dialog",
   "description": "Recover PWA updates and share the existing install bottom sheet.",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": "frontend",
   "scope": "mobile",
   "package": null,
@@ -11,11 +11,11 @@
   "creator": "rust-chain",
   "assignee": "rust-chain",
   "createdAt": "2026-10-20",
-  "completedAt": null,
+  "completedAt": "2026-10-20",
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
-  "commit": null,
+  "commit": "8ef0a379421e28b41932466be95e5e66145c1ff7",
   "pr_url": null,
   "subtasks": [],
   "children": [],
@@ -31,6 +31,6 @@
     "mobile/tests/pwa-prompt-behavior.test.ts",
     ".trellis/spec/mobile/pwa-and-shell.md"
   ],
-  "notes": "Implementation and validation complete. Final Mobile gate passed (871/871); 32 browser layout cases and real local worker activation/timeout/retry passed. Awaiting commit; no push or deployment. Preserve pending new-coin task and exclude .vite cache. Commit and remote push now requested in user follow-up; preparing verified scoped commits.",
+  "notes": "Implementation and verification complete; business commit 8ef0a37. Final combined Mobile release gate passed 871/871; browser verification recorded in delivery.md. Archiving this session task before normal origin/main push. No deployment; .vite cache excluded.",
   "meta": {}
 }
