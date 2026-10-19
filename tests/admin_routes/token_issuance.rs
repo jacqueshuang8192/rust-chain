@@ -44,7 +44,8 @@ async fn admin_token_creation_is_atomic_canonical_and_recoverable() -> Result<()
         900,
     )?;
     let app = build_router(AppState::new(test_settings()).with_mysql(pool.clone()));
-    let body = input(&pool).await;
+    let mut body = input(&pool).await;
+    body["logo_url"] = json!("https://images.example.test/admin-token.png");
     let path = "/admin/api/v1/new-coins/issuance";
     role(&pool, role_id, json!(["new_coin.projects.read"])).await;
     assert_eq!(
@@ -78,6 +79,12 @@ async fn admin_token_creation_is_atomic_canonical_and_recoverable() -> Result<()
     let counts: (i64,i64,i64,i64) = sqlx::query_as("SELECT (SELECT COUNT(*) FROM new_coin_projects WHERE asset_id=?),(SELECT COUNT(*) FROM trading_pairs WHERE base_asset=?),(SELECT COUNT(*) FROM wallet_accounts WHERE asset_id=?),(SELECT COUNT(*) FROM admin_token_issuance_receipts WHERE admin_id=?)")
         .bind(base).bind(base).bind(base).bind(admin).fetch_one(&pool).await?;
     assert_eq!(counts, (0, 0, 0, 0));
+    let rolled_back_logo: Option<String> =
+        sqlx::query_scalar("SELECT logo_url FROM assets WHERE id=?")
+            .bind(base)
+            .fetch_one(&pool)
+            .await?;
+    assert_eq!(rolled_back_logo, None);
     let (a, b) = tokio::join!(
         call(&app, &token, "POST", path, body.clone()),
         call(&app, &token, "POST", path, body.clone())
@@ -95,6 +102,21 @@ async fn admin_token_creation_is_atomic_canonical_and_recoverable() -> Result<()
     assert!(created["quote_symbol"].is_string());
     let project = created["id"].as_u64().unwrap();
     let pair = created["post_listing_pair_id"].as_u64().unwrap();
+    let logos: (Option<String>, Option<String>) = sqlx::query_as("SELECT a.logo_url,p.logo_url FROM trading_pairs p JOIN assets a ON a.id=p.base_asset WHERE p.id=?")
+        .bind(pair).fetch_one(&pool).await?;
+    assert_eq!(
+        logos,
+        (
+            Some(body["logo_url"].as_str().unwrap().into()),
+            Some(body["logo_url"].as_str().unwrap().into())
+        )
+    );
+    let mut changed_logo = body.clone();
+    changed_logo["logo_url"] = json!("https://images.example.test/different.png");
+    assert_eq!(
+        call(&app, &token, "POST", path, changed_logo).await.0,
+        StatusCode::CONFLICT
+    );
     let state: (String,bool,BigDecimal,i64) = sqlx::query_as("SELECT p.status,g.enabled,g.initial_price,(SELECT COUNT(*) FROM market_default_generator_versions WHERE pair_id=p.id) FROM trading_pairs p JOIN market_default_generators g ON g.pair_id=p.id WHERE p.id=?")
         .bind(pair).fetch_one(&pool).await?;
     assert_eq!(state, ("disabled".into(), false, decimal("0.3"), 1));
@@ -155,6 +177,10 @@ async fn admin_token_records_separate_ownership_and_only_show_executed_buybacks(
     )?;
     let app = build_router(AppState::new(test_settings()).with_mysql(pool.clone()));
     let body = input(&pool).await;
+    sqlx::query("UPDATE assets SET logo_url='https://images.example.test/existing.png' WHERE id=?")
+        .bind(body["asset_id"].as_u64().unwrap())
+        .execute(&pool)
+        .await?;
     let created = ok(call(
         &app,
         &token,
@@ -164,6 +190,28 @@ async fn admin_token_records_separate_ownership_and_only_show_executed_buybacks(
     )
     .await);
     let project = created["id"].as_u64().unwrap();
+    let inherited: Option<String> =
+        sqlx::query_scalar("SELECT logo_url FROM trading_pairs WHERE id=?")
+            .bind(created["post_listing_pair_id"].as_u64().unwrap())
+            .fetch_one(&pool)
+            .await?;
+    assert_eq!(
+        inherited.as_deref(),
+        Some("https://images.example.test/existing.png")
+    );
+    let mut null_logo_replay = body.clone();
+    null_logo_replay["logo_url"] = Value::Null;
+    assert_eq!(
+        ok(call(
+            &app,
+            &token,
+            "POST",
+            "/admin/api/v1/new-coins/issuance",
+            null_logo_replay
+        )
+        .await)["id"],
+        project
+    );
     let mut agents = Vec::new();
     for _ in 0..2 {
         let user = create_user(&pool).await;

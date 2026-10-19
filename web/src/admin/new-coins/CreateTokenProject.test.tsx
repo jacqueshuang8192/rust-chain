@@ -28,7 +28,7 @@ async function select(label: string, text: string) {
   const options = await screen.findAllByText(text, { selector: '.semi-select-option-text' });
   await userEvent.click(options.at(-1)!);
 }
-async function prepare() {
+async function prepare(withLogo = false) {
   await userEvent.click(screen.getByRole('button', { name: '添加新币项目' }));
   await waitFor(() => expect(screen.getByRole('button', { name: '提交添加新币项目' })).toBeEnabled());
   await select('发行资产', 'HIP - Hippo（ID: 11）');
@@ -42,6 +42,11 @@ async function prepare() {
   fireEvent.change(screen.getByLabelText('锁仓周期'), { target: { value: '3' } });
   await select('解锁卖出手续费', '按正收益比例');
   fireEvent.change(screen.getByLabelText('退出费用'), { target: { value: '0.2' } });
+  if (withLogo) {
+    fireEvent.change(document.querySelector('input[type="file"]')!, { target: { files: [new File(['GIF89aDATA!'], 'coin.gif', { type: 'image/gif' })] } });
+    await screen.findByText('更换币种 Logo');
+    await waitFor(() => expect(screen.getByRole('button', { name: '提交添加新币项目' })).toBeEnabled());
+  }
   await userEvent.click(screen.getByRole('button', { name: '提交添加新币项目' }));
   return screen.findByRole('dialog', { name: '确认创建新版发行项目' });
 }
@@ -110,4 +115,16 @@ it('hides creation without write permission and isolates a replacement session',
   await act(async () => authStore.setSession({ ...session, subject: 'admin:2', generation: 'replacement' }));
   expect(screen.queryByRole('dialog', { name: '确认创建新版发行项目' })).not.toBeInTheDocument();
   expect(writes()).toHaveLength(0);
+});
+
+it('includes the uploaded logo in the reviewed and persisted creation intent', async () => {
+  request.mockImplementation(async (path, options) => path === '/admin/api/v1/uploads/images'
+    ? { download_url: 'https://images.example.test/new-coin.gif' }
+    : { ...JSON.parse(String(options?.body)), id: 701 });
+  mount(); const dialog = await prepare(true);
+  expect(within(dialog).getByRole('img', { name: '币种 Logo' })).toHaveAttribute('src', 'https://images.example.test/new-coin.gif');
+  await userEvent.click(within(dialog).getByRole('button', { name: '确认创建' }));
+  await screen.findByRole('link', { name: '查看已创建项目 701' });
+  const creation = writes().find(([path]) => path === '/admin/api/v1/new-coins/issuance');
+  expect(JSON.parse(String(creation?.[1]?.body)).logo_url).toBe('https://images.example.test/new-coin.gif');
 });

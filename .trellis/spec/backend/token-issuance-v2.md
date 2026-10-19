@@ -287,3 +287,61 @@ policy/amounts/asset IDs, retry that intent, and read `new_coin_holdings`.
 Apply migration 0154 after 0152/0153 before exposing Admin v2 creation. It creates
 only receipt storage. Funding the buyback account remains a separate audited
 operational procedure; the creation API never fabricates treasury balances.
+
+## Coin Logo Upload and Spot Handoff
+
+### 1. Scope / Trigger
+New coin creation, agent review, and listing share `assets.logo_url` as the
+canonical image. Public Mobile copy is simplified independently of timestamps
+and automatic stage policy; PC presentation is unchanged.
+
+### 2. Signatures
+- `POST /agent/api/v1/coin-applications/logo`: authenticated multipart `file`,
+  returning the existing image-upload response (`download_url`, object metadata).
+- Agent application input/record: optional nullable `logo_url`.
+- `POST /admin/api/v1/new-coins/issuance`: optional `logo_url`; absent/null keeps
+  the selected asset image. Admin uploads use `/admin/api/v1/uploads/images`.
+- Migration 0155 adds nullable application `logo_url` and upload object
+  `uploaded_by_agent`, with its FK to `agent_admin_users`.
+
+### 3. Contracts
+Uploads reuse configured storage, byte/MIME validation and size limits. Owner
+columns distinguish admin, user and agent portal accounts. Uploading alone
+publishes no asset/project. Approval copies the immutable application Logo into
+its new asset. Admin creation changes the asset Logo in the same transaction as
+project/pair creation, audit and receipt. Logo is part of immutable replay input;
+missing admin Logo is omitted from serialized intent to preserve old receipts.
+Publishing copies the asset Logo into the dedicated pair. Listing refreshes a
+configured asset Logo onto that same pair without changing price, pair identity,
+history or money. If no asset Logo exists, preserve an existing pair image.
+The legacy pair activation path follows the same rule.
+
+### 4. Validation & Error Matrix
+| Condition | Result |
+| --- | --- |
+| Invalid agent session/scope or inactive hierarchy | Existing auth denial; no upload |
+| Invalid bytes/MIME/size or disabled storage | Existing upload validation error |
+| Optional Logo empty/whitespace | Normalize to no override |
+| Logo longer than 2048 characters | Validation error before persistence |
+| Same idempotency key with changed Logo | Conflict, no new project/application |
+| Approval/creation audit failure | Roll back asset Logo and publication |
+| Frontend upload/session replacement failure | Keep previous Logo; no late assignment |
+
+### 5. Good / Base / Bad Cases
+Good: uploaded Logo survives confirmation, unknown-result retry, review and spot
+handoff. Base: old applications with no Logo remain valid, and admin creation
+without an override inherits its selected asset image. Bad: assigning an agent
+portal ID to `uploaded_by` or hard-coding `logo_url: None` at review.
+
+### 6. Tests Required
+Run agent upload/ownership/publication routes, token lifecycle (including public
+project image and listing refresh), admin creation rollback/replay/inheritance,
+frontend upload failure/session isolation and receipt mismatch tests. Use an
+isolated MySQL database and disposable Redis for lifecycle tests. Run Mobile
+release gate and Web quality gates; report existing bundle-budget failures.
+
+### 7. Wrong vs Correct
+Wrong: recreate the pair at listing to install a Logo, or silently accept changed
+Logo metadata on an existing idempotency key. Correct: update image metadata on
+the existing pair in the listing transaction and compare the full original
+application/creation intent on retry.

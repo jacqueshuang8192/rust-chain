@@ -5,6 +5,7 @@ use utoipa::{OpenApi, ToSchema};
 struct CoinApplicationInput {
     symbol: String,
     name: String,
+    logo_url: Option<String>,
     #[schema(minimum = 0, maximum = 18)]
     precision_scale: i32,
     total_supply: String,
@@ -23,6 +24,7 @@ struct CoinApplicationRecord {
     agent_admin_id: u64,
     symbol: String,
     name: String,
+    logo_url: Option<String>,
     precision_scale: i32,
     total_supply: String,
     issue_price: String,
@@ -60,6 +62,27 @@ struct CoinQuoteAsset {
     symbol: String,
     precision_scale: i32,
 }
+
+#[derive(ToSchema)]
+struct CoinLogoFile {
+    #[schema(value_type = String, format = Binary)]
+    file: String,
+}
+#[derive(ToSchema)]
+struct CoinLogoUpload {
+    provider: String,
+    object_key: String,
+    download_url: String,
+    share_url: Option<String>,
+    delete_url: Option<String>,
+    mime_type: String,
+    size_bytes: u64,
+}
+/// 已认证代理上传币种图片，复用后台存储配置；不会创建或发布币种。
+#[utoipa::path(post,path="/agent/api/v1/coin-applications/logo",tag="coin-applications",security(("bearerAuth"=[])),
+request_body(content=CoinLogoFile,content_type="multipart/form-data"),
+responses((status=200,body=CoinLogoUpload),(status=400,body=ErrorResponse),(status=401,body=ErrorResponse),(status=403,body=ErrorResponse),(status=413,description="图片超过上传限制"),(status=500,body=ErrorResponse)))]
+fn upload_logo() {}
 
 /// 启用计价资产目录；仅提示，写入时重验。
 #[utoipa::path(get,path="/agent/api/v1/coin-applications/options",tag="coin-applications",security(("bearerAuth"=[])),
@@ -104,5 +127,5 @@ responses((status=200,body=CoinApplicationRecord),(status=400,body=ErrorResponse
 fn review() {}
 
 #[derive(OpenApi)]
-#[openapi(paths(options,submit,own,own_detail,queue,detail,review),components(schemas(CoinApplicationInput,CoinApplicationRecord,CoinApplicationPage,CoinApplicationDecision,CoinQuoteAsset)),tags((name="coin-applications",description="代理发行审核")))]
+#[openapi(paths(options,submit,own,own_detail,queue,detail,review,upload_logo),components(schemas(CoinLogoFile,CoinLogoUpload,CoinApplicationInput,CoinApplicationRecord,CoinApplicationPage,CoinApplicationDecision,CoinQuoteAsset)),tags((name="coin-applications",description="代理发行审核")))]
 pub(super) struct CoinApplicationsApiDoc;

@@ -749,8 +749,8 @@ pub(crate) async fn insert_admin_upload_object(
     sqlx::query(
         r#"INSERT INTO upload_objects
            (provider, object_key, public_url, share_url, delete_url, mime_type, size_bytes,
-            original_filename, uploaded_by, uploaded_by_user)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
+            original_filename, uploaded_by, uploaded_by_user, uploaded_by_agent)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
     )
     .bind(&input.provider)
     .bind(&input.object_key)
@@ -762,6 +762,7 @@ pub(crate) async fn insert_admin_upload_object(
     .bind(&input.original_filename)
     .bind(input.owner.admin_id())
     .bind(input.owner.user_id())
+    .bind(input.owner.agent_id())
     .execute(pool)
     .await?;
     Ok(())

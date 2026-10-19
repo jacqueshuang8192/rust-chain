@@ -127,3 +127,12 @@ describe('coin issuance application workflow', () => {
     expect(() => validateCoinInput({ ...row, precision_scale: 2 })).toThrow(/精度/);
   });
 });
+
+it('preserves an uploaded logo in submission and rejects a mismatched receipt', async () => {
+  const input = { ...row, logo_url: 'https://images.example.test/coin.png' };
+  request.mockResolvedValueOnce(input);
+  await expect(submitCoin(input, 'with-logo')).resolves.toMatchObject({ logo_url: input.logo_url });
+  expect(JSON.parse(String(request.mock.calls.at(-1)?.[1]?.body)).logo_url).toBe(input.logo_url);
+  request.mockResolvedValueOnce({ ...input, logo_url: null });
+  await expect(submitCoin(input, 'with-logo')).rejects.toThrow('发币申请响应无效');
+});

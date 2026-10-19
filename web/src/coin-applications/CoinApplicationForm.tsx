@@ -1,7 +1,8 @@
 import { buildPolicy, emptyPolicyDraft } from './issuancePolicy';
 import { IssuancePolicyFields } from './IssuancePolicyFields';
 import { IssuancePolicySummary } from './IssuancePolicySummary';
-import { Banner, Button, Modal, TextArea } from '@douyinfe/semi-ui';
+import { CoinLogoUpload } from './CoinLogoUpload';
+import { Banner, Button, Image, Modal, TextArea } from '@douyinfe/semi-ui';
 import { useEffect, useRef, useState } from 'react';
 import { type AuthSession, authStore } from '../auth/authStore';
 import { coinOptions, submitCoin, validateCoinInput, type CoinAsset, type CoinInput } from '../api/coinApplications';
@@ -12,7 +13,7 @@ import { decimalFitsPrecision } from '../shared/decimal';
 import { adminErrorMessage } from '../shared/adminErrorMessage';
 
 type Intent = { key: string; input: CoinInput };
-const empty = { symbol: '', name: '', precision: '8', supply: '', price: '', quote: '', listing: '', reason: '' };
+const empty = { logo: '', symbol: '', name: '', precision: '8', supply: '', price: '', quote: '', listing: '', reason: '' };
 function load(key: string): { intent: Intent | null; error: string } {
   try {
     const raw = sessionStorage.getItem(key);
@@ -41,6 +42,7 @@ export function CoinApplicationForm({ session, onSuccess }: { session: AuthSessi
   const [receipt, setReceipt] = useState('');
   const [confirmation, setConfirmation] = useState<CoinInput | null>(null);
   const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const flight = useRef(false);
   useEffect(() => {
     const c = new AbortController(); setAssets([]); setOptionsError('');
@@ -49,7 +51,7 @@ export function CoinApplicationForm({ session, onSuccess }: { session: AuthSessi
   }, [reload]);
   function prepare() {
     try {
-      const input = intent?.input ?? validateCoinInput({ symbol: draft.symbol, name: draft.name,
+      const input = intent?.input ?? validateCoinInput({ symbol: draft.symbol, name: draft.name, logo_url: draft.logo || null,
         precision_scale: requiredSafeInteger(draft.precision, '资产精度', 0, 18), total_supply: draft.supply, issue_price: draft.price,
         quote_asset_id: requiredSafeInteger(draft.quote, '计价资产', 1), listed_at: new Date(policyDraft.nodes.listing.local).getTime(), reason: draft.reason,
         issuance_policy: buildPolicy(policyDraft, assets.find(v => String(v.asset_id) === draft.quote)?.precision_scale ?? 18) });
@@ -86,6 +88,7 @@ export function CoinApplicationForm({ session, onSuccess }: { session: AuthSessi
     <Banner type="info" description="填写发行资料并提交审核。通过后创建资产与钱包，按各节点的手动或自动设置推进。派发始终由代理分批确认。" />
     {intent ? <Banner type="warning" description={`申请 ${intent.input.symbol} 的提交结果待核对，已保留原始资料与请求标识。`} /> : null}
     {!intent ? <div className="coin-application-fields">
+      <CoinLogoUpload scope="agent" value={draft.logo} disabled={busy || Boolean(confirmation)} onBusy={setUploading} onChange={logo => setDraft(v => ({ ...v, logo }))} />
       {field('symbol', '币种代码')}{field('name', '币种名称')}{field('precision', '资产精度')}{field('supply', '发行总量')}
       <label id="coin-quote-label">计价资产<AdminSelect ariaLabel="计价资产" ariaLabelledBy="coin-quote-label" value={draft.quote} disabled={busy}
         onChange={(quote) => setDraft({ ...draft, quote })} optionList={assets.map((v) => ({ value: String(v.asset_id), label: `${v.symbol}（${v.precision_scale} 位小数）` }))} /></label>
@@ -95,11 +98,11 @@ export function CoinApplicationForm({ session, onSuccess }: { session: AuthSessi
     {!intent ? <IssuancePolicyFields value={policyDraft} onChange={setPolicyDraft} disabled={busy} /> : null}
     {optionsError ? <p role="alert">{optionsError} <Button onClick={() => setReload((v) => v + 1)}>重新加载资产</Button></p> : null}
     {error ? <p role="alert">{error}</p> : null}{receipt ? <p role="status">{receipt}</p> : null}
-    <Button theme="solid" disabled={busy || Boolean(initial.error)} onClick={prepare}>{intent ? '核对原申请' : '提交发行申请'}</Button>
+    <Button theme="solid" disabled={busy || uploading || Boolean(initial.error)} onClick={prepare}>{intent ? '核对原申请' : '提交发行申请'}</Button>
     <Modal title="确认发行申请" visible={Boolean(confirmation)} motion={false} maskClosable={false} closeOnEsc={!busy}
       width="min(560px, calc(100vw - 32px))" onCancel={() => { if (!busy) setConfirmation(null); }} onOk={() => void submit()} confirmLoading={busy}
       okText={intent ? '按原申请重试' : '确认提交'} okButtonProps={{ 'aria-label': intent ? '按原申请重试' : '确认提交' }} cancelButtonProps={{ 'aria-label': '取消', disabled: busy }}>
-      {confirmation ? <><p>{confirmation.symbol} · {confirmation.name}</p><p>发行总量：{confirmation.total_supply}；价格：{confirmation.issue_price}</p><p>计划上市：{new Date(confirmation.listed_at).toLocaleString()}</p><p>申请说明：{confirmation.reason}</p>{confirmation.issuance_policy ? <IssuancePolicySummary policy={confirmation.issuance_policy} quote={assets.find(v => v.asset_id === confirmation.quote_asset_id)?.symbol} /> : <p>历史申请按原锁仓规则处理。</p>}<p>申请提交后不能修改，请核对全部规则。</p></> : null}
+      {confirmation ? <>{confirmation.logo_url ? <Image src={confirmation.logo_url} alt="币种 Logo" width={64} height={64} /> : null}<p>{confirmation.symbol} · {confirmation.name}</p><p>发行总量：{confirmation.total_supply}；价格：{confirmation.issue_price}</p><p>计划上市：{new Date(confirmation.listed_at).toLocaleString()}</p><p>申请说明：{confirmation.reason}</p>{confirmation.issuance_policy ? <IssuancePolicySummary policy={confirmation.issuance_policy} quote={assets.find(v => v.asset_id === confirmation.quote_asset_id)?.symbol} /> : <p>历史申请按原锁仓规则处理。</p>}<p>申请提交后不能修改，请核对全部规则。</p></> : null}
       {error ? <p role="alert">{error}</p> : null}
     </Modal>
   </section>;

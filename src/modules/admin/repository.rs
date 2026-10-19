@@ -211,24 +211,33 @@ pub(crate) struct AdminMarketSourceCredentialWrite {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum UploadObjectOwner {
-    // 上传对象归属只区分后台管理员和前台用户，避免落库时把上传入口耦合到 HTTP route。
+    // 分别记录管理员、用户和代理门户身份，避免不同账号表的 ID 混用。
     Admin(u64),
     User(u64),
+    Agent(u64),
 }
 
 impl UploadObjectOwner {
-    /// 仅当上传对象归属于后台管理员时返回其 ID；用户对象返回空值。
-    pub(crate) const fn admin_id(self) -> Option<u64> {
+    /// 仅代理门户上传对象返回门户账号 ID；不混用管理员或用户外键。
+    pub(crate) const fn agent_id(self) -> Option<u64> {
         match self {
-            Self::Admin(id) => Some(id),
-            Self::User(_) => None,
+            Self::Agent(id) => Some(id),
+            _ => None,
         }
     }
 
-    /// 仅当上传对象归属于前台用户时返回其 ID；管理员对象返回空值。
+    /// 仅管理员上传对象返回管理员 ID；用户和代理返回空值。
+    pub(crate) const fn admin_id(self) -> Option<u64> {
+        match self {
+            Self::Admin(id) => Some(id),
+            Self::User(_) | Self::Agent(_) => None,
+        }
+    }
+
+    /// 仅前台用户上传对象返回用户 ID；管理员和代理返回空值。
     pub(crate) const fn user_id(self) -> Option<u64> {
         match self {
-            Self::Admin(_) => None,
+            Self::Admin(_) | Self::Agent(_) => None,
             Self::User(id) => Some(id),
         }
     }

@@ -169,6 +169,8 @@ pub(crate) async fn advance(
     }
     if target == "listed" {
         trading::handoff_inventory(tx, before).await?;
+        sqlx::query("UPDATE trading_pairs p JOIN assets a ON a.id=p.base_asset SET p.logo_url=COALESCE(a.logo_url,p.logo_url) WHERE p.id=? AND p.base_asset=? AND p.quote_asset=?")
+            .bind(before.pair()?).bind(before.asset_id).bind(before.quote()?).execute(&mut **tx).await?;
     }
     let due = policy
         .next(target)
@@ -245,14 +247,14 @@ pub(crate) async fn publish_policy(
     admin_id: u64,
     policy: &crate::modules::new_coin::domain::issuance::IssuancePolicy,
 ) -> AppResult<()> {
-    let (base, quote, symbol, quote_symbol, quantity_precision, price_precision): (u64,u64,String,String,i32,i32) = sqlx::query_as("SELECT p.asset_id,p.quote_asset_id,p.symbol,q.symbol,a.precision_scale,q.precision_scale FROM new_coin_projects p JOIN assets a ON a.id=p.asset_id JOIN assets q ON q.id=p.quote_asset_id WHERE p.id=?")
+    let (base, quote, symbol, quote_symbol, quantity_precision, price_precision, logo): (u64,u64,String,String,i32,i32,Option<String>) = sqlx::query_as("SELECT p.asset_id,p.quote_asset_id,p.symbol,q.symbol,a.precision_scale,q.precision_scale,a.logo_url FROM new_coin_projects p JOIN assets a ON a.id=p.asset_id JOIN assets q ON q.id=p.quote_asset_id WHERE p.id=?")
         .bind(project_id).fetch_one(&mut **tx).await?;
     let pair_symbol = crate::modules::market::domain::ValidatedMarketSymbol::from_raw(&format!(
         "{symbol}{quote_symbol}"
     ))
     .map_err(|_| AppError::Validation("新币与计价资产组合后的交易对代码不能超过32位".into()))?;
-    let pair_id = sqlx::query("INSERT INTO trading_pairs (base_asset,quote_asset,symbol,price_precision,qty_precision,min_order_value,status,market_type) VALUES (?,?,?,?,?,0,'disabled','internal')")
-        .bind(base).bind(quote).bind(pair_symbol.as_str()).bind(price_precision).bind(quantity_precision)
+    let pair_id = sqlx::query("INSERT INTO trading_pairs (base_asset,quote_asset,symbol,price_precision,qty_precision,min_order_value,status,market_type,logo_url) VALUES (?,?,?,?,?,0,'disabled','internal',?)")
+        .bind(base).bind(quote).bind(pair_symbol.as_str()).bind(price_precision).bind(quantity_precision).bind(logo)
         .execute(&mut **tx).await?.last_insert_id();
     // 新交易对尚未提交、没有运行中的生成器；只在审批事务创建停用版本，不需要排空外部写入者。
     crate::modules::admin::infrastructure::save_default_market_in_tx(

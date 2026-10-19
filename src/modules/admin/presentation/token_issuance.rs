@@ -7,6 +7,8 @@ use crate::modules::new_coin::domain::issuance::IssuancePolicy;
 #[serde(deny_unknown_fields)]
 pub(crate) struct CreateTokenIssuanceRequest {
     pub asset_id: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub logo_url: Option<String>,
     pub quote_asset_id: u64,
     #[serde(deserialize_with = "crate::numeric::deserialize_decimal_text")]
     pub total_supply: BigDecimal,

@@ -337,3 +337,82 @@ async fn coin_applications_enforce_ownership_and_atomic_publication() {
         "rejected"
     );
 }
+
+#[tokio::test]
+async fn coin_logo_upload_authenticates_validates_and_records_agent_owner() {
+    let Some(pool) = mysql_pool().await else {
+        return;
+    };
+    let agent = create_agent(&pool, "logo-upload").await;
+    let (_, admin, _) = create_admin_with_password(&pool, "logo-admin", "test-password").await;
+    let admin_token = issue_token(
+        &test_settings(),
+        format!("admin:{admin}"),
+        TokenScope::Admin,
+        900,
+    )
+    .unwrap();
+    let app = build_router(AppState::new(test_settings()).with_mysql(pool.clone()));
+    let root = std::env::temp_dir().join(format!("coin-logo-{}", Uuid::now_v7()));
+    ok(request(&app, &admin_token, "PATCH", "/admin/api/v1/upload/config", json!({
+        "provider":"local", "local_root": root.to_string_lossy(), "public_base_url":"https://images.example.test",
+        "max_file_size_bytes":1024, "allowed_mime_types":["image/gif"], "enabled":true, "reason":"test coin logos"
+    })).await);
+    let agent_token = token(agent);
+    let upload = |token: String, data: &str| {
+        let body = format!(
+            "--coin-logo-boundary\r\nContent-Disposition: form-data; name=\"file\"; filename=\"coin.gif\"\r\nContent-Type: image/gif\r\n\r\n{data}\r\n--coin-logo-boundary--\r\n"
+        );
+        app.clone().oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/agent/api/v1/coin-applications/logo")
+                .header("authorization", format!("Bearer {token}"))
+                .header(
+                    "content-type",
+                    "multipart/form-data; boundary=coin-logo-boundary",
+                )
+                .body(Body::from(body))
+                .unwrap(),
+        )
+    };
+    assert_eq!(
+        upload(admin_token, "GIF89aDATA!").await.unwrap().status(),
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        upload(agent_token.clone(), "invalid-image")
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::BAD_REQUEST
+    );
+    let response = upload(agent_token.clone(), "GIF89aDATA!").await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = axum::body::to_bytes(response.into_body(), 16384)
+        .await
+        .unwrap();
+    let body: Value = serde_json::from_slice(&body).unwrap();
+    let owners: (Option<u64>, Option<u64>, Option<u64>) = sqlx::query_as("SELECT uploaded_by,uploaded_by_user,uploaded_by_agent FROM upload_objects WHERE object_key=?")
+        .bind(body["object_key"].as_str().unwrap()).fetch_one(&pool).await.unwrap();
+    assert_eq!(owners, (None, None, Some(agent.admin_user_id)));
+    assert_eq!(
+        std::fs::read(root.join(body["object_key"].as_str().unwrap())).unwrap(),
+        b"GIF89aDATA!"
+    );
+    sqlx::query("UPDATE agent_admin_users SET status='disabled' WHERE id=?")
+        .bind(agent.admin_user_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(matches!(
+        upload(agent_token, "GIF89aDATA!").await.unwrap().status(),
+        StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN
+    ));
+    std::fs::remove_dir_all(&root).unwrap();
+    sqlx::query("DELETE FROM upload_storage_configs WHERE local_root=?")
+        .bind(root.to_string_lossy().as_ref())
+        .execute(&pool)
+        .await
+        .unwrap();
+}

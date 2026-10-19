@@ -166,3 +166,17 @@ pub(crate) async fn operations(
     tx.commit().await?;
     Ok((rows, total))
 }
+
+/// 调用方先锁资产；新币 Logo 与创建项目、发布交易对及审计在同一事务内提交或回滚。
+pub(crate) async fn set_asset_logo(
+    tx: &mut sqlx::Transaction<'_, sqlx::MySql>,
+    asset: u64,
+    logo: &str,
+) -> crate::error::AppResult<()> {
+    sqlx::query("UPDATE assets SET logo_url=? WHERE id=?")
+        .bind(logo)
+        .bind(asset)
+        .execute(&mut **tx)
+        .await?;
+    Ok(())
+}

@@ -1,3 +1,4 @@
+import { AdminImageCell } from '../shared/AdminImageUpload';
 import { IssuancePolicySummary } from './IssuancePolicySummary';
 import { TokenProjects } from './TokenProjects';
 import { Banner, Button, SideSheet, Space, Tabs, Tag } from '@douyinfe/semi-ui';
@@ -94,7 +95,7 @@ function History({ scope, revision, canReview, session }: { scope: 'agent' | 'ad
       <div className="coin-application-detail">
         {detailError ? <p role="alert">{detailError}</p> : null}
         <Button loading={busy} onClick={() => void refreshDetail()}>刷新申请详情</Button>
-        {detail ? <><Status value={detail.status} /><h3>{detail.symbol} · {detail.name}</h3>
+        {detail ? <><Status value={detail.status} /><h3>{detail.symbol} · {detail.name}</h3><AdminImageCell alt="币种 Logo" value={detail.logo_url} />
           <dl><dt>申请编号</dt><dd>{detail.id}</dd>
             {scope === 'admin' ? <><dt>代理 / 申请账号</dt><dd>{detail.agent_id} / {detail.agent_admin_id}</dd></> : null}
             <dt>发行总量</dt><dd>{detail.total_supply}</dd><dt>发行价格</dt><dd>{detail.issue_price} {detail.quote_symbol}</dd>

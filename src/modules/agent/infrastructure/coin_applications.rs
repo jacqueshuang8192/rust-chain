@@ -106,11 +106,11 @@ pub(crate) async fn insert(
     quote_symbol: &str,
     req: &CoinApplicationRequest,
 ) -> AppResult<u64> {
-    let result = sqlx::query("INSERT INTO agent_new_coin_applications (agent_id,agent_admin_id,symbol,name,precision_scale,total_supply,issue_price,quote_asset_id,quote_symbol,listed_at,reason,idempotency_key,issuance_policy) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")
+    let result = sqlx::query("INSERT INTO agent_new_coin_applications (agent_id,agent_admin_id,symbol,name,precision_scale,total_supply,issue_price,quote_asset_id,quote_symbol,listed_at,reason,idempotency_key,issuance_policy,logo_url) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")
         .bind(agent).bind(actor).bind(&req.symbol).bind(&req.name).bind(req.precision_scale)
         .bind(&req.total_supply).bind(&req.issue_price).bind(req.quote_asset_id).bind(quote_symbol)
         .bind(req.listed_at).bind(&req.reason).bind(req.idempotency_key.as_bytes())
-        .bind(req.issuance_policy.as_ref().map(sqlx::types::Json)).execute(&mut **tx).await?;
+        .bind(req.issuance_policy.as_ref().map(sqlx::types::Json)).bind(&req.logo_url).execute(&mut **tx).await?;
     Ok(result.last_insert_id())
 }
 

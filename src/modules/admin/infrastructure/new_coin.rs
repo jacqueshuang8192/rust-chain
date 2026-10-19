@@ -412,13 +412,13 @@ pub(crate) async fn update_admin_new_coin_project_unlock_fee_rule_in_tx(
     Ok(())
 }
 
-/// 在调用方事务中把指定上市后交易对状态直接设为 active。
+/// 在调用方事务中激活上市后交易对，并同步已配置的资产 Logo；无资产 Logo 时保留原交易对图片。
 /// 更新不检查受影响行数；调用方须先确认交易对 base_asset 匹配项目资产并持有其行锁，函数不修改项目购买开关。
 pub(crate) async fn activate_admin_new_coin_post_listing_pair_in_tx(
     tx: &mut Transaction<'_, MySql>,
     pair_id: u64,
 ) -> AppResult<()> {
-    sqlx::query("UPDATE trading_pairs SET status = 'active' WHERE id = ?")
+    sqlx::query("UPDATE trading_pairs p JOIN assets a ON a.id=p.base_asset SET p.status = 'active', p.logo_url=COALESCE(a.logo_url,p.logo_url) WHERE p.id = ?")
         .bind(pair_id)
         .execute(&mut **tx)
         .await?;

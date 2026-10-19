@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 pub(crate) struct CoinApplicationRequest {
     pub symbol: String,
     pub name: String,
+    pub logo_url: Option<String>,
     pub precision_scale: i32,
     #[serde(deserialize_with = "crate::numeric::deserialize_decimal_text")]
     pub total_supply: BigDecimal,
@@ -43,6 +44,7 @@ pub(crate) struct CoinApplication {
     pub agent_admin_id: u64,
     pub symbol: String,
     pub name: String,
+    pub logo_url: Option<String>,
     pub precision_scale: i32,
     pub total_supply: BigDecimal,
     pub issue_price: BigDecimal,

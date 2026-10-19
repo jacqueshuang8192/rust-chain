@@ -112,7 +112,6 @@ onBeforeUnmount(() => { disposed = true; generation++; clearInterval(timer) })
 <template>
   <section class="token-surface token-trading">
     <header><h2>{{ t('token.title') }}</h2><button type="button" :disabled="loading || !owner" @click="load">{{ t('token.refresh') }}</button></header>
-    <p v-if="projectId">{{ t('token.live') }}</p>
     <div v-if="pairSymbol && ['purchase', 'listed'].includes(stage || '')" class="token-chart">
       <p>{{ t('token.market') }} · {{ t('token.marketHint') }}</p>
       <SecondsChartWorkspace :symbol="pairSymbol" initially-expanded />

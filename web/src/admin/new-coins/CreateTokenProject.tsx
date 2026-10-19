@@ -1,4 +1,5 @@
-import { Button, Modal, SideSheet, TextArea } from '@douyinfe/semi-ui';
+import { CoinLogoUpload } from '../../coin-applications/CoinLogoUpload';
+import { Button, Image, Modal, SideSheet, TextArea } from '@douyinfe/semi-ui';
 import { useRef, useState, useSyncExternalStore } from 'react';
 import { Link } from 'react-router-dom';
 import { authStore, type AuthSession } from '../../auth/authStore';
@@ -15,12 +16,13 @@ import { useAssetOptions, type CreateActionProps } from '../resources/actions/sh
 import { UnsavedChangesGuard } from '../settings/UnsavedChangesGuard';
 import '../../coin-applications/coinApplications.css';
 
-type Intent = { asset_id: number; quote_asset_id: number; total_supply: string; issue_price: string; issuance_policy: IssuancePolicy; reason: string; idempotency_key: string };
+type Intent = { logo_url?: string; asset_id: number; quote_asset_id: number; total_supply: string; issue_price: string; issuance_policy: IssuancePolicy; reason: string; idempotency_key: string };
 function validate(value: unknown): Intent {
   const v = value as Intent;
   requiredSafeInteger(v?.asset_id, '发行资产', 1); requiredSafeInteger(v?.quote_asset_id, '计价资产', 1);
   if (v.asset_id === v.quote_asset_id || ![v.total_supply, v.issue_price].every(n => decimalFitsStorage(n) && isPositiveDecimalText(n))
     || typeof v.reason !== 'string' || !v.reason.trim() || v.reason.length > 500 || typeof v.idempotency_key !== 'string' || !v.idempotency_key) throw new Error('发行资料不完整');
+  if (v.logo_url !== undefined && (typeof v.logo_url !== 'string' || !v.logo_url.trim() || [...v.logo_url].length > 2048)) throw new Error('币种 Logo 地址无效');
   validatePolicy(v.issuance_policy); return v;
 }
 function readIntent(key: string): { intent: Intent | null; error: string } {
@@ -47,7 +49,9 @@ function CreateForm({ session, onCreated }: CreateActionProps & { session: AuthS
   const [intent, setIntent] = useState(initial.intent);
   const [open, setOpen] = useState(false), [busy, setBusy] = useState(false), [error, setError] = useState(initial.error);
   const [confirmation, setConfirmation] = useState<Intent | null>(null), [created, setCreated] = useState<number | null>(null);
-  const [values, setValues] = useState({ asset: '', quote: '', supply: '', price: '', reason: '' });
+  const [values, setValues] = useState({ logo: '', asset: '', quote: '', supply: '', price: '', reason: '' });
+  const [uploading, setUploading] = useState(false);
+  const canUpload = useCanAdminRequest('/admin/api/v1/uploads/images', 'POST');
   const [policy, setPolicy] = useState(emptyPolicyDraft);
   const flight = useRef(false);
   const canReadAssets = useCanAdminRequest('/admin/api/v1/assets', 'GET');
@@ -58,7 +62,7 @@ function CreateForm({ session, onCreated }: CreateActionProps & { session: AuthS
     try {
       if (intent) { setConfirmation(intent); setError(''); return; }
       if (!base || !quote) throw new Error('请先选择已启用的发行资产和计价资产');
-      const next = validate({ asset_id: requiredSafeInteger(base.id, '发行资产', 1), quote_asset_id: requiredSafeInteger(quote.id, '计价资产', 1),
+      const next = validate({ ...(values.logo ? { logo_url: values.logo } : {}), asset_id: requiredSafeInteger(base.id, '发行资产', 1), quote_asset_id: requiredSafeInteger(quote.id, '计价资产', 1),
         total_supply: values.supply.trim(), issue_price: values.price.trim(), issuance_policy: buildPolicy(policy, quote.precisionScale ?? 18),
         reason: values.reason.trim(), idempotency_key: crypto.randomUUID() });
       if (!decimalFitsPrecision(next.total_supply, base.precisionScale ?? 18) || !decimalFitsPrecision(next.issue_price, quote.precisionScale ?? 18)) throw new Error('发行总量或申购价格超出资产精度');
@@ -81,7 +85,7 @@ function CreateForm({ session, onCreated }: CreateActionProps & { session: AuthS
         || canonicalDecimalText(result.total_supply) !== canonicalDecimalText(current.total_supply)
         || canonicalDecimalText(result.issue_price) !== canonicalDecimalText(current.issue_price)) throw new Error('返回的发行合同不符，请按原请求重试核对');
       persist(storageKey, null); setIntent(null); setConfirmation(null); setCreated(id); setOpen(false);
-      setValues({ asset: '', quote: '', supply: '', price: '', reason: '' }); setPolicy(emptyPolicyDraft()); onCreated?.();
+      setValues({ logo: '', asset: '', quote: '', supply: '', price: '', reason: '' }); setPolicy(emptyPolicyDraft()); onCreated?.();
     } catch (cause) {
       if (cause instanceof ApiError && ([400, 422].includes(cause.status) || (cause.status === 409 && cause.code === 'TOKEN_ISSUANCE_EXISTS'))) {
         try { persist(storageKey, null); setIntent(null); } catch { /* Keep the original intent if storage recovery fails. */ }
@@ -104,19 +108,21 @@ function CreateForm({ session, onCreated }: CreateActionProps & { session: AuthS
             <label>发行总量<AdminTextInput ariaLabel="发行总量" value={values.supply} disabled={disabled} onChange={supply => setValues(v => ({ ...v, supply }))} /></label>
             <label>申购价格<AdminTextInput ariaLabel="申购价格" value={values.price} disabled={disabled} onChange={price => setValues(v => ({ ...v, price }))} /></label>
           </div>
+          <CoinLogoUpload scope="admin" value={values.logo} disabled={disabled || !canUpload || Boolean(confirmation)} onBusy={setUploading} onChange={logo => setValues(v => ({ ...v, logo }))} />
+          {!values.logo ? <p>未上传时沿用所选资产的 Logo。</p> : null}
           <IssuancePolicyFields value={policy} onChange={setPolicy} disabled={disabled} />
           <label>创建原因<TextArea aria-label="创建原因" value={values.reason} disabled={disabled} onChange={reason => setValues(v => ({ ...v, reason }))} /></label>
         </>}
         {!canReadAssets ? <p role="alert">缺少资产读取权限，请联系管理员分配资产读取权限。</p> : null}
         {assetError ? <p role="alert">{adminErrorMessage(assetError)}</p> : null}
         {error ? <p role="alert">{error}</p> : null}
-        <Button theme="solid" disabled={busy || Boolean(initial.error) || (!intent && (!canReadAssets || assetLoading || Boolean(assetError)))} onClick={prepare}>{intent ? '核对原创建请求' : '提交添加新币项目'}</Button>
+        <Button theme="solid" disabled={busy || uploading || Boolean(initial.error) || (!intent && (!canReadAssets || assetLoading || Boolean(assetError)))} onClick={prepare}>{intent ? '核对原创建请求' : '提交添加新币项目'}</Button>
       </section>
     </SideSheet>
     <Modal title="确认创建新版发行项目" visible={Boolean(confirmation)} motion={false} width="min(560px, calc(100vw - 32px))" maskClosable={false}
       closeOnEsc={!busy} onCancel={() => { if (!busy) setConfirmation(null); }} onOk={() => void submit()} confirmLoading={busy}
       okText={intent ? '按原请求重试' : '确认创建'} okButtonProps={{ 'aria-label': intent ? '按原请求重试' : '确认创建' }} cancelButtonProps={{ disabled: busy, 'aria-label': '取消' }}>
-      {confirmation ? <><p>发行资产 ID {confirmation.asset_id} · 计价资产 ID {confirmation.quote_asset_id}</p><p>发行总量 {confirmation.total_supply} · 固定申购价 {confirmation.issue_price}</p>
+      {confirmation ? <>{confirmation.logo_url ? <Image src={confirmation.logo_url} alt="币种 Logo" width={64} height={64} /> : null}<p>发行资产 ID {confirmation.asset_id} · 计价资产 ID {confirmation.quote_asset_id}</p><p>发行总量 {confirmation.total_supply} · 固定申购价 {confirmation.issue_price}</p>
         <IssuancePolicySummary policy={confirmation.issuance_policy} /><p>创建原因：{confirmation.reason}</p><p>创建后合同固定；各阶段按独立开关推进，派发需人工确认。</p></> : null}
       {error ? <p role="alert">{error}</p> : null}
     </Modal>

@@ -111,7 +111,7 @@ async fn token_lifecycle_scopes_allocations_quotes_buyback_and_continuous_spot_h
             .unwrap();
     }
     let symbol = format!("T{}", &Uuid::now_v7().simple().to_string()[20..]).to_uppercase();
-    let input = json!({"symbol":symbol,"name":"Token lifecycle","precision_scale":8,"total_supply":"20000","issue_price":"0.2","quote_asset_id":quote,"listed_at":1800003000000i64,"reason":"new issue","idempotency_key":"token-application","issuance_policy":policy()});
+    let input = json!({"symbol":symbol,"name":"Token lifecycle","logo_url":"https://images.example.test/new-token.png","precision_scale":8,"total_supply":"20000","issue_price":"0.2","quote_asset_id":quote,"listed_at":1800003000000i64,"reason":"new issue","idempotency_key":"token-application","issuance_policy":policy()});
     let mut oversized = input.clone();
     oversized["symbol"] = json!("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
     assert_eq!(
@@ -135,6 +135,21 @@ async fn token_lifecycle_scopes_allocations_quotes_buyback_and_continuous_spot_h
     )
     .await);
     assert_eq!(application["issuance_policy"], policy());
+    assert_eq!(application["logo_url"], input["logo_url"]);
+    let mut changed_logo = input.clone();
+    changed_logo["logo_url"] = json!("https://images.example.test/different.png");
+    assert_eq!(
+        request(
+            &app,
+            &ct,
+            "POST",
+            "/agent/api/v1/coin-applications",
+            changed_logo
+        )
+        .await
+        .0,
+        StatusCode::CONFLICT
+    );
     let mut changed = input.clone();
     changed["issuance_policy"]["lock"] = json!({"kind":"none"});
     assert_eq!(
@@ -167,6 +182,15 @@ async fn token_lifecycle_scopes_allocations_quotes_buyback_and_continuous_spot_h
             .fetch_one(&pool)
             .await
             .unwrap();
+    let logos: (Option<String>, Option<String>) = sqlx::query_as("SELECT a.logo_url,p.logo_url FROM trading_pairs p JOIN assets a ON a.id=p.base_asset WHERE p.id=?")
+        .bind(pair).fetch_one(&pool).await.unwrap();
+    assert_eq!(
+        logos,
+        (
+            Some(input["logo_url"].as_str().unwrap().into()),
+            Some(input["logo_url"].as_str().unwrap().into())
+        )
+    );
     let pair_symbol: String = sqlx::query_scalar("SELECT symbol FROM trading_pairs WHERE id=?")
         .bind(pair)
         .fetch_one(&pool)
@@ -190,6 +214,7 @@ async fn token_lifecycle_scopes_allocations_quotes_buyback_and_continuous_spot_h
     )
     .await);
     assert_eq!(public["post_listing_pair_symbol"], pair_symbol);
+    assert_eq!(public["logo_url"], input["logo_url"]);
     let own = ok(request(
         &app,
         &ct,
@@ -613,7 +638,25 @@ async fn token_lifecycle_scopes_allocations_quotes_buyback_and_continuous_spot_h
             .fetch_one(&pool)
             .await
             .unwrap();
+    // Listing refreshes metadata even when an existing project predates logo support.
+    sqlx::query(
+        "UPDATE assets SET logo_url='https://images.example.test/listed-token.png' WHERE id=?",
+    )
+    .bind(asset)
+    .execute(&pool)
+    .await
+    .unwrap();
     stage(&app, &ct, project, "purchase", "listed").await;
+    let listed_logo: Option<String> =
+        sqlx::query_scalar("SELECT logo_url FROM trading_pairs WHERE id=?")
+            .bind(pair)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(
+        listed_logo.as_deref(),
+        Some("https://images.example.test/listed-token.png")
+    );
     let after:(u64,u32,BigDecimal)=sqlx::query_as("SELECT p.post_listing_pair_id,g.version,r.last_price FROM new_coin_projects p JOIN market_default_generators g ON g.pair_id=p.post_listing_pair_id JOIN market_pair_generation_runs r ON r.pair_id=g.pair_id WHERE p.id=?").bind(project).fetch_one(&pool).await.unwrap();
     assert_eq!(
         after,

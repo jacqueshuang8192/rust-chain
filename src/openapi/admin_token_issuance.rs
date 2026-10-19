@@ -6,6 +6,7 @@ use utoipa::{OpenApi, ToSchema};
 #[serde(deny_unknown_fields)]
 struct CreateAdminTokenIssuance {
     asset_id: u64,
+    logo_url: Option<String>,
     quote_asset_id: u64,
     total_supply: String,
     issue_price: String,

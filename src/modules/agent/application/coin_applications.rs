@@ -73,6 +73,8 @@ pub(crate) async fn submit(
 ) -> AppResult<CoinApplication> {
     req.symbol = normalize_asset_symbol(&req.symbol)?;
     req.name = validate_asset_name(&req.name)?;
+    req.logo_url =
+        crate::modules::admin::service::validate_optional_image_url(req.logo_url, "logo_url")?;
     validate_asset_precision(req.precision_scale)?;
     safe_id(req.quote_asset_id)?;
     req.reason = reason(&req.reason)?;
@@ -93,6 +95,7 @@ pub(crate) async fn submit(
         if row.agent_id != scope.agent_id
             || row.symbol != req.symbol
             || row.name != req.name
+            || row.logo_url != req.logo_url
             || row.precision_scale != req.precision_scale
             || row.total_supply != req.total_supply
             || row.issue_price != req.issue_price
@@ -239,7 +242,7 @@ pub(crate) async fn review(
             AdminAssetInsert {
                 symbol: row.symbol.clone(),
                 name: row.name.clone(),
-                logo_url: None,
+                logo_url: row.logo_url.clone(),
                 precision_scale: row.precision_scale,
                 asset_type: "coin".into(),
                 status: "active".into(),
@@ -310,4 +313,23 @@ pub(crate) async fn review(
     .await?;
     tx.commit().await?;
     Ok(after)
+}
+
+/// 代理图片上传复用存储与字节校验；身份及代理链有效才允许上传，归属记录为门户账号。
+/// 上传对象不代表发行成功；只有申请审核事务可以将 Logo 发布到资产和交易对。
+pub(crate) async fn upload_logo(
+    mysql: Option<Pool<MySql>>,
+    subject: &str,
+    key: Option<&str>,
+    input: crate::modules::admin::presentation::UploadFileInput,
+) -> AppResult<crate::modules::admin::presentation::UploadImageResponse> {
+    let (pool, _) = agent_context(mysql, subject).await?;
+    let actor = agent_admin_id_from_subject(subject)?;
+    crate::modules::admin::application::upload_image_for_owner(
+        &pool,
+        crate::modules::admin::repository::UploadObjectOwner::Agent(actor),
+        key,
+        input,
+    )
+    .await
 }

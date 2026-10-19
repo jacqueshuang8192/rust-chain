@@ -3,7 +3,7 @@ import { apiRequest, ContractError } from './client';
 import { compareDecimalText, decimalFitsPrecision, decimalFitsStorage, isPositiveDecimalText } from '../shared/decimal';
 import { isUnixMillis, requiredSafeInteger } from '../shared/integer';
 
-export type CoinInput = { issuance_policy?: IssuancePolicy | null; symbol: string; name: string; precision_scale: number; total_supply: string; issue_price: string; quote_asset_id: number; listed_at: number; reason: string };
+export type CoinInput = { logo_url?: string | null; issuance_policy?: IssuancePolicy | null; symbol: string; name: string; precision_scale: number; total_supply: string; issue_price: string; quote_asset_id: number; listed_at: number; reason: string };
 export type CoinStatus = 'pending' | 'approved' | 'rejected';
 export type CoinApplication = CoinInput & Record<string, unknown> & {
   id: number; agent_id: number; agent_admin_id: number; quote_symbol: string; status: CoinStatus;
@@ -27,7 +27,8 @@ export function validateCoinInput(input: CoinInput): CoinInput {
   if (!isUnixMillis(input.listed_at)) throw new Error('请选择有效的计划上市时间');
   if (!reason || [...reason].length > 500) throw new Error('申请说明需为 1 至 500 字');
   if (input.issuance_policy) { validatePolicy(input.issuance_policy); if (input.issuance_policy.listing.at !== input.listed_at) throw new Error("计划上市时间与发行规则不一致"); }
-  return { ...input, symbol, name, reason };
+  if (input.logo_url != null && (typeof input.logo_url !== 'string' || [...input.logo_url].length > 2048)) throw new Error('币种 Logo 地址无效');
+  return { ...input, symbol, name, reason, ...(input.logo_url != null ? { logo_url: input.logo_url.trim() || null } : {}) };
 }
 export function parseCoinApplication(value: unknown): CoinApplication {
   assert(object(value));
@@ -42,6 +43,7 @@ export function parseCoinApplication(value: unknown): CoinApplication {
   assert(value.status === 'pending'
     ? value.reviewed_by === null && value.review_reason === null && value.reviewed_at === null
     : integer(value.reviewed_by) && typeof value.review_reason === 'string' && value.review_reason.trim() && isUnixMillis(value.reviewed_at));
+  assert(value.logo_url == null || (typeof value.logo_url === 'string' && [...value.logo_url].length <= 2048));
   if (value.issuance_policy != null) validatePolicy(value.issuance_policy);
   return value as CoinApplication;
 }
@@ -64,7 +66,7 @@ export async function submitCoin(input: CoinInput, key: string): Promise<CoinApp
   const payload = validateCoinInput(input);
   if (!key || key.length > 128) throw new Error('申请请求标识无效');
   const row = parseCoinApplication(await apiRequest(coinPath('agent'), { authScope: 'agent', method: 'POST', body: JSON.stringify({ ...payload, idempotency_key: key }) }));
-  assert(row.symbol === payload.symbol && row.name === payload.name && row.precision_scale === payload.precision_scale &&
+  assert(row.symbol === payload.symbol && (row.logo_url ?? null) === (payload.logo_url ?? null) && row.name === payload.name && row.precision_scale === payload.precision_scale &&
     row.quote_asset_id === payload.quote_asset_id && row.listed_at === payload.listed_at && row.reason === payload.reason &&
     compareDecimalText(row.total_supply, payload.total_supply) === 0 && compareDecimalText(row.issue_price, payload.issue_price) === 0 && policyIdentity(row.issuance_policy) === policyIdentity(payload.issuance_policy));
   return row;

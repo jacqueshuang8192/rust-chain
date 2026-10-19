@@ -21,6 +21,8 @@ pub(crate) async fn create(
     mut req: CreateTokenIssuanceRequest,
 ) -> AppResult<NewCoinProjectResponse> {
     req.reason = required_admin_audit_reason(Some(req.reason))?;
+    req.logo_url =
+        crate::modules::admin::service::validate_optional_image_url(req.logo_url, "logo_url")?;
     req.idempotency_key = normalize_admin_recharge_idempotency_key(&req.idempotency_key)?;
     if req.asset_id == 0 || req.quote_asset_id == 0 || req.asset_id == req.quote_asset_id {
         return Err(AppError::Validation(
@@ -58,6 +60,22 @@ pub(crate) async fn create(
         }
     }
     let base = store::load_admin_asset_in_tx(&mut tx, req.asset_id).await?;
+    if let Some(logo) = &req.logo_url {
+        records::set_asset_logo(&mut tx, req.asset_id, logo).await?;
+        store::insert_admin_audit_log_entry_in_tx(
+            &mut tx,
+            admin,
+            store::AdminAuditLogEntry {
+                action: "asset.logo.update",
+                target_type: "asset",
+                target_id: req.asset_id,
+                before_json: Some(json!({"logo_url":base.logo_url})),
+                after_json: Some(json!({"logo_url":logo})),
+                reason: Some(req.reason.clone()),
+            },
+        )
+        .await?;
+    }
     let quote = store::load_admin_asset_in_tx(&mut tx, req.quote_asset_id).await?;
     req.issuance_policy.validate(quote.precision_scale)?;
     let project = create_admin_new_coin_project_in_tx(

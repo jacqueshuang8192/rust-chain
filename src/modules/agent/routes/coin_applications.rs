@@ -9,13 +9,19 @@ use crate::{
 };
 use axum::{
     Json, Router,
-    extract::{Path, Query, State},
-    routing::get,
+    extract::{DefaultBodyLimit, Multipart, Path, Query, State},
+    routing::{get, post},
 };
 pub(super) fn routes() -> Router<AppState> {
     Router::new()
         .route("/coin-applications", get(list).post(submit))
         .route("/coin-applications/options", get(options))
+        .route(
+            "/coin-applications/logo",
+            post(upload_logo).layer(DefaultBodyLimit::max(
+                crate::modules::admin::service::MAX_UPLOAD_BODY_SIZE_BYTES,
+            )),
+        )
         .route("/coin-applications/:id", get(detail))
 }
 async fn list(
@@ -52,4 +58,21 @@ async fn options(
     State(s): State<AppState>,
 ) -> AppResult<Json<Vec<crate::modules::agent::presentation::recharges::RechargeAsset>>> {
     Ok(Json(app::options(s.mysql, &c.sub).await?))
+}
+
+async fn upload_logo(
+    AgentAuth(c): AgentAuth,
+    State(s): State<AppState>,
+    multipart: Multipart,
+) -> AppResult<Json<crate::modules::admin::presentation::UploadImageResponse>> {
+    let input = crate::modules::admin::presentation::multipart_file_input(multipart).await?;
+    Ok(Json(
+        app::upload_logo(
+            s.mysql,
+            &c.sub,
+            s.settings.exposed_credential_encryption_key(),
+            input,
+        )
+        .await?,
+    ))
 }
