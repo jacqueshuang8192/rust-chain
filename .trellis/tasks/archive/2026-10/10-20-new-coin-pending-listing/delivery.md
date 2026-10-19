@@ -40,7 +40,7 @@
 
 ## Delivery state
 
-Implementation and validation complete locally. Not committed, pushed or deployed.
+Implementation and validation complete. Business commit `d467cf4` created; remote push pending. No deployment.
 Existing `.vite/` cache is excluded. Task space 26 and the task-owned 5187 Vite
 server were closed; pre-existing development servers were preserved. Ego Lite
 reported an available update; it was not installed.
@@ -48,3 +48,7 @@ reported an available update; it was not installed.
 For KHB, frontend deployment improves the explanation and freshness only.
 Actual purchase still requires settlement of pending subscription obligations;
 the configured listing node remains manual.
+
+## Commit result
+
+Business commit `d467cf4eca9d8c76be731b2d7801e151a3b1c598` is recorded. Task archive and journal follow before a normal remote push. Latest combined Mobile gate passed 871/871; no business source changed during submission.

@@ -27,8 +27,10 @@
 - `mobile/tests/new-coin-pencil-contract.test.ts`
 - `mobile/tests/secondary-product-order-views.test.ts`
 
-Excluded: pre-existing `.vite/` cache. No commit, push or deployment executed.
+Excluded: pre-existing `.vite/` cache. Business commit created; push pending; no deployment.
 
 ## Execution
 
 2026-10-20: proceeding with both verified mobile fixes in separate commits, then task archival and a normal push to `origin/main`. Local `.vite/` cache is excluded.
+
+Business commit: `d467cf4eca9d8c76be731b2d7801e151a3b1c598`. Staged scope matched this plan exactly; cached diff check passed.
