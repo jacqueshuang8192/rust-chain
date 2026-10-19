@@ -9859,3 +9859,10 @@
 - 修改文件：`migrations/0155_new_coin_logos.sql`；Agent 申请 DTO、路由、应用、持久化；Admin 上传归属、发行创建；新币发布/上市基础设施；OpenAPI；Web 新币创建、申请、详情和 `CoinLogoUpload`；相关测试和 `.trellis/spec/backend/token-issuance-v2.md`。
 - 验证结果：隔离 MySQL 完整迁移链成功，真实路由 11/11（代理申请/上传 2、发行生命周期 2、管理员发行 3、原上传回归 3、旧规则回归 1）；Rust all-targets check、严格 Clippy、fmt、架构 11/11、文档 1/1、OpenAPI 18/18 通过。Web 全量 118 文件/1130 项、聚焦 20/20、typecheck、lint、production-policy 15/15、coverage 23/23、production build 通过；bundle 仍有既存超标（2,715,299 > 2,600,000，既存记录 2,712,495），未放宽门禁。Ego 本地页面夹具验证 Mobile 320/390/448px 明暗主题无横向溢出、隐藏文案消失、四个时间保留、Logo 加载；Admin 1280px 创建抽屉上传预览正常。
 - 后续事项：发布时先执行迁移 0155，再发布后端与前端；未操作生产库、未推送或部署。已有 Web 包体积问题独立处理。
+
+## 2026-10-20 01:09 - 新币文案与 Logo 改动推送完成
+
+- 完成内容：按用户授权将新币文案和 Logo 功能提交`d61919b`、任务归档`0769cc8`及日志`5273eea`普通推送到`origin/main`，保留未跟踪的`.vite/`缓存。
+- 修改文件：业务内容沿用既有已验收提交；本切片仅追加本进度记录。
+- 验证结果：git fetch确认本地领先3个提交、无落后或分叉；git diff --check通过；push成功，git ls-remote确认远端main完整哈希为`5273eea4f248d8dcfc9312fc1e81c9f86d1b1185`，与本地一致。业务源码未改动，沿用既有完整验证及本会话20/20定向复核结果；本记录提交后再次普通推送核对。
+- 后续事项：未部署或迁移生产库；发布前须执行0155迁移。既有Web包体预算超限保留记录，未放宽门槛。
