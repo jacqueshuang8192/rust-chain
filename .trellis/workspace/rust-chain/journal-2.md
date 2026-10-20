@@ -370,3 +370,36 @@ Separated active purchase feeds from actual spot listing across catalog/favorite
 ### Next Steps
 
 - None - task complete
+
+
+## Session 70: Direct token purchase, detail layout and prelisting valuation
+
+**Date**: 2026-10-20
+**Task**: Direct token purchase, detail layout and prelisting valuation
+**Branch**: `main`
+
+### Summary
+
+Completed direct live-price purchase with atomic idempotent recovery; repaired prelisting wallet valuation in Mobile and PC without changing spot listing gates; refined Mobile detail layout. Mobile 885 tests and release gate, PC 125 tests/type/build, isolated MySQL/Redis lifecycle and backend regressions, fmt/Clippy and 12 browser layout combinations passed. Task environments cleaned. No remote push or deployment.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `bb23072` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
