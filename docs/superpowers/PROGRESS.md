@@ -9985,3 +9985,10 @@
 - 修改文件：`Dockerfile`、`tests/docker_image_contract.rs`、`docs/deployment/docker.md`、`.trellis/spec/backend/container-delivery.md`、`.trellis/tasks/10-20-ci-cargo-download-recovery/`及本记录。
 - 验证结果：Docker合同10/10、后端架构11/11、文档1/1、构建源测试18/18，源完整性扫描16项、严格Clippy all-targets、fmt、workflow YAML结构与双架构缓存/发布约束、两份Compose配置及supervisor语法通过；Web生产构建通过，保留既有chunk警告。真实Linux amd64/arm64清单下载及离线fetch通过、Cargo.lock逐字节不变；ARM64依赖镜像成功，新容器断网且无缓存挂载仍可离线fetch，后续编译复用该层。实际ARM64后端release构建7分35秒成功，确认两个可执行文件已安装到/out。diff和任务上下文检查通过。
 - 后续事项：保存本地提交并归档；本轮未推送、触发GitHub工作流、发布镜像或部署。本机GitHub API访问返回404；本地amd64镜像尝试因Rust基础镜像blob下载持续停滞而停止，尚未验证完整amd64镜像或GitHub重跑成功，也未重建集成runtime。持续runner/CDN故障仍会正常失败。本任务镜像标签验证后移除，保留既有服务、镜像、共享缓存与`.vite/`。
+
+## 2026-10-20 18:40 - CI Cargo 下载修复远程发布
+
+- 完成内容：按用户授权发布构建修复`6707fea`及对应归档、日志；本记录与修复一并普通推送到`origin/main`，避免为记录再单独触发一次镜像构建。
+- 修改文件：本轮仅追加`docs/superpowers/PROGRESS.md`，构建配置和测试沿用已验收提交。
+- 验证结果：fetch确认本地领先3个提交、无落后或分叉，`git diff --check`通过。沿用前述Docker合同10/10、构建源18/18、架构/文档、严格Clippy、Linux双架构依赖离线校验及ARM64实际release构建结果。提交后执行普通push，并以`git ls-remote`与本地HEAD完全一致作为本次发布完成条件。
+- 后续事项：GitHub Actions的实际打包结果仍待确认，本机API权限返回404；未部署服务器。保留既有未跟踪`.vite/`缓存。
