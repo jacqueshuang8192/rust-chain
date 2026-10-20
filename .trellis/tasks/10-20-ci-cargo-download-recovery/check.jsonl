@@ -1,0 +1,2 @@
+{"file":".trellis/spec/backend/container-delivery.md","reason":"Verify persistent dependency layers and unchanged runtime delivery"}
+{"file":".trellis/spec/backend/business-governance-audits.md","reason":"Existing user decision: CI static checks/builds without service-test jobs"}

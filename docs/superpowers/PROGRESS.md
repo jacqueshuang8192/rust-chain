@@ -9978,3 +9978,10 @@
 - 修改文件：本轮仅追加`docs/superpowers/PROGRESS.md`，业务源码沿用已验收提交。
 - 验证结果：fetch确认推送前本地领先3个提交、无落后或分叉，`git diff --check`通过；push成功，`git ls-remote`确认远端main与本地完整哈希`6cc45be9d5f4286bd9899ed237338025797fea2f`一致。源码未改动，沿用前述后端实库回归、Mobile885/885、PC125/125、Clippy及浏览器验收；本记录随后提交推送并再次核对。
 - 后续事项：未部署，无新增迁移，线上须更新后端才生效。保留既有未跟踪`.vite/`缓存。
+
+## 2026-10-20 18:18 - GitHub 镜像构建 Cargo 下载恢复与依赖层缓存
+
+- 完成内容：根据用户提供的amd64日志确认失败发生在crates.io索引和依赖下载阶段；新增只依赖Cargo清单的`rust-dependencies`阶段，将下载结果保存为可由既有GHA缓存导出的普通镜像层。下载限定5次Cargo网络重试、120秒HTTP超时及15分钟总截止时间，随后锁定离线编译两个后端二进制；保留target缓存。同步部署文档和规范，并将过期的Docker测试断言对齐2026-10-10已确认的CI静态检查策略。未修改workflow、锁文件、依赖版本或业务源码。
+- 修改文件：`Dockerfile`、`tests/docker_image_contract.rs`、`docs/deployment/docker.md`、`.trellis/spec/backend/container-delivery.md`、`.trellis/tasks/10-20-ci-cargo-download-recovery/`及本记录。
+- 验证结果：Docker合同10/10、后端架构11/11、文档1/1、构建源测试18/18，源完整性扫描16项、严格Clippy all-targets、fmt、workflow YAML结构与双架构缓存/发布约束、两份Compose配置及supervisor语法通过；Web生产构建通过，保留既有chunk警告。真实Linux amd64/arm64清单下载及离线fetch通过、Cargo.lock逐字节不变；ARM64依赖镜像成功，新容器断网且无缓存挂载仍可离线fetch，后续编译复用该层。实际ARM64后端release构建7分35秒成功，确认两个可执行文件已安装到/out。diff和任务上下文检查通过。
+- 后续事项：保存本地提交并归档；本轮未推送、触发GitHub工作流、发布镜像或部署。本机GitHub API访问返回404；本地amd64镜像尝试因Rust基础镜像blob下载持续停滞而停止，尚未验证完整amd64镜像或GitHub重跑成功，也未重建集成runtime。持续runner/CDN故障仍会正常失败。本任务镜像标签验证后移除，保留既有服务、镜像、共享缓存与`.vite/`。

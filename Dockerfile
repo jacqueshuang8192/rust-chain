@@ -16,7 +16,7 @@ COPY web ./
 
 RUN VITE_API_SAME_ORIGIN="${VITE_API_SAME_ORIGIN}" npm run build
 
-FROM rust:${RUST_VERSION}-bookworm AS builder
+FROM rust:${RUST_VERSION}-bookworm AS rust-dependencies
 
 WORKDIR /workspace
 
@@ -25,13 +25,21 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 COPY Cargo.toml Cargo.lock ./
+
+# GHA exports image layers, not mutable cache mounts. Keep fetched crates in a
+# source-independent layer so new runners can reuse them after source changes.
+# Limit recovery to downloads; compilation errors must fail without retries.
+RUN CARGO_NET_RETRY=5 CARGO_HTTP_TIMEOUT=120 \
+    timeout --kill-after=10s 15m cargo fetch --locked \
+        --target "$(rustc -vV | sed -n 's/^host: //p')"
+
+FROM rust-dependencies AS builder
+
 COPY migrations ./migrations
 COPY src ./src
 
-RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
-    --mount=type=cache,target=/usr/local/cargo/git,sharing=locked \
-    --mount=type=cache,target=/workspace/target,sharing=locked \
-    cargo build --locked --release --bin exchange-api --bin exchange-migrate \
+RUN --mount=type=cache,target=/workspace/target,sharing=locked \
+    cargo build --locked --offline --release --bin exchange-api --bin exchange-migrate \
     && install -Dm755 target/release/exchange-api /out/exchange-api \
     && install -Dm755 target/release/exchange-migrate /out/exchange-migrate
 

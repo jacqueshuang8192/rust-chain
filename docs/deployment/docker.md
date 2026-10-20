@@ -70,6 +70,30 @@ digest artifact；只有两个平台都成功，最终 job 才会把 digest 合�
 manifest，并附加 branch、semver、SHA 和 `latest` 标签。构建缓存使用 `max` 模式和按架构
 隔离的 `backend-image-<arch>` scope。
 
+### Cargo 依赖下载失败与缓存
+
+如果 Actions 日志停在 `Updating crates.io index` 或 `Downloading crates`，随后出现
+`static.crates.io:443` 连接失败，表示 Rust 依赖下载失败；这段日志本身不能证明业务源码
+编译有误，也不能确定是 runner 出网、DNS 还是 CDN 暂时不可用。
+
+Dockerfile 的 `rust-dependencies` 阶段只复制 `Cargo.toml` 和 `Cargo.lock`，按原生 Rust
+host 下载锁定依赖。Cargo 下载配置为最多 5 次网络重试、HTTP 超时 120 秒，并由外层
+`timeout` 将整个 fetch 限制为 15 分钟（终止后最多再等 10 秒强制退出）。持续不可达仍会
+使构建失败，不能通过无限重试或忽略退出码发布不完整制品。
+
+下载结果保留在普通镜像层，随既有 GHA `mode=max` 缓存按架构导出。只改业务源码时可以
+复用该层；依赖、Rust 基础镜像变更或缓存未命中仍需要联网。不要把 Cargo registry/git
+目录重新改回 `type=cache` 挂载：这类挂载不会默认随 GHA 层缓存保存，而且会遮住镜像层
+中已经下载的依赖。
+
+后续 `builder` 继承依赖层，再复制源码并运行 `cargo build --locked --offline --release`。
+Cargo 不再在编译时更新索引或下载 crate；编译失败直接返回错误。`--offline` 只约束 Cargo，
+并不禁止依赖包自己的 build script 联网，例如已有 Swagger UI 资源下载。
+
+若仍出现同类下载连接错误，可以在 GitHub Actions 对失败任务执行 **Re-run failed jobs**；
+若持续失败，应检查该次 runner 到 crates.io 的连接。仓库没有自动切换第三方 Cargo 镜像，
+Docker Hub 镜像加速配置也不会代理 crates.io 下载。
+
 ## 镜像标签
 
 GitHub Actions 对 pull request 只执行 `linux/amd64`、`linux/arm64` 构建，不推送镜像。

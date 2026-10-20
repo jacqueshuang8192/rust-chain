@@ -144,6 +144,9 @@
   `unknown API capability source.git.checksum`; every platform job must therefore check out the
   repository and use local `context: .`.
 - Both matrix jobs enable GitHub Actions cache in `max` mode with architecture-specific scopes.
+- Rust dependencies are fetched in the `rust-dependencies` stage before source
+  copies, and persisted in normal image layers so the existing GHA exporter can
+  reuse them on ephemeral runners. See the Cargo download scenario below.
 - The Dockerfile must use the Dockerfile frontend bundled with the GitHub Buildx/BuildKit runner;
   do not add a remote `docker/dockerfile` `# syntax=` image reference because resolving that
   frontend creates an unnecessary Docker Hub authentication dependency before the build graph can
@@ -411,3 +414,65 @@ The scanner is a text-only program using the Python standard library. It does no
 - run: python3 scripts/source_integrity_gate.py
 - uses: actions/setup-node@v6
 ```
+
+## Scenario: Recover Cargo downloads on ephemeral image builders
+
+### 1. Scope / Trigger
+
+Apply when changing dependency downloads or caches in the image build. A Cargo
+index timeout followed by static.crates.io connection failures establishes a
+download failure, not the underlying runner/CDN network cause.
+
+### 2. Signatures
+
+- `rust-dependencies`: copy only Cargo manifests, then run
+  `CARGO_NET_RETRY=5 CARGO_HTTP_TIMEOUT=120 timeout --kill-after=10s 15m cargo fetch --locked --target "$(rustc -vV | sed -n 's/^host: //p')"`.
+- `builder`: inherit that stage, copy migrations and sources, then
+  `cargo build --locked --offline --release --bin exchange-api --bin exchange-migrate`.
+
+### 3. Contracts
+
+The fetched registry/git directories are normal layer contents. GHA max caches
+do not automatically persist mutable cache mounts; never mount over these
+directories during fetch or compile. Keep the target directory mount for local
+incremental work. Source-only edits must not invalidate the dependency layer.
+The native Rust host selects dependency target resolution for both architecture
+jobs. No dummy source compilation, dependency upgrades or alternate registry is
+needed. Download retry/timeout variables apply only to fetch; compilation runs
+once and retains non-zero failures. The hard deadline permits at most 10 seconds
+between termination and forced kill. Cargo offline mode does not restrict
+network calls in third-party build scripts (including existing Swagger assets).
+
+### 4. Validation & Error Matrix
+
+| Condition | Result |
+|-----------|--------|
+| Source-only edit and matching exported dependency layer | Reuse downloaded dependencies |
+| Manifest/base change, cache miss or eviction | Fetch the locked native dependency set |
+| Temporary transport failure | Cargo may retry within its policy and the outer deadline |
+| Persistent download failure or expired deadline | Fail build; never compile or publish incomplete output |
+| Missing crate during compile | Offline Cargo fails; no hidden registry fallback |
+| Rust compilation error | Return the original failure without retries |
+
+### 5. Good/Base/Bad Cases
+
+Good: export ordinary dependency layers through the existing architecture scopes.
+Base: a cold runner downloads dependencies successfully before compiling.
+Bad: assume registry cache mounts survive the next runner, hide cached crates
+with a new empty mount, or retry an entire compiler command on every failure.
+
+### 6. Tests Required
+
+Exercise Docker contract guards for source-independent fetch, native target,
+bounded fetch, inherited dependencies, unmasked registry directories and locked
+offline compilation. Mutate the contract to ensure those regressions are rejected.
+Where Docker/network are available, build the dependency stage, verify offline
+resolution from a fresh container and verify a second build reuses the layer.
+Keep workflow static checks, native matrix, GHA scopes, PR permissions and digest
+publication unchanged. Record actual image/CI verification limits separately.
+
+### 7. Wrong vs Correct
+
+Wrong: `RUN --mount=type=cache,target=/usr/local/cargo/registry cargo build --locked`.
+Correct: persist `cargo fetch --locked` in a manifest-only stage, then inherit it
+and run `cargo build --locked --offline` after source copies.

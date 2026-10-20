@@ -307,24 +307,93 @@ fn dockerfile_does_not_depend_on_remote_frontend() {
     );
 }
 
+fn validate_cargo_download_layers(source: &str) -> Vec<&'static str> {
+    let mut errors = Vec::new();
+    let dependencies = stage_instructions(source, "rust-dependencies").unwrap_or_default();
+    let builder = stage_instructions(source, "builder").unwrap_or_default();
+    if !dependencies.iter().any(|line| {
+        line.contains("cargo fetch --locked")
+            && line.contains("--target")
+            && line.contains("rustc -vV")
+            && line.contains("timeout --kill-after=10s 15m")
+    }) {
+        errors.push("native locked fetch must have a hard deadline");
+    }
+    if dependencies.iter().any(|line| {
+        instruction_body(line, "COPY").is_some_and(|body| body != "Cargo.toml Cargo.lock ./")
+    }) {
+        errors.push("dependency layer must not depend on application sources");
+    }
+    if dependencies.iter().chain(&builder).any(|line| {
+        line.split_whitespace()
+            .any(|word| word.starts_with("--mount=") && word.contains("target=/usr/local/cargo"))
+    }) {
+        errors.push("downloaded dependencies must persist in exported layers and remain visible");
+    }
+    if builder
+        .first()
+        .is_none_or(|line| line != "FROM rust-dependencies AS builder")
+    {
+        errors.push("compiler must inherit fetched dependencies");
+    }
+    if !builder.iter().any(|line| {
+        line.contains("cargo build --locked --offline --release")
+            && line.contains("--bin exchange-api --bin exchange-migrate")
+            && !line.contains("||")
+    }) {
+        errors.push("both release binaries must compile offline without masking failure");
+    }
+    errors
+}
+
 #[test]
-fn release_publish_waits_for_real_dependency_read_write_smoke() {
-    for required in [
-        "integration-smoke:",
-        "mysql:8.4",
-        "redis:7.4",
-        "mongo:8.0",
-        "cargo run --bin exchange-migrate",
-        "cargo test --test real_dependency_smoke -- --nocapture",
-        "MONGODB_DATABASE: exchange_ci",
-        "RUN_REAL_DEPENDENCY_SMOKE: '1'",
-        "- integration-smoke",
+fn cargo_dependencies_are_reusable_without_mutable_runner_caches() {
+    assert!(validate_cargo_download_layers(DOCKERFILE).is_empty());
+}
+
+#[test]
+fn cargo_layer_cache_and_offline_regressions_are_rejected() {
+    for broken in [
+        DOCKERFILE.replace(
+            "COPY Cargo.toml Cargo.lock ./",
+            "COPY Cargo.toml Cargo.lock ./\nCOPY src ./src",
+        ),
+        DOCKERFILE.replace(
+            "RUN CARGO_NET_RETRY=5",
+            "RUN --mount=type=cache,target=/usr/local/cargo/registry CARGO_NET_RETRY=5",
+        ),
+        DOCKERFILE.replace(
+            "RUN --mount=type=cache,target=/workspace/target",
+            "RUN --mount=type=cache,target=/usr/local/cargo/registry --mount=type=cache,target=/workspace/target",
+        ),
+        DOCKERFILE.replace("FROM rust-dependencies AS builder", "FROM rust:1.92.0 AS builder"),
+        DOCKERFILE.replace("cargo build --locked --offline", "cargo build --locked"),
+        DOCKERFILE.replace("timeout --kill-after=10s 15m ", ""),
     ] {
+        assert!(!validate_cargo_download_layers(&broken).is_empty());
+    }
+}
+
+#[test]
+fn release_publish_waits_for_the_configured_static_quality_gate() {
+    // The 2026-10-10 delivery decision keeps service tests local and explicit.
+    for (job, next_job) in [
+        ("pull-request-build", "publish-platform"),
+        ("publish-platform", "publish-manifest"),
+    ] {
+        let section = DOCKER_IMAGE_WORKFLOW
+            .split_once(&format!("\n  {job}:"))
+            .unwrap()
+            .1
+            .split_once(&format!("\n  {next_job}:"))
+            .unwrap()
+            .0;
         assert!(
-            DOCKER_IMAGE_WORKFLOW.contains(required),
-            "Docker workflow is missing real dependency contract: {required}"
+            section.contains("needs:\n      - quality-gate"),
+            "{job} must wait for the static quality gate"
         );
     }
+    assert!(!DOCKER_IMAGE_WORKFLOW.contains("integration-smoke:"));
 }
 
 #[test]
