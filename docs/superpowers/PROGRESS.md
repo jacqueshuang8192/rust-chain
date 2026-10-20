@@ -10013,3 +10013,10 @@
 - 修改文件：Mobile/PC新币交易、申购、记录组件及tokenIssuance核心/API/消息；`mobile/src/views/HomeView.vue`、`NewCoinDetailView.vue`、`NewCoinRecordsView.vue`、`mobile/src/styles/token-issuance.css`；`pc/src/components/TokenQuoteBalance.vue`、`pc/src/views/TokenProject.vue`、`User/LaunchpadOrders.vue`；相关行为测试和隔离浏览器夹具；`.trellis/spec/mobile/backend-integration.md`、`.trellis/tasks/10-21-new-coin-holdings-numeral/`及本记录。
 - 验证结果：Mobile release:gate通过891/891、类型、PWA/Tauri Web构建/制品/包体/治理；PC最终类型/构建及127/127通过。Ego 56组中英/明暗/320与448px检查无横溢或数值裁剪，动作高度至少44px；模拟买入余额1000→999.2，首页估值2000→3000→读取失败未知→3000自动恢复，读取矩阵零写请求。最终截图重试仍因CDP超时失败，未完成本轮截图目视验收；此前持仓格式轮已查看截图。diff与任务上下文校验通过，预算未提高。
 - 后续事项：按工作流保存本地提交并归档；未推送或部署，未验证生产接口和原生Android/iOS包。已关闭Ego空间1和5187预览，保留既有`.vite/`及独立Cloudflare任务。
+
+## 2026-10-21 03:02 - 打新展示与首页估值修复推送
+
+- 完成内容：按用户授权发布业务提交`09877ce`及任务归档、日志和范围清理提交；本记录一并提交后普通推送到`origin/main`。
+- 修改文件：本轮仅追加`docs/superpowers/PROGRESS.md`，业务代码沿用已验证提交。
+- 验证结果：fetch确认本地领先4个提交、无落后或分叉；沿用Mobile release:gate 891/891、PC类型/构建127/127及56组浏览器布局检查。提交前执行diff检查，推送后以远端main与本地HEAD哈希一致验证完成。
+- 后续事项：未部署，CI实际构建结果待确认；保留独立Cloudflare排查目录和`.vite/`缓存。
