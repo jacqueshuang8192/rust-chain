@@ -469,3 +469,36 @@ Separated native locked dependency fetching into an ordinary cached image stage,
 ### Next Steps
 
 - None - task complete
+
+
+## Session 73: New coin presentation and home valuation
+
+**Date**: 2026-10-21
+**Task**: New coin presentation and home valuation
+**Branch**: `main`
+
+### Summary
+
+Improved Mobile/PC new coin actions, precise Numeral displays and quote available balances; repaired Home prelisting asset valuation. Mobile release gate 891/891 and PC 127/127 passed; 56 browser layout combinations, simulated purchase balance refresh and Home valuation failure/recovery passed. Follow-up screenshots timed out; no production/native-device verification. Local commit only, no push or deployment. Separate Cloudflare task and existing .vite preserved.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `09877ce` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
