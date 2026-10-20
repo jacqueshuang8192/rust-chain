@@ -436,3 +436,36 @@ Resolved real generated ticker provenance against matching current engine checkp
 ### Next Steps
 
 - None - task complete
+
+
+## Session 72: Persist Cargo downloads for GitHub image builds
+
+**Date**: 2026-10-20
+**Task**: Persist Cargo downloads for GitHub image builds
+**Branch**: `main`
+
+### Summary
+
+Separated native locked dependency fetching into an ordinary cached image stage, with bounded retries and timeout, followed by offline release compilation. Docker contracts 10/10, architecture 11/11, documentation 1/1, source tests 18/18, strict Clippy/fmt, Web build and workflow/Compose checks passed. Real amd64/arm64 dependency fetch and offline verification passed; ARM64 dependency layer, disconnected fresh-container reuse and both release binaries built successfully. AMD64 base-image pull stalled locally; full AMD64 image and GitHub rerun remain unverified. No push or deployment; task image tags removed and existing caches preserved.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6707fea` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

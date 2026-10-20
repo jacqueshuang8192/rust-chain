@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 71
+- **Total Sessions**: 72
 - **Last Active**: 2026-10-20
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~438 | Active |
+| `journal-2.md` | ~471 | Active |
 | `journal-1.md` | ~1985 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 72 | 2026-10-20 | Persist Cargo downloads for GitHub image builds | `6707fea` | `main` |
 | 71 | 2026-10-20 | Repair live token holding and wallet valuation | `4d124e2` | `main` |
 | 70 | 2026-10-20 | Direct token purchase, detail layout and prelisting valuation | `bb23072` | `main` |
 | 69 | 2026-10-20 | Keep purchase-stage tokens out of spot | `fcb123c` | `main` |
