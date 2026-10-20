@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSessionStore } from '@/stores/session'
 import { subscribeToken, type TokenSubscriptionIntent } from '@/api/tokenIssuance'
-import { tokenDecimal, tokenMultiply } from '@/core/tokenIssuance'
+import { tokenDecimal, tokenMultiply, formatTokenAmount } from '@/core/tokenIssuance'
 import { tokenIssuanceMessages } from '@/core/tokenIssuanceMessages'
 const props = withDefaults(defineProps<{ projectId: number; symbol: string; quoteSymbol: string; quoteAssetId: number; price: string; subscriptionOpen?: boolean }>(), { subscriptionOpen: true })
 const emit = defineEmits<{ completed: [] }>()
@@ -54,10 +54,10 @@ onBeforeUnmount(() => { generation++ })
 </script>
 <template>
   <section v-if="owner && (subscriptionOpen || intent || recoveryBlocked || success)" class="token-surface token-subscribe">
-    <h2>{{ t('token.subscribe') }} · {{ symbol }}</h2><p>{{ t('token.fixedPrice') }}: {{ price }} {{ quoteSymbol }}</p>
+    <h2>{{ t('token.subscribe') }} · {{ symbol }}</h2><p>{{ t('token.fixedPrice') }}: {{ formatTokenAmount(price) }} {{ quoteSymbol }}</p>
     <p v-if="error" role="alert">{{ error }}</p><p v-if="success" role="status">{{ t('token.subscribed') }}</p>
     <p v-if="!subscriptionOpen && intent && !uncertain">{{ t('token.subscriptionClosed') }}</p>
     <form v-if="!intent && subscriptionOpen" @submit.prevent="review"><label>{{ t('token.quantity') }}<input class="token-control" v-model="quantity" inputmode="decimal" required /></label><button class="token-control" type="submit" :disabled="recoveryBlocked">{{ t('token.review') }}</button></form>
-    <div v-if="intent" aria-live="polite"><p>{{ intent.quantity }} {{ symbol }} · {{ t('token.freeze') }}: {{ intent.quote_amount }} {{ quoteSymbol }}</p><p>{{ t('token.subscriptionNote') }}</p><button class="token-control" :disabled="busy || (!subscriptionOpen && !uncertain)" type="button" @click="submit">{{ t(busy ? 'token.processing' : uncertain ? 'token.retry' : 'token.confirm') }}</button><button class="token-control" :disabled="busy || uncertain" type="button" @click="cancel">{{ t('token.cancel') }}</button></div>
+    <div v-if="intent" aria-live="polite"><p>{{ formatTokenAmount(intent.quantity) }} {{ symbol }} · {{ t('token.freeze') }}: {{ formatTokenAmount(intent.quote_amount) }} {{ quoteSymbol }}</p><p>{{ t('token.subscriptionNote') }}</p><button class="token-control" :disabled="busy || (!subscriptionOpen && !uncertain)" type="button" @click="submit">{{ t(busy ? 'token.processing' : uncertain ? 'token.retry' : 'token.confirm') }}</button><button class="token-control" :disabled="busy || uncertain" type="button" @click="cancel">{{ t('token.cancel') }}</button></div>
   </section>
 </template>

@@ -22,7 +22,7 @@ function harness(app: 'mobile' | 'pc', storage = new Map<string,string>()) {
   'vue-i18n':{useI18n:()=>({t:(key:string)=>key,locale:Vue.ref('en')})},'vue-router':{useRouter:()=>({push(){},currentRoute:{value:{fullPath:'/'}}})},
   '@/stores/session':{useSessionStore:()=>session},'@/stores/user':{useUserStore:()=>session},
   '@/components/SecondsChartWorkspace.vue':{},'@/components/chart/MarketChart.vue':{},
-  '@/core/tokenIssuanceMessages':{},'@/core/tokenIssuance':contract,
+  './TokenQuoteBalance.vue': {}, '@/core/tokenIssuanceMessages':{},'@/core/tokenIssuance':contract,
   '@/api/tokenIssuance':{
    fetchTokenHoldings:async()=>({holdings:[],next:null}),
    purchaseToken:(_symbol:string,_project:number,intent:contract.TokenPurchaseIntent)=>{const write={...deferred<contract.TokenReceipt>(),intent:{...intent}};writes.push(write);return write.promise},
@@ -36,7 +36,7 @@ function harness(app: 'mobile' | 'pc', storage = new Map<string,string>()) {
   {getItem:(k:string)=>storage.get(k),setItem:(k:string,v:string)=>{if(failStorage)throw new Error('storage blocked');storage.set(k,v)},removeItem:(k:string)=>{if(failStorage)throw new Error('storage blocked');storage.delete(k)}},()=>1,()=>{},
  )
  const scope=Vue.effectScope()
- const state=scope.run(()=>exports.default.setup(props,{expose(){}})) as {
+ const state=scope.run(()=>exports.default.setup(props,{expose(){},emit(){}})) as {
   quantity:Vue.Ref<string>;pending:Vue.Ref<{mode?:string;intent:contract.TokenQuoteIntent;uncertain:boolean}|null>;
   busy:Vue.Ref<boolean>;notice:Vue.Ref<string>;buy():Promise<void>;executePurchase():Promise<void>;cancel():void;retrieveQuote():Promise<void>
  }

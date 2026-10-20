@@ -4,6 +4,6 @@
     "allowJs": true,
     "types": ["node", "vite/client"]
   },
-  "include": ["tests/**/*.ts"],
+  "include": ["tests/**/*.ts", "src/numeral.d.ts"],
   "exclude": ["src-tauri"]
 }

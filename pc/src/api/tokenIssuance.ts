@@ -1,7 +1,7 @@
 import request from './request'
 import { backendApiUrl as requestUrl } from './backendAdapters'
 const client = request.instance
-import { parseTokenPurchase, type TokenPurchaseIntent, parseTokenSubscriptionReceipt, parseTokenHolding, parseTokenQuote, parseTokenReceipt, tokenObject, type TokenQuote, type TokenQuoteIntent } from '@/core/tokenIssuance'
+import { parseTokenQuoteBalance, parseTokenPurchase, type TokenPurchaseIntent, parseTokenSubscriptionReceipt, parseTokenHolding, parseTokenQuote, parseTokenReceipt, tokenObject, type TokenQuote, type TokenQuoteIntent } from '@/core/tokenIssuance'
 export async function fetchTokenHoldings(project?: number, before?: number) {
   const r = tokenObject((await client.get(requestUrl('/new-coins/holdings'), { params: { project_id: project, before_id: before } })).data)
   if (!Array.isArray(r.holdings)) throw new Error('Invalid holdings response')
@@ -22,4 +22,8 @@ export async function subscribeToken(symbol: string, intent: TokenSubscriptionIn
 
 export async function purchaseToken(symbol: string, project: number, intent: TokenPurchaseIntent) {
   return parseTokenPurchase((await client.post(requestUrl(`/new-coins/${encodeURIComponent(symbol)}/market-purchases`), intent)).data, project, intent)
+}
+
+export async function fetchTokenQuoteBalance(assetId: number, symbol: string) {
+  return parseTokenQuoteBalance((await client.get(requestUrl('/wallet/accounts'))).data, assetId, symbol)
 }

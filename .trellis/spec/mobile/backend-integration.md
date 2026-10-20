@@ -36,6 +36,21 @@
   confirmation checks; save evidence and explicitly distinguish native-device,
   database and production checks that were not run.
 
+## New Coin Holdings Presentation
+
+Mobile and PC label the detail holdings section `我的持仓` / `My holdings`.
+`formatTokenAmount` groups integer digits with Numeral only within the safe
+integer range; larger integers use string grouping. Fractional digits stay as
+text, with trailing zeros removed. Null or invalid display values are `—`,
+zero is `0`, and tiny nonzero amounts keep all significant digits. Quantity,
+cost, valuation and profit use this display helper; return percentages keep
+the existing BigInt calculation and two fractional digits with grouped whole
+parts. Never feed formatted output back into requests or monetary arithmetic.
+Apply the same display helper to new-coin records and confirmations, preserving
+request values. Long record values wrap without horizontal overflow.
+Run both clients' token issuance tests, including unsafe integers, 18-digit
+fractions, tiny values, negative profit and unavailable return cases.
+
 ## Earn And Loan Uncertain Submission Recovery
 
 - Earn subscriptions and loan applications retain the canonical request key in
@@ -2525,3 +2540,22 @@ quote/contract errors, unknown/late frames, and listed-only new-coin opportuniti
   Only the detail page applies the compact chart and framed holding presentation.
 - Validate `token-direct-purchase`, `token-issuance` and `wallet-valuation` behavior,
   Mobile release gate, PC checks/build/tests, and actual browser interactions.
+
+### New coin quote balances and Home totals
+
+- Display only the quote asset's spendable `available` wallet amount, never frozen
+  or locked funds. Match the authoritative asset ID; the PC raw adapter also
+  validates symbol and rejects duplicate/malformed matches. A successful empty
+  account list means zero; pending/error means unknown, never invented zero.
+- Mobile detail reuses its parent wallet loader, including V2 issuance projects,
+  and refreshes after project polling and successful subscription/trade events.
+  PC uses TokenQuoteBalance with a visible 10-second refresh and success revision.
+  Identity changes clear old balances and late responses cannot cross accounts.
+- Home uses the same `estimateWalletAsset` contract as Assets. Issuance valuation
+  does not require a listed spot ticker. Count booked available/frozen/locked
+  funds once across wallets; zero balances do not require prices. Missing or
+  expired issuance valuation stays unknown with no ticker fallback.
+- Home refreshes visible wallet data every 10 seconds, retains valid values while
+  loading, clears on error/account changes and rejects stale response versions.
+  Run home-asset-estimate and token-quote-balance behavioral regressions plus
+  both clients' issuance checks and Mobile release gate.

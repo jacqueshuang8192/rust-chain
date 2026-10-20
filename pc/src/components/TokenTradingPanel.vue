@@ -1,14 +1,15 @@
 <script setup lang="ts">
+import TokenQuoteBalance from './TokenQuoteBalance.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import MarketChart from '@/components/chart/MarketChart.vue'
 import { confirmToken, fetchTokenHoldings, purchaseToken, quoteToken } from '@/api/tokenIssuance'
-import { parseTokenQuote, tokenDecimal, tokenReturn, type TokenHolding, type TokenQuote, type TokenQuoteIntent } from '@/core/tokenIssuance'
+import { parseTokenQuote, tokenDecimal, formatTokenAmount, formatTokenReturn, type TokenHolding, type TokenQuote, type TokenQuoteIntent } from '@/core/tokenIssuance'
 import { tokenIssuanceMessages } from '@/core/tokenIssuanceMessages'
 
-const props = defineProps<{ projectId?: number; symbol?: string; quoteSymbol?: string; pairSymbol?: string; stage?: string }>()
+const props = defineProps<{ projectId?: number; symbol?: string; quoteSymbol?: string; quoteAssetId?: number; pairSymbol?: string; stage?: string }>()
 const { t, locale } = useI18n({ useScope: 'local', messages: tokenIssuanceMessages })
 const router = useRouter()
 const session = useUserStore()
@@ -18,6 +19,7 @@ const owner = computed(() => {
 })
 const holdings = ref<TokenHolding[]>([])
 const quantity = ref('')
+const walletRevision = ref(0)
 const before = ref<number | undefined>()
 const next = ref<number | null>(null)
 const busy = ref(false)
@@ -66,8 +68,8 @@ async function executePurchase() {
   try {
     const receipt = await purchaseToken(p.symbol, p.project, { quantity: p.intent.quantity, idempotency_key: p.intent.idempotency_key })
     if (!valid(g)) return
-    save(null); quantity.value = ''
-    notice.value = `${t('token.success')} · ${t('token.gross')}: ${receipt.gross} ${p.quoteSymbol}`
+    save(null); quantity.value = ''; walletRevision.value++
+    notice.value = `${t('token.success')} · ${t('token.gross')}: ${formatTokenAmount(receipt.gross)} ${p.quoteSymbol}`
     await load()
   } catch (e) {
     if (!valid(g)) return
@@ -94,7 +96,7 @@ async function retrieveQuote() {
     if (!valid(g)) return
     quote.value = q
     save({ ...p, quote: q })
-    if (q.status === 'executed' && q.receipt_json) { notice.value = t('token.success'); save(null); quote.value = null; await load() }
+    if (q.status === 'executed' && q.receipt_json) { notice.value = t('token.success'); walletRevision.value++; save(null); quote.value = null; await load() }
   } catch { if (valid(g)) error.value = t('token.failure') }
   finally { if (valid(g)) busy.value = false }
 }
@@ -106,8 +108,8 @@ async function confirm() {
   try {
     const receipt = await confirmToken(q)
     if (!valid(g)) return
-    notice.value = `${t('token.success')} · ${receipt.side === 'sell' ? t('token.net') : t('token.gross')}: ${receipt.side === 'sell' ? receipt.net : receipt.gross} ${pending.value?.quoteSymbol || ''}`
-    save(null); quote.value = null; quantity.value = ''; await load()
+    notice.value = `${t('token.success')} · ${receipt.side === 'sell' ? t('token.net') : t('token.gross')}: ${formatTokenAmount(receipt.side === 'sell' ? receipt.net : receipt.gross)} ${pending.value?.quoteSymbol || ''}`
+    walletRevision.value++; save(null); quote.value = null; quantity.value = ''; await load()
   } catch (e) {
     if (!valid(g)) return
     const status = (e as { response?: { status?: number } }).response?.status
@@ -150,23 +152,24 @@ onBeforeUnmount(() => { disposed = true; generation++; clearInterval(timer) })
       <div class="token-chart-canvas"><MarketChart :symbol="pairSymbol" /></div>
     </div>
     <button v-if="stage === 'listed' && pairSymbol" type="button" @click="openSpot">{{ t('token.spot') }}</button>
-    <button v-if="!owner" type="button" @click="login">{{ t('token.login') }}</button>
+    <button class="token-action" v-if="!owner" type="button" @click="login">{{ t('token.login') }}</button>
     <template v-else>
       <p v-if="error" role="alert">{{ error }}</p><p v-if="notice" role="status">{{ notice }}</p>
       <form v-if="stage === 'purchase' && !pending" @submit.prevent="buy()">
+        <TokenQuoteBalance v-if="quoteAssetId && quoteSymbol" :owner="owner" :asset-id="quoteAssetId" :symbol="quoteSymbol" :revision="walletRevision" />
         <label>{{ t('token.quantity') }} · {{ symbol }}<input v-model="quantity" inputmode="decimal" :disabled="busy" required /></label>
         <button type="submit" :disabled="busy || recoveryBlocked || !quantity">{{ t('token.buy') }}</button>
       </form>
       <section v-if="pending?.mode === 'market'" class="token-confirm" aria-live="polite">
         <h3>{{ pending.symbol }} · {{ t('token.buy') }}</h3>
-        <p>{{ t('token.quantity') }}: {{ pending.intent.side === 'buy' ? pending.intent.quantity : '' }} {{ pending.symbol }}</p>
+        <p>{{ t('token.quantity') }}: {{ pending.intent.side === 'buy' ? formatTokenAmount(pending.intent.quantity) : '' }} {{ pending.symbol }}</p>
         <p>{{ t(busy ? 'token.processing' : 'token.purchasePending') }}</p>
         <button type="button" :disabled="busy" @click="executePurchase">{{ t(busy ? 'token.processing' : 'token.retry') }}</button>
       </section>
       <section v-else-if="pending" class="token-confirm" aria-live="polite">
         <h3>{{ pending.symbol }} · {{ t(pending.intent.side === 'sell' ? 'token.sell' : 'token.quote') }}</h3>
         <template v-if="quote">
-          <dl><div v-for="key in (pending.intent.side === 'sell' ? ['quantity', 'price', 'gross', 'fee', 'net'] as const : ['quantity', 'price', 'gross'] as const)" :key="key"><dt>{{ t(`token.${key}`) }}</dt><dd>{{ quote[key] }} {{ key === 'quantity' ? pending.symbol : pending.quoteSymbol }}</dd></div></dl>
+          <dl><div v-for="key in (pending.intent.side === 'sell' ? ['quantity', 'price', 'gross', 'fee', 'net'] as const : ['quantity', 'price', 'gross'] as const)" :key="key"><dt>{{ t(`token.${key}`) }}</dt><dd>{{ formatTokenAmount(quote[key]) }} {{ key === 'quantity' ? pending.symbol : pending.quoteSymbol }}</dd></div></dl>
           <p>{{ t('token.observed') }}: {{ date(quote.observed_at) }}</p><p>{{ t('token.expires') }}: {{ date(quote.expires_at) }}</p>
           <p v-if="pending.intent.side === 'sell'">{{ t('token.saleNote') }}</p>
           <p v-if="pending.uncertain">{{ t('token.pending') }}</p><p v-else-if="expired">{{ t('token.expired') }}</p>
@@ -179,11 +182,11 @@ onBeforeUnmount(() => { disposed = true; generation++; clearInterval(timer) })
       <p v-if="loading && !holdings.length">{{ t('token.loading') }}</p><p v-else-if="!visible.length && !error">{{ t('token.empty') }}</p>
       <article v-for="row in visible" :key="row.holding.id" class="token-holding">
         <header><strong>{{ row.symbol }} · #{{ row.holding.id }}</strong><span>{{ t(row.holding.status === 'sold' ? 'token.sold' : row.eligible ? 'token.eligible' : 'token.locked') }}</span></header>
-        <dl><div><dt>{{ t('token.quantity') }}</dt><dd>{{ row.holding.quantity }} {{ row.symbol }}</dd></div><div><dt>{{ t('token.cost') }}</dt><dd>{{ row.holding.cost }} {{ row.quote_symbol }}</dd></div>
-          <template v-if="row.holding.status === 'held'"><div><dt>{{ t('token.value') }}</dt><dd>{{ row.market_value ?? '—' }} {{ row.quote_symbol }}</dd></div><div><dt>{{ t('token.profit') }}</dt><dd>{{ row.profit ?? '—' }} / {{ tokenReturn(row.profit, row.holding.cost) ?? '—' }}</dd></div></template>
+        <dl><div><dt>{{ t('token.quantity') }}</dt><dd>{{ formatTokenAmount(row.holding.quantity) }} {{ row.symbol }}</dd></div><div><dt>{{ t('token.cost') }}</dt><dd>{{ formatTokenAmount(row.holding.cost) }} {{ row.quote_symbol }}</dd></div>
+          <template v-if="row.holding.status === 'held'"><div><dt>{{ t('token.value') }}</dt><dd>{{ formatTokenAmount(row.market_value) }} {{ row.quote_symbol }}</dd></div><div><dt>{{ t('token.profit') }}</dt><dd>{{ formatTokenAmount(row.profit) }} / {{ formatTokenReturn(row.profit, row.holding.cost) }}</dd></div></template>
           <div><dt>{{ t('token.acquired') }}</dt><dd>{{ date(row.holding.acquired_at) }}</dd></div><div><dt>{{ t('token.ruleTime') }}</dt><dd>{{ row.unlock_at ? date(row.unlock_at) : t(`token.${row.holding.policy_json.lock.kind}`, { count: 'count' in row.holding.policy_json.lock ? row.holding.policy_json.lock.count : '' }) }}</dd></div>
         </dl>
-        <button v-if="row.holding.status === 'held'" type="button" :disabled="busy || recoveryBlocked || !!pending || !row.eligible || !row.market_price" @click="requestQuote(row)">{{ t('token.sell') }}</button>
+        <button class="token-action" v-if="row.holding.status === 'held'" type="button" :disabled="busy || recoveryBlocked || !!pending || !row.eligible || !row.market_price" @click="requestQuote(row)">{{ t('token.sell') }}</button>
       </article>
       <nav><button v-if="before" type="button" :disabled="busy || loading" @click="page()">{{ t('token.firstPage') }}</button><button v-if="next" type="button" :disabled="busy || loading" @click="page(next)">{{ t('token.nextPage') }}</button></nav>
     </template>
@@ -193,4 +196,7 @@ onBeforeUnmount(() => { disposed = true; generation++; clearInterval(timer) })
 .token-chart-canvas { height: 420px; min-width: 0; overflow: auto; }
 .token-trading { --text: hsl(var(--foreground)); --muted: hsl(var(--muted-foreground)); --line: hsl(var(--border)); --surface: hsl(var(--card)); --surface-2: hsl(var(--muted)); --focus: hsl(var(--primary)); padding: 20px 16px; min-width: 0; color: var(--text); }
 header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; } h2 { font-size: 18px; margin: 0; } h3 { font-size: 16px; margin-block: 20px 12px; } p, dt, header span { color: var(--muted); font-size: 13px; } p { line-height: 1.6; } button { min-height: 44px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; color: var(--text); background: var(--surface-2); cursor: pointer; } button:disabled { opacity: .45; cursor: default; } button:focus-visible, input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; } form { display: grid; gap: 12px; margin-block: 16px; } label { display: grid; gap: 8px; } input { min-width: 0; min-height: 44px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); padding: 10px; } dl { display: grid; gap: 10px; } dl div { display: grid; grid-template-columns: minmax(100px,1fr) minmax(0,1.5fr); gap: 12px; } dd { margin: 0; text-align: right; overflow-wrap: anywhere; font-size: 14px; font-variant-numeric: tabular-nums; } .token-holding { padding-block: 18px; border-bottom: 1px solid var(--line); } .token-holding button { width: 100%; margin-top: 12px; } .token-confirm { margin-block: 18px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); } .token-confirm button { margin: 8px 8px 0 0; } .token-chart { margin-block: 16px; }
+.token-action { width: 100%; border: 0; border-radius: 12px; min-height: 48px; margin: 12px 0 0; padding: 12px 16px; font-weight: 600; line-height: 1.5; color: var(--surface); background: var(--text); }
+.token-action:disabled { opacity: 1; background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); cursor: not-allowed; }
+.token-action:not(:disabled):hover { filter: brightness(.9); }
 </style>

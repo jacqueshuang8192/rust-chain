@@ -40,7 +40,8 @@ import {
 } from '@/api/wallet'
 import { formatAmount, formatPercent, formatPrice } from '@/core/format'
 import { buildReturnHistoryGeometry } from '@/core/returnHistoryGeometry'
-import { decimalAdd, decimalMultiply, decimalSign, normalizeDecimalText, type DecimalText } from '@/core/decimal'
+import { decimalAdd, decimalSign, normalizeDecimalText, type DecimalText } from '@/core/decimal'
+import { estimateWalletAsset } from '@/core/walletValuation'
 import { walletTotal } from '@/core/walletAmounts'
 import { formatFinancialAmount } from '@/core/financialDisplay'
 import { resolveTodayReturnPresentation } from '@/core/todayReturnPresentation'
@@ -67,6 +68,8 @@ const assetVisible = ref(true)
 const spotAccounts = ref<WalletAccount[]>([])
 const marginAccounts = ref<WalletAccount[]>([])
 const assetEstimateReady = ref(false)
+const valuationClock = ref(Date.now())
+const assetsLoading = ref(false)
 const todayReturn = ref<TodayReturn | null>(null)
 const todayReturnState = ref<'idle' | 'loading' | 'complete' | 'partial' | 'error'>('idle')
 const selectedReturnHistoryPeriod = ref<ReturnHistoryPeriodDays>(1)
@@ -127,21 +130,17 @@ const carouselPaused = computed(() => (
   || carouselTouching.value
 ))
 
-const totalAssetEstimate = computed(() => [...spotAccounts.value, ...marginAccounts.value].reduce((total, account) => {
-  const accountAmount = walletTotal(account)
-  if (account.symbol === 'USDT' || account.symbol === 'USDC' || account.symbol === 'USD') return decimalAdd(total, accountAmount)
-  const price = marketStore.tickerFor(`${account.symbol}/USDT`)?.lastPriceText
-  return price ? decimalAdd(total, decimalMultiply(accountAmount, price)) : total
-}, normalizeDecimalText('0')))
-
-const assetEstimateComplete = computed(() => [...spotAccounts.value, ...marginAccounts.value].every((account) => {
-  const accountAmount = walletTotal(account)
-  return decimalSign(accountAmount) === 0
-    || account.symbol === 'USDT'
-    || account.symbol === 'USDC'
-    || account.symbol === 'USD'
-    || Boolean(marketStore.tickerFor(`${account.symbol}/USDT`)?.lastPriceText)
+const assetEstimates = computed(() => [...spotAccounts.value, ...marginAccounts.value].map(account => {
+  const amount = walletTotal(account)
+  if (decimalSign(amount) === 0) return amount
+  const source = spotAccounts.value.find(row => row.assetId === account.assetId) || account
+  return estimateWalletAsset(account.symbol, amount, source,
+    marketStore.tickerFor(`${account.symbol}/USDT`)?.lastPriceText, valuationClock.value)
 }))
+const totalAssetEstimate = computed(() => assetEstimates.value.reduce<DecimalText>(
+  (total, value) => value === null ? total : decimalAdd(total, value), normalizeDecimalText('0'),
+))
+const assetEstimateComplete = computed(() => assetEstimates.value.every(value => value !== null))
 
 const displayedAssetAmount = computed(() => (
   session.isAuthenticated && assetEstimateReady.value && assetEstimateComplete.value
@@ -372,16 +371,8 @@ async function loadCarousel(): Promise<void> {
 async function loadAssetEstimate(): Promise<void> {
   const requestVersion = ++assetRequestVersion
   const token = session.token
-  spotAccounts.value = []
-  marginAccounts.value = []
-  if (!session.isAuthenticated) {
-    spotAccounts.value = []
-    marginAccounts.value = []
-    assetEstimateReady.value = false
-    return
-  }
-
-  assetEstimateReady.value = false
+  if (!session.isAuthenticated) return
+  assetsLoading.value = true
   try {
     const [nextSpotAccounts, marginState] = await Promise.all([
       fetchWalletAccounts(),
@@ -390,11 +381,13 @@ async function loadAssetEstimate(): Promise<void> {
     if (!viewActive || requestVersion !== assetRequestVersion || session.token !== token) return
     spotAccounts.value = nextSpotAccounts
     marginAccounts.value = marginState.wallets
+    valuationClock.value = Date.now()
     assetEstimateReady.value = true
   } catch {
     if (!viewActive || requestVersion !== assetRequestVersion || session.token !== token) return
-    spotAccounts.value = []
-    marginAccounts.value = []
+    spotAccounts.value = []; marginAccounts.value = []; assetEstimateReady.value = false
+  } finally {
+    if (requestVersion === assetRequestVersion) assetsLoading.value = false
   }
 }
 
@@ -471,6 +464,7 @@ onUnmounted(() => {
   viewActive = false
   carouselRequestVersion++
   assetRequestVersion++
+  clearInterval(assetRefreshTimer)
   stopCarouselTimer()
   reducedMotionMediaQuery?.removeEventListener('change', updateCarouselReducedMotion)
   document.removeEventListener('visibilitychange', updateCarouselVisibility)
@@ -478,7 +472,15 @@ onUnmounted(() => {
   returnHistoryRequestLifecycle.stop()
   marketStore.stopLiveUpdates('home')
 })
-watch(() => session.token, () => { void loadAssetEstimate() }, { immediate: true })
+watch(() => session.token, () => {
+  assetRequestVersion++; spotAccounts.value = []; marginAccounts.value = []
+  assetEstimateReady.value = false; assetsLoading.value = false
+  void loadAssetEstimate()
+}, { immediate: true })
+const assetRefreshTimer = setInterval(() => {
+  valuationClock.value = Date.now()
+  if (session.isAuthenticated && !assetsLoading.value && document.visibilityState === 'visible') void loadAssetEstimate()
+}, 10_000)
 watch(() => session.token, () => {
   todayReturnRequestLifecycle.invalidate()
   void loadTodayReturn()

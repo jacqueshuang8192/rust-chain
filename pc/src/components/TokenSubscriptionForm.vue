@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import TokenQuoteBalance from './TokenQuoteBalance.vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
 import { subscribeToken, type TokenSubscriptionIntent } from '@/api/tokenIssuance'
-import { tokenDecimal, tokenMultiply } from '@/core/tokenIssuance'
+import { tokenDecimal, tokenMultiply, formatTokenAmount } from '@/core/tokenIssuance'
 import { tokenIssuanceMessages } from '@/core/tokenIssuanceMessages'
 const props = defineProps<{ projectId: number; symbol: string; quoteSymbol: string; quoteAssetId: number; price: string }>()
 const emit = defineEmits<{ completed: [] }>()
@@ -15,6 +16,7 @@ const owner = computed(() => {
 })
 const recoveryBlocked = ref(false)
 const quantity = ref(''); const busy = ref(false); const uncertain = ref(false); const error = ref(''); const success = ref(false)
+const walletRevision = ref(0)
 const intent = ref<TokenSubscriptionIntent | null>(null)
 let generation = 0
 const storageKey = () => `token-subscription:${owner.value}:${props.projectId}`
@@ -40,7 +42,7 @@ async function submit() {
   try {
     await subscribeToken(props.symbol, intent.value)
     if (g !== generation) return
-    sessionStorage.removeItem(storageKey()); intent.value = null; uncertain.value = false; success.value = true; quantity.value = ''; emit('completed')
+    sessionStorage.removeItem(storageKey()); intent.value = null; uncertain.value = false; success.value = true; walletRevision.value++; quantity.value = ''; emit('completed')
   } catch (e) {
     if (g !== generation) return
     const status = (e as { response?: { status?: number } }).response?.status
@@ -57,10 +59,11 @@ onBeforeUnmount(() => { generation++ })
 </script>
 <template>
   <section v-if="owner" class="token-subscribe">
-    <h2>{{ t('token.subscribe') }} · {{ symbol }}</h2><p>{{ t('token.fixedPrice') }}: {{ price }} {{ quoteSymbol }}</p>
+    <h2>{{ t('token.subscribe') }} · {{ symbol }}</h2><p>{{ t('token.fixedPrice') }}: {{ formatTokenAmount(price) }} {{ quoteSymbol }}</p>
+    <TokenQuoteBalance :owner="owner" :asset-id="quoteAssetId" :symbol="quoteSymbol" :revision="walletRevision" />
     <p v-if="error" role="alert">{{ error }}</p><p v-if="success" role="status">{{ t('token.subscribed') }}</p>
     <form v-if="!intent" @submit.prevent="review"><label>{{ t('token.quantity') }}<input v-model="quantity" inputmode="decimal" required /></label><button type="submit" :disabled="recoveryBlocked">{{ t('token.review') }}</button></form>
-    <div v-else aria-live="polite"><p>{{ intent.quantity }} {{ symbol }} · {{ t('token.freeze') }}: {{ intent.quote_amount }} {{ quoteSymbol }}</p><p>{{ t('token.subscriptionNote') }}</p><button :disabled="busy" type="button" @click="submit">{{ t(busy ? 'token.processing' : uncertain ? 'token.retry' : 'token.confirm') }}</button><button :disabled="busy || uncertain" type="button" @click="cancel">{{ t('token.cancel') }}</button></div>
+    <div v-else aria-live="polite"><p>{{ formatTokenAmount(intent.quantity) }} {{ symbol }} · {{ t('token.freeze') }}: {{ formatTokenAmount(intent.quote_amount) }} {{ quoteSymbol }}</p><p>{{ t('token.subscriptionNote') }}</p><button :disabled="busy" type="button" @click="submit">{{ t(busy ? 'token.processing' : uncertain ? 'token.retry' : 'token.confirm') }}</button><button :disabled="busy || uncertain" type="button" @click="cancel">{{ t('token.cancel') }}</button></div>
   </section>
 </template>
 <style scoped>

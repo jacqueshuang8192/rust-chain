@@ -33,7 +33,7 @@ watch(symbol, () => { void load() }, { immediate: true })
     <header><RouterLink to="/launchpad">{{ t('token.all') }}</RouterLink><h1>{{ symbol }}</h1><button :disabled="loading" type="button" @click="load">{{ t('token.refreshProject') }}</button></header>
     <p v-if="loading">{{ t('token.processing') }}</p><p v-if="error" role="alert">{{ error }}</p>
     <template v-if="project">
-      <TokenTradingPanel :project-id="project.id" :symbol="project.symbol" :quote-symbol="project.quote" :pair-symbol="project.pair" :stage="project.stage" />
+      <TokenTradingPanel :project-id="project.id" :symbol="project.symbol" :quote-symbol="project.quote" :quote-asset-id="project.quoteId" :pair-symbol="project.pair" :stage="project.stage" />
       <TokenSubscriptionForm v-if="project.stage === 'subscription'" :project-id="project.id" :symbol="project.symbol" :quote-symbol="project.quote" :quote-asset-id="project.quoteId" :price="project.price" />
       <TokenIssuanceRules :policy="project.policy" :quote-symbol="project.quote" />
     </template>

@@ -1,3 +1,5 @@
+import numeral from 'numeral/src/numeral.js'
+
 /** Versioned issuance transport: amounts stay decimal text; missing evidence never becomes zero. */
 export type TokenLock = { kind: 'none' | 'on_purchase' | 'on_listing' } | { kind: 'weeks' | 'months'; count: number } | { kind: 'fixed'; at: number }
 export type TokenFee = { kind: 'none' } | { kind: 'profit' | 'gross'; rate: string } | { kind: 'fixed'; amount: string }
@@ -117,4 +119,33 @@ export function parseTokenPurchase(raw: unknown, project: number, intent: TokenP
   if (receipt.project_id !== project || receipt.side !== 'buy' || canonical(receipt.quantity) !== canonical(tokenDecimal(intent.quantity))) throw new Error('Purchase intent mismatch')
   if (!/[1-9]/.test(receipt.price) || !/[1-9]/.test(receipt.gross) || canonical(receipt.fee) !== canonical('0') || canonical(receipt.net) !== canonical(receipt.gross)) throw new Error('Invalid purchase settlement')
   return receipt
+}
+
+/** Display only: Numeral groups safe integers; fractional digits never enter Number. */
+export function formatTokenAmount(value: string | null, minimumFractionDigits = 0): string {
+  if (value === null || value.length > 128 || !/^-?\d+(?:\.\d+)?$/.test(value)) return '—'
+  const [rawWhole = '', rawFraction = ''] = value.replace(/^-/, '').split('.')
+  const whole = rawWhole.replace(/^0+(?=\d)/, '')
+  const fraction = rawFraction.replace(/0+$/, '').padEnd(minimumFractionDigits, '0')
+  const grouped = BigInt(whole) <= BigInt(Number.MAX_SAFE_INTEGER)
+    ? numeral(Number(whole)).format('0,0')
+    : whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  const sign = value.startsWith('-') && /[1-9]/.test(whole + fraction) ? '-' : ''
+  return `${sign}${grouped}${fraction ? `.${fraction}` : ''}`
+}
+
+export function formatTokenReturn(profit: string | null, cost: string): string {
+  const result = tokenReturn(profit, cost)
+  return result === null ? '—' : `${formatTokenAmount(result.slice(0, -1), 2)}%`
+}
+
+/** Match the payment asset exactly and expose spendable funds only. */
+export function parseTokenQuoteBalance(raw: unknown, assetId: number, symbol: string): string {
+  id(assetId)
+  const rows = tokenObject(raw).accounts
+  if (!Array.isArray(rows)) throw new Error('Invalid wallet accounts')
+  const matches = rows.map(tokenObject).filter(row => row.asset_id === assetId)
+  if (!matches.length) return '0'
+  if (matches.length !== 1 || matches[0]!.symbol !== symbol) throw new Error('Quote asset mismatch')
+  return tokenDecimal(matches[0]!.available)
 }

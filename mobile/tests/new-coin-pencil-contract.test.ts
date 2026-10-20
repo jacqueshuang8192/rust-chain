@@ -60,7 +60,7 @@ test('guest zone and opportunities stay public while account and record reads re
   assert.match(api, /publicApiRequestConfig\(\{ params: \{ limit \} \}\)/)
   assert.match(api, /fetchNewCoinProject[\s\S]*?publicApiRequestConfig\(\)/)
   assert.match(marketApi, /fetchMarketTickers[\s\S]*?publicApiRequestConfig\(\)/)
-  assert.match(detail, /sessionKey: \(\) => session\.isAuthenticated && project\.value && !project\.value\.issuancePolicy/)
+  assert.match(detail, /sessionKey: \(\) => session\.isAuthenticated && project\.value/)
   assert.match(detail, /request: fetchWalletAccounts/)
   assert.match(records, /async function load\(\): Promise<void> \{\s*if \(!session\.isAuthenticated\) return/)
   assert.doesNotMatch(api.slice(api.indexOf('export async function subscribeNewCoin')), /publicApiRequestConfig/)

@@ -42,6 +42,7 @@ import {
   positiveDecimalInput,
   type DecimalText,
 } from '@/core/decimal'
+import { formatTokenAmount } from '@/core/tokenIssuance'
 import { formatFinancialAmount } from '@/core/financialDisplay'
 import { formatDateTime } from '@/core/format'
 import { useModalDialog } from '@/core/modalDialog'
@@ -58,6 +59,7 @@ const router = useRouter()
 const { locale, t } = useI18n()
 const session = useSessionStore()
 const accounts = ref<WalletAccount[]>([])
+const accountsReady = ref(false)
 const amount = ref('')
 const selectedPercentage = ref<25 | 50 | 75 | 100 | null>(null)
 const submitting = ref(false)
@@ -86,7 +88,7 @@ const selectedAccount = computed(() => accounts.value.find(
 ))
 const amountText = computed(() => positiveDecimalInput(amount.value))
 const availableText = computed(() => decimalTextFromBoundary(
-  selectedAccount.value?.availableText,
+  selectedAccount.value?.availableText ?? (accountsReady.value ? '0' : undefined),
   { allowNegative: false },
 ))
 // Both subscription and post-listing purchase are settled by the backend at
@@ -175,20 +177,19 @@ function unlockTypeLabel(type: string): string {
 }
 
 const accountRequests = createSessionRequestLifecycle({
-  sessionKey: () => session.isAuthenticated && project.value && !project.value.issuancePolicy
+  sessionKey: () => session.isAuthenticated && project.value
     ? `${session.identityScope}:${project.value.id}` : '',
   request: fetchWalletAccounts,
 })
 async function loadAccounts(): Promise<void> {
   const result = await accountRequests.load()
-  if (result.state === 'loaded') accounts.value = result.value
-  else if (result.state === 'guest') accounts.value = []
-  else if (result.state === 'error') error.value = apiErrorMessage(result.error, t('newCoin.projectLoadFailed'))
+  if (result.state === 'loaded') { accounts.value = result.value; accountsReady.value = true }
+  else if (result.state === 'guest' || result.state === 'error') { accounts.value = []; accountsReady.value = false }
 }
 async function load(): Promise<void> { error.value = ''; await refreshProject(); await loadAccounts() }
-watch(() => [project.value?.id, session.identityScope], () => {
-  accounts.value = []
-  void loadAccounts()
+watch(() => [project.value?.id, session.identityScope, refreshing.value] as const, ([id, owner, pending], [oldId, oldOwner]) => {
+  if (id !== oldId || owner !== oldOwner) { accounts.value = []; accountsReady.value = false }
+  if (!pending) void loadAccounts()
 })
 watch(() => props.symbol, () => {
   reviewOpen.value = false
@@ -357,8 +358,12 @@ function handleReviewKeydown(event: KeyboardEvent): void {
         </ol>
       </section>
 
+      <div v-if="project.issuancePolicy && session.isAuthenticated" class="new-coin-detail-balance token-quote-balance">
+        <span>{{ t('newCoin.availableBalance') }} · {{ quoteSymbol }}</span>
+        <strong>{{ formatTokenAmount(availableText) }} {{ quoteSymbol }}</strong>
+      </div>
       <TokenSubscriptionForm v-if="project.issuancePolicy && project.quoteAssetId" :key="project.id" :subscription-open="canSubscribe" :project-id="project.id" :symbol="project.symbol" :quote-symbol="quoteSymbol" :quote-asset-id="project.quoteAssetId" :price="project.issuePriceText" @completed="load" />
-      <TokenTradingPanel v-if="project.issuancePolicy" :key="project.id" :project-id="project.id" :symbol="project.symbol" :quote-symbol="project.quoteAssetSymbol" :pair-symbol="project.postListingPairSymbol" :stage="project.lifecycleStatus" />
+      <TokenTradingPanel v-if="project.issuancePolicy" :key="project.id" :project-id="project.id" :symbol="project.symbol" :quote-symbol="project.quoteAssetSymbol" :pair-symbol="project.postListingPairSymbol" :stage="project.lifecycleStatus" @completed="loadAccounts" />
       <section v-else class="new-coin-detail-rules">
         <header><h2>{{ t('newCoin.rules') }}</h2><ChevronRight :size="19" aria-hidden="true" /></header>
         <dl>
@@ -484,7 +489,6 @@ function handleReviewKeydown(event: KeyboardEvent): void {
 
 .new-coin-detail-visual {
   background: var(--new-coin-detail-visual);
-  box-sizing: border-box;
   display: grid;
   gap: 16px;
   min-height: 164px;
@@ -616,7 +620,6 @@ function handleReviewKeydown(event: KeyboardEvent): void {
 }
 
 .new-coin-detail-stages {
-  box-sizing: border-box;
   padding: 12px 16px 4px;
 }
 
@@ -672,7 +675,6 @@ function handleReviewKeydown(event: KeyboardEvent): void {
 }
 
 .new-coin-detail-rules {
-  box-sizing: border-box;
   height: 104px;
   padding: 0 16px 10px;
 }
@@ -736,7 +738,6 @@ function handleReviewKeydown(event: KeyboardEvent): void {
 .new-coin-detail-entry {
   background: var(--new-coin-detail-panel);
   border-radius: 26px 26px 0 0;
-  box-sizing: border-box;
   display: grid;
   gap: 11px;
   min-height: 328px;
@@ -778,7 +779,6 @@ function handleReviewKeydown(event: KeyboardEvent): void {
   background: var(--new-coin-detail-field);
   border: 1px solid var(--new-coin-detail-line);
   border-radius: 17px;
-  box-sizing: border-box;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   height: 56px;
@@ -960,7 +960,6 @@ function handleReviewKeydown(event: KeyboardEvent): void {
 .new-coin-entry-review {
   background: var(--new-coin-detail-panel);
   border-radius: 24px 24px 0 0;
-  box-sizing: border-box;
   color: var(--new-coin-detail-ink);
   padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
   width: 100%;

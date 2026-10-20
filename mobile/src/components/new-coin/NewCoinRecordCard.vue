@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { ChevronRight, CreditCard, LockOpen } from 'lucide-vue-next'
 import { useI18n } from 'vue-i18n'
 import AssetMark from '@/components/AssetMark.vue'
-import { formatFinancialAmount } from '@/core/financialDisplay'
+import { formatTokenAmount } from '@/core/tokenIssuance'
 import { formatDateTime } from '@/core/format'
 import type { UnifiedNewCoinRecord } from '@/core/newCoinPresentation'
 
@@ -18,7 +18,7 @@ defineEmits<{
   release: []
 }>()
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const symbol = computed(() => props.record.assetSymbol
   || (props.record.assetId ? t('newCoin.assetNumber', { id: props.record.assetId }) : t('newCoin.unavailableValue')))
 const title = computed(() => props.record.project
@@ -49,7 +49,7 @@ const primaryAmount = computed(() => {
     || props.record.distribution?.quantityText
     || props.record.purchase?.quantityText
     || props.record.unlock?.unlockQuantityText
-  return format(value, symbol.value)
+  return format(value)
 })
 const quoteSymbol = computed(() => {
   const quoteAssetId = props.record.subscription?.quoteAssetId || props.record.purchase?.quoteAssetId
@@ -75,12 +75,12 @@ const secondaryAmount = computed(() => {
   const subscription = props.record.subscription
   if (subscription?.settlementMode === 'manual_distribution') {
     const amount = subscription.status === 'pending'
-      ? format(subscription.frozenQuoteAmountText, quoteSymbol.value)
-      : `${format(subscription.settledQuoteAmountText, quoteSymbol.value)} / ${format(subscription.refundedQuoteAmountText, quoteSymbol.value)}`
+      ? format(subscription.frozenQuoteAmountText)
+      : `${format(subscription.settledQuoteAmountText)} / ${format(subscription.refundedQuoteAmountText)}`
     return `${amount} ${quoteSymbol.value}`
   }
-  if (subscription) return `${format(subscription.quoteAmountText, quoteSymbol.value)} ${quoteSymbol.value}`
-  if (props.record.purchase) return `${format(props.record.purchase.quoteAmountText, quoteSymbol.value)} ${quoteSymbol.value}`
+  if (subscription) return `${format(subscription.quoteAmountText)} ${quoteSymbol.value}`
+  if (props.record.purchase) return `${format(props.record.purchase.quoteAmountText)} ${quoteSymbol.value}`
   if (props.record.distribution) {
     if (props.record.distribution.status === 'refunded') return t('newCoin.statusRefunded')
     return props.record.distribution.lockPositionId
@@ -94,7 +94,7 @@ const secondaryAmount = computed(() => {
       : unlock.unlockFeeAssetId
         ? t('newCoin.assetNumber', { id: unlock.unlockFeeAssetId })
         : t('newCoin.unavailableValue')
-    return `${format(unlock.unlockFeeAmountText, feeAsset)} ${feeAsset}`
+    return `${format(unlock.unlockFeeAmountText)} ${feeAsset}`
   }
   return t('newCoin.noUnlockFee')
 })
@@ -112,10 +112,8 @@ const canRelease = computed(() => Boolean(
   && !['released', 'completed'].includes(unlock.value.status.toLowerCase()),
 ))
 
-function format(value: string | null | undefined, asset?: string): string {
-  return value
-    ? formatFinancialAmount(value, locale.value, { assetSymbol: asset })
-    : t('newCoin.unavailableValue')
+function format(value: string | null | undefined): string {
+  return formatTokenAmount(value ?? null)
 }
 </script>
 
@@ -166,15 +164,14 @@ function format(value: string | null | undefined, asset?: string): string {
   </article>
 </template>
 
-<style scoped>
+<style>
 .new-coin-record-card {
   background: var(--new-coin-record-card);
   border: 1px solid var(--new-coin-record-border);
   border-radius: 18px;
   box-shadow: var(--new-coin-record-shadow);
-  box-sizing: border-box;
   color: var(--new-coin-record-ink);
-  height: 168px;
+  min-height: 168px;
   overflow: hidden;
   position: relative;
   width: 100%;
@@ -189,7 +186,7 @@ function format(value: string | null | undefined, asset?: string): string {
   width: 4px;
 }
 
-.new-coin-record-card :deep(.new-coin-record-card__mark.asset-mark--fallback) {
+.new-coin-record-card .new-coin-record-card__mark.asset-mark--fallback {
   --asset-color: var(--new-coin-record-active);
   --asset-ink: var(--new-coin-record-active);
   background: var(--new-coin-record-mark);
@@ -264,7 +261,7 @@ function format(value: string | null | undefined, asset?: string): string {
   border-bottom: 1px solid var(--new-coin-record-line);
   display: grid;
   grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
-  height: 54px;
+  min-height: 54px;
   margin: 0;
   padding-bottom: 9px;
 }
@@ -291,9 +288,7 @@ function format(value: string | null | undefined, asset?: string): string {
   font-weight: 700;
   line-height: 19px;
   margin: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .new-coin-record-card dl > div:first-child dd {

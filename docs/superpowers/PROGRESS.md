@@ -9992,3 +9992,24 @@
 - 修改文件：本轮仅追加`docs/superpowers/PROGRESS.md`，构建配置和测试沿用已验收提交。
 - 验证结果：fetch确认本地领先3个提交、无落后或分叉，`git diff --check`通过。沿用前述Docker合同10/10、构建源18/18、架构/文档、严格Clippy、Linux双架构依赖离线校验及ARM64实际release构建结果。提交后执行普通push，并以`git ls-remote`与本地HEAD完全一致作为本次发布完成条件。
 - 后续事项：GitHub Actions的实际打包结果仍待确认，本机API权限返回404；未部署服务器。保留既有未跟踪`.vite/`缓存。
+
+## 2026-10-21 01:06 - 代理发币图片上传 Cloudflare 拦截初步定位
+
+- 完成内容：核对用户 HTML，确认域名 cllbmz.kdns.fr 的 Cloudflare 拦截页，Ray ID a4d96b139804b7fd；定位代理 Logo multipart 接口及共享存储调用，未发现 Content-Type 误设 JSON。尚无安全事件，未确定命中规则和拦截层级。
+- 修改文件：`.trellis/tasks/10-21-agent-coin-logo-security-block/`、`docs/superpowers/PROGRESS.md`。
+- 验证结果：`npm --prefix web test -- src/coin-applications/CoinLogoUpload.test.tsx src/api/client.test.ts` 25/25 通过；未执行线上上传或变更 Cloudflare 配置。
+- 后续事项：取得失败请求 URL、状态码及对应 Cloudflare 安全事件中的服务、动作和规则 ID，针对性修复并实测；业务代码未修改。
+
+## 2026-10-21 02:14 - 打新详情持仓标题与 Numeral 数字展示
+
+- 完成内容：Mobile/PC“我的发行持仓”改为“我的持仓”，英文同步为 My holdings；数量、成本、估值、收益增加千位分隔并去除冗余尾零，收益率保留原有精确计算和两位小数。Numeral 仅处理安全整数部分，大整数及小数保留文本精度，不改变交易请求。
+- 修改文件：`mobile/pc src/core/tokenIssuance.ts`、`tokenIssuanceMessages.ts`、`src/components/TokenTradingPanel.vue`、`src/numeral.d.ts`、两端`tests/token-issuance.test.ts`；`mobile/package.json`、`mobile/package-lock.json`、`mobile/tsconfig.tests.json`；`.trellis/spec/mobile/backend-integration.md`、`.trellis/tasks/10-21-new-coin-holdings-numeral/`及本记录。
+- 验证结果：Mobile release:gate 全部通过，886/886、类型、PWA/Tauri Web构建、制品、包体与治理通过；PC类型/构建及126/126通过。完整Numeral曾导致包体超限，改用上游核心模块后PWA JS1499.9KiB、Tauri JS1496.3KiB，未提高1500KiB阈值。Ego真实组件隔离只读响应16组中英/明暗/窄屏与长数字无横溢，截图已查看；git diff及task validate通过。
+- 后续事项：未提交、推送或部署；未验证生产接口和原生Android/iOS安装包。Cloudflare任务保持独立待排查；保留既有`.vite/`。
+
+## 2026-10-21 02:59 - 打新按钮与余额、记录数字和首页总资产修复
+
+- 完成内容：Mobile/PC打新详情及记录登录/解锁卖出按钮统一优化，保留禁用和焦点状态；显示计价资产可用钱包余额，成交和周期刷新，区分空账户零余额与读取失败。记录及确认数值复用保精度Numeral格式。Mobile首页复用钱包发行估值，修复未上市币无现货ticker导致总资产显示--，支持价格时效、自动刷新和会话隔离。
+- 修改文件：Mobile/PC新币交易、申购、记录组件及tokenIssuance核心/API/消息；`mobile/src/views/HomeView.vue`、`NewCoinDetailView.vue`、`NewCoinRecordsView.vue`、`mobile/src/styles/token-issuance.css`；`pc/src/components/TokenQuoteBalance.vue`、`pc/src/views/TokenProject.vue`、`User/LaunchpadOrders.vue`；相关行为测试和隔离浏览器夹具；`.trellis/spec/mobile/backend-integration.md`、`.trellis/tasks/10-21-new-coin-holdings-numeral/`及本记录。
+- 验证结果：Mobile release:gate通过891/891、类型、PWA/Tauri Web构建/制品/包体/治理；PC最终类型/构建及127/127通过。Ego 56组中英/明暗/320与448px检查无横溢或数值裁剪，动作高度至少44px；模拟买入余额1000→999.2，首页估值2000→3000→读取失败未知→3000自动恢复，读取矩阵零写请求。最终截图重试仍因CDP超时失败，未完成本轮截图目视验收；此前持仓格式轮已查看截图。diff与任务上下文校验通过，预算未提高。
+- 后续事项：按工作流保存本地提交并归档；未推送或部署，未验证生产接口和原生Android/iOS包。已关闭Ego空间1和5187预览，保留既有`.vite/`及独立Cloudflare任务。

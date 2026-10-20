@@ -153,6 +153,7 @@
 </template>
 
 <script setup lang="ts">
+import { formatTokenAmount } from '@/core/tokenIssuance'
 import TokenTradingPanel from '@/components/TokenTradingPanel.vue'
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -266,12 +267,7 @@ function feeText(record: NewCoinUnlockRecord) {
   return `${trim(record.unlockFeeAmount)} ${assetSymbol(record.unlockFeeAsset)}`
 }
 
-// 后端 DECIMAL(36,18) 序列化为定长字符串，去掉尾随零但保留全部有效位。
-function trim(value: string) {
-  if (!value.includes('.')) return value
-  const trimmed = value.replace(/0+$/, '').replace(/\.$/, '')
-  return trimmed === '' || trimmed === '-' ? '0' : trimmed
-}
+function trim(value: string) { return formatTokenAmount(value) }
 
 function statusText(status: string) {
   const key = `launchpad.record_status_${status}`

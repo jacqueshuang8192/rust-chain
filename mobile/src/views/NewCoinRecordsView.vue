@@ -24,7 +24,7 @@ import {
 } from '@/api/newCoin'
 import { fetchWalletAccounts } from '@/api/wallet'
 import { decimalCompare, decimalTextFromBoundary, type DecimalText } from '@/core/decimal'
-import { formatFinancialAmount } from '@/core/financialDisplay'
+import { formatTokenAmount } from '@/core/tokenIssuance'
 import { useModalDialog } from '@/core/modalDialog'
 import {
   buildUnifiedNewCoinRecords,
@@ -37,7 +37,7 @@ import type { WalletAccount } from '@/core/types'
 import { useSessionStore } from '@/stores/session'
 
 const router = useRouter()
-const { locale, t } = useI18n()
+const { t } = useI18n()
 const session = useSessionStore()
 const projects = ref<NewCoinProject[]>([])
 const subscriptions = ref<NewCoinSubscription[]>([])
@@ -207,10 +207,8 @@ async function release(record: UnifiedNewCoinRecord): Promise<void> {
   }
 }
 
-function formatMoney(value: DecimalText | null, asset?: string): string {
-  return value
-    ? formatFinancialAmount(value, locale.value, { assetSymbol: asset })
-    : t('newCoin.unavailableValue')
+function formatMoney(value: DecimalText | null): string {
+  return formatTokenAmount(value)
 }
 
 function handleFeeKeydown(event: KeyboardEvent): void {
@@ -330,8 +328,8 @@ onMounted(() => { void load() })
           <p id="new-coin-fee-description">{{ t('newCoin.feeDescription') }}</p>
           <dl>
             <div><dt>{{ t('newCoin.paymentAsset') }}</dt><dd>{{ paymentAccount?.symbol || t('newCoin.assetNumber', { id: pendingUnlock.unlockFeeAssetId }) }}</dd></div>
-            <div><dt>{{ t('newCoin.unlockFee') }}</dt><dd>{{ formatMoney(paymentAmountText, paymentAccount?.symbol) }} {{ paymentAccount?.symbol || '' }}</dd></div>
-            <div><dt>{{ t('newCoin.availableBalance') }}</dt><dd>{{ formatMoney(paymentAvailableText, paymentAccount?.symbol) }} {{ paymentAccount?.symbol || '' }}</dd></div>
+            <div><dt>{{ t('newCoin.unlockFee') }}</dt><dd>{{ formatMoney(paymentAmountText) }} {{ paymentAccount?.symbol || '' }}</dd></div>
+            <div><dt>{{ t('newCoin.availableBalance') }}</dt><dd>{{ formatMoney(paymentAvailableText) }} {{ paymentAccount?.symbol || '' }}</dd></div>
           </dl>
           <p v-if="error" class="new-coin-record-sheet__error" role="alert">{{ error }}</p>
           <div class="new-coin-record-sheet__actions">
@@ -493,7 +491,6 @@ onMounted(() => { void load() })
 .new-coin-record-sheet {
   background: var(--new-coin-record-card);
   border-radius: 24px 24px 0 0;
-  box-sizing: border-box;
   color: var(--new-coin-record-ink);
   padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
   width: 100%;

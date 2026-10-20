@@ -7,7 +7,7 @@ import { compileScript, parse } from '@vue/compiler-sfc'
 import { createSessionRequestLifecycle } from '../src/core/sessionRequest.ts'
 import type { NewCoinProject } from '../src/core/newCoinModel.ts'
 import { normalizeDecimalText } from '../src/core/decimal.ts'
-import { parseTokenPolicy, tokenDecimal, tokenMultiply, type TokenPolicy } from '../src/core/tokenIssuance.ts'
+import { parseTokenPolicy, tokenDecimal, tokenMultiply, formatTokenAmount, type TokenPolicy } from '../src/core/tokenIssuance.ts'
 import * as decimal from '../src/core/decimal.ts'
 import * as presentation from '../src/core/newCoinPresentation.ts'
 import { formatDateTime } from '../src/core/format.ts'
@@ -132,7 +132,7 @@ function subscriptionHarness() {
     '@/api/tokenIssuance': { subscribeToken: (_symbol: string, intent: TokenSubscriptionIntent) => {
       const write = { ...deferred<void>(), intent: { ...intent } }; writes.push(write); return write.promise
     } },
-    '@/core/tokenIssuance': { tokenDecimal, tokenMultiply }, '@/core/tokenIssuanceMessages': {},
+    '@/core/tokenIssuance': { tokenDecimal, tokenMultiply }, './TokenQuoteBalance.vue': {}, '@/core/tokenIssuanceMessages': {},
   }, { crypto: { randomUUID: () => 'original-subscription-key' }, sessionStorage: {
     setItem: (key: string, value: string) => storage.set(key, value), getItem: (key: string) => storage.get(key), removeItem: (key: string) => storage.delete(key),
   } })
