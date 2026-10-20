@@ -535,3 +535,36 @@ Home balance uses exact Numeral display at 26px or 22px; replaced return history
 ### Next Steps
 
 - None - task complete
+
+
+## Session 75: Spot editable amount presentation
+
+**Date**: 2026-10-21
+**Task**: Spot editable amount presentation
+**Branch**: `main`
+
+### Summary
+
+Formatted idle spot quantity and turnover without rounding order state. Focus restores exact values and quote draft remains stable. Mobile release gate894/894 passed; real app isolated browser interaction verified zero writes. No push or deployment.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `05aff56` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
