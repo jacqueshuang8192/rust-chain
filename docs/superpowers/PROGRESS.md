@@ -10034,3 +10034,10 @@
 - 修改文件：`mobile/src/views/HomeView.vue`、`mobile/src/styles/home-numeric.css`、`prototype-parity.css`、`mobile/src/assets/home/portfolio-wallet.png`；首页和历史图相关测试；`.trellis/spec/mobile/backend-integration.md`与当前任务记录。
 - 验证结果：最终Mobile release:gate全部通过，892/892、类型、PWA/Tauri Web构建/制品/包体/治理；PNG为RGBA、alpha范围0–255。既有24组布局检查通过，最终素材深色390px和浅色320px长金额无横溢、字体26/22px、无历史请求，截图已查看；diff和任务上下文检查通过。
 - 后续事项：保存本地提交并归档，未推送或部署，未验证原生设备和生产接口；最终Ego空间已关闭，预览服务停止，保留独立Cloudflare目录与`.vite/`。
+
+## 2026-10-21 05:54 - 首页资产展示优化推送
+
+- 完成内容：按用户授权发布首页余额Numeral与透明插画提交`cc76daa`及归档、日志；本记录一起提交后普通推送到`origin/main`。
+- 修改文件：本轮仅追加`docs/superpowers/PROGRESS.md`，业务源码沿用已验收提交。
+- 验证结果：fetch确认本地领先3个提交、无落后或分叉；沿用Mobile release:gate 892/892及构建、包体、浏览器验收。提交前检查diff，推送后核对远端main与本地HEAD完整哈希。
+- 后续事项：未部署，CI构建结果待确认；独立Cloudflare排查目录与`.vite/`保留。
