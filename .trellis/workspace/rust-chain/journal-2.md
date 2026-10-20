@@ -502,3 +502,36 @@ Improved Mobile/PC new coin actions, precise Numeral displays and quote availabl
 ### Next Steps
 
 - None - task complete
+
+
+## Session 74: Home portfolio typography and transparent illustration
+
+**Date**: 2026-10-21
+**Task**: Home portfolio typography and transparent illustration
+**Branch**: `main`
+
+### Summary
+
+Home balance uses exact Numeral display at 26px or 22px; replaced return history chart and requests with generated RGBA wallet illustration. Final Mobile release gate passed 892/892, types, PWA/Tauri Web builds and budgets. Prior 24-case layout matrix plus final light/dark screenshots verified. Local commit only; no push/deployment.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `cc76daa` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 73
+- **Total Sessions**: 74
 - **Last Active**: 2026-10-21
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~504 | Active |
+| `journal-2.md` | ~537 | Active |
 | `journal-1.md` | ~1985 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 74 | 2026-10-21 | Home portfolio typography and transparent illustration | `cc76daa` | `main` |
 | 73 | 2026-10-21 | New coin presentation and home valuation | `09877ce` | `main` |
 | 72 | 2026-10-20 | Persist Cargo downloads for GitHub image builds | `6707fea` | `main` |
 | 71 | 2026-10-20 | Repair live token holding and wallet valuation | `4d124e2` | `main` |
