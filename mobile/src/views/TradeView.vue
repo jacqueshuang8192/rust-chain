@@ -85,6 +85,7 @@ import {
   resolveMarginPositionRiskMetrics,
   type MarginPositionRiskMetrics,
 } from '@/core/marginRiskMetrics'
+import { financialAssetDisplayDigits } from '@/core/financialDisplay'
 import { useModalDialog } from '@/core/modalDialog'
 import { goBackOr } from '@/core/navigation'
 import {
@@ -317,6 +318,23 @@ const amountValue = computed({
   get: () => quoteFromBase(quantity.value, orderPrice.value) ?? '',
   set: (value: string) => { quantity.value = baseFromQuote(value, orderPrice.value, 18) ?? '' },
 })
+// Display formatting never writes rounded values back into the order draft.
+const spotQuantityEditing = ref(false)
+const spotAmountEditing = ref(false)
+const spotAmountDraft = ref('')
+const spotQuantityInput = computed({
+  get: () => spotQuantityEditing.value ? quantity.value : moneyText(quantity.value, 8, quantity.value),
+  set: (value: string) => { quantity.value = value; clearPercentageSelection() },
+})
+const spotAmountInput = computed({
+  get: () => spotAmountEditing.value ? spotAmountDraft.value
+    : moneyText(amountValue.value, financialAssetDisplayDigits(quoteAsset.value), amountValue.value),
+  set: (value: string) => { spotAmountDraft.value = value; amountValue.value = value; clearPercentageSelection() },
+})
+function beginSpotAmountEditing(): void {
+  spotAmountDraft.value = amountValue.value
+  spotAmountEditing.value = true
+}
 function spotDraft(): Readonly<SpotOrderReviewSnapshot> | null {
   return createSpotReview({ symbol: pairSymbol.value, side: side.value, orderType: orderType.value,
     quantity: quantity.value, limitPrice: price.value, marketPrice: tickerPrice.value })
@@ -1678,7 +1696,8 @@ onBeforeUnmount(() => {
           </label>
           <label class="spot-field-shell spot-field-shell--unit">
             <span>{{ t('common.quantity') }}</span>
-            <input v-model="quantity" inputmode="decimal" :placeholder="t('trade.quantityPlaceholder')" />
+            <input v-model="spotQuantityInput" inputmode="decimal" :placeholder="t('trade.quantityPlaceholder')"
+              :title="quantity" @focus="spotQuantityEditing = true" @blur="spotQuantityEditing = false" />
             <b>{{ baseAsset }}</b>
           </label>
 
@@ -1698,7 +1717,8 @@ onBeforeUnmount(() => {
 
           <label class="spot-field-shell spot-field-shell--unit">
             <span>{{ t('trade.turnover') }}</span>
-            <input v-model="amountValue" inputmode="decimal" :placeholder="t('trade.turnover')" />
+            <input v-model="spotAmountInput" inputmode="decimal" :placeholder="t('trade.turnover')"
+              :title="amountValue" @focus="beginSpotAmountEditing" @blur="spotAmountEditing = false" />
             <b>{{ quoteAsset }}</b>
           </label>
 

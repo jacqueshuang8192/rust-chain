@@ -2553,3 +2553,16 @@ quote/contract errors, unknown/late frames, and listed-only new-coin opportuniti
   loading, clears on error/account changes and rejects stale response versions.
   Run home-asset-estimate and token-quote-balance behavioral regressions plus
   both clients' issuance checks and Mobile release gate.
+
+### Spot editable amount presentation
+
+- Spot quantity/turnover use separate display and editing values. Unfocused quantity
+  uses eight display decimals; turnover follows `financialAssetDisplayDigits` for
+  the quote asset. Reuse financial grouping and tiny-nonzero threshold semantics.
+- Focus reveals exact decimal text. Blur must never write rounded display output
+  into order quantity. Keep an independent quote input draft while editing so
+  division/multiplication cannot overwrite partial input or cursor position.
+- Manual edits clear percentage selection. Spot submission continues to use the
+  existing exact quantity and conversion path; contract inputs stay unchanged.
+- Verify `spot-input-presentation.test.ts`, including screenshot values, focus/blur
+  equality, stable partial quote inputs, unsafe integers and tiny amounts.

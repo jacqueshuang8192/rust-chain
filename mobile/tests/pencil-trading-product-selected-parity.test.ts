@@ -203,6 +203,20 @@ test('现货 yzOPc/bo8k5 模板仅定向调整订单类型入口与持仓归属�
             </div>`,
     'provenance-aware recent trade row',
   )
+  normalizedSpotTemplate = replaceExactlyOnce(
+    normalizedSpotTemplate,
+    `<input v-model="spotQuantityInput" inputmode="decimal" :placeholder="t('trade.quantityPlaceholder')"
+              :title="quantity" @focus="spotQuantityEditing = true" @blur="spotQuantityEditing = false" />`,
+    `<input v-model="quantity" inputmode="decimal" :placeholder="t('trade.quantityPlaceholder')" />`,
+    'display-only spot quantity formatting',
+  )
+  normalizedSpotTemplate = replaceExactlyOnce(
+    normalizedSpotTemplate,
+    `<input v-model="spotAmountInput" inputmode="decimal" :placeholder="t('trade.turnover')"
+              :title="amountValue" @focus="beginSpotAmountEditing" @blur="spotAmountEditing = false" />`,
+    `<input v-model="amountValue" inputmode="decimal" :placeholder="t('trade.turnover')" />`,
+    'display-only spot amount formatting',
+  )
   const priorSpotDigest = createHash('sha256').update(normalizedSpotTemplate).digest('hex')
 
   assert.equal(priorSpotDigest, '80417caf6742d533159cc2ba09a723c9ea3d2ebcb6a04df7926fd075c65cb828')

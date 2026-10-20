@@ -10041,3 +10041,10 @@
 - 修改文件：本轮仅追加`docs/superpowers/PROGRESS.md`，业务源码沿用已验收提交。
 - 验证结果：fetch确认本地领先3个提交、无落后或分叉；沿用Mobile release:gate 892/892及构建、包体、浏览器验收。提交前检查diff，推送后核对远端main与本地HEAD完整哈希。
 - 后续事项：未部署，CI构建结果待确认；独立Cloudflare排查目录与`.vite/`保留。
+
+## 2026-10-21 07:33 - 现货数量与交易额展示优化
+
+- 完成内容：现货非编辑数量最多8位小数、交易额按计价资产展示精度（USDT2位），增加分组和去尾零；聚焦恢复完整精度，失焦不修改下单值，交易额编辑保留输入草稿，手动编辑清除百分比选择。
+- 修改文件：`mobile/src/views/TradeView.vue`、`mobile/tests/spot-input-presentation.test.ts`、`mobile/tests/pencil-trading-product-selected-parity.test.ts`、`.trellis/spec/mobile/backend-integration.md`及当前任务记录。
+- 验证结果：Mobile release:gate通过894/894、类型、PWA/Tauri Web构建/制品/包体/治理；浏览器真实页面隔离接口验证0.54005511和44,900.85显示、聚焦原值及100.50输入保留，零写请求，截图已查看（桌面壳，未宣称窄屏视觉验收）；diff和任务校验通过。
+- 后续事项：保存本地提交并归档；未推送或部署，未验证生产接口和原生设备。Ego空间和本轮预览已关闭，独立Cloudflare任务及`.vite/`保留。
