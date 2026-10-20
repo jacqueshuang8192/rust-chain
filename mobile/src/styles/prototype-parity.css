@@ -2615,7 +2615,7 @@ body,
   display: flex;
   flex-wrap: wrap;
   column-gap: 6px;
-  font-size: 32px;
+  font-size: 26px;
   font-weight: 700;
   line-height: 1.2;
   margin-top: 6px;
@@ -2679,93 +2679,14 @@ body,
   color: var(--negative);
 }
 
-.app-stage .mobile-canvas .home-view .portfolio-chart {
-  align-self: end;
-  background-image: none;
-  border: 0;
-  height: 86px;
-  margin: 0 0 10px;
-  min-height: 86px;
-  overflow: visible;
-  position: relative;
-}
-
-.app-stage .mobile-canvas .home-view .portfolio-chart::before,
-.app-stage .mobile-canvas .home-view .portfolio-chart::after {
-  display: none;
-}
-
-.app-stage .mobile-canvas .home-view .portfolio-chart__plot {
-  height: 64px;
-  left: 0;
-  position: absolute;
-  top: 10px;
-  width: calc(100% - 6px);
-}
-
-.app-stage .mobile-canvas .home-view .portfolio-chart svg {
+.app-stage .mobile-canvas .home-view .portfolio-illustration {
+  align-self: center;
   display: block;
-  height: 100%;
-  inset: 0;
-  overflow: visible;
-  position: absolute;
   width: 100%;
-}
-
-.app-stage .mobile-canvas .home-view .portfolio-return-dot {
-  background: currentColor;
-  border: 2px solid var(--pencil-surface-strong);
-  border-radius: 50%;
-  height: 8px;
-  position: absolute;
-  transform: translate(-50%, -50%);
-  width: 8px;
-}
-
-/* Plot tones must not inherit the prototype's important financial-text colors. */
-.app-stage .mobile-canvas .home-view .portfolio-return-line[data-tone='positive'],
-.app-stage .mobile-canvas .home-view .portfolio-return-dot[data-tone='positive'] {
-  color: var(--pencil-mint);
-}
-
-.app-stage .mobile-canvas .home-view .portfolio-return-line[data-tone='negative'],
-.app-stage .mobile-canvas .home-view .portfolio-return-dot[data-tone='negative'] {
-  color: var(--negative);
-}
-
-.app-stage .mobile-canvas .home-view .portfolio-return-line[data-tone='neutral'],
-.app-stage .mobile-canvas .home-view .portfolio-return-dot[data-tone='neutral'] {
-  color: var(--muted-strong);
-}
-
-.app-stage .mobile-canvas .home-view .portfolio-history-state {
-  align-content: center;
-  color: var(--pencil-muted);
-  display: grid;
-  font-size: 11px;
-  gap: 2px;
-  inset: 0;
-  justify-items: center;
-  padding: 2px;
-  position: absolute;
-  text-align: center;
-  z-index: 2;
-}
-
-.app-stage .mobile-canvas .home-view .portfolio-history-state button {
-  background: var(--pencil-surface-strong);
-  border: 1px solid var(--pencil-border);
-  border-radius: 4px;
-  color: var(--pencil-text);
-  min-height: 44px;
-  min-width: 88px;
-  padding: 0 16px;
-}
-
-.app-stage .mobile-canvas .home-view .portfolio-history-state button:focus-visible {
-  box-shadow: 0 0 0 3px var(--focus-ring);
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+  height: 104px;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
 }
 
 .app-stage .mobile-canvas .home-view .funding-actions {

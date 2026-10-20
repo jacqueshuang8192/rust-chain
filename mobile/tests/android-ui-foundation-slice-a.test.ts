@@ -43,7 +43,7 @@ test('根头部与首页对齐选中品牌 Hero、成员资产图、双资金动
   assert.match(homeSource, /const guestHeroImage = computed\(\(\) => theme\.isDark \? guestHeroDark : guestHeroLight\)/)
   assert.equal((homeSource.match(/class="home-guest-hero__image"/g) || []).length, 1)
   assert.match(homeSource, /class="portfolio-overview home-portfolio home-portfolio--member"/)
-  assert.match(homeSource, /class="portfolio-chart"/)
+  assert.match(homeSource, /class="portfolio-illustration"/)
   assert.match(homeSource, /class="home-carousel"/)
   assert.match(homeSource, /v-if="activeCarouselSlide"/)
   assert.match(homeSource, /rootPrototype\.todayReturn/)

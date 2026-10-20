@@ -1219,30 +1219,24 @@ isolation, the Home complete-status display guard, executable Assets
 presentation states, wallet/today-return request independence, exact-token
 account/transfer invalidation, and narrow-grid overflow guards.
 
-## 11. Home Return History Contract
+## 11. Home Portfolio Presentation and Shared Return History
 
-- Home fetches only protected `GET /wallet/return-history?days=1|7|30|180` for
-  its chart. The API adapter owns the period whitelist and strict mapping;
-  guests make no request.
-- The mapper validates realized/USDT, period echo, exactly N UTC-midnight
-  points, 86,400,000ms continuity, point/top complete-partial consistency,
-  nullable partial fields, sorted missing-price unions, rates, cumulative sums,
-  and complete summary equality. Malformed decimals are rejected rather than
-  coerced to zero.
-- Geometry consumes only complete mapped history and plots
-  `[0, ...daily cumulativeAmount]` in the existing 358x153 SVG. Its y-domain
-  includes zero; all-zero history is centered at y=76.5; the final x is 358.
-- Period changes, retries, exact-token changes, logout, and unmount reuse
-  `createSessionRequestLifecycle`. Clear the old DTO/path before every load so
-  period ABA and late responses cannot restore stale account data.
-- Hidden, loading, partial, and error states render no path, endpoint, or
-  accessible financial values. Complete visible history supplies a localized
-  summary and UTC-day table; partial/error remain retryable.
-
-Required tests cover all four periods, strict DTO failures, one-day baseline,
-zero/positive/negative/cross-zero geometry, partial cumulative propagation,
-guest/latest-request/ABA/token/unmount isolation, privacy, source contracts,
-44px period/retry controls, and symmetric locale keys.
+- Home shows the authoritative wallet valuation and today return. The old return
+  history chart is replaced by a decorative transparent image (`alt=""`,
+  `aria-hidden="true"`); Home must not request `/wallet/return-history` or create
+  its history lifecycle. Do not let decorative art imply financial performance.
+- Home total uses the existing precision-safe `formatTokenAmount` Numeral helper
+  after decimal-text four-place half-up rounding. If rounding would erase a
+  nonzero balance, preserve its exact text. Keep unknown `--`, privacy masks,
+  valuation freshness and account-isolation behavior. Never cast the full amount
+  through Number. Typography is 26px normally and 22px for long wrapped values.
+- The shared return-history adapter, domain, geometry and API remain available.
+  The mapper validates realized/USDT, period echo, exactly N UTC-midnight points,
+  continuity, complete/partial consistency, decimal text and cumulative sums.
+  Its existing lifecycle continues to reject obsolete requests and sessions.
+- Regression coverage retains history adapter/geometry/lifecycle tests and Home
+  valuation lifecycle tests; Home rendering verifies no history request, today
+  return retention, numeral grouping/precision, privacy, and narrow layout.
 
 ## 12. Wallet Ledger Account And Category Contract
 

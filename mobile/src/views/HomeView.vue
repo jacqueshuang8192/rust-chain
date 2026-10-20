@@ -25,22 +25,18 @@ import {
 import AssetMark from '@/components/AssetMark.vue'
 import guestHeroDark from '@/assets/home/market-hero-dark.jpg'
 import guestHeroLight from '@/assets/home/market-hero-light.jpg'
+import portfolioIllustration from '@/assets/home/portfolio-wallet.png'
 import { fetchHomeCarousel, type HomeCarouselSlide } from '@/api/homeCarousel'
 import { fetchMarginWallets } from '@/api/trading'
 import {
-  createReturnHistoryRequestLifecycle,
   createTodayReturnRequestLifecycle,
-  fetchReturnHistory,
   fetchTodayReturn,
   fetchWalletAccounts,
-  type ReturnHistory,
-  type ReturnHistoryPeriodDays,
-  type ReturnHistoryViewState,
   type TodayReturn,
 } from '@/api/wallet'
-import { formatAmount, formatPercent, formatPrice } from '@/core/format'
-import { buildReturnHistoryGeometry } from '@/core/returnHistoryGeometry'
-import { decimalAdd, decimalSign, normalizeDecimalText, type DecimalText } from '@/core/decimal'
+import { formatPercent, formatPrice } from '@/core/format'
+import { decimalAdd, decimalRoundHalfUp, decimalSign, normalizeDecimalText, type DecimalText } from '@/core/decimal'
+import { formatTokenAmount } from '@/core/tokenIssuance'
 import { estimateWalletAsset } from '@/core/walletValuation'
 import { walletTotal } from '@/core/walletAmounts'
 import { formatFinancialAmount } from '@/core/financialDisplay'
@@ -72,9 +68,6 @@ const valuationClock = ref(Date.now())
 const assetsLoading = ref(false)
 const todayReturn = ref<TodayReturn | null>(null)
 const todayReturnState = ref<'idle' | 'loading' | 'complete' | 'partial' | 'error'>('idle')
-const selectedReturnHistoryPeriod = ref<ReturnHistoryPeriodDays>(1)
-const returnHistory = ref<ReturnHistory | null>(null)
-const returnHistoryState = ref<ReturnHistoryViewState>('idle')
 const carouselSlides = ref<HomeCarouselSlide[]>([])
 const carouselState = ref<'idle' | 'loading' | 'ready' | 'empty' | 'error'>('idle')
 const carouselIndex = ref(0)
@@ -88,10 +81,6 @@ const carouselTouching = ref(false)
 const todayReturnRequestLifecycle = createTodayReturnRequestLifecycle({
   sessionKey: () => session.token,
   fetchTodayReturn,
-})
-const returnHistoryRequestLifecycle = createReturnHistoryRequestLifecycle({
-  sessionKey: () => session.token,
-  fetchReturnHistory: () => fetchReturnHistory(selectedReturnHistoryPeriod.value),
 })
 let viewActive = true
 let carouselTimer: number | undefined
@@ -142,11 +131,11 @@ const totalAssetEstimate = computed(() => assetEstimates.value.reduce<DecimalTex
 ))
 const assetEstimateComplete = computed(() => assetEstimates.value.every(value => value !== null))
 
-const displayedAssetAmount = computed(() => (
-  session.isAuthenticated && assetEstimateReady.value && assetEstimateComplete.value
-    ? formatAmount(totalAssetEstimate.value)
-    : '--'
-))
+const displayedAssetAmount = computed(() => {
+  if (!session.isAuthenticated || !assetEstimateReady.value || !assetEstimateComplete.value) return '--'
+  const rounded = decimalRoundHalfUp(totalAssetEstimate.value, 4)
+  return formatTokenAmount(decimalSign(rounded) === 0 ? totalAssetEstimate.value : rounded)
+})
 
 const todayReturnPresentation = computed(() => resolveTodayReturnPresentation({
   visible: assetVisible.value,
@@ -170,57 +159,12 @@ const displayedTodayReturnAmount = computed(() => (
 const displayedTodayReturnDetail = computed(() => todayReturnPresentation.value.detail)
 const todayReturnTone = computed(() => todayReturnPresentation.value.tone)
 
-const portfolioGeometry = computed(() => {
-  if (!assetVisible.value || returnHistoryState.value !== 'complete' || !returnHistory.value) {
-    return null
-  }
-  return buildReturnHistoryGeometry(returnHistory.value)
-})
-
-const returnHistoryStatusMessage = computed(() => {
-  if (!assetVisible.value) return t('home.returnHistoryHidden')
-  if (returnHistoryState.value === 'loading') return t('home.returnHistoryLoading')
-  if (returnHistoryState.value === 'partial') return t('home.returnHistoryPartial')
-  if (returnHistoryState.value === 'error') return t('home.returnHistoryUnavailable')
-  return ''
-})
-
-const returnHistoryChartLabel = computed(() => {
-  if (returnHistoryStatusMessage.value) return returnHistoryStatusMessage.value
-  const value = returnHistory.value
-  if (returnHistoryState.value !== 'complete' || value?.status !== 'complete') {
-    return t('home.returnHistoryUnavailable')
-  }
-  return t('home.returnHistoryChartSummary', {
-    days: value.periodDays,
-    amount: formatSignedReturnAmount(value.summary.amount),
-    asset: value.reportingAsset,
-  })
-})
-
-const accessibleReturnHistoryPoints = computed(() => {
-  const value = returnHistory.value
-  if (!assetVisible.value || returnHistoryState.value !== 'complete' || value?.status !== 'complete') {
-    return []
-  }
-  return value.points
-})
-
 function formatSignedReturnAmount(value: DecimalText | null | undefined): string {
   const decimal = value ?? normalizeDecimalText('0')
   const formatted = formatFinancialAmount(decimal, locale.value === 'en' ? 'en-US' : 'zh-CN', {
     assetSymbol: 'USDT',
   })
   return `${decimalSign(decimal) > 0 && !formatted.startsWith('<') ? '+' : ''}${formatted}`
-}
-
-function formatReturnHistoryDay(dayStartAt: number): string {
-  return new Intl.DateTimeFormat(locale.value, {
-    timeZone: 'UTC',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date(dayStartAt))
 }
 
 function openMarket(symbol: string): void {
@@ -416,36 +360,6 @@ async function loadTodayReturn(): Promise<void> {
   todayReturnState.value = 'error'
 }
 
-async function loadReturnHistory(): Promise<void> {
-  if (!session.token) {
-    returnHistory.value = null
-    returnHistoryState.value = 'idle'
-    return
-  }
-
-  returnHistory.value = null
-  returnHistoryState.value = 'loading'
-  const result = await returnHistoryRequestLifecycle.load()
-  if (result.state === 'stale') return
-  if (result.state === 'guest') {
-    returnHistory.value = null
-    returnHistoryState.value = 'idle'
-    return
-  }
-  if (result.state === 'loaded') {
-    returnHistory.value = result.value
-    returnHistoryState.value = result.value.status
-    return
-  }
-  returnHistory.value = null
-  returnHistoryState.value = 'error'
-}
-
-function retryReturnHistory(): void {
-  returnHistoryRequestLifecycle.invalidate()
-  void loadReturnHistory()
-}
-
 async function refreshMarkets(force = false): Promise<void> {
   await marketStore.refresh(force)
   if (viewActive) marketStore.startLiveUpdates('home')
@@ -469,7 +383,6 @@ onUnmounted(() => {
   reducedMotionMediaQuery?.removeEventListener('change', updateCarouselReducedMotion)
   document.removeEventListener('visibilitychange', updateCarouselVisibility)
   todayReturnRequestLifecycle.stop()
-  returnHistoryRequestLifecycle.stop()
   marketStore.stopLiveUpdates('home')
 })
 watch(() => session.token, () => {
@@ -484,13 +397,6 @@ const assetRefreshTimer = setInterval(() => {
 watch(() => session.token, () => {
   todayReturnRequestLifecycle.invalidate()
   void loadTodayReturn()
-}, { immediate: true })
-watch(() => session.token, () => {
-  returnHistoryRequestLifecycle.invalidate()
-  returnHistory.value = null
-  returnHistoryState.value = 'idle'
-  selectedReturnHistoryPeriod.value = 1
-  void loadReturnHistory()
 }, { immediate: true })
 watch(locale, () => { void loadCarousel() })
 watch([carouselSlides, carouselPaused], restartCarouselTimer)
@@ -545,7 +451,7 @@ watch([carouselSlides, carouselPaused], restartCarouselTimer)
     <section
       v-else
       class="portfolio-overview home-portfolio home-portfolio--member"
-      data-portfolio-source="realized-return-history"
+      data-portfolio-source="wallet-valuation"
       :data-long-amount="assetVisible && displayedAssetAmount.length > 14"
       :aria-busy="!assetEstimateReady"
     >
@@ -580,68 +486,15 @@ watch([carouselSlides, carouselPaused], restartCarouselTimer)
             <small class="numeric" :class="todayReturnTone">{{ displayedTodayReturnDetail }}</small>
           </div>
         </div>
-        <figure
-          id="portfolio-return-history-chart"
-          class="portfolio-chart"
-          :class="{ 'has-live-history': portfolioGeometry }"
-          :data-return-history-status="assetVisible ? returnHistoryState : 'hidden'"
-          :aria-busy="assetVisible && returnHistoryState === 'loading'"
-          :aria-label="returnHistoryChartLabel"
-        >
-          <div class="portfolio-chart__plot" aria-hidden="true">
-            <svg viewBox="0 0 358 153" preserveAspectRatio="none">
-              <path
-                v-if="portfolioGeometry"
-                :d="portfolioGeometry.path"
-                class="portfolio-return-line"
-                :data-tone="portfolioGeometry.tone"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                vector-effect="non-scaling-stroke"
-              />
-            </svg>
-            <span v-if="portfolioGeometry" class="portfolio-return-dot" :data-tone="portfolioGeometry.tone"
-              :style="{ left: `${portfolioGeometry.latest.x / 358 * 100}%`, top: `${portfolioGeometry.latest.y / 153 * 100}%` }" />
-          </div>
-          <div
-            v-if="returnHistoryStatusMessage"
-            class="portfolio-history-state"
-            :role="returnHistoryState === 'error' && assetVisible ? 'alert' : 'status'"
-            aria-live="polite"
-          >
-            <span>{{ returnHistoryStatusMessage }}</span>
-            <button
-              v-if="assetVisible && (returnHistoryState === 'partial' || returnHistoryState === 'error')"
-              type="button"
-              @click="retryReturnHistory"
-            >
-              {{ t('common.retry') }}
-            </button>
-          </div>
-          <figcaption v-if="accessibleReturnHistoryPoints.length" class="sr-only">
-            {{ returnHistoryChartLabel }}
-          </figcaption>
-          <table v-if="accessibleReturnHistoryPoints.length" class="sr-only">
-            <caption>{{ t('home.returnHistoryTableCaption') }}</caption>
-            <thead>
-              <tr>
-                <th scope="col">{{ t('home.returnHistoryDate') }}</th>
-                <th scope="col">{{ t('home.returnHistoryDaily') }}</th>
-                <th scope="col">{{ t('home.returnHistoryCumulative') }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="point in accessibleReturnHistoryPoints" :key="point.dayStartAt">
-                <th scope="row">{{ formatReturnHistoryDay(point.dayStartAt) }}</th>
-                <td>{{ formatSignedReturnAmount(point.amount) }} USDT</td>
-                <td>{{ formatSignedReturnAmount(point.cumulativeAmount) }} USDT</td>
-              </tr>
-            </tbody>
-          </table>
-        </figure>
+        <img
+          class="portfolio-illustration"
+          :src="portfolioIllustration"
+          alt=""
+          aria-hidden="true"
+          width="120"
+          height="104"
+          decoding="async"
+        />
     </section>
 
     <section v-if="session.isAuthenticated" class="funding-actions" :aria-label="t('assets.operations')">

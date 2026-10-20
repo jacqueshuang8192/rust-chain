@@ -26,7 +26,7 @@ test('Root Header 使用 1000x250 横版品牌素材并精确渲染为 136x34', 
   assert.match(parityCss, /\.root-header__control\.root-header__control,[\s\S]*?background:\s*transparent;[\s\S]*?border:\s*0;/)
 })
 
-test('访客主页使用 tracked 明暗 Hero，登录后才展示真实资产与收益历史曲线', () => {
+test('访客主页使用 tracked 明暗 Hero，登录后才展示真实资产与装饰图片', () => {
   assert.match(homeSource, /import guestHeroDark from '@\/assets\/home\/market-hero-dark\.jpg'/)
   assert.match(homeSource, /import guestHeroLight from '@\/assets\/home\/market-hero-light\.jpg'/)
   assert.doesNotMatch(homeSource, /mobile\/pencil|@\/\.\.\/pencil|generated-178568/)
@@ -43,10 +43,8 @@ test('访客主页使用 tracked 明暗 Hero，登录后才展示真实资产与
 
   assert.match(homeSource, /fetchWalletAccounts\(\)/)
   assert.match(homeSource, /fetchMarginWallets\(\)/)
-  assert.match(homeSource, /fetchReturnHistory\(selectedReturnHistoryPeriod\.value\)/)
-  assert.match(homeSource, /data-portfolio-source="realized-return-history"/)
+  assert.match(homeSource, /data-portfolio-source="wallet-valuation"/)
   assert.doesNotMatch(homeSource, /portfolioSamples|totalAssetEstimate,[\s\S]*portfolioSamples/)
-  assert.match(homeSource, /v-if="portfolioGeometry"[\s\S]*:d="portfolioGeometry\.path"/)
   assert.doesNotMatch(homeSource, /portfolioPeriods|period\.days === selectedReturnHistoryPeriod/)
   assert.match(homeSource, /rootPrototype\.todayReturn[\s\S]*displayedTodayReturnAmount/)
   assert.match(homeSource, /data-today-return-status="todayReturnState"/)
@@ -58,7 +56,7 @@ test('首页 390px 块级几何与三行真实行情按选中画板固定', () =
   assert.match(parityCss, /\.home-view \.home-portfolio--guest\s*\{[^}]*padding:\s*8px 16px;/)
   assert.match(parityCss, /\.home-view \.home-guest-hero\s*\{[^}]*min-height:\s*128px;/)
   assert.match(parityCss, /\.home-portfolio--member\.portfolio-overview\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) clamp\(72px, calc\(100% - 230px\), 120px\);[^}]*min-height:\s*128px;/)
-  assert.match(parityCss, /\.home-view \.portfolio-chart\s*\{[^}]*background-image:\s*none;[^}]*height:\s*86px;/)
+  assert.match(parityCss, /\.home-view \.portfolio-illustration\s*\{[^}]*height:\s*104px;[^}]*object-fit:\s*contain;/)
   assert.match(parityCss, /\.home-view \.funding-actions\s*\{[\s\S]*?height:\s*64px;/)
   assert.match(parityCss, /\.home-view \.shortcut-section\s*\{[\s\S]*?height:\s*176px;/)
   assert.match(parityCss, /\.home-carousel__slide\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) 76px;[^}]*height:\s*108px;/)
@@ -78,18 +76,13 @@ test('首页 390px 块级几何与三行真实行情按选中画板固定', () =
   assert.match(parityCss, /@media \(max-width: 340px\)/)
 })
 
-test('顶部卡片还原紧凑操作、文字节奏和不受图表缩放影响的末端圆点', () => {
+test('顶部卡片还原紧凑操作、文字节奏和透明装饰图片', () => {
   assert.match(parityCss, /\.home-guest-hero__register\s*\{[^}]*height:\s*30px;[^}]*min-height:\s*30px;/)
   assert.match(parityCss, /\.home-guest-hero__copy\s*\{[^}]*gap:\s*4px;/)
   assert.match(parityCss, /\.home-guest-hero__actions\s*\{[^}]*gap:\s*6px;/)
   assert.match(parityCss, /\.home-guest-hero\s*\{[^}]*box-shadow:\s*inset[^;]*0 4px 12px/)
   assert.match(parityCss, /\.home-view \.portfolio-heading\s*\{[^}]*gap:\s*6px;[^}]*padding:\s*6px 0 10px;/)
   assert.match(parityCss, /\.home-view \.portfolio-change\s*\{[^}]*gap:\s*4px;[^}]*margin:\s*0;[^}]*padding:\s*0;/)
-  assert.match(parityCss, /\.portfolio-return-dot\s*\{[^}]*height:\s*8px;[^}]*width:\s*8px;/)
-  assert.match(homeSource, /<span v-if="portfolioGeometry" class="portfolio-return-dot"/)
-  assert.equal((homeSource.match(/:data-tone="portfolioGeometry\.tone"/g) || []).length, 2)
-  assert.doesNotMatch(homeSource, /:class="portfolioGeometry\.tone"/)
-  assert.match(parityCss, /\.portfolio-return-dot\[data-tone='positive'\]\s*\{[^}]*color:\s*var\(--pencil-mint\);/)
   assert.doesNotMatch(homeSource, /<circle|home-carousel__pause|carouselUserPaused/)
 })
 

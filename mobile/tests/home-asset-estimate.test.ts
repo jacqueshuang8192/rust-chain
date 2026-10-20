@@ -3,17 +3,17 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import ts from 'typescript'
 import * as Vue from 'vue'
-import { decimalAdd, decimalSign, normalizeDecimalText as n } from '../src/core/decimal.ts'
+import { decimalAdd, decimalRoundHalfUp, decimalSign, normalizeDecimalText as n } from '../src/core/decimal.ts'
 import { walletTotal } from '../src/core/walletAmounts.ts'
 import { estimateWalletAsset } from '../src/core/walletValuation.ts'
-import { formatAmount } from '../src/core/format.ts'
+import { formatTokenAmount } from '../src/core/tokenIssuance.ts'
 import type { WalletAccount } from '../src/core/types.ts'
 const flush = async () => { for (let i = 0; i < 10; i++) await Promise.resolve(); await Vue.nextTick() }
 const account = (symbol: string, available: string, locked = '0'): WalletAccount => ({
   assetId: symbol === 'USDT' ? 1 : 2, symbol, available: Number(available), frozen: 0, locked: Number(locked),
   availableText: n(available), frozenText: n('0'), lockedText: n(locked),
 })
-function harness() {
+function harness(marginBalance = '100') {
   const source = readFileSync(new URL('../src/views/HomeView.vue', import.meta.url), 'utf8')
   const computed = source.slice(source.indexOf('const assetEstimates ='), source.indexOf('const todayReturnPresentation ='))
   const load = source.slice(source.indexOf('async function loadAssetEstimate()'), source.indexOf('async function loadTodayReturn()'))
@@ -24,9 +24,9 @@ function harness() {
   const prices = Vue.reactive<Record<string, ReturnType<typeof n>>>({})
   let tick = () => {}, now = 1000
   const bindings = { ref: Vue.ref, computed: Vue.computed, watch: Vue.watch, session, marketStore: { tickerFor: (symbol: string) => prices[symbol] ? { lastPriceText: prices[symbol] } : undefined },
-    decimalAdd, decimalSign, normalizeDecimalText: n, walletTotal, estimateWalletAsset, formatAmount,
+    decimalAdd, decimalRoundHalfUp, decimalSign, normalizeDecimalText: n, walletTotal, estimateWalletAsset, formatTokenAmount,
     fetchWalletAccounts: () => new Promise<WalletAccount[]>((resolve, reject) => requests.push({ resolve, reject })),
-    fetchMarginWallets: async () => ({ wallets: [account('USDT', '100')] }),
+    fetchMarginWallets: async () => ({ wallets: [account('USDT', marginBalance)] }),
     document: { visibilityState: 'visible' }, Date: { now: () => now },
     setInterval: (fn: () => void) => { tick = fn; return 1 },
   }
@@ -67,4 +67,16 @@ test('Home total rejects stale sessions and never replaces missing issuance pric
   h.session.token = ''; h.session.isAuthenticated = false; await flush(); assert.equal(h.state.totalAssetEstimate.value, '0')
   h.session.token = 'c'; h.session.isAuthenticated = true; await flush(); h.stop()
   h.requests[2]!.resolve([account('USDT', '99')]); await flush(); assert.equal(h.state.displayedAssetAmount.value, '--')
+})
+
+test('Home Numeral display groups large totals without losing digits and preserves tiny balances', async () => {
+  const h = harness('0')
+  try {
+    h.requests[0]!.resolve([account('USDT', '9007199254740993.123456')]); await flush()
+    assert.equal(h.state.displayedAssetAmount.value, '9,007,199,254,740,993.1235')
+    h.tick(2000); h.requests[1]!.resolve([account('USDT', '0.000000000000000001')]); await flush()
+    assert.equal(h.state.displayedAssetAmount.value, '0.000000000000000001')
+    h.tick(3000); h.requests[2]!.resolve([account('USDT', '0')]); await flush()
+    assert.equal(h.state.displayedAssetAmount.value, '0')
+  } finally { h.stop() }
 })

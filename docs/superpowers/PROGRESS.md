@@ -10020,3 +10020,17 @@
 - 修改文件：本轮仅追加`docs/superpowers/PROGRESS.md`，业务代码沿用已验证提交。
 - 验证结果：fetch确认本地领先4个提交、无落后或分叉；沿用Mobile release:gate 891/891、PC类型/构建127/127及56组浏览器布局检查。提交前执行diff检查，推送后以远端main与本地HEAD哈希一致验证完成。
 - 后续事项：未部署，CI实际构建结果待确认；保留独立Cloudflare排查目录和`.vite/`缓存。
+
+## 2026-10-21 03:27 - 首页资产数字与曲线替换代码切片
+
+- 完成内容：首页总资产接入保精度Numeral格式，普通字号26px、超长22px；保留四位小数展示规则与极小非零金额。移除首页历史曲线及请求，保留今日收益、钱包估值刷新和隐私。当前品牌图仅临时占位，用户已选择API钱包插画，最终素材尚未生成。
+- 修改文件：`mobile/src/views/HomeView.vue`、`mobile/src/styles/home-numeric.css`、`prototype-parity.css`；首页/历史图相关既有测试及`home-asset-estimate.test.ts`；`.trellis/spec/mobile/backend-integration.md`及当前任务记录。
+- 验证结果：Mobile release:gate通过892/892及类型、PWA/Tauri Web构建/制品/预算/治理；后续仅调整测试夹具，首页3/3及测试类型检查通过。Ego24组中英/明暗/320、390、448px与长金额检查通过，字号26/22px、无横溢、无历史请求，隐私隐藏正常。尚未验证最终图片视觉。
+- 后续事项：等待本机OPENAI_API_KEY配置及gpt-image-1.5确认，生成真正透明钱包插画并替换临时图片后完成验证/提交。未推送或部署；Ego空间2保留待续，5187预览停止，独立Cloudflare任务及`.vite/`保留。
+
+## 2026-10-21 05:37 - 首页资产数字与透明插画完成
+
+- 完成内容：首页余额使用保精度Numeral分组、去尾零，普通26px/长金额22px；移除历史曲线与请求，换为真实透明钱包插画，保留今日收益、资产刷新和隐私。内置图片工具本轮成功，未使用API密钥或CLI回退。
+- 修改文件：`mobile/src/views/HomeView.vue`、`mobile/src/styles/home-numeric.css`、`prototype-parity.css`、`mobile/src/assets/home/portfolio-wallet.png`；首页和历史图相关测试；`.trellis/spec/mobile/backend-integration.md`与当前任务记录。
+- 验证结果：最终Mobile release:gate全部通过，892/892、类型、PWA/Tauri Web构建/制品/包体/治理；PNG为RGBA、alpha范围0–255。既有24组布局检查通过，最终素材深色390px和浅色320px长金额无横溢、字体26/22px、无历史请求，截图已查看；diff和任务上下文检查通过。
+- 后续事项：保存本地提交并归档，未推送或部署，未验证原生设备和生产接口；最终Ego空间已关闭，预览服务停止，保留独立Cloudflare目录与`.vite/`。

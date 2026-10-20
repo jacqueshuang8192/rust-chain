@@ -214,24 +214,13 @@ test('收益历史生命周期隔离访客、周期 ABA、换 token、重试与�
   assert.deepEqual(await lifecycle.load(), { state: 'stale' })
 })
 
-test('Home 只从真实接口绘图并为周期、隐私、状态和重试保留可访问边界', () => {
+test('Home replaces history chart with decoration while retaining the shared history adapter', () => {
   assert.match(walletSource, /requestUrl\('\/wallet\/return-history'\)[\s\S]*params: \{ days: periodDays \}/)
-  assert.match(homeSource, /data-portfolio-source="realized-return-history"/)
-  assert.doesNotMatch(homeSource, /RETURN_HISTORY_PERIODS\.map/)
-  assert.match(homeSource, /createReturnHistoryRequestLifecycle\(\{[\s\S]*sessionKey: \(\) => session\.token/)
-  assert.match(homeSource, /fetchReturnHistory: \(\) => fetchReturnHistory\(selectedReturnHistoryPeriod\.value\)/)
-  assert.match(homeSource, /buildReturnHistoryGeometry\(returnHistory\.value\)/)
-  assert.doesNotMatch(homeSource, /portfolioPeriods|period\.days === selectedReturnHistoryPeriod/)
-  assert.match(homeSource, /returnHistoryRequestLifecycle\.invalidate\(\)[\s\S]*returnHistory\.value = null[\s\S]*selectedReturnHistoryPeriod\.value = 1/)
-  assert.match(homeSource, /onUnmounted\(\(\) => \{[\s\S]*returnHistoryRequestLifecycle\.stop\(\)/)
-  assert.match(homeSource, /if \(!assetVisible\.value \|\| returnHistoryState\.value !== 'complete'/)
-  assert.match(homeSource, /v-if="accessibleReturnHistoryPoints\.length" class="sr-only"/)
-  assert.match(homeSource, /returnHistoryState === 'partial' \|\| returnHistoryState === 'error'/)
-  assert.doesNotMatch(parityCss, /\.home-view \.portfolio-periods/)
-  assert.match(parityCss, /\.home-view \.portfolio-chart\s*\{[^}]*background-image:\s*none;[^}]*border:\s*0;/)
-  assert.match(parityCss, /\.home-view \.portfolio-history-state button[\s\S]*min-height:\s*44px;/)
-  assert.doesNotMatch(homeSource, /portfolioSamples|mockPortfolio|demoPortfolio|fallbackReturnHistory|random/i)
-  assert.doesNotMatch(homeSource, /watch\(\s*\[\s*\(\) => session\.isAuthenticated,[\s\S]*totalAssetEstimate/)
+  assert.doesNotMatch(homeSource, /fetchReturnHistory|createReturnHistoryRequestLifecycle|portfolioGeometry|portfolio-return-history-chart/)
+  assert.match(homeSource, /class="portfolio-illustration"[\s\S]*?alt=""[\s\S]*?aria-hidden="true"/)
+  assert.match(homeSource, /data-portfolio-source="wallet-valuation"/)
+  assert.match(homeSource, /fetchTodayReturn/)
+  assert.doesNotMatch(parityCss, /\.home-view \.portfolio-chart|\.home-view \.portfolio-history-state/)
 })
 
 test('收益历史状态与表格文案中英文对称', () => {
