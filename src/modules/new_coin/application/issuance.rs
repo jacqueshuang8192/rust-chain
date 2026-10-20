@@ -256,7 +256,7 @@ pub(crate) async fn quote(
     let pair = trading::pair_symbol(&mut tx, &p).await?;
     let (base_precision, quote_precision) = trading::lock_money(&mut tx, &p, &[]).await?;
     let now = store::now(&mut tx).await?;
-    let mut price = trading::price(redis, &pair, now).await?;
+    let mut price = trading::price(&mut tx, &p, redis, &pair, now).await?;
     let engine = trading::engine_ready(&mut tx, &p, &price.source).await?;
     price.source_version = format!("{};{engine}", price.source_version);
     let q = trading::save_quote(
@@ -306,7 +306,7 @@ pub(crate) async fn market_purchase(
     let treasury = trading::treasury(&mut tx).await?;
     let precision = trading::lock_money(&mut tx, &p, &[user, treasury]).await?;
     let now = store::now(&mut tx).await?;
-    let mut price = trading::price(redis, &pair, now).await?;
+    let mut price = trading::price(&mut tx, &p, redis, &pair, now).await?;
     let engine = trading::engine_ready(&mut tx, &p, &price.source).await?;
     price.source_version = format!("{};{engine}", price.source_version);
     let q = trading::save_quote(
@@ -388,7 +388,7 @@ pub(crate) async fn holdings(
         let mut tx = pool.begin().await?;
         let pair = trading::pair_symbol(&mut tx, &p).await.ok();
         let price = if let Some(symbol) = pair.as_deref() {
-            match trading::price(redis, symbol, now).await {
+            match trading::price(&mut tx, &p, redis, symbol, now).await {
                 Ok(price)
                     if trading::engine_ready(&mut tx, &p, &price.source)
                         .await

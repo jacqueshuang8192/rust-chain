@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/backend/token-issuance-v2.md", "reason": "Issuance price, holdings and wallet contracts"}
+{"file": ".trellis/spec/backend/market-provenance.md", "reason": "Generic public source must not be mistaken for engine identity"}
+{"file": ".trellis/spec/backend/default-market-generation.md", "reason": "Live generation and private checkpoints"}

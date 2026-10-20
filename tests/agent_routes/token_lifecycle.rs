@@ -1,5 +1,7 @@
 #[path = "token_lifecycle/direct_purchase.rs"]
 mod direct_purchase;
+#[path = "token_lifecycle/live_valuation.rs"]
+mod live_valuation;
 use super::coin_applications::{ok, request, token};
 use super::*;
 use redis::AsyncCommands;
@@ -37,17 +39,34 @@ async fn ticker(
     age: i64,
 ) {
     let now = chrono::Utc::now();
-    let payload = json!({"symbol":symbol,"last_price":price,"volume_24h":"0","provider":"strategy","source":"default","observed_at":(now-chrono::Duration::seconds(age)).timestamp_millis()});
+    let snapshot = exchange_api::modules::market::MarketTickerSnapshot::new(
+        exchange_api::modules::market::MarketDataProvider::Strategy,
+        symbol,
+        BigDecimal::from_str(price).unwrap(),
+        BigDecimal::from(0),
+        now - chrono::Duration::seconds(age),
+    )
+    .unwrap();
+    let payload = serde_json::to_string(
+        &exchange_api::modules::market::MarketTickerCacheEntry::from_snapshot(&snapshot).unwrap(),
+    )
+    .unwrap();
     redis
         .clone()
         .set::<_, _, ()>(
             exchange_api::modules::market::market_ticker_redis_key(symbol),
-            payload.to_string(),
+            payload,
         )
         .await
         .unwrap();
     sqlx::query("INSERT INTO market_pair_generation_runs(pair_id,generation,active_source,default_version,lease_owner,lease_expires_at,last_price,last_tick_at) VALUES (?,1,'default',2,'test',DATE_ADD(UTC_TIMESTAMP(6),INTERVAL 5 MINUTE),?,UTC_TIMESTAMP(6)) ON DUPLICATE KEY UPDATE active_source='default',lease_expires_at=VALUES(lease_expires_at),last_price=VALUES(last_price),last_tick_at=VALUES(last_tick_at)")
         .bind(pair).bind(BigDecimal::from_str(price).unwrap()).execute(pool).await.unwrap();
+    sqlx::query("INSERT INTO market_generation_price_checkpoints(symbol,event_key,price,source,observed_at,generation,source_version) SELECT ?,?,?, 'default',?,generation,CONCAT('default:',pair_id,':g',generation,':v',default_version) FROM market_pair_generation_runs WHERE pair_id=? ON DUPLICATE KEY UPDATE event_key=VALUES(event_key),price=VALUES(price),source='default',observed_at=VALUES(observed_at),generation=VALUES(generation),source_version=VALUES(source_version),strategy_id=NULL,strategy_version=NULL")
+        .bind(exchange_api::modules::market::sanitize_symbol(symbol))
+        .bind(Uuid::now_v7().simple().to_string())
+        .bind(BigDecimal::from_str(price).unwrap())
+        .bind(chrono::DateTime::from_timestamp_millis(snapshot.observed_at().timestamp_millis()).unwrap())
+        .bind(pair).execute(pool).await.unwrap();
 }
 async fn wallet(pool: &MySqlPool, user: u64, asset: u64) -> (BigDecimal, BigDecimal, BigDecimal) {
     sqlx::query_as(
@@ -479,6 +498,15 @@ async fn token_lifecycle_scopes_allocations_quotes_buyback_and_continuous_spot_h
         BigDecimal::from(4000)
     );
     stage(&app, &ct, project, "distribution", "purchase").await;
+    live_valuation::verify(
+        &app,
+        &pool,
+        &redis,
+        &bt,
+        (project, pair, asset, holding),
+        &pair_symbol,
+    )
+    .await;
     ticker(&redis, &pool, pair, &pair_symbol, "0.4", 0).await;
     // Quote source must be current, not future, paused or from a departed engine generation.
     let v = direct_purchase::valuation(&app, &bt, asset).await;
@@ -574,6 +602,12 @@ async fn token_lifecycle_scopes_allocations_quotes_buyback_and_continuous_spot_h
         .0,
         StatusCode::CONFLICT
     );
+    assert!(
+        direct_purchase::valuation(&app, &bt, asset).await["issuance_valuation"]["price_usdt"]
+            .is_null()
+    );
+    // A new engine must publish its own matching checkpoint before issuing fresh quotes.
+    ticker(&redis, &pool, pair, &pair_symbol, "0.4", 0).await;
     // A separately funded user proves stage rejection, not insufficient balances.
     let spot_user = create_user(&pool, "prelisting-spot").await;
     let spot_token = utoken(spot_user);

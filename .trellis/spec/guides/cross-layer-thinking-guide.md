@@ -153,6 +153,20 @@ When a CLI auto-detects a mode by probing a remote resource (e.g., checking if `
 
 ---
 
+## Financial display fixtures must cross the real producer boundary
+
+When a chart has prices but holdings or wallet values are null, trace the
+producer serializer, cache reader and business-specific provenance validation
+before changing the UI. A common provider enum can cover several internal
+engines; display metadata must not be treated as exact execution identity.
+
+Use at least one production publisher-to-authenticated-API regression. Handwritten
+JSON can accidentally satisfy the consumer's incorrect assumption and make all
+unit and browser fixtures pass. In issuance valuation, synthetic default and
+manual tickers both publish `generated/strategy`, whereas internal readiness
+requires an exact default/manual identity. The matching current checkpoint
+provides that evidence without relaxing freshness or trading permissions.
+
 ## When to Create Flow Documentation
 
 Create detailed flow docs when:

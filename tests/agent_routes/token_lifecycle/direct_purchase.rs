@@ -124,6 +124,30 @@ pub(super) async fn verify(
     assert_eq!(wallet(pool, buyer, quote).await.0, BigDecimal::from(99));
     assert_eq!(wallet(pool, buyer, asset).await.2, BigDecimal::from(2));
     ticker(redis, pool, pair, pair_symbol, "0.8", 0).await;
+    let holdings = ok(request(
+        app,
+        &auth,
+        "GET",
+        &format!("/api/v1/new-coins/holdings?project_id={project}"),
+        json!(null),
+    )
+    .await);
+    let holding = &holdings["holdings"][0];
+    assert_eq!(holding["holding"]["source_kind"], "purchase");
+    assert_eq!(
+        decimal(&holding["market_value"]),
+        BigDecimal::from_str("1.6").unwrap()
+    );
+    assert_eq!(
+        decimal(&holding["profit"]),
+        BigDecimal::from_str("0.6").unwrap()
+    );
+    let account = valuation(app, &auth, asset).await;
+    assert_eq!(decimal(&account["locked"]), BigDecimal::from(2));
+    assert_eq!(
+        decimal(&account["issuance_valuation"]["price_usdt"]),
+        BigDecimal::from_str("1.6").unwrap()
+    );
     assert_eq!(
         ok(request(
             app,

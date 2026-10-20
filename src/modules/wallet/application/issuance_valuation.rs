@@ -34,7 +34,7 @@ pub(super) async fn enrich(
             Some(p.issue_price.clone())
         } else if matches!(p.lifecycle_status.as_str(), "purchase" | "listed") {
             if let Ok(pair) = trading::pair_symbol(&mut tx, &p).await {
-                match trading::price(redis, &pair, now).await {
+                match trading::price(&mut tx, &p, redis, &pair, now).await {
                     Ok(price)
                         if trading::engine_ready(&mut tx, &p, &price.source)
                             .await

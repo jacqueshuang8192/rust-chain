@@ -9964,3 +9964,10 @@
 - 修改文件：本轮仅追加`docs/superpowers/PROGRESS.md`，业务源码沿用已验收提交。
 - 验证结果：fetch确认推送前本地领先3个提交、无落后或分叉，git diff --check通过；push成功，git ls-remote确认远端main完整哈希`73225fd3df0e32b0eeebe989a9fd1d38131ee413`与本地一致。源码未改动，沿用Mobile885/885、PC125/125、后端实库回归及Clippy和浏览器验收；本记录提交后再次普通推送核对。
 - 后续事项：未部署，无新增迁移，发布须同步后端与Mobile/PC。保留既有未跟踪`.vite/`缓存。
+
+## 2026-10-20 15:31 - 认购锁仓持仓与总资产实时估值修复
+
+- 完成内容：修复真实默认行情以generated/strategy发布、被新币默认引擎误判来源的问题；通过同币种、同价格、同观察时间的既有检查点及当前运行版本核验身份，Redis仍是唯一价格来源。详情锁仓持仓恢复当前估值、未实现收益和收益率，Mobile/PC资产行及总资产正确计入认购币种；保留时效、暂停、租约、解禁和上市前现货限制。补充真实行情生产者到鉴权接口的回归及跨层规范。
+- 修改文件：`src/modules/new_coin/{application/issuance,infrastructure/issuance/trading}.rs`、`src/modules/wallet/application/issuance_valuation.rs`、`tests/agent_routes/token_lifecycle.rs`及`token_lifecycle/{direct_purchase,live_valuation}.rs`、`.trellis/spec/backend/token-issuance-v2.md`、`.trellis/spec/guides/cross-layer-thinking-guide.md`、`.trellis/tasks/10-20-token-valuation-live-prices/`及本记录。无前端生产源码变更和新迁移。
+- 验证结果：先仅替换为真实生产DTO复现旧代码估值为空，再完成修复。隔离MySQL/Redis生命周期2/2，包含默认/人工真实发布、来源切换、旧版本/暂停/租约/过期/未来价拒绝及恢复、直接认购估值和现货隔离；后端架构11/11、文档1/1、旧新币11/11、OpenAPI18/18、钱包15通过/1项既有手动夹具忽略、钱包现货仓储2/2。`cargo fmt --all -- --check`、严格Clippy all-targets、Mobile测试类型检查及885/885、PC125/125通过。Ego以真实接口响应只读重放，确认锁仓2500枚估值1000、收益500/100%，Mobile/PC按quote汇率换算后币种估值2000、总资产11000，行情缺失后可自动恢复，卖出仍禁用且未进入现货；截图已查看、零写请求。diff和任务上下文校验通过，详细命令见任务delivery.md。
+- 后续事项：按工作流保存本地提交并归档；未推送或部署，线上须更新后端才生效。本轮未重建PWA/Tauri/PC，未验证Mongo历史K线和实体设备安装态。任务Ego空间31、5187/5188预览、Redis16393和隔离测试库已清理，保留既有服务与`.vite/`缓存；未操作生产资金。

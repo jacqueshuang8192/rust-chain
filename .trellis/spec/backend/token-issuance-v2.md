@@ -466,3 +466,47 @@ Wrong: restore purchase tokens to `/markets` to repair their asset value.
 Correct: carry wallet-only valuation metadata and keep actual-listing spot gates.
 Wrong: fetch a buy quote, then hide its confirmation behind a second request.
 Correct: take and settle the live server price in one atomic purchase request.
+
+## Generated-price identity for issuance valuation
+
+### Scope and data flow
+
+Default and manual producers both serialize `MarketTickerSnapshot` through
+`MarketTickerCacheEntry::from_snapshot` as `source=generated,provider=strategy`.
+This public provenance does not identify a manual strategy. Treating it as one
+made default-generated purchase holdings and wallet valuations return null,
+which also removed their contribution to portfolio totals.
+
+`trading::price(tx, project, redis, symbol, now)` keeps Redis as the only price
+source and resolves private engine identity through the existing latest
+`market_generation_price_checkpoints` row. Require identical normalized symbol,
+exact decimal price and millisecond observation time, plus the active runtime:
+
+- Default: checkpoint generation equals runtime generation; source version is
+  `default:{pair_id}:g{generation}:v{default_version}`, with no strategy identity.
+- Manual: checkpoint strategy ID/version match runtime; checkpoint generation is
+  the strategy version, and source version is `strategy:{id}:v{version}`.
+- The resolved source then passes existing enabled/pause, live lease and version
+  checks. Both valuation consumers and new quote/direct-buy paths use this same
+  reader. Confirmation still compares the original engine fingerprint.
+
+No missing Redis/checkpoint, mismatched observation, stale/future ticker, changed
+generation/version or paused engine may fall back to SQL or a configured price.
+The checkpoint validates provenance; it is not a second pricing source.
+Public chart metadata, lock eligibility and spot listing gates are unchanged.
+
+### Required regression
+
+Use the production DTO for generic ticker fixtures. Exercise actual default and
+manual ticker ingestion with isolated MySQL/Redis, then read authenticated
+holdings and wallets. A lock that has not matured must still expose current
+value and profit. At price 0.4, quantity 2500 and cost 500, value is 1000 and
+profit is 500 in the quote asset (return 100%). If the quote is worth 2 USDT,
+the wallet token price is 0.8 USDT and its locked balance is worth 2000 USDT.
+
+Reject mismatched price/time, missing cache/checkpoint, wrong provider,
+old source after handoff, expired leases, changed versions, and paused engines;
+verify recovery and that the token remains absent from spot discovery. Also
+assert values and profit on holdings created by direct market purchase.
+Never hand-author `source=default` as the only test of the real default producer:
+that fixture concealed the original producer/consumer mismatch.

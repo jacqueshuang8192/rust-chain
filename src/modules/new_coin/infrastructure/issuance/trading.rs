@@ -138,14 +138,17 @@ pub(crate) async fn pair_symbol(tx: &mut Transaction<'_, MySql>, p: &Project) ->
     }
 }
 
-/// 只接收平台引擎最新正价格；陈旧、未来、未知或外部来源均拒绝，绝不使用发行价兜底。
+/// 价格仅取 Redis；共享 Strategy 提供方不能区分默认与人工引擎，须以同价同时间的检查点核验来源和版本。
+/// 检查点只证明当前报价身份，不作为缺失缓存的价格回退；陈旧、未来、外部或已切换版本全部拒绝。
 pub(crate) async fn price(
+    tx: &mut Transaction<'_, MySql>,
+    p: &Project,
     redis: Option<&ConnectionManager>,
     symbol: &str,
     now: DateTime<Utc>,
 ) -> AppResult<LatestPrice> {
     let redis = redis.ok_or_else(|| AppError::Conflict("行情暂不可用".into()))?;
-    let value = load_latest_price(redis, symbol)
+    let mut value = load_latest_price(redis, symbol)
         .await?
         .ok_or_else(|| AppError::Conflict("等待首个有效行情".into()))?;
     let age = now
@@ -154,6 +157,28 @@ pub(crate) async fn price(
     if !(0..=60_000).contains(&age) || !matches!(value.source.as_str(), "default" | "strategy") {
         return Err(AppError::Conflict("行情已过期或来源无效".into()));
     }
+    let source: Option<String> = sqlx::query_scalar(
+        "SELECT c.source FROM market_generation_price_checkpoints c
+         JOIN market_pair_generation_runs r ON r.pair_id=?
+         WHERE c.symbol=? AND c.price=? AND c.observed_at=? AND c.source=r.active_source
+         AND ((c.source='default' AND c.generation=r.generation
+               AND c.source_version=CONCAT('default:',r.pair_id,':g',r.generation,':v',r.default_version)
+               AND c.strategy_id IS NULL AND c.strategy_version IS NULL)
+           OR (c.source='strategy' AND c.strategy_id=r.strategy_id
+               AND c.strategy_version=r.strategy_version AND c.generation=r.strategy_version
+               AND c.source_version=CONCAT('strategy:',r.strategy_id,':v',r.strategy_version)))
+         FOR SHARE",
+    )
+    .bind(p.pair()?)
+    .bind(&value.symbol)
+    .bind(&value.price)
+    .bind(value.observed_at)
+    .fetch_optional(&mut **tx)
+    .await?;
+    let source = source
+        .filter(|source| value.source != "default" || source == "default")
+        .ok_or_else(|| AppError::Conflict("行情与当前引擎检查点不一致".into()))?;
+    value.source = source;
     Ok(value)
 }
 
