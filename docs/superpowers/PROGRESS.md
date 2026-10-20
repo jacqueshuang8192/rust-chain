@@ -9957,3 +9957,10 @@
 - 修改文件：`mobile/src/{api,components,core,styles,views}`与`pc/src/{api,components,core,views}`中的新币交易、资产估值相关文件及测试；新币/钱包后端、OpenAPI和实库测试；`.trellis/spec/backend/token-issuance-v2.md`、`.trellis/spec/mobile/backend-integration.md`、`.trellis/tasks/10-20-new-coin-direct-buy-detail/`及本记录。精确提交范围见任务`commit-plan.md`。
 - 验证结果：最终Mobile release:gate通过，885/885及类型、PWA/Tauri构建/制品、包体和治理门禁全部通过，未放宽预算；PC类型检查、构建、125/125通过。隔离MySQL/Redis生命周期2/2，后端架构11/11、文档1/1、旧新币11/11、OpenAPI18/18、钱包15项通过/1项既有手动夹具忽略、钱包现货仓储2/2，严格Clippy all-targets和fmt通过。Ego最终12组中英/明暗/320至448px布局无横溢或阶段裁剪，验证直接买入零报价请求、丢失响应原键恢复、申购/认购资产自动估值切换、上市入口、持仓详情键盘展开；Mobile/PC最终截图已查看。git diff与任务上下文校验通过。
 - 后续事项：实现与验收完成，按工作流保存本地提交并归档；本轮未推送或部署，无新迁移，发布须同步前后端。已关闭任务Ego空间30和5187/5188预览，停止专属Redis16392并清理隔离测试库，保留原有服务和`.vite/`缓存。Mongo历史K线实读、实体设备安装态未验证；未操作生产资金。
+
+## 2026-10-20 09:31 - 新币直接认购与资产估值推送完成
+
+- 完成内容：按用户授权将直接认购、详情布局与资产估值业务提交`bb23072`及对应任务归档和日志共3个提交普通推送到`origin/main`。
+- 修改文件：本轮仅追加`docs/superpowers/PROGRESS.md`，业务源码沿用已验收提交。
+- 验证结果：fetch确认推送前本地领先3个提交、无落后或分叉，git diff --check通过；push成功，git ls-remote确认远端main完整哈希`73225fd3df0e32b0eeebe989a9fd1d38131ee413`与本地一致。源码未改动，沿用Mobile885/885、PC125/125、后端实库回归及Clippy和浏览器验收；本记录提交后再次普通推送核对。
+- 后续事项：未部署，无新增迁移，发布须同步后端与Mobile/PC。保留既有未跟踪`.vite/`缓存。
