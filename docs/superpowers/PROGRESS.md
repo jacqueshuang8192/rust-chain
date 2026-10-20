@@ -9971,3 +9971,10 @@
 - 修改文件：`src/modules/new_coin/{application/issuance,infrastructure/issuance/trading}.rs`、`src/modules/wallet/application/issuance_valuation.rs`、`tests/agent_routes/token_lifecycle.rs`及`token_lifecycle/{direct_purchase,live_valuation}.rs`、`.trellis/spec/backend/token-issuance-v2.md`、`.trellis/spec/guides/cross-layer-thinking-guide.md`、`.trellis/tasks/10-20-token-valuation-live-prices/`及本记录。无前端生产源码变更和新迁移。
 - 验证结果：先仅替换为真实生产DTO复现旧代码估值为空，再完成修复。隔离MySQL/Redis生命周期2/2，包含默认/人工真实发布、来源切换、旧版本/暂停/租约/过期/未来价拒绝及恢复、直接认购估值和现货隔离；后端架构11/11、文档1/1、旧新币11/11、OpenAPI18/18、钱包15通过/1项既有手动夹具忽略、钱包现货仓储2/2。`cargo fmt --all -- --check`、严格Clippy all-targets、Mobile测试类型检查及885/885、PC125/125通过。Ego以真实接口响应只读重放，确认锁仓2500枚估值1000、收益500/100%，Mobile/PC按quote汇率换算后币种估值2000、总资产11000，行情缺失后可自动恢复，卖出仍禁用且未进入现货；截图已查看、零写请求。diff和任务上下文校验通过，详细命令见任务delivery.md。
 - 后续事项：按工作流保存本地提交并归档；未推送或部署，线上须更新后端才生效。本轮未重建PWA/Tauri/PC，未验证Mongo历史K线和实体设备安装态。任务Ego空间31、5187/5188预览、Redis16393和隔离测试库已清理，保留既有服务与`.vite/`缓存；未操作生产资金。
+
+## 2026-10-20 16:16 - 认购锁仓估值修复推送完成
+
+- 完成内容：按用户授权将认购锁仓估值修复`4d124e2`及对应任务归档、会话日志共3个提交普通推送到`origin/main`。
+- 修改文件：本轮仅追加`docs/superpowers/PROGRESS.md`，业务源码沿用已验收提交。
+- 验证结果：fetch确认推送前本地领先3个提交、无落后或分叉，`git diff --check`通过；push成功，`git ls-remote`确认远端main与本地完整哈希`6cc45be9d5f4286bd9899ed237338025797fea2f`一致。源码未改动，沿用前述后端实库回归、Mobile885/885、PC125/125、Clippy及浏览器验收；本记录随后提交推送并再次核对。
+- 后续事项：未部署，无新增迁移，线上须更新后端才生效。保留既有未跟踪`.vite/`缓存。
