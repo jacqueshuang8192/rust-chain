@@ -403,3 +403,36 @@ Completed direct live-price purchase with atomic idempotent recovery; repaired p
 ### Next Steps
 
 - None - task complete
+
+
+## Session 71: Repair live token holding and wallet valuation
+
+**Date**: 2026-10-20
+**Task**: Repair live token holding and wallet valuation
+**Branch**: `main`
+
+### Summary
+
+Resolved real generated ticker provenance against matching current engine checkpoints. Verified locked holding value, profit, return rate and Mobile/PC portfolio totals through real ingestion/API integration and read-only browser replay. Lifecycle 2/2, backend regressions 58 passed plus 1 existing ignored fixture, Mobile 885/885, PC 125/125, strict Clippy and fmt passed. No frontend production changes, migration, remote push or deployment; backend update required. Test services and isolated database cleaned up.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4d124e2` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
