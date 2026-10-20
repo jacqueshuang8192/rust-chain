@@ -1,3 +1,4 @@
+import { parseIssuanceValuation } from '../core/walletValuation.ts'
 import { APP_CONFIG } from '../config/app.ts'
 import { formatBusinessOrderNo } from '../utils/orderNo.ts'
 import { mapMarketProvenance, type MarketProvenance } from './marketProvenance.ts'
@@ -95,6 +96,7 @@ export interface BackendWalletAccountsResponse {
 }
 
 export interface BackendWalletAccount {
+  issuance_valuation?: unknown
   user_id: number
   asset_id: number
   symbol: string
@@ -114,6 +116,7 @@ export interface PcCoin {
 }
 
 export interface PcMemberWallet {
+  issuanceValuation?: import('@/core/walletValuation').IssuanceValuation
   id: string | number
   memberId: string | number
   coin: PcCoin
@@ -1035,6 +1038,7 @@ export function mapWalletAccountsToMemberWallets(
           canRecharge: true,
           logoUrl: logoUrl || undefined,
         },
+        issuanceValuation: parseIssuanceValuation(account.issuance_valuation),
         balance: toNumber(account.available),
         frozenBalance: toNumber(account.frozen) + toNumber(account.locked),
         address: '',

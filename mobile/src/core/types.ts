@@ -91,6 +91,7 @@ export interface DepositAddress {
 }
 
 export interface WalletAccount {
+  issuanceValuation?: import('./walletValuation').IssuanceValuation
   assetId: number
   symbol: string
   logoUrl?: string

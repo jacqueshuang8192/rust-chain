@@ -396,3 +396,73 @@ Real MySQL/Redis lifecycle tests must prove hidden directories and saved
 Wrong: disable the purchase pair or treat every active ticker as a spot listing.
 Correct: retain active feed reads, gate spot discovery/admission on both actual
 listing fields, and let REST catalogs own client market membership.
+
+## Direct purchase and wallet valuation
+
+### 1. Scope / Trigger
+
+V2 purchase-stage clients buy immediately; wallet value must be available before
+spot listing. Listing eligibility remains unchanged.
+
+### 2. Signatures
+
+```text
+POST /api/v1/new-coins/:symbol/market-purchases
+{quantity:"2",idempotency_key:"..."}
+=> {idempotency_key:"...",receipt:TradeReceipt}
+GET /api/v1/wallet/accounts
+accounts[].issuance_valuation?: {price_usdt:string|null,stage:string,expires_at:number}
+```
+
+### 3. Contracts
+
+- Direct buys accept no client price, side, fee or recipient. Lock the active
+  user, replay canonical `operation=market_purchase` intent, then lock project,
+  pair and ordered asset/wallet rows. Load the fresh engine price and verify its
+  live lease/version. Persist and execute the internal quote in that same
+  transaction; no pending quote or partial funding survives rollback.
+- Same user/key and canonical quantity returns the original receipt before
+  checking current phase or price. Different quantities or legacy quote intents
+  conflict. Old quote/confirm clients and selling retain their existing contracts.
+- Wallet valuation reads only nonzero booked balances of the authenticated user.
+  Pending subscription quantities are not additional balances: their quote funds
+  are already frozen. Subscription/distribution uses fixed `issue_price`;
+  purchase/listed requires a fresh platform ticker and live engine.
+- Convert the project's actual quote asset through a fresh matching USDT ticker;
+  only USDT itself has unit value. Unknown/stale/missing prices stay null.
+  `expires_at` is no later than either underlying price's 60-second lifetime.
+  Missing metadata means ordinary market valuation, while present/null metadata
+  forbids fallback to stale spot prices. Wallet reads never widen spot discovery.
+
+### 4. Validation & Error Matrix
+
+| Condition | Result |
+|---|---|
+| Numeric quantity / unknown client price | 422 |
+| Nonpositive quantity, precision, supply or balance failure | 400, atomic rollback |
+| Wrong phase, stale/future price, paused engine, reused changed intent | 409 |
+| Final audit fails | 500; no quote, holding, purchase, ledger or balance mutation |
+| Lost response, same canonical request after listing | Original receipt |
+| Missing valuation or quote conversion ticker | Null valuation, balances retained |
+
+### 5. Good / Base / Bad Cases
+
+2 tokens at the current 0.5 price debit 1 quote unit once, even when retried at
+0.8. A booked 2,500-token balance at 0.2 in a quote currency worth 2 USDT values
+to 1,000 USDT. Missing conversion cannot be treated as quote=USDT.
+
+### 6. Tests Required
+
+Run isolated MySQL/Redis `agent_routes::token_lifecycle` including the
+`direct_purchase` helper: concurrency, canonical replay, audit rollback,
+changed/legacy intent collisions, freshness, precision, supply/balance rejection,
+listing replay and new-order rejection, fixed/live/missing/FX valuation. Regress
+wallet routes, legacy new-coin routes, architecture, documentation and OpenAPI.
+Client tests must exercise durable unknown-result retry and account replacement.
+
+### 7. Wrong vs Correct
+
+Wrong: restore purchase tokens to `/markets` to repair their asset value.
+Correct: carry wallet-only valuation metadata and keep actual-listing spot gates.
+Wrong: fetch a buy quote, then hide its confirmation behind a second request.
+Correct: take and settle the live server price in one atomic purchase request.

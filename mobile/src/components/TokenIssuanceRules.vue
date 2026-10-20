@@ -10,7 +10,7 @@ const date = (at: number) => new Date(at).toLocaleString(locale.value, { year: '
 <template>
   <section class="token-surface token-rules">
     <h2>{{ t('token.rules') }}</h2>
-    <dl>
+    <dl class="token-data">
       <div><dt>{{ t('token.seed') }}</dt><dd>{{ policy.purchase_initial_price }} {{ quoteSymbol }}</dd></div>
       <div v-for="node in nodes" :key="node"><dt>{{ t('token.plannedTime', { stage: t(`token.${node}`) }) }}</dt><dd><time>{{ date(policy[node].at) }}</time></dd></div>
       <div><dt>{{ t('token.lock') }}</dt><dd>{{ t(`token.${policy.lock.kind}`, { count: 'count' in policy.lock ? policy.lock.count : '' }) }}<template v-if="policy.lock.kind === 'fixed'"> · {{ date(policy.lock.at) }}</template></dd></div>

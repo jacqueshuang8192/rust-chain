@@ -9943,3 +9943,17 @@
 - 修改文件：本轮仅追加`docs/superpowers/PROGRESS.md`；业务源码沿用已验收提交。
 - 验证结果：fetch确认无落后或分叉，git diff --check通过；push成功，git ls-remote确认远端main完整哈希`7b653f4ec6653e437051ad3bbc3fa3dfd745f82f`与本地一致。源码未变化，沿用Mobile874/874、PC123/123和后端实库/Clippy检查；本结果记录提交后再次普通推送并核对。
 - 后续事项：未部署。上线需同步后端和前端；保留未跟踪`.vite/`缓存。Mongo历史K线实读未验证的限制沿用前次记录。
+
+## 2026-10-20 09:02 - 直接认购买入与独立钱包估值
+
+- 完成内容：新增单请求实时认购接口，服务端行情、内部凭证、钱包扣款、持仓与审计原子提交；原键先重放再检查阶段。钱包响应新增发行估值，申购/派发按申购价，认购/上市校验平台行情并按实际计价资产换算 USDT，不改变现货准入或重复加入待派发数量。
+- 修改文件：`src/modules/new_coin/{application/issuance,infrastructure/issuance,presentation/issuance,routes/issuance}.rs`、`src/modules/wallet/application/issuance_valuation.rs`及钱包应用/响应/路由、OpenAPI、`tests/agent_routes/token_lifecycle*`。
+- 验证结果：隔离 MySQL `codex_token_direct_20261020`、专属 Redis 16392 完整迁移和生命周期 2/2 通过；包含直接成交、并发/原键重放、阶段转换、精度/供给/余额拒绝、陈旧/未来行情和停机、审计故障回滚、固定/实时估值及跨币换算，现货隔离回归保留。严格 Clippy all-targets 通过。
+- 后续事项：完成 Mobile/PC 买入与资产展示、详情布局门禁与浏览器矩阵；未推送或部署，未操作生产数据。
+
+## 2026-10-20 09:18 - 新币直接认购、详情布局与资产估值最终验收
+
+- 完成内容：Mobile/PC 取消买入前获取报价步骤，直接按服务端实时行情成交，保留未知结果原单重试与旧报价恢复；资产页独立获取申购/认购估值并每10秒刷新，计入已入账可用、冻结和锁仓余额，不重复计入待派发数量，不改变上市前现货限制。Mobile 打新详情压缩身份/进度区域、前移操作、缩短图表并强化持仓估值和收益层次，原购买/解禁详情可展开。
+- 修改文件：`mobile/src/{api,components,core,styles,views}`与`pc/src/{api,components,core,views}`中的新币交易、资产估值相关文件及测试；新币/钱包后端、OpenAPI和实库测试；`.trellis/spec/backend/token-issuance-v2.md`、`.trellis/spec/mobile/backend-integration.md`、`.trellis/tasks/10-20-new-coin-direct-buy-detail/`及本记录。精确提交范围见任务`commit-plan.md`。
+- 验证结果：最终Mobile release:gate通过，885/885及类型、PWA/Tauri构建/制品、包体和治理门禁全部通过，未放宽预算；PC类型检查、构建、125/125通过。隔离MySQL/Redis生命周期2/2，后端架构11/11、文档1/1、旧新币11/11、OpenAPI18/18、钱包15项通过/1项既有手动夹具忽略、钱包现货仓储2/2，严格Clippy all-targets和fmt通过。Ego最终12组中英/明暗/320至448px布局无横溢或阶段裁剪，验证直接买入零报价请求、丢失响应原键恢复、申购/认购资产自动估值切换、上市入口、持仓详情键盘展开；Mobile/PC最终截图已查看。git diff与任务上下文校验通过。
+- 后续事项：实现与验收完成，按工作流保存本地提交并归档；本轮未推送或部署，无新迁移，发布须同步前后端。已关闭任务Ego空间30和5187/5188预览，停止专属Redis16392并清理隔离测试库，保留原有服务和`.vite/`缓存。Mongo历史K线实读、实体设备安装态未验证；未操作生产资金。

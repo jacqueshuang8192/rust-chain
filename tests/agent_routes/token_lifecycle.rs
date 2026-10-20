@@ -1,3 +1,5 @@
+#[path = "token_lifecycle/direct_purchase.rs"]
+mod direct_purchase;
 use super::coin_applications::{ok, request, token};
 use super::*;
 use redis::AsyncCommands;
@@ -392,6 +394,37 @@ async fn token_lifecycle_scopes_allocations_quotes_buyback_and_continuous_spot_h
             BigDecimal::from(2500)
         )
     );
+    assert!(
+        direct_purchase::valuation(&app, &bt, asset).await["issuance_valuation"]["price_usdt"]
+            .is_null()
+    );
+    let quote_symbol: String = sqlx::query_scalar("SELECT symbol FROM assets WHERE id=?")
+        .bind(quote)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    redis.clone().set::<_,_,()>(exchange_api::modules::market::market_ticker_redis_key(&format!("{quote_symbol}USDT")), json!({"symbol":format!("{quote_symbol}USDT"),"last_price":"2","provider":"coinbase","observed_at":chrono::Utc::now().timestamp_millis()}).to_string()).await.unwrap();
+    let v = direct_purchase::valuation(&app, &bt, asset).await;
+    assert_eq!(
+        decimal(&v["issuance_valuation"]["price_usdt"]),
+        BigDecimal::from_str("0.4").unwrap()
+    );
+    assert_eq!(decimal(&v["locked"]), BigDecimal::from(2500));
+    // The fixed subscription basis also values already-booked balances in subscription.
+    sqlx::query("UPDATE new_coin_projects SET lifecycle_status='subscription' WHERE id=?")
+        .bind(project)
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert_eq!(
+        direct_purchase::valuation(&app, &bt, asset).await["issuance_valuation"]["price_usdt"],
+        v["issuance_valuation"]["price_usdt"]
+    );
+    sqlx::query("UPDATE new_coin_projects SET lifecycle_status='distribution' WHERE id=?")
+        .bind(project)
+        .execute(&pool)
+        .await
+        .unwrap();
     let mut changed_batch = batch.clone();
     changed_batch["percent"] = json!("80");
     assert_eq!(
@@ -448,6 +481,11 @@ async fn token_lifecycle_scopes_allocations_quotes_buyback_and_continuous_spot_h
     stage(&app, &ct, project, "distribution", "purchase").await;
     ticker(&redis, &pool, pair, &pair_symbol, "0.4", 0).await;
     // Quote source must be current, not future, paused or from a departed engine generation.
+    let v = direct_purchase::valuation(&app, &bt, asset).await;
+    assert_eq!(
+        decimal(&v["issuance_valuation"]["price_usdt"]),
+        BigDecimal::from_str("0.8").unwrap()
+    );
     ticker(&redis, &pool, pair, &pair_symbol, "0.4", -30).await;
     assert_eq!(
         request(
@@ -829,6 +867,18 @@ async fn token_lifecycle_scopes_allocations_quotes_buyback_and_continuous_spot_h
         .0,
         StatusCode::CONFLICT
     );
+    assert!(
+        direct_purchase::valuation(&app, &bt, asset).await["issuance_valuation"]["price_usdt"]
+            .is_null()
+    );
+    let (direct_auth, direct_receipt) = direct_purchase::verify(
+        &app,
+        &pool,
+        &redis,
+        (project, pair, asset, quote),
+        (&symbol, &pair_symbol),
+    )
+    .await;
     ticker(&redis, &pool, pair, &pair_symbol, "0.42", 0).await;
     let version: u32 =
         sqlx::query_scalar("SELECT version FROM market_default_generators WHERE pair_id=?")
@@ -845,6 +895,30 @@ async fn token_lifecycle_scopes_allocations_quotes_buyback_and_continuous_spot_h
     .await
     .unwrap();
     stage(&app, &ct, project, "purchase", "listed").await;
+    let direct_path = format!("/api/v1/new-coins/{symbol}/market-purchases");
+    assert_eq!(
+        ok(request(
+            &app,
+            &direct_auth,
+            "POST",
+            &direct_path,
+            json!({"quantity":"2","idempotency_key":"direct-live"})
+        )
+        .await),
+        direct_receipt
+    );
+    assert_eq!(
+        request(
+            &app,
+            &direct_auth,
+            "POST",
+            &direct_path,
+            json!({"quantity":"2","idempotency_key":"after-listed"})
+        )
+        .await
+        .0,
+        StatusCode::CONFLICT
+    );
     assert_spot_discovery(&app, &spot_token, pair, true).await;
     assert!(
         spot_repo

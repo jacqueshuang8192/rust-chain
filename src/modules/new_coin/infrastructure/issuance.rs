@@ -14,6 +14,7 @@ pub(crate) mod trading;
 pub(crate) struct Project {
     pub id: u64,
     pub asset_id: u64,
+    pub issue_price: BigDecimal,
     pub quote_asset_id: Option<u64>,
     pub symbol: String,
     pub lifecycle_status: String,
@@ -28,6 +29,12 @@ pub(crate) struct Project {
     #[serde(with = "crate::time::option_unix_millis")]
     pub next_transition_at: Option<DateTime<Utc>>,
     pub transition_error: Option<String>,
+}
+
+/// 估值只读取本人已有非零钱包对应的新版项目；不把待派发订单的预期数量加进钱包资产。
+pub(crate) async fn wallet_projects(pool: &Pool<MySql>, user: u64) -> AppResult<Vec<Project>> {
+    Ok(sqlx::query_as("SELECT p.* FROM new_coin_projects p JOIN wallet_accounts w ON w.asset_id=p.asset_id WHERE w.user_id=? AND (w.available<>0 OR w.frozen<>0 OR w.locked<>0) AND p.issuance_policy IS NOT NULL ORDER BY p.id")
+        .bind(user).fetch_all(pool).await?)
 }
 impl Project {
     /// 交易和调度仅接受显式第二版合同；不为历史项目填充新默认值。

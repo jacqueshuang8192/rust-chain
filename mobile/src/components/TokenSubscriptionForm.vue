@@ -57,7 +57,7 @@ onBeforeUnmount(() => { generation++ })
     <h2>{{ t('token.subscribe') }} · {{ symbol }}</h2><p>{{ t('token.fixedPrice') }}: {{ price }} {{ quoteSymbol }}</p>
     <p v-if="error" role="alert">{{ error }}</p><p v-if="success" role="status">{{ t('token.subscribed') }}</p>
     <p v-if="!subscriptionOpen && intent && !uncertain">{{ t('token.subscriptionClosed') }}</p>
-    <form v-if="!intent && subscriptionOpen" @submit.prevent="review"><label>{{ t('token.quantity') }}<input v-model="quantity" inputmode="decimal" required /></label><button type="submit" :disabled="recoveryBlocked">{{ t('token.review') }}</button></form>
-    <div v-if="intent" aria-live="polite"><p>{{ intent.quantity }} {{ symbol }} · {{ t('token.freeze') }}: {{ intent.quote_amount }} {{ quoteSymbol }}</p><p>{{ t('token.subscriptionNote') }}</p><button :disabled="busy || (!subscriptionOpen && !uncertain)" type="button" @click="submit">{{ t(busy ? 'token.processing' : uncertain ? 'token.retry' : 'token.confirm') }}</button><button :disabled="busy || uncertain" type="button" @click="cancel">{{ t('token.cancel') }}</button></div>
+    <form v-if="!intent && subscriptionOpen" @submit.prevent="review"><label>{{ t('token.quantity') }}<input class="token-control" v-model="quantity" inputmode="decimal" required /></label><button class="token-control" type="submit" :disabled="recoveryBlocked">{{ t('token.review') }}</button></form>
+    <div v-if="intent" aria-live="polite"><p>{{ intent.quantity }} {{ symbol }} · {{ t('token.freeze') }}: {{ intent.quote_amount }} {{ quoteSymbol }}</p><p>{{ t('token.subscriptionNote') }}</p><button class="token-control" :disabled="busy || (!subscriptionOpen && !uncertain)" type="button" @click="submit">{{ t(busy ? 'token.processing' : uncertain ? 'token.retry' : 'token.confirm') }}</button><button class="token-control" :disabled="busy || uncertain" type="button" @click="cancel">{{ t('token.cancel') }}</button></div>
   </section>
 </template>

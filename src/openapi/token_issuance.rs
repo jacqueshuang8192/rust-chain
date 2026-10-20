@@ -109,6 +109,17 @@ struct QuoteInput {
     idempotency_key: String,
 }
 #[derive(ToSchema)]
+#[serde(deny_unknown_fields)]
+struct MarketPurchaseInput {
+    quantity: String,
+    idempotency_key: String,
+}
+#[derive(ToSchema)]
+struct MarketPurchaseReceipt {
+    idempotency_key: String,
+    receipt: TradeReceipt,
+}
+#[derive(ToSchema)]
 struct TradeReceipt {
     quote_id: String,
     project_id: u64,
@@ -195,6 +206,9 @@ fn quote() {}
 /// 确认该用户原报价；锁仓核销、平台回购、费用与到账原子完成。已成交报价无条件重放原收据，未成交过期报价返回409。
 #[utoipa::path(post,path="/api/v1/new-coins/quotes/{id}/confirm",tag="token-issuance",security(("bearerAuth"=[])),params(("id"=String,Path)),responses((status=200,body=TradeReceipt),(status=400,body=ErrorResponse),(status=401,body=ErrorResponse),(status=404,body=ErrorResponse),(status=409,body=ErrorResponse),(status=500,body=ErrorResponse)))]
 fn confirm() {}
+/// 认购按提交时有效平台行情直接买入；价格由服务端获取，原子结算并以原键重放。
+#[utoipa::path(post,path="/api/v1/new-coins/{symbol}/market-purchases",tag="token-issuance",security(("bearerAuth"=[])),params(("symbol"=String,Path)),request_body=MarketPurchaseInput,responses((status=200,body=MarketPurchaseReceipt),(status=400,body=ErrorResponse),(status=401,body=ErrorResponse),(status=404,body=ErrorResponse),(status=409,body=ErrorResponse),(status=422,description="无效输入"),(status=500,body=ErrorResponse)))]
+fn market_purchase() {}
 #[derive(OpenApi)]
-#[openapi(paths(projects,stage,allocate,holdings,quote,confirm),components(schemas(IssuancePolicy,PhaseNode,HoldingLock,ExitFee,TokenProject,TokenProjects,StageInput,AllocationInput,AllocationResult,AllocationReceipt,QuoteInput,TradeReceipt,TradeQuote,Holding,HoldingView,HoldingsPage)),tags((name="token-issuance",description="实时新币发行、分批派发与原子回购")))]
+#[openapi(paths(projects,stage,allocate,holdings,quote,confirm,market_purchase),components(schemas(IssuancePolicy,PhaseNode,HoldingLock,ExitFee,TokenProject,TokenProjects,StageInput,AllocationInput,AllocationResult,AllocationReceipt,QuoteInput,MarketPurchaseInput,MarketPurchaseReceipt,TradeReceipt,TradeQuote,Holding,HoldingView,HoldingsPage)),tags((name="token-issuance",description="实时新币发行、分批派发与原子回购")))]
 pub(super) struct TokenIssuanceApiDoc;

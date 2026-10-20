@@ -4,7 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import MarketChart from '@/components/chart/MarketChart.vue'
-import { confirmToken, fetchTokenHoldings, quoteToken } from '@/api/tokenIssuance'
+import { confirmToken, fetchTokenHoldings, purchaseToken, quoteToken } from '@/api/tokenIssuance'
 import { parseTokenQuote, tokenDecimal, tokenReturn, type TokenHolding, type TokenQuote, type TokenQuoteIntent } from '@/core/tokenIssuance'
 import { tokenIssuanceMessages } from '@/core/tokenIssuanceMessages'
 
@@ -27,7 +27,7 @@ const notice = ref('')
 const recoveryBlocked = ref(false)
 const clock = ref(Date.now())
 const quote = ref<TokenQuote | null>(null)
-type Pending = { project: number; symbol: string; quoteSymbol: string; intent: TokenQuoteIntent; quote?: TokenQuote; uncertain: boolean }
+type Pending = { mode?: 'market'; project: number; symbol: string; quoteSymbol: string; intent: TokenQuoteIntent; quote?: TokenQuote; uncertain: boolean }
 const pending = ref<Pending | null>(null)
 let generation = 0
 let disposed = false
@@ -48,13 +48,41 @@ async function load() {
   catch { if (valid(g)) error.value = t('token.failure') }
   finally { if (valid(g)) loading.value = false }
 }
-async function requestQuote(row?: TokenHolding) {
+async function buy() {
+  if (busy.value || pending.value || !owner.value || recoveryBlocked.value || props.stage !== 'purchase') return
+  try {
+    const amount = tokenDecimal(quantity.value.trim())
+    if (!/[1-9]/.test(amount)) throw new Error(t('token.failure'))
+    save({ mode: 'market', project: props.projectId!, symbol: props.symbol!, quoteSymbol: props.quoteSymbol || '', intent: { side: 'buy', quantity: amount, idempotency_key: crypto.randomUUID() }, uncertain: true })
+    await executePurchase()
+  } catch (e) { error.value = e instanceof Error ? e.message : t('token.failure') }
+}
+async function executePurchase() {
+  const p = pending.value
+  if (!p || p.mode !== 'market' || p.intent.side !== 'buy' || busy.value) return
+  const g = generation
+  try { save({ ...p, uncertain: true }) } catch { error.value = t('token.unavailableStorage'); return }
+  busy.value = true; error.value = ''; notice.value = ''
+  try {
+    const receipt = await purchaseToken(p.symbol, p.project, { quantity: p.intent.quantity, idempotency_key: p.intent.idempotency_key })
+    if (!valid(g)) return
+    save(null); quantity.value = ''
+    notice.value = `${t('token.success')} · ${t('token.gross')}: ${receipt.gross} ${p.quoteSymbol}`
+    await load()
+  } catch (e) {
+    if (!valid(g)) return
+    const status = (e as { response?: { status?: number } }).response?.status
+    if (status && [400, 403, 404, 409, 422].includes(status)) {
+      try { save(null) } catch { recoveryBlocked.value = true }
+    }
+    error.value = pending.value ? t('token.purchasePending') : t('token.failure')
+  } finally { if (valid(g)) busy.value = false }
+}
+async function requestQuote(row: TokenHolding) {
   if (busy.value || pending.value || !owner.value || recoveryBlocked.value) return
   try {
-    const intent: TokenQuoteIntent = row ? { side: 'sell', holding_id: row.holding.id, idempotency_key: crypto.randomUUID() }
-      : { side: 'buy', quantity: tokenDecimal(quantity.value.trim()), idempotency_key: crypto.randomUUID() }
-    if (!row && !/[1-9]/.test(quantity.value)) throw new Error(t('token.failure'))
-    save({ project: row?.holding.project_id || props.projectId!, symbol: row?.symbol || props.symbol!, quoteSymbol: row?.quote_symbol || props.quoteSymbol || '', intent, uncertain: false })
+    const intent: TokenQuoteIntent = { side: 'sell', holding_id: row.holding.id, idempotency_key: crypto.randomUUID() }
+    save({ project: row.holding.project_id, symbol: row.symbol, quoteSymbol: row.quote_symbol, intent, uncertain: false })
     await retrieveQuote()
   } catch (e) { error.value = e instanceof Error ? e.message : t('token.failure') }
 }
@@ -101,9 +129,10 @@ watch(() => [owner.value, props.projectId], () => {
     const raw = sessionStorage.getItem(persistenceKey())
     if (raw) {
       const p = JSON.parse(raw) as Pending
-      if (!Number.isSafeInteger(p.project) || !p.symbol || !p.intent?.idempotency_key || typeof p.uncertain !== 'boolean') throw new Error('Invalid pending trade')
-      pending.value = p
+      if (!Number.isSafeInteger(p.project) || p.project <= 0 || (props.projectId && p.project !== props.projectId) || !p.symbol || typeof p.intent?.idempotency_key !== 'string' || !p.intent.idempotency_key || typeof p.uncertain !== 'boolean' || (p.mode !== undefined && p.mode !== 'market')) throw new Error('Invalid pending trade')
+      if (p.mode === 'market' && (p.intent.side !== 'buy' || !/[1-9]/.test(tokenDecimal(p.intent.quantity)))) throw new Error('Invalid pending purchase')
       if (p.quote) quote.value = parseTokenQuote(p.quote, p.project, p.intent)
+      pending.value = p
       notice.value = t('token.recovered')
     }
   } catch { recoveryBlocked.value = true; error.value = t('token.pending') }
@@ -124,11 +153,17 @@ onBeforeUnmount(() => { disposed = true; generation++; clearInterval(timer) })
     <button v-if="!owner" type="button" @click="login">{{ t('token.login') }}</button>
     <template v-else>
       <p v-if="error" role="alert">{{ error }}</p><p v-if="notice" role="status">{{ notice }}</p>
-      <form v-if="stage === 'purchase' && !pending" @submit.prevent="requestQuote()">
+      <form v-if="stage === 'purchase' && !pending" @submit.prevent="buy()">
         <label>{{ t('token.quantity') }} · {{ symbol }}<input v-model="quantity" inputmode="decimal" :disabled="busy" required /></label>
-        <button type="submit" :disabled="busy || recoveryBlocked || !quantity">{{ t('token.quote') }}</button>
+        <button type="submit" :disabled="busy || recoveryBlocked || !quantity">{{ t('token.buy') }}</button>
       </form>
-      <section v-if="pending" class="token-confirm" aria-live="polite">
+      <section v-if="pending?.mode === 'market'" class="token-confirm" aria-live="polite">
+        <h3>{{ pending.symbol }} · {{ t('token.buy') }}</h3>
+        <p>{{ t('token.quantity') }}: {{ pending.intent.side === 'buy' ? pending.intent.quantity : '' }} {{ pending.symbol }}</p>
+        <p>{{ t(busy ? 'token.processing' : 'token.purchasePending') }}</p>
+        <button type="button" :disabled="busy" @click="executePurchase">{{ t(busy ? 'token.processing' : 'token.retry') }}</button>
+      </section>
+      <section v-else-if="pending" class="token-confirm" aria-live="polite">
         <h3>{{ pending.symbol }} · {{ t(pending.intent.side === 'sell' ? 'token.sell' : 'token.quote') }}</h3>
         <template v-if="quote">
           <dl><div v-for="key in (pending.intent.side === 'sell' ? ['quantity', 'price', 'gross', 'fee', 'net'] as const : ['quantity', 'price', 'gross'] as const)" :key="key"><dt>{{ t(`token.${key}`) }}</dt><dd>{{ quote[key] }} {{ key === 'quantity' ? pending.symbol : pending.quoteSymbol }}</dd></div></dl>

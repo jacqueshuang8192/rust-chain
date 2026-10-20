@@ -367,6 +367,16 @@ pub struct WalletAccountResponse {
     pub available: BigDecimal,
     pub frozen: BigDecimal,
     pub locked: BigDecimal,
+    /// 新版发行资产独立于现货目录估值；内部空价格表示当前不可估值，不能回退到旧现货价。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub issuance_valuation: Option<IssuanceValuation>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct IssuanceValuation {
+    pub price_usdt: Option<BigDecimal>,
+    pub stage: String,
+    pub expires_at: i64,
 }
 
 #[derive(Debug, Deserialize)]

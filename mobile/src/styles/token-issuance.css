@@ -1,18 +1,36 @@
 
 .token-surface { padding: 20px 16px; min-width: 0; color: var(--text); }
-.token-surface > h2, .token-surface > header > h2 { font-size: 18px; margin: 0 0 12px; }
+.token-surface > h2 { font-size: 18px; margin: 0 0 12px; }
 .token-surface > h3, .token-confirm > h3 { font-size: 16px; margin-block: 20px 12px; }
 :where(.token-surface, .token-confirm, .token-subscribe > div, .token-chart) > p { font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
-:where(.token-surface, .token-holding, .token-confirm) > dl > div > dt { color: var(--muted); font-size: 13px; }
-:where(.token-surface, .token-holding, .token-confirm) > dl, .token-surface > form, .token-surface > form > label { display: grid; gap: 12px; }
-:where(.token-surface, .token-holding, .token-confirm) > dl > div { display: grid; grid-template-columns: minmax(100px,1fr) minmax(0,1.5fr); gap: 12px; }
-:where(.token-surface, .token-holding, .token-confirm) > dl > div > dd { margin: 0; text-align: right; overflow-wrap: anywhere; font-size: 14px; font-variant-numeric: tabular-nums; }
-:where(.token-surface, .token-surface > header, .token-surface > form, .token-surface > form > label, .token-surface > nav, .token-holding, .token-confirm, .token-subscribe > div) > :is(button,input) { min-width: 0; min-height: 44px; border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; color: var(--text); background: var(--surface-2); }
-:where(.token-surface, .token-surface > header, .token-surface > form, .token-surface > nav, .token-holding, .token-confirm, .token-subscribe > div) > button { margin: 8px 8px 0 0; cursor: pointer; }
-:where(.token-surface, .token-surface > header, .token-surface > form, .token-surface > nav, .token-holding, .token-confirm, .token-subscribe > div) > button:disabled { opacity: .45; cursor: default; }
-:where(.token-surface, .token-surface > header, .token-surface > form, .token-surface > form > label, .token-surface > nav, .token-holding, .token-confirm, .token-subscribe > div) > :is(button,input):focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.token-data > div > dt { color: var(--muted); font-size: 13px; }
+.token-data, .token-surface > form, .token-surface > form > label { display: grid; gap: 12px; }
+.token-data > div { display: grid; grid-template-columns: minmax(100px,1fr) minmax(0,1.5fr); gap: 12px; }
+.token-data > div > dd { margin: 0; text-align: right; overflow-wrap: anywhere; font-size: 14px; font-variant-numeric: tabular-nums; }
+.token-control { min-width: 0; min-height: 44px; border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; color: var(--text); background: var(--surface-2); }
+button.token-control { margin: 8px 8px 0 0; cursor: pointer; }
+button.token-control:disabled { opacity: .45; cursor: default; }
+.token-control:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .token-holding > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
 .token-holding { padding-block: 18px; border-bottom: 1px solid var(--line); }
 .token-holding button { width: 100%; }
 .token-confirm { margin-block: 18px; padding: 16px; border-radius: 12px; background: var(--surface-2); }
 .token-chart { margin-block: 16px; }
+
+/* Detail-only hierarchy: action, compact live chart, holdings, then issuance terms. */
+.new-coin-detail-pencil .token-trading { display: flex; flex-direction: column; gap: 16px; padding-top: 16px; }
+.new-coin-detail-pencil .token-chart .seconds-chart-workspace__chart { height: 320px; }
+.new-coin-detail-pencil .token-surface form input { min-height: 52px; font-size: 20px; }
+.new-coin-detail-pencil .token-surface form > button { min-height: 48px; margin: 0; background: var(--text); color: var(--surface); font-size: 15px; font-weight: 700; border: 0; border-radius: 10px; }
+.token-holdings-title { padding-top: 8px; }
+.token-buy-form, .new-coin-detail-pencil .token-holding { padding: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; }
+.token-holding-summary { display: grid; grid-template-columns: minmax(0,1.3fr) minmax(0,1fr); gap: 12px; margin-block: 22px 18px; }
+.token-holding-summary > div { display: grid; gap: 6px; min-width: 0; }
+.token-holding-summary span { color: var(--muted-strong); font-size: 12px; }
+.token-holding-summary strong { font-size: 21px; line-height: 1.3; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.token-holding-summary small { font-size: 12px; font-weight: 400; overflow-wrap: anywhere; }
+.token-holding-summary .is-positive { color: var(--positive); }
+.token-holding-summary .is-negative { color: var(--negative); }
+.token-holding-details { border-top: 1px solid var(--line); margin-top: 16px; }
+.token-holding-details summary { cursor: pointer; padding-block: 14px; min-height: 44px; box-sizing: border-box; color: var(--muted-strong); font-size: 12px; }
+.token-holding-details summary:focus-visible { outline: 2px solid var(--focus); }

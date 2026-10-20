@@ -13,7 +13,6 @@ import {
   PackageOpen,
   RefreshCw,
   Share2,
-  Tag,
   TicketCheck,
   X,
 } from 'lucide-vue-next'
@@ -327,14 +326,14 @@ function handleReviewKeydown(event: KeyboardEvent): void {
           </span>
           <b>{{ lifecycleLabel }}</b>
         </header>
-        <p>{{ t('newCoin.projectDataDescription') }}</p>
+        <p v-if="!project.issuancePolicy">{{ t('newCoin.projectDataDescription') }}</p>
         <dl class="new-coin-detail-plates">
           <div>
-            <dt><Tag :size="17" /><span>{{ t(project.issuancePolicy ? 'newCoin.fixedSubscriptionPrice' : 'newCoin.issuePrice') }}</span></dt>
+            <dt><span>{{ t(project.issuancePolicy ? 'newCoin.fixedSubscriptionPrice' : 'newCoin.issuePrice') }}</span></dt>
             <dd>{{ formatMoney(project.issuePriceText, project.quoteAssetSymbol) }} {{ quoteSymbol }}</dd>
           </div>
           <div>
-            <dt><PackageCheck :size="17" /><span>{{ t('newCoin.plannedIssue') }}</span></dt>
+            <dt><span>{{ t('newCoin.plannedIssue') }}</span></dt>
             <dd>{{ formatMoney(project.totalSupplyText, project.symbol) }} {{ project.symbol }}</dd>
           </div>
         </dl>
@@ -344,15 +343,12 @@ function handleReviewKeydown(event: KeyboardEvent): void {
         </div>
       </section>
 
-      <section class="new-coin-detail-stages">
-        <header>
-          <h2>{{ t('newCoin.currentStage') }}</h2>
-          <small>{{ lifecycleLabel }} · {{ t('newCoin.progressRatio', { ratio: progressText }) }}</small>
-        </header>
+      <section class="new-coin-detail-stages" :aria-label="t('newCoin.currentStage')">
         <ol :style="{ gridTemplateColumns: `repeat(${stageItems.length}, minmax(0, 1fr))` }">
           <li
             v-for="(stage, index) in stageItems"
             :key="stage.key"
+            :aria-current="index === milestone ? 'step' : undefined"
             :class="{ completed: index < milestone, active: index === milestone }"
           >
             <span><component :is="stage.icon" :size="14" /></span>
@@ -361,6 +357,7 @@ function handleReviewKeydown(event: KeyboardEvent): void {
         </ol>
       </section>
 
+      <TokenSubscriptionForm v-if="project.issuancePolicy && project.quoteAssetId" :key="project.id" :subscription-open="canSubscribe" :project-id="project.id" :symbol="project.symbol" :quote-symbol="quoteSymbol" :quote-asset-id="project.quoteAssetId" :price="project.issuePriceText" @completed="load" />
       <TokenTradingPanel v-if="project.issuancePolicy" :key="project.id" :project-id="project.id" :symbol="project.symbol" :quote-symbol="project.quoteAssetSymbol" :pair-symbol="project.postListingPairSymbol" :stage="project.lifecycleStatus" />
       <section v-else class="new-coin-detail-rules">
         <header><h2>{{ t('newCoin.rules') }}</h2><ChevronRight :size="19" aria-hidden="true" /></header>
@@ -371,7 +368,6 @@ function handleReviewKeydown(event: KeyboardEvent): void {
         </dl>
       </section>
 
-      <TokenSubscriptionForm v-if="project.issuancePolicy && project.quoteAssetId" :key="project.id" :subscription-open="canSubscribe" :project-id="project.id" :symbol="project.symbol" :quote-symbol="quoteSymbol" :quote-asset-id="project.quoteAssetId" :price="project.issuePriceText" @completed="load" />
       <TokenIssuanceRules v-if="project.issuancePolicy" :policy="project.issuancePolicy" :quote-symbol="project.quoteAssetSymbol" />
       <section v-if="!project.issuancePolicy" class="new-coin-detail-entry">
         <h2>{{ t(canPurchase ? 'newCoin.purchaseTitle' : 'newCoin.subscribeTitle') }}</h2>
@@ -490,8 +486,8 @@ function handleReviewKeydown(event: KeyboardEvent): void {
   background: var(--new-coin-detail-visual);
   box-sizing: border-box;
   display: grid;
-  gap: 8px;
-  height: 210px;
+  gap: 16px;
+  min-height: 164px;
   padding: 16px;
 }
 
@@ -522,8 +518,8 @@ function handleReviewKeydown(event: KeyboardEvent): void {
 
 .new-coin-detail-visual header small {
   color: var(--new-coin-detail-muted);
-  font-size: 10px;
-  line-height: 12px;
+  font-size: 12px;
+  line-height: 18px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -535,10 +531,10 @@ function handleReviewKeydown(event: KeyboardEvent): void {
   border-radius: 13px;
   color: var(--new-coin-detail-signal);
   display: inline-flex;
-  font-size: 10px;
-  height: 26px;
+  font-size: 12px;
+  min-height: 28px;
   justify-content: center;
-  max-width: 92px;
+  max-width: 120px;
   min-width: 69px;
   overflow: hidden;
   padding: 0 8px;
@@ -560,7 +556,7 @@ function handleReviewKeydown(event: KeyboardEvent): void {
   display: grid;
   gap: 8px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  height: 48px;
+  min-height: 52px;
   margin: 0;
 }
 
@@ -570,28 +566,21 @@ function handleReviewKeydown(event: KeyboardEvent): void {
   display: grid;
   align-content: center;
   min-width: 0;
-  padding: 0 10px 0 35px;
+  padding: 10px 12px;
   position: relative;
 }
 
 .new-coin-detail-plates dt {
   color: var(--new-coin-detail-muted);
-  font-size: 9px;
-  line-height: 12px;
-}
-
-.new-coin-detail-plates dt svg {
-  left: 10px;
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .new-coin-detail-plates dd {
   font-family: var(--font-numeric);
-  font-size: 12px;
-  font-weight: 750;
-  line-height: 17px;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 22px;
   margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -628,38 +617,14 @@ function handleReviewKeydown(event: KeyboardEvent): void {
 
 .new-coin-detail-stages {
   box-sizing: border-box;
-  height: 112px;
-  padding: 14px 16px;
-}
-
-.new-coin-detail-stages > header {
-  align-items: center;
-  display: flex;
-  font-size: 14px;
-  height: 22px;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.new-coin-detail-stages h2 {
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 22px;
-  margin: 0;
-}
-
-.new-coin-detail-stages header small {
-  color: var(--new-coin-detail-signal);
-  font-family: var(--font-numeric);
-  font-size: 10px;
-  line-height: 16px;
+  padding: 12px 16px 4px;
 }
 
 .new-coin-detail-stages ol {
   display: grid;
   gap: 6px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  height: 52px;
+  min-height: 60px;
   list-style: none;
   margin: 0;
   padding: 0;
@@ -687,12 +652,12 @@ function handleReviewKeydown(event: KeyboardEvent): void {
 }
 
 .new-coin-detail-stages li strong {
-  font-size: 10px;
-  line-height: 14px;
+  font-size: 11px;
+  line-height: 16px;
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .new-coin-detail-stages li.active {
@@ -1068,29 +1033,13 @@ function handleReviewKeydown(event: KeyboardEvent): void {
 }
 
 @media (max-width: 340px) {
-  .new-coin-detail-visual,
-  .new-coin-detail-stages,
-  .new-coin-detail-rules,
-  .new-coin-detail-entry {
-    padding-left: 16px;
-    padding-right: 16px;
-  }
-
   .new-coin-detail-plates > div {
-    padding-left: 29px;
-    padding-right: 7px;
-  }
-
-  .new-coin-detail-plates dt svg {
-    left: 7px;
+    padding-inline: 10px;
   }
 
   .new-coin-detail-stages ol {
     gap: 3px;
   }
 
-  .new-coin-detail-stages li strong {
-    font-size: 9px;
-  }
 }
 </style>

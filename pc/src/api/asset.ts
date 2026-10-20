@@ -13,6 +13,7 @@ export interface Coin {
 }
 
 export interface MemberWallet {
+  issuanceValuation?: import('@/core/walletValuation').IssuanceValuation
     id: string | number
     memberId: string | number
     coin: Coin

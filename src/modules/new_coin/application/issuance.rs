@@ -273,6 +273,62 @@ pub(crate) async fn quote(
     Ok(q)
 }
 
+/// 认购以提交时有效行情一次成交；内部报价与钱包、持仓、审计同事务提交，不留下待确认报价。
+/// 用户锁串行化幂等键；终态先于阶段和行情检查重放，未知结果重试不会按新价格再次购买。
+pub(crate) async fn market_purchase(
+    mysql: Option<Pool<MySql>>,
+    redis: Option<&ConnectionManager>,
+    subject: &str,
+    symbol: &str,
+    req: MarketPurchaseRequest,
+) -> AppResult<Value> {
+    let user = user(subject)?;
+    let pool = pool(mysql)?;
+    let key = key(&req.idempotency_key)?;
+    let hint = store::project_by_symbol(&pool, symbol).await?;
+    let intent = json!({"operation":"market_purchase","project_id":hint.id,"quantity":req.quantity.normalized().to_string()});
+    let mut tx = pool.begin().await?;
+    trading::lock_user(&mut tx, user).await?;
+    if let Some(q) = trading::quote_replay(&mut tx, user, &key, &intent).await? {
+        let receipt = q
+            .receipt_json
+            .filter(|_| q.status == "executed")
+            .ok_or_else(|| AppError::Conflict("成交凭证尚未完成".into()))?;
+        tx.commit().await?;
+        return Ok(json!({"idempotency_key":key,"receipt":receipt.0}));
+    }
+    let p = store::lock_project(&mut tx, hint.id).await?;
+    p.policy()?;
+    if p.status != "active" || p.lifecycle_status != "purchase" {
+        return Err(AppError::Conflict("项目不在认购阶段".into()));
+    }
+    let pair = trading::pair_symbol(&mut tx, &p).await?;
+    let treasury = trading::treasury(&mut tx).await?;
+    let precision = trading::lock_money(&mut tx, &p, &[user, treasury]).await?;
+    let now = store::now(&mut tx).await?;
+    let mut price = trading::price(redis, &pair, now).await?;
+    let engine = trading::engine_ready(&mut tx, &p, &price.source).await?;
+    price.source_version = format!("{};{engine}", price.source_version);
+    let q = trading::save_quote(
+        &mut tx,
+        &p,
+        user,
+        &TradeQuoteRequest {
+            side: "buy".into(),
+            quantity: Some(req.quantity),
+            holding_id: None,
+            idempotency_key: key.clone(),
+        },
+        &price,
+        intent,
+        precision,
+    )
+    .await?;
+    let receipt = trading::execute(&mut tx, &p, &q, treasury).await?;
+    tx.commit().await?;
+    Ok(json!({"idempotency_key":key,"receipt":receipt}))
+}
+
 /// 一次确认原子完成买入或解锁卖出；终态重放返回原收据，行情故障、余额不足或日志故障全部回滚。
 pub(crate) async fn confirm(
     mysql: Option<Pool<MySql>>,

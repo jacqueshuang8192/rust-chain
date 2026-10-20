@@ -2500,3 +2500,28 @@ PC live frames may update existing catalog entries only, never insert unknown or
 removed symbols. Listing discovery comes from the next REST catalog refresh.
 Regression tests execute the real adapters/stores for empty-catalog removal,
 quote/contract errors, unknown/late frames, and listed-only new-coin opportunities.
+
+### Direct token purchase and wallet valuation
+
+- V2 Mobile and PC purchase forms call `market-purchases` once with decimal-text
+  quantity and an account-scoped durable key. Save `mode:market` before sending;
+  unknown results retain the exact key/quantity through remount or listing.
+  Receipt identity binds key, project, side and canonical quantity. Never send a
+  client execution price. Definite 400/403/404/409/422 responses permit a new intent;
+  network/contract/5xx failures remain uncertain. Storage failure sends no order.
+- Legacy pending buy quotes and fee-bearing sell quotes remain recoverable through
+  quote/confirm. Account/project change and unmount invalidate late completions.
+- Wallet `issuance_valuation` is independent of `marketStore` membership. Consume
+  exact price text, reject malformed/expired values, and never fall back to a
+  normal ticker when an explicit issuance price is null. Value available + frozen
+  + locked once, without adding pending token orders. Visible assets refresh
+  every 10 seconds with session and in-flight guards; stale prices become unknown.
+- Mobile details put the purchase/subscription action before a compact live chart,
+  then holdings and issuance terms. Keep full stage labels at narrow widths,
+  44px controls, themes/locales and existing hidden notices. Detailed holding
+  times are available through native `details` disclosure.
+- Token-authored inputs/buttons carry `token-control`; owned definition lists
+  carry `token-data`. These explicit selectors must not restyle chart internals.
+  Only the detail page applies the compact chart and framed holding presentation.
+- Validate `token-direct-purchase`, `token-issuance` and `wallet-valuation` behavior,
+  Mobile release gate, PC checks/build/tests, and actual browser interactions.

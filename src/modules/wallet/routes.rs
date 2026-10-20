@@ -167,7 +167,7 @@ async fn list_accounts(
 ) -> AppResult<Json<WalletAccountsResponse>> {
     let user_id = user_id_from_subject(&claims.sub)?;
     let pool = mysql_pool(&state)?;
-    let accounts = list_wallet_accounts_use_case(&pool, user_id).await?;
+    let accounts = list_wallet_accounts_use_case(&pool, state.redis.as_ref(), user_id).await?;
 
     Ok(Json(WalletAccountsResponse { accounts }))
 }

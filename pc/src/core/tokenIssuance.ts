@@ -107,3 +107,14 @@ export function parseTokenSubscriptionReceipt(raw: unknown, key: string) {
   if (r.idempotency_key !== key || !['pending', 'allocated', 'partial_allocated', 'refunded'].includes(String(r.status)) || r.lock_position_id !== null) throw new Error('Subscription receipt mismatch')
   return r
 }
+
+export type TokenPurchaseIntent = { quantity: string; idempotency_key: string }
+/** A direct buy receipt must identify this exact request, without accepting a client price. */
+export function parseTokenPurchase(raw: unknown, project: number, intent: TokenPurchaseIntent): TokenReceipt {
+  const r = tokenObject(raw)
+  if (r.idempotency_key !== intent.idempotency_key) throw new Error('Purchase identity mismatch')
+  const receipt = parseTokenReceipt(r.receipt)
+  if (receipt.project_id !== project || receipt.side !== 'buy' || canonical(receipt.quantity) !== canonical(tokenDecimal(intent.quantity))) throw new Error('Purchase intent mismatch')
+  if (!/[1-9]/.test(receipt.price) || !/[1-9]/.test(receipt.gross) || canonical(receipt.fee) !== canonical('0') || canonical(receipt.net) !== canonical(receipt.gross)) throw new Error('Invalid purchase settlement')
+  return receipt
+}

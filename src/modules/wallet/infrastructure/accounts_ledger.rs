@@ -1063,6 +1063,7 @@ fn wallet_ledger_fee_joins_sql() -> &'static str {
 /// 三桶余额按定点原值输出，不合并成总额也不做单位换算，前端需要总资产时须自行相加。
 fn wallet_account_response(row: WalletAccountRow) -> WalletAccountResponse {
     WalletAccountResponse {
+        issuance_valuation: None,
         user_id: row.user_id,
         asset_id: row.asset_id,
         symbol: row.symbol,

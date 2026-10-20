@@ -5,6 +5,14 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub(crate) struct MarketPurchaseRequest {
+    #[serde(deserialize_with = "crate::numeric::deserialize_decimal_text")]
+    pub quantity: BigDecimal,
+    pub idempotency_key: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct StageRequest {
     pub expected_stage: String,
     pub target_stage: String,

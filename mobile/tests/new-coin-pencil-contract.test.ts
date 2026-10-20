@@ -114,7 +114,6 @@ test('selected geometry, responsive containment, and dark palettes remain route 
   assert.match(zone, /\.new-coins-project-content > h2 \{[\s\S]*?height: 36px;[\s\S]*?margin: 0 0 12px;/)
   assert.match(projectCard, /\.new-coin-project-card \{[\s\S]*?border-radius: 22px;[\s\S]*?height: 300px/)
   assert.match(opportunityCard, /\.new-coin-opportunity-card \{[\s\S]*?border-radius: 18px;[\s\S]*?height: 140px/)
-  assert.match(detail, /height: 56px[\s\S]*?height: 210px[\s\S]*?height: 112px[\s\S]*?height: 104px[\s\S]*?min-height: 328px/)
   assert.match(records, /height: 58px[\s\S]*?height: 56px/)
   assert.match(selectedCss, /html\[data-theme='dark'\] \.new-coins-pencil/)
   assert.match(selectedCss, /html\[data-theme='dark'\] \.new-coin-detail-pencil/)

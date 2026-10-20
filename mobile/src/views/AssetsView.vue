@@ -32,6 +32,7 @@ import {
 } from '@/api/wallet'
 import { formatAmount, formatFiat } from '@/core/format'
 import { decimalAdd, decimalCompare, decimalMultiply, decimalSign, decimalTextFromBoundary, formatDecimalText, normalizeDecimalText, tryNormalizeDecimalText, type DecimalText } from '@/core/decimal'
+import { estimateWalletAsset } from '@/core/walletValuation'
 import { walletTotal, walletAvailable, walletFrozen } from '@/core/walletAmounts'
 import { useModalDialog } from '@/core/modalDialog'
 import { createSessionRequestLifecycle } from '@/core/sessionRequest'
@@ -65,6 +66,7 @@ const marketStore = useMarketStore()
 const session = useSessionStore()
 const theme = useThemeStore()
 const { locale, t } = useI18n()
+const valuationClock = ref(Date.now())
 const accounts = ref<WalletAccount[]>([])
 const marginAccounts = ref<WalletAccount[]>([])
 const assetAccountScope = ref<AssetAccountScope>('all')
@@ -145,7 +147,7 @@ const selectedHoldingsTitle = computed(() => {
 })
 const memberState = computed<'loading' | 'error' | 'empty' | 'holdings'>(() => {
   if (error.value) return 'error'
-  if (loading.value || !accountsReady.value) return 'loading'
+  if (!accountsReady.value) return 'loading'
   return hasHoldings.value ? 'holdings' : 'empty'
 })
 const estimateCoverage = computed<'full' | 'partial' | 'unavailable' | 'empty'>(() => {
@@ -221,7 +223,7 @@ const canSubmitTransfer = computed(() => Boolean(transferAsset.value
   && decimalCompare(transferValueText.value, transferAvailableText.value) <= 0
   && !transferring.value))
 
-async function loadAccounts(): Promise<void> {
+async function loadAccounts(quiet = false): Promise<void> {
   if (!session.token) {
     resetSessionAccountState()
     loading.value = false
@@ -229,7 +231,7 @@ async function loadAccounts(): Promise<void> {
     return
   }
   loading.value = true
-  accountsReady.value = false
+  if (!quiet) accountsReady.value = false
   error.value = ''
   const result = await accountRequestLifecycle.load()
   if (result.state === 'stale') return
@@ -484,9 +486,7 @@ function upsertWalletAccount(wallets: WalletAccount[], next: WalletAccount): Wal
 }
 
 function estimateAssetValue(symbol: string, amount: DecimalText): DecimalText | null {
-  if (symbol === QUOTE_ASSET_SYMBOL) return amount
-  const lastPrice = marketStore.tickerFor(`${symbol}/USDT`)?.lastPriceText
-  return lastPrice ? decimalMultiply(amount, lastPrice) : null
+  return estimateWalletAsset(symbol, amount, accounts.value.find(a => a.symbol === symbol), marketStore.tickerFor(`${symbol}/USDT`)?.lastPriceText, valuationClock.value)
 }
 
 function preferredTransferAsset(wallets: WalletAccount[]): string {
@@ -511,7 +511,12 @@ watch(() => session.token, () => {
   todayReturnRequestLifecycle.invalidate()
   void loadTodayReturn()
 }, { immediate: true })
+const valuationTimer = setInterval(() => {
+  valuationClock.value = Date.now()
+  if (session.isAuthenticated && !loading.value && !transferring.value && document.visibilityState === 'visible') void loadAccounts(true)
+}, 10_000)
 onUnmounted(() => {
+  clearInterval(valuationTimer)
   accountRequestLifecycle.stop()
   todayReturnRequestLifecycle.stop()
   transferRequestVersion += 1
@@ -653,7 +658,7 @@ onUnmounted(() => {
         <div v-else-if="memberState === 'error'" class="assets-holdings__state assets-holdings__state--error" role="alert">
           <strong>{{ t('common.serviceUnavailable') }}</strong>
           <span>{{ error }}</span>
-          <button class="pencil-secondary" type="button" :disabled="loading" @click="loadAccounts">{{ t('common.retry') }}</button>
+          <button class="pencil-secondary" type="button" :disabled="loading" @click="loadAccounts()">{{ t('common.retry') }}</button>
         </div>
         <div v-else-if="selectedHasHoldings" class="assets-holdings__list">
           <button

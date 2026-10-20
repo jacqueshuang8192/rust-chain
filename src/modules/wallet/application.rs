@@ -38,6 +38,7 @@ use crate::{
     state::AppState,
 };
 
+mod issuance_valuation;
 pub(crate) mod withdrawal_policy;
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeDelta, Utc};
@@ -167,9 +168,12 @@ pub(crate) async fn get_or_assign_deposit_address(
 /// 查询不加资金行锁，返回值只用于展示，扣款前必须在事务内重新锁行读取最新余额。
 pub(crate) async fn list_wallet_accounts(
     pool: &Pool<MySql>,
+    redis: Option<&ConnectionManager>,
     user_id: u64,
 ) -> AppResult<Vec<WalletAccountResponse>> {
-    infrastructure::list_wallet_accounts(pool, user_id).await
+    let mut accounts = infrastructure::list_wallet_accounts(pool, user_id).await?;
+    issuance_valuation::enrich(pool, redis, user_id, &mut accounts).await?;
+    Ok(accounts)
 }
 
 /// 以当前 UTC 时间计算用户当日已实现收益，缺价时返回部分状态而非估算值。

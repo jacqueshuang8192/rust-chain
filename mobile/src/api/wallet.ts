@@ -1,3 +1,4 @@
+import { parseIssuanceValuation } from '@/core/walletValuation'
 import { client, readAuthSessionSnapshot, requestUrl } from './client'
 import { canonicalRequestIntent, RetryStableIdempotencyKeys } from './idempotency'
 import {
@@ -287,6 +288,7 @@ interface BackendDepositAddress {
 }
 
 interface BackendWalletAccount {
+  issuance_valuation?: unknown
   asset_id?: number
   symbol: string
   logo_url?: string | null
@@ -747,6 +749,7 @@ function mapWalletAccount(
     availableText,
     frozenText,
     lockedText,
+    issuanceValuation: parseIssuanceValuation('issuance_valuation' in account ? account.issuance_valuation : undefined),
   }
 }
 

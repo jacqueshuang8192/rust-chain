@@ -5,7 +5,9 @@ use crate::{
         auth::UserAuth,
         new_coin::{
             application::issuance as app,
-            presentation::issuance::{HoldingsQuery, TradeQuote, TradeQuoteRequest},
+            presentation::issuance::{
+                HoldingsQuery, MarketPurchaseRequest, TradeQuote, TradeQuoteRequest,
+            },
         },
     },
     state::AppState,
@@ -19,8 +21,19 @@ use serde_json::Value;
 pub(super) fn routes() -> Router<AppState> {
     Router::new()
         .route("/new-coins/holdings", get(holdings))
+        .route("/new-coins/:symbol/market-purchases", post(market_purchase))
         .route("/new-coins/:symbol/quotes", post(quote))
         .route("/new-coins/quotes/:id/confirm", post(confirm))
+}
+async fn market_purchase(
+    UserAuth(c): UserAuth,
+    State(s): State<AppState>,
+    Path(symbol): Path<String>,
+    Json(req): Json<MarketPurchaseRequest>,
+) -> AppResult<Json<Value>> {
+    Ok(Json(
+        app::market_purchase(s.mysql, s.redis.as_ref(), &c.sub, &symbol, req).await?,
+    ))
 }
 async fn quote(
     UserAuth(c): UserAuth,

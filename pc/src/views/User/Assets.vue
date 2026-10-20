@@ -138,7 +138,7 @@
                   {{ asset.coin }}
                   <span class="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-normal border border-border">{{ asset.name }}</span>
                </div>
-               <div class="text-sm text-muted-foreground font-mono mt-0.5">{{ t('assets.price') }}: ${{ formatNumber(asset.price, 'price') }}</div>
+               <div class="text-sm text-muted-foreground font-mono mt-0.5">{{ t('assets.price') }}: ${{ asset.price === null ? '--' : formatNumber(asset.price, 'price') }}</div>
              </div>
            </div>
 
@@ -148,7 +148,7 @@
                  {{ hideBalance ? '********' : formatNumber(asset.balance, 'amount') }}
              </div>
              <div class="text-sm text-muted-foreground font-mono">
-                 ≈ ${{ hideBalance ? '****' : formatNumber(asset.balance * asset.price, 'price') }}
+                 ≈ ${{ hideBalance ? '****' : asset.price === null ? '--' : formatNumber(asset.balance * asset.price, 'price') }}
              </div>
            </div>
         </div>
@@ -163,12 +163,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { useMarketStore } from '@/stores/market'
 import { useContractStore } from '@/stores/contract'
 import { useI18n } from 'vue-i18n'
 import { formatNumber } from '@/utils/format'
+import { issuancePrice } from '@/core/walletValuation'
 import { getWallets, type MemberWallet } from '@/api/asset'
 
 const { t } = useI18n()
@@ -178,14 +179,17 @@ const contractStore = useContractStore()
 
 const activeTab = ref<'spot' | 'margin'>('spot')
 const hideBalance = ref(false)
+const valuationClock = ref(Date.now())
 const wallets = ref<MemberWallet[]>([])
 const failedLogoSymbols = ref<Set<string>>(new Set())
 
 const getAssetPrice = (unit: string) => {
     const symbol = unit.toUpperCase()
     if (symbol === 'USDT') return 1
+    const value = issuancePrice(wallets.value.find(w => w.coin.unit.toUpperCase() === symbol)?.issuanceValuation, valuationClock.value)
+    if (value !== undefined) return value === null ? null : Number(value)
     const ticker = marketStore.tickers.find(t => t.symbol === `${symbol}/USDT`)
-    return ticker ? ticker.close : 0
+    return ticker ? ticker.close : null
 }
 const getAssetIcon = (unit: string): string => {
   const symbol = unit.toUpperCase()
@@ -194,7 +198,7 @@ const getAssetIcon = (unit: string): string => {
   return ticker?.icon || ''
 }
 
-const btcPrice = computed(() => getAssetPrice('BTC') || 40000)
+const btcPrice = computed(() => getAssetPrice('BTC'))
 
 const normalizeLogoUrl = (value?: string | null) => value?.trim() || ''
 
@@ -234,14 +238,14 @@ const spotAssets = computed(() => {
         coin,
         name: w.coin.name || coin,
         ...resolveAssetVisual(coin, w.coin.logoUrl),
-        balance: w.balance,
+        balance: w.balance + w.frozenBalance,
         price: getAssetPrice(coin)
       }
     })
 })
 
 const marginAssets = computed(() => {
-  const grouped = new Map<string, { coin: string; name: string; logoUrl: string; fallbackIcon: string; balance: number; price: number }>()
+  const grouped = new Map<string, { coin: string; name: string; logoUrl: string; fallbackIcon: string; balance: number; price: number | null }>()
   for (const wallet of contractStore.wallets) {
     const coin = (wallet.baseSymbol || 'USDT').toUpperCase()
     const existing = grouped.get(coin)
@@ -264,16 +268,17 @@ const marginAssets = computed(() => {
 const displayAssets = computed(() => activeTab.value === 'spot' ? spotAssets.value : marginAssets.value)
 
 const totalUsdValue = computed(() => {
-  const total = displayAssets.value.reduce((sum, asset) => sum + (asset.balance * asset.price), 0)
+  const total = displayAssets.value.reduce((sum, asset) => sum + (asset.balance * (asset.price ?? 0)), 0)
   return total
 })
 
 const totalBalanceUSD = computed(() => {
+  if (displayAssets.value.some(a => a.balance > 0 && a.price === null)) return '--'
   return formatNumber(totalUsdValue.value, 'price')
 })
 
 const totalBalanceBTC = computed(() => {
-  return formatNumber(totalUsdValue.value / btcPrice.value, 'amount')
+  return btcPrice.value && totalBalanceUSD.value !== '--' ? formatNumber(totalUsdValue.value / btcPrice.value, 'amount') : '--'
 })
 
 const marginPositionCount = computed(() => {
@@ -330,15 +335,21 @@ const pnlRatioDisplay = computed(() => {
 const pnlClass = computed(() => pnlValue.value >= 0 ? 'text-up' : 'text-down')
 const pnlBadgeClass = computed(() => pnlValue.value >= 0 ? 'bg-up/10 text-up border-up/20' : 'bg-down/10 text-down border-down/20')
 
+let walletLoading = false
+let walletGeneration = 0
+let disposed = false
 const loadWallets = async () => {
+    if (walletLoading || !userStore.isLoggedIn || disposed) return
+    const token = userStore.token; const generation = walletGeneration
+    walletLoading = true
     try {
         const res = await getWallets()
-        if (res.data?.code === 0) {
+        if (!disposed && generation === walletGeneration && token === userStore.token && res.data?.code === 0) {
             wallets.value = res.data.data
         }
     } catch (error) {
         console.error('Failed to load wallets:', error)
-    }
+    } finally { if (generation === walletGeneration) walletLoading = false }
 }
 
 const loadMarginWallets = async () => {
@@ -366,6 +377,12 @@ onMounted(() => {
     }
 })
 
+const valuationTimer = setInterval(() => {
+  valuationClock.value = Date.now()
+  if (document.visibilityState === 'visible') void loadWallets()
+}, 10_000)
+watch(() => userStore.token, () => { walletGeneration++; walletLoading = false; wallets.value = []; void loadWallets() })
+onBeforeUnmount(() => { disposed = true; walletGeneration++; clearInterval(valuationTimer) })
 watch(activeTab, (tab) => {
     if (tab === 'margin' && userStore.isLoggedIn) {
         loadMarginWallets()
