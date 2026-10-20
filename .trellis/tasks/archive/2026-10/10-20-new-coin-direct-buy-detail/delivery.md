@@ -77,5 +77,5 @@ Logs: `/tmp/token-direct-{financial,regression,clippy-final,mobile-gate,pc-type-
   Redis 16392, and dropped only the isolated `codex_token_direct_20261020` database.
 - Preserved existing services and the pre-existing untracked `.vite/` directory.
 - Ego reported an available update; no browser upgrade was performed.
-- Save one scoped implementation commit, then archive this task and record its
-  journal in separate bookkeeping commits. No remote push is part of this task.
+- Implementation saved locally as `bb230723c592d173ffae19c532f9a3c5e41d13ff`. Archive and
+  journal are separate bookkeeping commits. No remote push is part of this task.
