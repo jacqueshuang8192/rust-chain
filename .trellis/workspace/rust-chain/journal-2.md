@@ -568,3 +568,36 @@ Formatted idle spot quantity and turnover without rounding order state. Focus re
 ### Next Steps
 
 - None - task complete
+
+
+## Session 76: Spot holdings cards
+
+**Date**: 2026-10-21
+**Task**: Spot holdings cards
+**Branch**: `main`
+
+### Summary
+
+Compact asset cards show exact total holdings plus available and frozen/locked breakdown. Mobile release gate894/894 and light/dark320-448px browser checks passed. No push/deployment.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `79791ef` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 75
+- **Total Sessions**: 76
 - **Last Active**: 2026-10-21
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~570 | Active |
+| `journal-2.md` | ~603 | Active |
 | `journal-1.md` | ~1985 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 76 | 2026-10-21 | Spot holdings cards | `79791ef` | `main` |
 | 75 | 2026-10-21 | Spot editable amount presentation | `05aff56` | `main` |
 | 74 | 2026-10-21 | Home portfolio typography and transparent illustration | `cc76daa` | `main` |
 | 73 | 2026-10-21 | New coin presentation and home valuation | `09877ce` | `main` |
