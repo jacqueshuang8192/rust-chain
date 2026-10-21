@@ -10069,3 +10069,10 @@
 - 修改文件：`mobile/src/views/TradeView.vue`、`.trellis/tasks/10-21-refine-spot-account-navigation-tabs/`及本记录。
 - 验证结果：Mobile release:gate通过896/896、类型、PWA/Tauri Web构建/制品/包体/治理；Ego明暗320/390/448px无横溢，点击区44px、字号15/14px和选中线宽均符合预期，两张截图已查看；diff及任务校验通过。
 - 后续事项：保存本地提交并归档，未推送或部署；预览与Ego空间已关闭，保留独立Cloudflare目录与`.vite/`。
+
+## 2026-10-21 12:09 - 移除现货持仓成本价并优化两列排版
+
+- 完成内容：删除spot-holding-card成本价栏，币种权益与最新价改为左右两列，主数字17px；可用与冻结锁定明细13px并增加分隔线，缩减上下间距，保留USDT隐藏和原估值逻辑。
+- 修改文件：`mobile/src/components/SpotHoldingCard.vue`、`.trellis/spec/mobile/backend-integration.md`、本任务目录及本记录。
+- 验证结果：Mobile release:gate通过896/896、类型、PWA/Tauri Web构建/制品/包体/治理；Ego明暗320/390/448px均为两列、无成本标签、无页面或卡片横溢，两张截图已查看；diff与任务校验通过。
+- 后续事项：保存本地提交并归档，未推送或部署；本轮预览与Ego已关闭，独立Cloudflare目录及`.vite/`保留。

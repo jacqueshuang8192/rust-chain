@@ -2581,13 +2581,13 @@ quote/contract errors, unknown/late frames, and listed-only new-coin opportuniti
 
 - Current-pair spot holdings exclude USDT, without changing the underlying wallet
   collection used for order balances or Assets. Cost basis is not supplied by the
-  wallet API: display an em dash and omit PnL rather than deriving fictitious costs.
-- Flat rows show equity quantity, cost placeholder and latest USDT price, followed
+  wallet API: omit cost price and PnL rather than deriving fictitious costs.
+- Flat rows show equity quantity and latest USDT price in two columns, followed
   by available and frozen/locked balances. Estimated equity uses walletTotal and
   estimateWalletAsset; missing/expired issuance prices never fall back to ticker.
 - A component-owned 10-second clock invalidates expired issuance values; clear
   its timer on unmount. Prices use up to8 decimals; USDT valuations use2, retaining
-  tiny-nonzero thresholds. Keep localized labels and wrapping three-column layout.
+  tiny-nonzero thresholds. Keep localized labels and wrapping two-column layout.
 - Verify spot-holdings-presentation tests for USDT exclusion without wallet mutation,
   exact total, expiry/recovery and timer cleanup; use numeric-browser fixture's
   optional spot-holdings flag for isolated actual-page rendering.
