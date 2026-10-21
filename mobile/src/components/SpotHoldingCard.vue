@@ -35,12 +35,12 @@ const priceText = computed(() => formatFinancialAmount(price.value, locale.value
   </article>
 </template>
 <style scoped>
-.spot-holding-card { min-width: 0; padding: 12px 0 16px; border-bottom: 1px solid var(--line); }
+.spot-holding-card { min-width: 0; padding: 12px 0 16px; }
 .spot-holding-card header { display: flex; gap: 10px; align-items: center; font-size: 17px; margin-bottom: 16px; }
 .spot-holding-card dl { display: grid; gap: 12px; margin: 0; }
 .spot-holding-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .spot-holding-card dl > div:last-child { text-align: right; }
-.spot-holding-card .spot-holding-balances { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--line); }
+.spot-holding-card .spot-holding-balances { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 16px; padding-top: 12px; }
 .spot-holding-card dt, .spot-holding-card small { color: var(--muted); font-size: 11px; line-height: 1.5; }
 .spot-holding-card .spot-holding-balances dd { font-size: 13px; font-weight: 500; }
 .spot-holding-card dd { margin: 5px 0 3px; font-size: 17px; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; }

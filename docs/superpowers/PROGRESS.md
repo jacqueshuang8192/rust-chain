@@ -10076,3 +10076,10 @@
 - 修改文件：`mobile/src/components/SpotHoldingCard.vue`、`.trellis/spec/mobile/backend-integration.md`、本任务目录及本记录。
 - 验证结果：Mobile release:gate通过896/896、类型、PWA/Tauri Web构建/制品/包体/治理；Ego明暗320/390/448px均为两列、无成本标签、无页面或卡片横溢，两张截图已查看；diff与任务校验通过。
 - 后续事项：保存本地提交并归档，未推送或部署；本轮预览与Ego已关闭，独立Cloudflare目录及`.vite/`保留。
+
+## 2026-10-21 12:14 - 移除现货持仓分割线
+
+- 完成内容：按最新要求移除spot-holding-card内部与底部两处分割线，保留两列布局和留白，覆盖上一切片的分隔线设计。
+- 修改文件：`mobile/src/components/SpotHoldingCard.vue`、本任务目录及本记录。
+- 验证结果：Mobile release:gate通过896/896、类型、PWA/Tauri Web构建/制品/预算/治理，diff与任务上下文检查通过；仅删除两条边框声明，未重拍截图。
+- 后续事项：保存本地提交并归档，未推送或部署；独立Cloudflare目录与`.vite/`保留。
