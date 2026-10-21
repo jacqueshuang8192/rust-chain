@@ -85,6 +85,7 @@ import {
   resolveMarginPositionRiskMetrics,
   type MarginPositionRiskMetrics,
 } from '@/core/marginRiskMetrics'
+import SpotHoldingCard from '@/components/SpotHoldingCard.vue'
 import { financialAssetDisplayDigits } from '@/core/financialDisplay'
 import { useModalDialog } from '@/core/modalDialog'
 import { goBackOr } from '@/core/navigation'
@@ -1812,11 +1813,7 @@ onBeforeUnmount(() => {
             <button type="button" @click="loadTradingBalances">{{ t('common.retry') }}</button>
           </div>
           <div v-else-if="session.isAuthenticated && spotVisibleBalances.length" class="spot-balance-preview">
-            <article v-for="wallet in spotVisibleBalances" :key="wallet.symbol">
-              <span>{{ wallet.symbol }}</span>
-              <strong class="numeric">{{ moneyText(walletAmount(wallet, 'available')) }}</strong>
-              <small>{{ t('assets.frozen', { amount: moneyText(frozenAmount(wallet)) }) }}</small>
-            </article>
+            <SpotHoldingCard v-for="wallet in spotVisibleBalances" :key="wallet.assetId" :wallet="wallet" />
           </div>
           <div v-else class="spot-account-state">
             <strong>{{ t('trade.spotAssetEmpty') }}</strong>
@@ -3488,27 +3485,10 @@ onBeforeUnmount(() => {
 
 .spot-balance-preview {
   display: grid;
-  gap: 8px;
+  align-content: start;
+  gap: 10px;
   min-height: 198px;
-  padding: 18px 16px 24px;
-}
-
-.spot-balance-preview article {
-  align-items: center;
-  border-bottom: 1px solid var(--line);
-  display: grid;
-  gap: 4px 12px;
-  grid-template-columns: minmax(0, 1fr) auto;
-  min-height: 64px;
-}
-
-.spot-balance-preview article strong {
-  font-size: 15px;
-}
-
-.spot-balance-preview article small {
-  color: var(--muted);
-  grid-column: 1 / -1;
+  padding: 12px 16px 20px;
 }
 
 .spot-chart-entry {

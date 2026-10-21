@@ -10048,3 +10048,10 @@
 - 修改文件：`mobile/src/views/TradeView.vue`、`mobile/tests/spot-input-presentation.test.ts`、`mobile/tests/pencil-trading-product-selected-parity.test.ts`、`.trellis/spec/mobile/backend-integration.md`及当前任务记录。
 - 验证结果：Mobile release:gate通过894/894、类型、PWA/Tauri Web构建/制品/包体/治理；浏览器真实页面隔离接口验证0.54005511和44,900.85显示、聚焦原值及100.50输入保留，零写请求，截图已查看（桌面壳，未宣称窄屏视觉验收）；diff和任务校验通过。
 - 后续事项：保存本地提交并归档；未推送或部署，未验证生产接口和原生设备。Ego空间和本轮预览已关闭，独立Cloudflare任务及`.vite/`保留。
+
+## 2026-10-21 08:54 - 现货持仓卡片优化
+
+- 完成内容：现货持仓改为紧凑资产卡片，展示币种图标、精确总持仓及可用/冻结锁定明细；数字按币种精度分组、去尾零，极小值保留阈值提示，长数字换行。保留当前交易对筛选和加载/错误/空状态。
+- 修改文件：`mobile/src/components/SpotHoldingCard.vue`、`mobile/src/views/TradeView.vue`、中英文消息、`mobile/tests/pencil-trading-product-selected-parity.test.ts`、`.trellis/spec/mobile/backend-integration.md`及本任务记录。
+- 验证结果：Mobile release:gate通过894/894、类型、PWA/Tauri Web构建/制品/包体/治理；原内联方案超源文件预算后提取组件解决，未提高预算。Ego明暗主题320/390/448px无页面或卡片横溢，超大余额和冻结锁定精确总量正确、零写请求，两张截图已查看。diff与任务校验通过。
+- 后续事项：保存本地提交并归档；未推送或部署，未验证生产接口/原生设备。本轮预览与Ego空间已关闭，保留独立Cloudflare任务和`.vite/`。

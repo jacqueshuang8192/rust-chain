@@ -370,6 +370,8 @@ export default {
     noResults: '没有找到匹配的交易对。',
   },
   trade: {
+    holdingQuantity: '持仓数量',
+    frozenLocked: '冻结 / 锁定',
     category: '交易类别',
     swap: '闪兑',
     spot: '现货',

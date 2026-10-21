@@ -217,6 +217,16 @@ test('现货 yzOPc/bo8k5 模板仅定向调整订单类型入口与持仓归属�
     `<input v-model="amountValue" inputmode="decimal" :placeholder="t('trade.turnover')" />`,
     'display-only spot amount formatting',
   )
+  normalizedSpotTemplate = replaceExactlyOnce(
+    normalizedSpotTemplate,
+    `          <SpotHoldingCard v-for="wallet in spotVisibleBalances" :key="wallet.assetId" :wallet="wallet" />`,
+    `          <article v-for="wallet in spotVisibleBalances" :key="wallet.symbol">
+            <span>{{ wallet.symbol }}</span>
+            <strong class="numeric">{{ moneyText(walletAmount(wallet, 'available')) }}</strong>
+            <small>{{ t('assets.frozen', { amount: moneyText(frozenAmount(wallet)) }) }}</small>
+          </article>`,
+    'wallet holdings card presentation',
+  )
   const priorSpotDigest = createHash('sha256').update(normalizedSpotTemplate).digest('hex')
 
   assert.equal(priorSpotDigest, '80417caf6742d533159cc2ba09a723c9ea3d2ebcb6a04df7926fd075c65cb828')

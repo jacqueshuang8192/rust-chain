@@ -2566,3 +2566,13 @@ quote/contract errors, unknown/late frames, and listed-only new-coin opportuniti
   existing exact quantity and conversion path; contract inputs stay unchanged.
 - Verify `spot-input-presentation.test.ts`, including screenshot values, focus/blur
   equality, stable partial quote inputs, unsafe integers and tiny amounts.
+
+### Spot holdings cards
+
+- SpotHoldingCard displays walletTotal (available+frozen+locked) as holdings and
+  labels available and walletFrozen (frozen+locked) separately. Never present
+  locked funds as spendable or invent position cost/PnL from wallet balances.
+- Use the existing asset-aware financial formatter, raw decimal titles, AssetMark
+  logo fallback, and wrapping numeric columns. Keep current-pair filtering and
+  loading/error/guest/empty branches in TradeView. Cards align to the top rather
+  than stretching inside the panel's minimum height.

@@ -370,6 +370,8 @@ export default {
     noResults: 'No matching pairs found.',
   },
   trade: {
+    holdingQuantity: 'Holdings',
+    frozenLocked: 'Frozen / Locked',
     category: 'Trade category',
     swap: 'Convert',
     spot: 'Spot',
