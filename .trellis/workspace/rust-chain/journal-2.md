@@ -634,3 +634,36 @@ Flat three-column holding rows with equity valuation, unavailable cost placehold
 ### Next Steps
 
 - None - task complete
+
+
+## Session 78: Spot account tabs styling
+
+**Date**: 2026-10-21
+**Task**: Spot account tabs styling
+**Branch**: `main`
+
+### Summary
+
+Readable labels, spacing, active underline and44px history control. CSS-only, existing navigation retained. Mobile release gate896/896 and six theme/width browser cases passed; screenshots checked. Local commit only.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6000b84` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
