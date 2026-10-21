@@ -395,3 +395,17 @@ fn actual_listing_gate_never_uses_planned_time_and_keeps_project_identity() {
     assert_eq!(after.locked_amount, amount(0));
     assert!(after.lock_positions.is_empty());
 }
+
+#[test]
+fn post_listing_pair_symbol_joins_project_and_quote_with_hyphen() {
+    assert_eq!(
+        service::post_listing_pair_symbol("myc", "usdt").unwrap(),
+        "MYC-USDT"
+    );
+    assert_eq!(
+        service::post_listing_pair_symbol("ABC_DEF", "usdt").unwrap(),
+        "ABC-DEF-USDT"
+    );
+    assert!(service::post_listing_pair_symbol(&"A".repeat(64), "USDT").is_err());
+    assert!(service::post_listing_pair_symbol("MYC", "US DT").is_err());
+}

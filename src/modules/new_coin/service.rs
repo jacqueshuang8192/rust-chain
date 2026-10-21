@@ -734,6 +734,19 @@ pub(crate) fn manual_new_coin_settlement_amounts(
     Ok((payment, refund))
 }
 
+/// 组装上市后购买交易对的代码：项目代码与计价资产符号大写后用连字符连接，长度上限 64。
+/// 与后台手工创建交易对共用同一归一化口径，保证新币交易对和手工交易对的命名完全一致；
+/// 非法字符或超长返回参数错误而不静默截断，避免落库代码与页面展示代码不一致。
+pub(crate) fn post_listing_pair_symbol(
+    project_symbol: &str,
+    quote_symbol: &str,
+) -> AppResult<String> {
+    crate::modules::admin::service::normalize_trading_pair_symbol(&format!(
+        "{project_symbol}-{quote_symbol}"
+    ))
+    .map_err(|_| AppError::Validation("新币与计价资产组合后的交易对代码不合法或超过64位".into()))
+}
+
 #[cfg(test)]
 #[path = "../../../tests/unit_src/new_coin_manual_settlement_tests.rs"]
 mod tests_manual_settlement;

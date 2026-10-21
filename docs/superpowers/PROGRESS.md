@@ -1,3 +1,10 @@
+## 2026-10-22 01:31 - 新币交易对代码补上连字符
+
+- 完成内容：新币发行创建的交易对代码原先走行情模块的规范形式，`-`、`_`、`/` 会被剥掉，落库成 `MYCUSDT`，与后台手工创建的 `BTC-USDT` 风格不一致，PC 端按连字符取基础币的展示（`symbol.split('-')[0]`）会出错。现改为项目代码与计价资产用连字符连接，并复用后台手工创建交易对的同一归一化口径（大写、`-_/` 归一为 `-`、长度上限 64），非法字符或超长仍在发行事务内返回参数错误。行情缓存键、订阅与秒合约取价仍由 `sanitize_symbol` 归一，带连字符的代码不影响取价与结算。
+- 修改文件：`src/modules/new_coin/{service.rs,infrastructure/issuance.rs}`、`tests/unit_src/src_modules_new_coin_mod_tests.rs`。
+- 验证结果：`cargo test --lib new_coin` 25/25（含新增 `post_listing_pair_symbol_joins_project_and_quote_with_hyphen`）、`cargo check --all-targets --all-features`、严格 Clippy、架构 11/11、文档 1/1、`cargo fmt --all -- --check` 通过。全量 `cargo test --lib` 为 528 通过、5 失败，失败项全部是依赖外网的既有测试（Cloudflare Turnstile 3 项、GMPay 2 项，均返回 502 Bad Gateway），与本次改动无关；新币/代理路由集成测试需 `DATABASE_URL` 与 Redis，本机跳过。
+- 后续事项：存量已按无连字符落库的新币交易对不会自动改名，如需统一可后台手工改名或单独做数据订正。
+
 ## 2026-10-21 14:48 - 秒合约控单取消必填原因
 
 - 完成内容：控输控赢设置不再强制填写原因。订单级与用户级请求的 `reason` 变为可选，空白或缺失归一为 `None`：订单 `control_reason` 写 NULL、用户控制表与控制流水 `reason` 写空串、后台审计原因留空；代理与后台控制响应中的 `reason` 改为可空，代理用户页只在原因非空时展示。代理控制弹窗的“确认控制”不再因原因为空而禁用；后台秒合约订单的控赢/控输/取消控制复用 `ConfirmAction` 新增的 `reasonOptional`，同样允许空原因；超过审计长度上限的文本仍在提交前拒绝。

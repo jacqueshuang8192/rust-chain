@@ -256,12 +256,11 @@ pub(crate) async fn publish_policy(
 ) -> AppResult<()> {
     let (base, quote, symbol, quote_symbol, quantity_precision, price_precision, logo): (u64,u64,String,String,i32,i32,Option<String>) = sqlx::query_as("SELECT p.asset_id,p.quote_asset_id,p.symbol,q.symbol,a.precision_scale,q.precision_scale,a.logo_url FROM new_coin_projects p JOIN assets a ON a.id=p.asset_id JOIN assets q ON q.id=p.quote_asset_id WHERE p.id=?")
         .bind(project_id).fetch_one(&mut **tx).await?;
-    let pair_symbol = crate::modules::market::domain::ValidatedMarketSymbol::from_raw(&format!(
-        "{symbol}{quote_symbol}"
-    ))
-    .map_err(|_| AppError::Validation("新币与计价资产组合后的交易对代码不能超过32位".into()))?;
+    // 交易对代码与后台手工创建保持同一口径：项目代码与计价资产用连字符连接。
+    let pair_symbol =
+        crate::modules::new_coin::service::post_listing_pair_symbol(&symbol, &quote_symbol)?;
     let pair_id = sqlx::query("INSERT INTO trading_pairs (base_asset,quote_asset,symbol,price_precision,qty_precision,min_order_value,status,market_type,logo_url) VALUES (?,?,?,?,?,0,'disabled','internal',?)")
-        .bind(base).bind(quote).bind(pair_symbol.as_str()).bind(price_precision).bind(quantity_precision).bind(logo)
+        .bind(base).bind(quote).bind(&pair_symbol).bind(price_precision).bind(quantity_precision).bind(logo)
         .execute(&mut **tx).await?.last_insert_id();
     // 新交易对尚未提交、没有运行中的生成器；只在审批事务创建停用版本，不需要排空外部写入者。
     crate::modules::admin::infrastructure::save_default_market_in_tx(
