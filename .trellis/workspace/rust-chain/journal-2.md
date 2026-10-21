@@ -667,3 +667,37 @@ Readable labels, spacing, active underline and44px history control. CSS-only, ex
 ### Next Steps
 
 - None - task complete
+
+
+## Session 79: Simplify spot holding layout without dividers
+
+**Date**: 2026-10-21
+**Task**: Simplify spot holding layout without dividers
+**Branch**: `main`
+
+### Summary
+
+Removed cost price, aligned two-column holding metrics and secondary balances, then removed inner/bottom dividers per user steering. Final Mobile release gate896/896 passed; prior two-column theme/width screenshots checked. Local commits only.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f1d1eca` | (see git log) |
+| `49dfd18` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
