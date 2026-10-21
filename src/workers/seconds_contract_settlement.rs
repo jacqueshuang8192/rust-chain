@@ -15,8 +15,8 @@ use crate::{
             },
             service::{
                 SETTLEMENT_PRICE_WINDOW_SECONDS as EVENT_PRICE_WINDOW_SECONDS,
-                resolve_settlement_outcome, seconds_contract_payout_amount,
-                settlement_result_from_prices,
+                price_step_for_precision, resolve_settlement_outcome,
+                seconds_contract_payout_amount, settlement_result_from_prices,
             },
         },
     },
@@ -526,12 +526,16 @@ async fn settle_order_by_id(
     } else {
         None
     };
+    let price_precision = infrastructure::load_pair_price_precision(&mut tx, order.pair_id).await?;
+    let price_step = price_step_for_precision(price_precision)?;
     let resolution = resolve_settlement_outcome(
+        order.id,
         &order.direction,
         entry_price,
         &snapshot.price,
         order_control.as_deref(),
         user_control.as_deref(),
+        &price_step,
     )?;
     let result = resolution.result.as_str();
     if resolution.controlled {

@@ -1,3 +1,10 @@
+## 2026-10-22 05:33 - 秒合约控单判定价改为按价格精度尾数偏移
+
+- 完成内容：控输控赢的判定价规则重做。结算时先按实时价判定，只有当实时价推导出的结果与控制目标冲突时才改写结算价；改写的判定价改为「开仓价 ± 1~9 个最小价格步长」，步长由交易对 `price_precision` 换算为 `10^-price_precision`，尾数 1~9 由订单号、方向与控制目标散列确定性选取（同一订单复核可复现）。例：开仓价 65532.44、精度两位、用户看跌、控制输 → 结算价 65532.44 + n×0.01，如 65532.49。原来的固定一亿分之一步长与「输单直接取开仓价」已移除；自动结算与后台人工结算共用同一函数，且每次结算读取一次交易对价格精度，缺失即失败重试而不是回落到固定精度。
+- 修改文件：`src/modules/seconds_contract/{service.rs,infrastructure.rs,application.rs}`、`src/workers/seconds_contract_settlement.rs`、`tests/unit_src/src_modules_seconds_contract_tests.rs`、`.trellis/spec/backend/seconds-contracts.md`。
+- 验证结果：`cargo test --lib seconds_contract` 21/21（含新增价格精度步长、尾数确定性、四种方向/结果判定价与 65532.44 尾数示例）、`cargo check --all-targets --all-features`、严格 Clippy、架构 11/11、文档 1/1、`cargo fmt --all -- --check` 通过。全量 `cargo test --lib` 531 通过、5 失败，失败项仍是依赖外网的既有测试（Cloudflare Turnstile 3 项、GMPay 2 项，均 502 Bad Gateway），与本次改动无关。
+- 后续事项：无。
+
 ## 2026-10-22 01:31 - 新币交易对代码补上连字符
 
 - 完成内容：新币发行创建的交易对代码原先走行情模块的规范形式，`-`、`_`、`/` 会被剥掉，落库成 `MYCUSDT`，与后台手工创建的 `BTC-USDT` 风格不一致，PC 端按连字符取基础币的展示（`symbol.split('-')[0]`）会出错。现改为项目代码与计价资产用连字符连接，并复用后台手工创建交易对的同一归一化口径（大写、`-_/` 归一为 `-`、长度上限 64），非法字符或超长仍在发行事务内返回参数错误。行情缓存键、订阅与秒合约取价仍由 `sanitize_symbol` 归一，带连字符的代码不影响取价与结算。

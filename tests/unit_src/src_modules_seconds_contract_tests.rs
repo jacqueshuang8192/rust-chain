@@ -144,12 +144,48 @@ fn control_result_normalization_accepts_clear_aliases_and_rejects_unknown() {
     }
 }
 
+/// 受控判定价的步长按交易对价格精度换算；测试统一用两位精度，步长为 0.01。
+fn control_step() -> BigDecimal {
+    service::price_step_for_precision(2).unwrap()
+}
+
+#[test]
+fn price_step_for_precision_matches_pair_scale() {
+    assert_eq!(
+        service::price_step_for_precision(0).unwrap(),
+        BigDecimal::from(1)
+    );
+    assert_eq!(control_step(), BigDecimal::from_str("0.01").unwrap());
+    assert_eq!(
+        service::price_step_for_precision(8).unwrap(),
+        BigDecimal::from_str("0.00000001").unwrap()
+    );
+    assert!(service::price_step_for_precision(-1).is_err());
+    assert!(service::price_step_for_precision(19).is_err());
+}
+
+#[test]
+fn control_offset_units_are_stable_and_bounded() {
+    let units = service::control_price_offset_units(7, "down", "loss");
+    assert_eq!(
+        units,
+        service::control_price_offset_units(7, "down", "loss")
+    );
+    assert!((1..=9).contains(&units));
+    let spread: Vec<u8> = (1..=200)
+        .map(|order_id| service::control_price_offset_units(order_id, "up", "win"))
+        .collect();
+    assert!(spread.iter().all(|value| (1..=9).contains(value)));
+    assert!(spread.iter().any(|value| *value != spread[0]));
+}
+
 #[test]
 fn resolve_settlement_outcome_without_control_follows_market_price() {
     let entry = BigDecimal::from(100);
     let market = BigDecimal::from(101);
     let resolution =
-        service::resolve_settlement_outcome("up", &entry, &market, None, None).unwrap();
+        service::resolve_settlement_outcome(1, "up", &entry, &market, None, None, &control_step())
+            .unwrap();
     assert_eq!(resolution.result, "win");
     assert_eq!(resolution.market_result, "win");
     assert_eq!(resolution.settlement_price, market);
@@ -160,91 +196,120 @@ fn resolve_settlement_outcome_without_control_follows_market_price() {
 fn resolve_settlement_outcome_prefers_order_control_over_user_control() {
     let entry = BigDecimal::from(100);
     let market = BigDecimal::from(101);
-    let resolution =
-        service::resolve_settlement_outcome("up", &entry, &market, Some("loss"), Some("win"))
-            .unwrap();
+    let resolution = service::resolve_settlement_outcome(
+        1,
+        "up",
+        &entry,
+        &market,
+        Some("loss"),
+        Some("win"),
+        &control_step(),
+    )
+    .unwrap();
     assert_eq!(resolution.result, "loss");
     assert_eq!(resolution.market_result, "win");
     assert!(resolution.controlled);
-    assert_eq!(resolution.settlement_price, entry);
+    let units = i64::from(service::control_price_offset_units(1, "up", "loss"));
+    assert_eq!(
+        resolution.settlement_price,
+        entry.clone() - control_step() * BigDecimal::from(units)
+    );
 }
 
 #[test]
 fn resolve_settlement_outcome_keeps_market_price_when_control_already_matches() {
     let entry = BigDecimal::from(100);
     let market = BigDecimal::from_str("99.5").unwrap();
-    let resolution =
-        service::resolve_settlement_outcome("up", &entry, &market, Some("loss"), None).unwrap();
+    let resolution = service::resolve_settlement_outcome(
+        1,
+        "up",
+        &entry,
+        &market,
+        Some("loss"),
+        None,
+        &control_step(),
+    )
+    .unwrap();
     assert_eq!(resolution.result, "loss");
     assert_eq!(resolution.settlement_price, market);
     assert!(resolution.controlled);
 }
 
 #[test]
-fn resolve_settlement_outcome_builds_matching_price_when_control_conflicts() {
-    let entry = BigDecimal::from(100);
+fn controlled_loss_offsets_entry_tail_within_one_to_nine_units() {
+    // 开仓价 65532.44、两位精度、用户看跌、控制输：结算价应为开仓价加上 1 到 9 个尾数单位。
+    let entry = BigDecimal::from_str("65532.44").unwrap();
+    let market = BigDecimal::from_str("65530.00").unwrap();
+    let resolution = service::resolve_settlement_outcome(
+        42,
+        "down",
+        &entry,
+        &market,
+        Some("loss"),
+        None,
+        &control_step(),
+    )
+    .unwrap();
+    assert_eq!(resolution.result, "loss");
+    assert_eq!(resolution.market_result, "win");
+    let units = i64::from(service::control_price_offset_units(42, "down", "loss"));
+    assert_eq!(
+        resolution.settlement_price,
+        entry.clone() + control_step() * BigDecimal::from(units)
+    );
+    assert!(resolution.settlement_price > entry);
+    assert!(resolution.settlement_price < BigDecimal::from_str("65533").unwrap());
+}
 
+#[test]
+fn controlled_win_offsets_entry_on_the_profitable_side() {
+    let entry = BigDecimal::from(100);
     let up_win = service::resolve_settlement_outcome(
+        9,
         "up",
         &entry,
         &BigDecimal::from_str("99").unwrap(),
         Some("win"),
         None,
+        &control_step(),
     )
     .unwrap();
+    let up_units = i64::from(service::control_price_offset_units(9, "up", "win"));
     assert_eq!(up_win.result, "win");
-    assert_eq!(up_win.market_result, "loss");
     assert_eq!(
         up_win.settlement_price,
-        BigDecimal::from_str("100.00000001").unwrap()
+        entry.clone() + control_step() * BigDecimal::from(up_units)
     );
 
     let down_win = service::resolve_settlement_outcome(
+        9,
         "down",
         &entry,
         &BigDecimal::from_str("101").unwrap(),
         Some("win"),
         None,
+        &control_step(),
     )
     .unwrap();
+    let down_units = i64::from(service::control_price_offset_units(9, "down", "win"));
     assert_eq!(down_win.result, "win");
     assert_eq!(
         down_win.settlement_price,
-        BigDecimal::from_str("99.99999999").unwrap()
+        entry.clone() - control_step() * BigDecimal::from(down_units)
     );
-
-    let up_loss = service::resolve_settlement_outcome(
-        "up",
-        &entry,
-        &BigDecimal::from_str("101").unwrap(),
-        Some("loss"),
-        None,
-    )
-    .unwrap();
-    assert_eq!(up_loss.result, "loss");
-    assert_eq!(up_loss.settlement_price, entry);
-
-    let down_loss = service::resolve_settlement_outcome(
-        "down",
-        &entry,
-        &BigDecimal::from_str("99").unwrap(),
-        Some("loss"),
-        None,
-    )
-    .unwrap();
-    assert_eq!(down_loss.result, "loss");
-    assert_eq!(down_loss.settlement_price, entry);
 }
 
 #[test]
 fn resolve_settlement_outcome_keeps_controlled_down_win_price_positive() {
-    let entry = BigDecimal::from_str("0.000000001").unwrap();
+    let entry = BigDecimal::from_str("0.001").unwrap();
     let resolution = service::resolve_settlement_outcome(
+        3,
         "down",
         &entry,
-        &BigDecimal::from_str("0.000000002").unwrap(),
+        &BigDecimal::from_str("0.002").unwrap(),
         Some("win"),
         None,
+        &control_step(),
     )
     .unwrap();
     assert_eq!(resolution.result, "win");

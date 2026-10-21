@@ -710,12 +710,15 @@ strict receipt validation; both locale families and ledger mappers are checked.
 - Set/clear only while the order is `opened`; `settled`, `manual_review` and
   `refunded` return `409`. A missing order or an order/user outside the agent's
   materialized-path subtree returns `404`.
-- Control decides the payout direction. When the control already matches the
-  market direction, the order keeps the real market price. When it conflicts,
-  the stored `settlement_price` is the judgement price
-  (`entry ± 0.00000001`, or `entry` for a loss) so the client never sees a
-  price that contradicts the result, while `settlement_market_price` keeps the
-  real quote for reconciliation.
+- Control decides the payout direction. The real market price is checked first:
+  when its implied result already equals the control target, the order keeps the
+  real quote and nothing is rewritten. Only on a conflict does the order store a
+  judgement price, built as `entry ± n × price_step`, where `price_step` is
+  `10^-price_precision` of the trading pair and `n` is a deterministic 1..9 tail
+  derived from order id, direction and target (example: entry `65532.44`,
+  precision 2, `down` plus `loss` gives `65532.44 + n × 0.01`). The client never
+  sees a price that contradicts the result, while `settlement_market_price`
+  keeps the real quote for reconciliation.
 - Both the automatic worker and manual settlement use the same resolution
   function, so a controlled order cannot be overridden by an admin settle call
   that names the opposite result.
@@ -749,8 +752,9 @@ strict receipt validation; both locale families and ledger mappers are checked.
 
 ### 6. Tests Required
 
-- Unit tests cover normalization, resolution precedence, conflict judgement
-  prices for all four direction/result pairs and the tiny-entry guard.
+- Unit tests cover normalization, resolution precedence, the price step derived
+  from pair precision, the deterministic 1..9 tail, judgement prices for all
+  four direction/result pairs, the entry-tail example and the tiny-entry guard.
 - Agent route tests cover set/clear, list echo, settled conflict, cross-team
   `404`, invalid result, optional/blank reason and user-level get/set/clear.
 - Frontend tests cover the control dialog (optional reason, selected result,

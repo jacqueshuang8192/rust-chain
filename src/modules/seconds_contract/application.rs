@@ -36,7 +36,8 @@ use super::{
         ensure_manual_settlement_allowed, normalize_control_result, normalize_direction,
         normalize_idempotency_key, normalize_settlement_result, normalized_product_status,
         optional_control_reason, optional_image_url, optional_string, order_audit_json,
-        product_audit_json, publish_seconds_contract_order_opened_event_if_needed,
+        price_step_for_precision, product_audit_json,
+        publish_seconds_contract_order_opened_event_if_needed,
         publish_seconds_contract_order_settled_event_if_needed, required_reason,
         resolve_settlement_outcome, route_limit, route_offset, settlement_payout_amount,
         validate_create_product_request, validate_product_stake, validate_stake_amount,
@@ -609,12 +610,16 @@ pub(crate) async fn settle_order(
     } else {
         None
     };
+    let price_precision = infrastructure::load_pair_price_precision(&mut tx, order.pair_id).await?;
+    let price_step = price_step_for_precision(price_precision)?;
     let resolution = resolve_settlement_outcome(
+        order.id,
         &order.direction,
         entry_price,
         &snapshot.price,
         order_control.as_deref(),
         user_control.as_deref(),
+        &price_step,
     )?;
     let result = resolution.result.as_str();
     if requested_result

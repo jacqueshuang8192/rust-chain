@@ -27,7 +27,9 @@ use crate::{
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, TimeDelta, Utc};
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use std::collections::HashSet;
+use std::str::FromStr;
 
 /// 结算价格事件窗口长度；可选历史范围为 `[expires_at, expires_at + 5s)`。
 pub(crate) const SETTLEMENT_PRICE_WINDOW_SECONDS: i64 = 5;
@@ -410,10 +412,30 @@ pub(crate) fn normalize_control_result(value: &str) -> AppResult<Option<String>>
     }
 }
 
-/// 受控结算的判定价与市场价之间的步长，即一亿分之一，用于把价格严格放到开仓价的某一侧。
-/// 该步长足够小，使受控单的判定价看起来仍然贴近真实行情，同时保证胜负判定没有平局歧义。
-fn control_price_step() -> BigDecimal {
-    BigDecimal::from(1i64) / BigDecimal::from(100_000_000i64)
+/// 由交易对价格精度换算出最小价格步长，即 `10^-price_precision`。
+/// 受控判定价只允许在开仓价上偏移这个步长的整数倍，保证写入的仍是该交易对可表示的有效价格。
+/// 精度越界属于交易对配置错误，返回内部错误而不是用固定步长兜底。
+pub(crate) fn price_step_for_precision(price_precision: i32) -> AppResult<BigDecimal> {
+    if !(0..=18).contains(&price_precision) {
+        return Err(AppError::Internal(
+            "seconds contract pair price precision is invalid".to_owned(),
+        ));
+    }
+    if price_precision == 0 {
+        return Ok(BigDecimal::from(1i64));
+    }
+    BigDecimal::from_str(&format!("1e-{price_precision}"))
+        .map_err(|_| AppError::Internal("seconds contract price step is invalid".to_owned()))
+}
+
+/// 为受控判定价挑选 1 到 9 之间的尾数偏移量，由订单、方向与控制目标确定性散列得到。
+/// 确定性保证同一订单在复核或重算时得到同一个尾数，而尾数分布与真实行情无异，不会被一眼认出是构造价。
+pub(crate) fn control_price_offset_units(order_id: u64, direction: &str, control: &str) -> u8 {
+    let mut hasher = Sha256::new();
+    hasher.update(order_id.to_be_bytes());
+    hasher.update(direction.as_bytes());
+    hasher.update(control.as_bytes());
+    (hasher.finalize()[0] % 9) + 1
 }
 
 /// 一次结算的最终判定：对外结果、写入订单的判定价、真实市场价推导出的结果，以及是否受控结算。
@@ -431,14 +453,17 @@ pub(crate) struct SecondsContractSettlementResolution {
 }
 
 /// 解析到期结算的最终结果：订单级控制优先于用户级控制，两者都缺失时按真实市场价判定。
-/// 控制目标与市场方向一致时直接用市场价，避免无意义的改价；冲突时生成贴边判定价。
-/// 本函数不读数据库也不改钱包，真实市场价由调用方在同一事务内取定后传入。
+/// 先看实时价推导出的结果是否已经满足控制目标，满足就直接采用真实价；只有方向冲突时才构造判定价，
+/// 判定价为开仓价偏移 1 到 9 个最小价格步长，`price_step` 由调用方按交易对价格精度换算后传入。
+/// 本函数不读数据库也不改钱包，真实市场价与步长由调用方在同一事务内取定后传入。
 pub(crate) fn resolve_settlement_outcome(
+    order_id: u64,
     direction: &str,
     entry_price: &BigDecimal,
     market_price: &BigDecimal,
     order_control: Option<&str>,
     user_control: Option<&str>,
+    price_step: &BigDecimal,
 ) -> AppResult<SecondsContractSettlementResolution> {
     let market_result =
         settlement_result_from_prices(direction, entry_price, market_price)?.to_owned();
@@ -459,7 +484,9 @@ pub(crate) fn resolve_settlement_outcome(
             controlled: true,
         });
     }
-    let settlement_price = control_price_for(direction, entry_price, control)?;
+    let offset_units = control_price_offset_units(order_id, direction, control);
+    let settlement_price =
+        control_price_for(direction, entry_price, control, price_step, offset_units)?;
     Ok(SecondsContractSettlementResolution {
         result: control.to_owned(),
         settlement_price,
@@ -468,26 +495,29 @@ pub(crate) fn resolve_settlement_outcome(
     })
 }
 
-/// 生成与目标结果严格一致的判定价：赢单落在开仓价的有利一侧，输单直接落在开仓价上。
-/// 结算规则把平价判为输，因此输单不需要跨过开仓价，价格观感更接近真实行情。
-/// 生成后会立即用同一胜负函数自检，任何不满足目标的结果都返回内部错误而不是继续派奖。
+/// 生成与目标结果严格一致的判定价：在开仓价上偏移 1 到 9 个最小价格步长。
+/// 目标为赢时把价格放到开仓价的有利一侧，目标为输时放到不利一侧，因此判定价与目标结果永远不矛盾。
+/// 例如开仓价 65532.44、精度两位、尾数 5、用户看跌且控输，判定价为 65532.49。
+/// 价格过小无法向下偏移时退化为开仓价的一半，仍然落在目标一侧；生成后用同一胜负函数自检。
 fn control_price_for(
     direction: &str,
     entry_price: &BigDecimal,
     control: &str,
+    price_step: &BigDecimal,
+    offset_units: u8,
 ) -> AppResult<BigDecimal> {
-    let step = control_price_step();
+    let units = i64::from(offset_units.clamp(1, 9));
+    let delta = price_step.clone() * BigDecimal::from(units);
     let price = match (control, direction) {
-        ("win", "up") => entry_price.clone() + step,
-        ("win", "down") => {
-            let candidate = entry_price.clone() - step;
+        ("win", "up") | ("loss", "down") => entry_price.clone() + delta,
+        ("win", "down") | ("loss", "up") => {
+            let candidate = entry_price.clone() - delta;
             if candidate > 0 {
                 candidate
             } else {
                 entry_price.clone() / BigDecimal::from(2i64)
             }
         }
-        ("loss", "up") | ("loss", "down") => entry_price.clone(),
         _ => {
             return Err(AppError::Validation(
                 "seconds contract direction must be up or down".to_owned(),

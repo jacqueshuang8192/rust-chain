@@ -946,6 +946,20 @@ pub(crate) async fn load_asset_precision_scale(
         .ok_or(AppError::NotFound)
 }
 
+/// 在事务内读取交易对的价格小数位，用于把受控判定价换算成该交易对可表示的最小价格步长。
+/// 交易对不存在返回 `AppError::NotFound` 并中断结算；不回落到固定精度，避免写出无法表示的价格。
+/// 查询只读不加锁，与资产精度读取共用同一条「缺失即失败」的取值口径。
+pub(crate) async fn load_pair_price_precision(
+    tx: &mut Transaction<'_, MySql>,
+    pair_id: u64,
+) -> AppResult<i32> {
+    sqlx::query_scalar::<_, i32>("SELECT price_precision FROM trading_pairs WHERE id = ? LIMIT 1")
+        .bind(pair_id)
+        .fetch_optional(&mut **tx)
+        .await?
+        .ok_or(AppError::NotFound)
+}
+
 /// 在开仓事务内插入订单行并返回自增主键，状态硬编码为 `opened`，结算价与结果留空待到期填写。
 /// 写入的是下单当刻的快照：服务端开仓价、选定周期时长、该周期的赔率以及到期时间，
 /// 这些值一旦落库就不再随产品配置变更而改变，保证结算口径与用户下单时看到的一致。
