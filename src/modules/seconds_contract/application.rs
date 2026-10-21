@@ -447,6 +447,7 @@ pub(crate) async fn open_order(
         stake_amount: request.stake_amount.clone(),
         duration_seconds: product.duration_seconds,
         payout_rate: product.payout_rate.clone(),
+        price_precision: product.pair_price_precision,
         entry_price,
         idempotency_key,
         expires_at,
@@ -610,7 +611,12 @@ pub(crate) async fn settle_order(
     } else {
         None
     };
-    let price_precision = infrastructure::load_pair_price_precision(&mut tx, order.pair_id).await?;
+    // 判定价尾数按该单下单时固化的交易对精度换算；存量订单缺快照时才回落到交易对当前精度。
+    let price_precision =
+        match infrastructure::select_order_price_precision(&mut tx, order.id).await? {
+            Some(snapshot) => snapshot,
+            None => infrastructure::load_pair_price_precision(&mut tx, order.pair_id).await?,
+        };
     let price_step = price_step_for_precision(price_precision)?;
     let resolution = resolve_settlement_outcome(
         order.id,

@@ -716,7 +716,10 @@ strict receipt validation; both locale families and ledger mappers are checked.
   judgement price, built as `entry ± n × price_step`, where `price_step` is
   `10^-price_precision` of the trading pair and `n` is a deterministic 1..9 tail
   derived from order id, direction and target (example: entry `65532.44`,
-  precision 2, `down` plus `loss` gives `65532.44 + n × 0.01`). The client never
+  precision 2, `down` plus `loss` gives `65532.44 + n × 0.01`). The step is
+  taken from the pair price precision snapshotted on the order at open time
+  (`seconds_contract_orders.price_precision`); rows written before that snapshot
+  existed fall back to the pair's current precision. The client never
   sees a price that contradicts the result, while `settlement_market_price`
   keeps the real quote for reconciliation.
 - Both the automatic worker and manual settlement use the same resolution

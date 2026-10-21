@@ -1,3 +1,10 @@
+## 2026-10-22 06:27 - 秒合约控单尾数按交易对精度固化到订单
+
+- 完成内容：受控判定价的尾数步长改为按「该单下单时固化的交易对价格精度」计算，而不是结算时临时读取交易对当前配置。迁移 0157 为 `seconds_contract_orders` 增加 `price_precision`；开仓锁定产品时一并读取 `trading_pairs.price_precision` 并写入订单快照；自动结算与后台人工结算都优先用订单快照换算 `10^-price_precision`，只有迁移前落库、快照为空的存量订单才回落到交易对当前精度。这样每个交易对的尾数各自不同且与该单下单时一致，后台调整价格精度也不会改变已开仓订单的判定价口径。
+- 修改文件：`migrations/0157_seconds_contract_order_price_precision.sql`、`src/modules/seconds_contract/{repository.rs,infrastructure.rs,application.rs}`、`src/workers/seconds_contract_settlement.rs`、`.trellis/spec/backend/seconds-contracts.md`。
+- 验证结果：`cargo test --lib seconds_contract` 21/21、`cargo check --all-targets --all-features`、严格 Clippy、`cargo fmt --all -- --check` 通过。迁移 0157 未在真实库执行；秒合约路由与 worker 集成测试仍需 `DATABASE_URL` 与 Redis，本机跳过。
+- 后续事项：部署前需执行迁移 0157；存量未结算订单走回落分支（读交易对当前精度），新开仓订单一律使用订单快照。
+
 ## 2026-10-22 05:33 - 秒合约控单判定价改为按价格精度尾数偏移
 
 - 完成内容：控输控赢的判定价规则重做。结算时先按实时价判定，只有当实时价推导出的结果与控制目标冲突时才改写结算价；改写的判定价改为「开仓价 ± 1~9 个最小价格步长」，步长由交易对 `price_precision` 换算为 `10^-price_precision`，尾数 1~9 由订单号、方向与控制目标散列确定性选取（同一订单复核可复现）。例：开仓价 65532.44、精度两位、用户看跌、控制输 → 结算价 65532.44 + n×0.01，如 65532.49。原来的固定一亿分之一步长与「输单直接取开仓价」已移除；自动结算与后台人工结算共用同一函数，且每次结算读取一次交易对价格精度，缺失即失败重试而不是回落到固定精度。

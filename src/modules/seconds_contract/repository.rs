@@ -96,6 +96,8 @@ pub(crate) struct SecondsContractProductRuleRow {
     pub(crate) stake_asset: u64,
     /// 质押资产的小数位精度，用于投注额合法性校验与赔付金额向零截断。
     pub(crate) stake_asset_precision: i32,
+    /// 交易对的价格精度，下单时固化进订单，用于受控判定价的尾数步长。
+    pub(crate) pair_price_precision: i32,
     /// 本次下单选中周期的时长，单位为秒，与开仓时间相加得到到期时刻。
     pub(crate) duration_seconds: u32,
     /// 本次下单选中周期的赔率，会被固化进订单快照，后续改配置不影响该单结算。
@@ -181,6 +183,8 @@ pub(crate) struct SecondsContractOrderInsert {
     pub(crate) duration_seconds: u32,
     /// 该周期的赔率快照，结算时按此值而非产品当前配置计算赔付。
     pub(crate) payout_rate: BigDecimal,
+    /// 下单时固化的交易对价格精度，受控判定价按它换算尾数步长。
+    pub(crate) price_precision: i32,
     /// 服务端从行情缓存取得的开仓价，客户端上送值一律不采纳。
     pub(crate) entry_price: BigDecimal,
     /// 下单幂等键，与用户编号共同构成唯一约束，是防重复扣款的依据。

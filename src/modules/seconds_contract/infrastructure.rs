@@ -864,6 +864,7 @@ pub(crate) async fn lock_active_product(
     let product = sqlx::query_as::<_, SecondsContractProductRuleRow>(
         r#"SELECT products.id, products.pair_id, pairs.symbol,
                   products.stake_asset, assets.precision_scale AS stake_asset_precision,
+                  pairs.price_precision AS pair_price_precision,
                   products.duration_seconds, products.payout_rate, products.min_stake,
                   products.max_stake, products.status, products.open_payout_capacity
            FROM seconds_contract_products products
@@ -924,6 +925,7 @@ pub(crate) async fn lock_active_product(
         symbol: product.symbol,
         stake_asset: product.stake_asset,
         stake_asset_precision: product.stake_asset_precision,
+        pair_price_precision: product.pair_price_precision,
         duration_seconds,
         payout_rate,
         min_stake,
@@ -960,6 +962,22 @@ pub(crate) async fn load_pair_price_precision(
         .ok_or(AppError::NotFound)
 }
 
+/// 读取订单在下单时固化的交易对价格精度，供受控判定价换算尾数步长。
+/// 存量订单该列为空时返回 `None`，由调用方回落到交易对当前精度，而不是用固定精度兜底。
+/// 只读当前行值，调用方应已持有订单行锁，避免读到与结算价不一致的精度快照。
+pub(crate) async fn select_order_price_precision(
+    tx: &mut Transaction<'_, MySql>,
+    order_id: u64,
+) -> AppResult<Option<i32>> {
+    Ok(sqlx::query_scalar::<_, Option<i32>>(
+        "SELECT price_precision FROM seconds_contract_orders WHERE id = ?",
+    )
+    .bind(order_id)
+    .fetch_optional(&mut **tx)
+    .await?
+    .flatten())
+}
+
 /// 在开仓事务内插入订单行并返回自增主键，状态硬编码为 `opened`，结算价与结果留空待到期填写。
 /// 写入的是下单当刻的快照：服务端开仓价、选定周期时长、该周期的赔率以及到期时间，
 /// 这些值一旦落库就不再随产品配置变更而改变，保证结算口径与用户下单时看到的一致。
@@ -973,8 +991,8 @@ pub(crate) async fn insert_open_order(
     sqlx::query(
         r#"INSERT INTO seconds_contract_orders
            (user_id, product_id, pair_id, stake_asset, direction, stake_amount,
-            duration_seconds, payout_rate, entry_price, status, idempotency_key, expires_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'opened', ?, ?)"#,
+            duration_seconds, payout_rate, price_precision, entry_price, status, idempotency_key, expires_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'opened', ?, ?)"#,
     )
     .bind(order.user_id)
     .bind(order.product_id)
@@ -984,6 +1002,7 @@ pub(crate) async fn insert_open_order(
     .bind(&order.stake_amount)
     .bind(order.duration_seconds)
     .bind(&order.payout_rate)
+    .bind(order.price_precision)
     .bind(&order.entry_price)
     .bind(&order.idempotency_key)
     .bind(order.expires_at)
