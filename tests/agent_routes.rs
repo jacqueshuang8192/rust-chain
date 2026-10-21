@@ -20,6 +20,8 @@ use uuid::Uuid;
 mod coin_applications;
 #[path = "agent_routes/recharges.rs"]
 mod recharges;
+#[path = "agent_routes/seconds_control.rs"]
+mod seconds_control;
 #[path = "agent_routes/team_orders.rs"]
 mod team_orders;
 #[path = "agent_routes/token_lifecycle.rs"]

@@ -678,3 +678,83 @@ event, no replay/failure events, original-user isolation and neutral payload.
 Frontend tests cover disabled/null forms, pinned versions and retained drafts,
 legacy refusal, server eligibility times, stable unknown-outcome retry and
 strict receipt validation; both locale families and ledger mappers are checked.
+
+## Scenario: Result Control (控输控赢)
+
+### 1. Scope / Trigger
+
+- Trigger: changing how a seconds-contract order result is decided, or adding
+  an order-level / user-level control entry in the admin console or agent
+  portal.
+- Cross-layer: MySQL columns and control tables, settlement worker and manual
+  settlement, agent/admin HTTP contracts, agent console tables and dialogs.
+
+### 2. Signatures
+
+- `seconds_contract_orders`: `control_result`, `control_actor_type`,
+  `control_actor_id`, `control_reason`, `control_at`,
+  `settlement_market_price`.
+- `seconds_contract_user_controls`: one row per user (`user_id` primary key).
+- `seconds_contract_result_control_events`: append-only log with `scope`
+  (`order`/`user`), `control_result` (`NULL` when cleared), actor and reason.
+- Agent: `POST /agent/api/v1/seconds-contract-orders/:order_id/control` with
+  `{ "result": "win" | "loss" | "clear", "reason"?: string }`.
+- Agent: `GET|PUT /agent/api/v1/users/:user_id/seconds-contract-control`.
+- Admin: `POST /admin/api/v1/seconds-contracts/orders/:id/control`,
+  `PUT /admin/api/v1/seconds-contracts/users/:user_id/control`.
+
+### 3. Contracts
+
+- Resolution order is order control, then user control, then the real market
+  price. A user-level setting never rewrites existing orders.
+- Set/clear only while the order is `opened`; `settled`, `manual_review` and
+  `refunded` return `409`. A missing order or an order/user outside the agent's
+  materialized-path subtree returns `404`.
+- Control decides the payout direction. When the control already matches the
+  market direction, the order keeps the real market price. When it conflicts,
+  the stored `settlement_price` is the judgement price
+  (`entry ± 0.00000001`, or `entry` for a loss) so the client never sees a
+  price that contradicts the result, while `settlement_market_price` keeps the
+  real quote for reconciliation.
+- Both the automatic worker and manual settlement use the same resolution
+  function, so a controlled order cannot be overridden by an admin settle call
+  that names the opposite result.
+- Every set/clear writes an order/user row plus one control event. Admin actors
+  additionally write `admin_audit_logs` (`seconds_contract_order.control`,
+  `seconds_contract_user.control`). Agent actors are recorded with
+  `agent_admin_users.id` in the order row and the control event.
+- Agent order lists expose `control_result` and `control_actor_type`; the agent
+  console shows the current control state and only enables the action for
+  `opened` orders.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required result |
+|---|---|
+| `result` not in win/loss/clear | `400` validation error |
+| Reason omitted or blank | Allowed; order column stores `NULL`, event stores `''` |
+| Reason longer than the audit limit | `400` validation error |
+| Order already settled / under review | `409` conflict |
+| Order or user outside agent subtree | `404` not found |
+| Control value equals market result | Keep market price, no fake judgement price |
+| Control conflicts with market result | Store judgement price plus real market price |
+
+### 5. Good / Base / Bad Cases
+
+- Good: an agent sets `win` on an opened order before expiry; the worker settles
+  it as `win` and records the judgement price when the market quote disagreed.
+- Base: a user-level `loss` applies only to orders opened after it was set.
+- Bad: mutating `settlement_price` without recording the real market price, or
+  letting a manual settle call flip a controlled order.
+
+### 6. Tests Required
+
+- Unit tests cover normalization, resolution precedence, conflict judgement
+  prices for all four direction/result pairs and the tiny-entry guard.
+- Agent route tests cover set/clear, list echo, settled conflict, cross-team
+  `404`, invalid result, optional/blank reason and user-level get/set/clear.
+- Frontend tests cover the control dialog (optional reason, selected result,
+  server error retained) and the user-level panel load/update states.
+- Run seconds-contract lib tests, `cargo check --all-targets`, strict Clippy,
+  backend architecture/documentation gates, `cargo fmt --check` and the web
+  typecheck plus agent tests.

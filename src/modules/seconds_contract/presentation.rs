@@ -394,3 +394,46 @@ pub(crate) struct SettleSecondsContractOrderResponse {
     /// 实际入账的赔付额，赢单为含本金的总额，输单为零。
     pub(crate) payout_amount: BigDecimal,
 }
+
+/// 设置订单级控输控赢的请求体；`result` 接受 `win`、`loss` 或表示取消控制的 `clear`。
+/// 原因字段在业务上必填，会同时写入订单控制列与控制流水，用于事后追责。
+#[derive(Debug, Deserialize)]
+pub(crate) struct SetSecondsContractOrderControlRequest {
+    /// 目标结算结果，`clear` 表示撤销该单控制。
+    pub(crate) result: String,
+    /// 操作原因，可选；留空时仍记录操作人与时间。
+    pub(crate) reason: Option<String>,
+}
+
+/// 设置用户级控输控赢的请求体；对该用户后续所有秒合约订单生效。
+/// `result` 语义与订单级一致，代理只能对自己子树内的用户操作。
+#[derive(Debug, Deserialize)]
+pub(crate) struct SetSecondsContractUserControlRequest {
+    /// 目标结算结果，`clear` 表示取消该用户控制。
+    pub(crate) result: String,
+    /// 操作原因，可选；留空时仍记录操作人与时间。
+    pub(crate) reason: Option<String>,
+}
+
+/// 控制设置结果，回显作用域、受控对象与控制内容，供前端即时刷新状态。
+/// `control_result` 为 `None` 表示本次操作是取消控制；`control_at` 为操作落库时刻。
+#[derive(Debug, Serialize)]
+pub(crate) struct SecondsContractControlResponse {
+    /// 作用域，取值为 `order` 或 `user`。
+    pub(crate) scope: String,
+    /// 订单级控制时的订单编号。
+    pub(crate) order_id: Option<u64>,
+    /// 受控用户编号。
+    pub(crate) user_id: u64,
+    /// 当前生效的目标结果；取消控制后为 `None`。
+    pub(crate) control_result: Option<String>,
+    /// 操作来源，取值为 `admin` 或 `agent`。
+    pub(crate) actor_type: String,
+    /// 操作人编号。
+    pub(crate) actor_id: u64,
+    /// 本次操作原因；未填写时为空。
+    pub(crate) reason: Option<String>,
+    /// 操作落库时刻，以毫秒时间戳输出。
+    #[serde(with = "unix_millis")]
+    pub(crate) control_at: DateTime<Utc>,
+}

@@ -40,6 +40,7 @@ use sqlx::{MySql, Pool};
 
 pub(crate) mod coin_applications;
 pub(crate) mod recharges;
+pub(crate) mod seconds_control;
 pub(crate) mod team_orders;
 pub(crate) mod wallet_records;
 

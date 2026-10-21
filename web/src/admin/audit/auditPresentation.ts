@@ -79,6 +79,8 @@ const AUDIT_ACTION_LABELS: Record<string, string> = {
   'new_coin_project.unlock_fee_rule.update': '更新新币解禁费用规则',
   'new_coin_project.unlock_rule.update': '更新新币解禁规则',
   'seconds_contract_order.settle': '人工结算秒合约订单',
+  'seconds_contract_order.control': '设置秒合约订单控输控赢',
+  'seconds_contract_user.control': '设置用户级秒合约控输控赢',
   'spot_order.cancel': '取消现货订单',
   'user_2fa.reset': '重置用户两步验证',
   'user_referral.assign_agent': '分配用户代理',

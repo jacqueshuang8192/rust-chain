@@ -19,6 +19,7 @@ import { formatBusinessOrderNo } from '../shared/orderNo';
 import { multiplyDecimalText } from '../shared/decimal';
 import { formatAdminNumber } from '../shared/numberFormat';
 import { teamOrderFilters, teamOrderLabels, teamOrderPrefixes, teamOrderQuery, teamOrderStatuses } from './teamOrderModel';
+import { SecondsControlActions } from './SecondsControl';
 import './TeamOrdersPage.css';
 
 const stringValue = (value: unknown) => typeof value === 'string' ? value : null;
@@ -31,7 +32,7 @@ const timeColumn = (key: string, title: string): ColumnProps<AgentTeamOrder> => 
   key, dataIndex: key, title, width: 186, render: value => <TimestampText value={value} />
 });
 
-function columnsFor(kind: AgentOrderKind, detail: (row: AgentTeamOrder) => void): Array<ColumnProps<AgentTeamOrder>> {
+function columnsFor(kind: AgentOrderKind, detail: (row: AgentTeamOrder) => void, refresh: () => void): Array<ColumnProps<AgentTeamOrder>> {
   const columns: Array<ColumnProps<AgentTeamOrder>> = [
     { key: 'order_no', title: '订单号', width: 200, render: (_, row) => <Button theme="borderless" onClick={() => detail(row)}>{formatBusinessOrderNo(teamOrderPrefixes[kind], row)}</Button> },
     { key: 'user', title: '用户', width: 260, render: (_, row) => <div className="agent-order-identity">
@@ -77,6 +78,11 @@ function columnsFor(kind: AgentOrderKind, detail: (row: AgentTeamOrder) => void)
         { key: 'duration_seconds', title: '周期', width: 100, render: (_, row) => `${row.duration_seconds} 秒` },
         amountColumn('entry_price', '开仓价'), amountColumn('settlement_price', '结算价'),
         { key: 'result', title: '结算结果', width: 120, render: (_, row) => <StatusTag value={stringValue(row.result)} /> },
+        { key: 'control', title: '控输控赢', width: 150, render: (_, row) => <SecondsControlActions
+          current={row.control_result === 'win' || row.control_result === 'loss' ? row.control_result : null}
+          disabled={row.status !== 'opened'}
+          onDone={refresh}
+          orderId={row.id} /> },
         timeColumn('expires_at', '到期时间'));
     } else if (kind === 'margin') {
       columns.push(amountColumn('margin_amount', '保证金', 'margin_asset_symbol'), amountColumn('leverage', '杠杆倍数'),
@@ -111,7 +117,7 @@ function TeamOrders({ kind }: { kind: AgentOrderKind }) {
   });
   const key = JSON.stringify([filters, page, pageSize, revision]);
   const current = state.key === key ? state : { orders: [], total: 0, loading: true, error: null };
-  const columns = useMemo(() => columnsFor(kind, setSelected), [kind]);
+  const columns = useMemo(() => columnsFor(kind, setSelected, () => setRevision(value => value + 1)), [kind]);
   useEffect(() => setAllocationIds([]), [key]);
   const advancedCount = Object.keys(filters).filter(field => !primaryFilters.has(field)).length;
   useEffect(() => {

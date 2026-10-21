@@ -204,6 +204,88 @@ pub(crate) struct SecondsContractSettlementExceptionWrite {
     pub(crate) window_end: DateTime<Utc>,
 }
 
+/// 控输控赢的操作来源：后台管理员与代理管理员分属两张账号表，编号不能混用。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SecondsContractControlActor {
+    /// 后台管理员，编号对应 `admin_users.id`。
+    Admin(u64),
+    /// 代理门户管理员，编号对应 `agent_admin_users.id`。
+    Agent(u64),
+}
+
+impl SecondsContractControlActor {
+    /// 落库的actor类型字符串，与迁移中的 CHECK 约束保持一致。
+    pub(crate) fn actor_type(self) -> &'static str {
+        match self {
+            Self::Admin(_) => "admin",
+            Self::Agent(_) => "agent",
+        }
+    }
+
+    /// 操作人在对应账号表中的主键，用于审计追溯。
+    pub(crate) fn actor_id(self) -> u64 {
+        match self {
+            Self::Admin(id) | Self::Agent(id) => id,
+        }
+    }
+}
+
+/// 当前生效的控输控赢设置快照，用于结算前决定胜负方向与后台回显。
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub(crate) struct SecondsContractControlSnapshot {
+    /// 目标结算结果，取值为 `win` 或 `loss`。
+    pub(crate) control_result: String,
+    /// 设置来源，取值为 `admin` 或 `agent`。
+    pub(crate) actor_type: String,
+    /// 设置人编号。
+    pub(crate) actor_id: u64,
+    /// 设置原因。
+    pub(crate) reason: String,
+    /// 设置时刻，以 UTC 保存。
+    pub(crate) control_at: DateTime<Utc>,
+}
+
+/// 订单级控制写入参数；`control_result` 为空表示取消该单的控制。
+#[derive(Debug, Clone)]
+pub(crate) struct SecondsContractOrderControlWrite {
+    /// 目标订单主键。
+    pub(crate) order_id: u64,
+    /// 目标结算结果，`None` 表示清除控制。
+    pub(crate) control_result: Option<String>,
+    /// 操作来源与操作人。
+    pub(crate) actor: SecondsContractControlActor,
+    /// 操作原因，可选；未填写时落库为空值。
+    pub(crate) reason: Option<String>,
+}
+
+/// 用户级控制写入参数；`control_result` 的空值语义由调用方决定走删除，因此本结构只承载非空写入。
+#[derive(Debug, Clone)]
+pub(crate) struct SecondsContractUserControlWrite {
+    /// 受控用户编号。
+    pub(crate) user_id: u64,
+    /// 操作来源与操作人。
+    pub(crate) actor: SecondsContractControlActor,
+    /// 操作原因，可选；未填写时写入空字符串。
+    pub(crate) reason: Option<String>,
+}
+
+/// 控制流水的追加参数，订单级与用户级共用，保留每次设置与取消的完整痕迹。
+#[derive(Debug, Clone)]
+pub(crate) struct SecondsContractControlEventWrite {
+    /// 作用域，取值为 `order` 或 `user`。
+    pub(crate) scope: &'static str,
+    /// 订单级控制对应的订单主键，用户级为 `None`。
+    pub(crate) order_id: Option<u64>,
+    /// 受控用户编号。
+    pub(crate) user_id: u64,
+    /// 本次设置的结果，`None` 表示取消。
+    pub(crate) control_result: Option<String>,
+    /// 操作来源与操作人。
+    pub(crate) actor: SecondsContractControlActor,
+    /// 操作原因，可选；未填写时流水记录空字符串。
+    pub(crate) reason: Option<String>,
+}
+
 /// 秒合约资金流水的写入参数，开仓扣款与结算派奖共用同一结构。
 /// 各项 `*_after` 必须是同一次钱包更新之后的余额，调用方要在持有钱包行锁期间算好再传入。
 #[derive(Debug, Clone)]

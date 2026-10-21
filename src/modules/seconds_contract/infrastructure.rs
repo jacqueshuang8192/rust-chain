@@ -1131,24 +1131,30 @@ async fn select_locked_order(
     .map_err(AppError::from)
 }
 
-/// 把已由调用方持锁并确认 opened 的订单更新为 settled，写入结果与数据库当前结算时间。
-/// 本函数不写结算价格或赔付字段，也不自行附加 opened 条件；调用方事务负责钱包、流水和审计的一致提交。
+/// 把已由调用方持锁并确认 opened 的订单更新为 settled，写入判定结果、判定价与数据库当前结算时间。
+/// `settlement_price` 是最终展示与派奖依据的判定价；`market_price` 只在受控结算时给出真实市场价，
+/// 无控制或控制与市场方向一致时传 `None`，订单的结算价字段本身就是真实行情。
+/// 本函数不写钱包或赔付字段，也不自行附加 opened 条件之外的业务判定；
+/// 调用方事务负责钱包、流水和审计的一致提交，并在调用前持有订单行锁。
 pub(crate) async fn mark_order_settled(
     tx: &mut Transaction<'_, MySql>,
     order_id: u64,
     result: &str,
+    settlement_price: &BigDecimal,
+    market_price: Option<&BigDecimal>,
     snapshot: &SecondsContractSettlementPriceRow,
 ) -> AppResult<()> {
     let update = sqlx::query(
         r#"UPDATE seconds_contract_orders
-           SET status = 'settled', result = ?, settlement_price = ?,
+           SET status = 'settled', result = ?, settlement_price = ?, settlement_market_price = ?,
                settlement_price_tick_id = ?, settlement_price_source = ?,
                settlement_price_observed_at = ?, settlement_price_generation = ?,
                settlement_price_version = ?, settled_at = CURRENT_TIMESTAMP(6)
            WHERE id = ? AND status = 'opened'"#,
     )
     .bind(result)
-    .bind(&snapshot.price)
+    .bind(settlement_price)
+    .bind(market_price)
     .bind(snapshot.id)
     .bind(&snapshot.source)
     .bind(snapshot.observed_at.naive_utc())
@@ -1163,6 +1169,174 @@ pub(crate) async fn mark_order_settled(
         ));
     }
     Ok(())
+}
+
+/// 读取订单上已生效的控输控赢目标；返回 `None` 表示该单未设置控制。
+/// 本函数只读当前行值，调用方应已持有订单行锁，否则读到控制后订单仍可能被并发结算。
+/// 不做结果合法性归一，落库值由设置用例保证只在 win/loss 之间。
+pub(crate) async fn select_order_control(
+    tx: &mut Transaction<'_, MySql>,
+    order_id: u64,
+) -> AppResult<Option<String>> {
+    Ok(sqlx::query_scalar::<_, Option<String>>(
+        "SELECT control_result FROM seconds_contract_orders WHERE id = ?",
+    )
+    .bind(order_id)
+    .fetch_optional(&mut **tx)
+    .await?
+    .flatten())
+}
+
+/// 读取用户级控输控赢目标，作为订单未单独设置控制时的兜底规则。
+/// 设置由代理或后台的独立用例写入，本函数不加锁，读到的是当前已提交值。
+pub(crate) async fn select_user_control(
+    tx: &mut Transaction<'_, MySql>,
+    user_id: u64,
+) -> AppResult<Option<String>> {
+    Ok(sqlx::query_scalar::<_, String>(
+        "SELECT control_result FROM seconds_contract_user_controls WHERE user_id = ?",
+    )
+    .bind(user_id)
+    .fetch_optional(&mut **tx)
+    .await?)
+}
+
+/// 把订单级控制写入订单行，仅对仍处于 opened 的订单生效。
+/// 设置与清除分成两条 SQL，避免用同一个占位符既表达值又表达 NULL 造成绑定歧义。
+/// 更新条件带 `status = 'opened'`：订单已结算或已转人工审核时拒绝并返回冲突，
+/// 由调用方事务回滚，不在只读状态上留半截控制记录。
+pub(crate) async fn update_order_control_in_tx(
+    tx: &mut Transaction<'_, MySql>,
+    write: &super::repository::SecondsContractOrderControlWrite,
+) -> AppResult<()> {
+    let updated = match &write.control_result {
+        Some(result) => {
+            sqlx::query(
+                r#"UPDATE seconds_contract_orders
+                   SET control_result = ?, control_actor_type = ?, control_actor_id = ?,
+                       control_reason = ?, control_at = CURRENT_TIMESTAMP(6)
+                   WHERE id = ? AND status = 'opened'"#,
+            )
+            .bind(result)
+            .bind(write.actor.actor_type())
+            .bind(write.actor.actor_id())
+            .bind(write.reason.as_deref())
+            .bind(write.order_id)
+            .execute(&mut **tx)
+            .await?
+        }
+        None => {
+            sqlx::query(
+                r#"UPDATE seconds_contract_orders
+                   SET control_result = NULL, control_actor_type = NULL, control_actor_id = NULL,
+                       control_reason = NULL, control_at = NULL
+                   WHERE id = ? AND status = 'opened'"#,
+            )
+            .bind(write.order_id)
+            .execute(&mut **tx)
+            .await?
+        }
+    };
+    if updated.rows_affected() != 1 {
+        return Err(AppError::Conflict(
+            "seconds contract order is no longer open for control".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+/// 写入或覆盖用户级控制；同一用户始终只有一条生效设置。
+/// 已存在时按 MySQL upsert 覆盖结果、操作人与原因，`created_at` 保留首次设置时间。
+/// 清除走独立删除函数，避免把空值写进非空列。
+pub(crate) async fn upsert_user_control_in_tx(
+    tx: &mut Transaction<'_, MySql>,
+    write: &super::repository::SecondsContractUserControlWrite,
+    result: &str,
+) -> AppResult<()> {
+    sqlx::query(
+        r#"INSERT INTO seconds_contract_user_controls
+           (user_id, control_result, control_actor_type, control_actor_id, control_reason)
+           VALUES (?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+               control_result = VALUES(control_result),
+               control_actor_type = VALUES(control_actor_type),
+               control_actor_id = VALUES(control_actor_id),
+               control_reason = VALUES(control_reason),
+               updated_at = CURRENT_TIMESTAMP(6)"#,
+    )
+    .bind(write.user_id)
+    .bind(result)
+    .bind(write.actor.actor_type())
+    .bind(write.actor.actor_id())
+    .bind(write.reason.as_deref().unwrap_or(""))
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
+/// 删除用户级控制；返回是否实际删除了设置，供用例区分“取消控制”和“本来就没有控制”。
+pub(crate) async fn delete_user_control_in_tx(
+    tx: &mut Transaction<'_, MySql>,
+    user_id: u64,
+) -> AppResult<bool> {
+    let deleted = sqlx::query("DELETE FROM seconds_contract_user_controls WHERE user_id = ?")
+        .bind(user_id)
+        .execute(&mut **tx)
+        .await?;
+    Ok(deleted.rows_affected() == 1)
+}
+
+/// 追加一条控制流水，记录每次设置与取消的操作人、原因和结果。
+/// 流水只追加不更新，是代理与后台控制行为的唯一历史凭证；不与订单行更新合并成覆盖写。
+pub(crate) async fn insert_control_event_in_tx(
+    tx: &mut Transaction<'_, MySql>,
+    event: &super::repository::SecondsContractControlEventWrite,
+) -> AppResult<()> {
+    sqlx::query(
+        r#"INSERT INTO seconds_contract_result_control_events
+           (scope, order_id, user_id, control_result, actor_type, actor_id, reason)
+           VALUES (?, ?, ?, ?, ?, ?, ?)"#,
+    )
+    .bind(event.scope)
+    .bind(event.order_id)
+    .bind(event.user_id)
+    .bind(event.control_result.as_deref())
+    .bind(event.actor.actor_type())
+    .bind(event.actor.actor_id())
+    .bind(event.reason.as_deref().unwrap_or(""))
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
+/// 读取用户当前生效的控制设置，供代理后台在用户页回显。/// 未设置返回 `None`；只读连接池，不加锁也不改动任何订单。
+pub(crate) async fn load_user_control_snapshot(
+    pool: &Pool<MySql>,
+    user_id: u64,
+) -> AppResult<Option<super::repository::SecondsContractControlSnapshot>> {
+    sqlx::query_as::<_, super::repository::SecondsContractControlSnapshot>(
+        r#"SELECT control_result, control_actor_type AS actor_type, control_actor_id AS actor_id,
+                  control_reason AS reason, updated_at AS control_at
+           FROM seconds_contract_user_controls WHERE user_id = ?"#,
+    )
+    .bind(user_id)
+    .fetch_optional(pool)
+    .await
+    .map_err(AppError::from)
+}
+
+/// 在用户级控制事务内锁定用户行，既做存在性检查，也让同一用户的并发控制设置串行化。
+/// 用户不存在返回 `AppError::NotFound`，不新建用户也不写任何控制记录。
+/// 本函数不加订单锁，订单级控制的并发边界由订单行锁单独保证。
+pub(crate) async fn lock_user_for_control_in_tx(
+    tx: &mut Transaction<'_, MySql>,
+    user_id: u64,
+) -> AppResult<()> {
+    let locked = sqlx::query_scalar::<_, u64>("SELECT id FROM users WHERE id = ? FOR UPDATE")
+        .bind(user_id)
+        .fetch_optional(&mut **tx)
+        .await?;
+    locked.map(|_| ()).ok_or(AppError::NotFound)
 }
 
 /// 已锁定审核单且核验历史证据后，在同一结算事务内恢复为 opened，随后必须结算或整体回滚。

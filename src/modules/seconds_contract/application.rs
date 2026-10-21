@@ -17,25 +17,28 @@ use super::{
         AdminOrdersQuery, AdminProductsQuery, AdminSecondsContractOrdersResponse,
         AdminSecondsContractProductsResponse, CreateSecondsContractProductRequest,
         DeleteSecondsContractProductRequest, OpenSecondsContractOrderRequest,
-        OpenSecondsContractOrderResponse, SecondsContractOrderResponse,
-        SecondsContractOrdersResponse, SecondsContractProductResponse,
-        SecondsContractProductsResponse, SettleSecondsContractOrderRequest,
-        SettleSecondsContractOrderResponse, UpdateSecondsContractProductRequest,
-        UpdateSecondsContractProductStatusRequest,
+        OpenSecondsContractOrderResponse, SecondsContractControlResponse,
+        SecondsContractOrderResponse, SecondsContractOrdersResponse,
+        SecondsContractProductResponse, SecondsContractProductsResponse,
+        SetSecondsContractOrderControlRequest, SetSecondsContractUserControlRequest,
+        SettleSecondsContractOrderRequest, SettleSecondsContractOrderResponse,
+        UpdateSecondsContractProductRequest, UpdateSecondsContractProductStatusRequest,
     },
     repository::{
-        SecondsContractAdminOrderFilter, SecondsContractOrderInsert, SecondsContractProductWrite,
+        SecondsContractAdminOrderFilter, SecondsContractControlActor,
+        SecondsContractControlEventWrite, SecondsContractOrderControlWrite,
+        SecondsContractOrderInsert, SecondsContractProductWrite, SecondsContractUserControlWrite,
         SecondsContractWalletLedgerWrite,
     },
     service::{
         NormalizedSecondsContractProductCycle, SETTLEMENT_PRICE_WINDOW_SECONDS,
         ensure_existing_order_matches_request, ensure_existing_settlement_matches,
-        ensure_manual_settlement_allowed, normalize_direction, normalize_idempotency_key,
-        normalize_settlement_result, normalized_product_status, optional_image_url,
-        optional_string, order_audit_json, product_audit_json,
-        publish_seconds_contract_order_opened_event_if_needed,
-        publish_seconds_contract_order_settled_event_if_needed, required_reason, route_limit,
-        route_offset, settlement_payout_amount, settlement_result_from_prices,
+        ensure_manual_settlement_allowed, normalize_control_result, normalize_direction,
+        normalize_idempotency_key, normalize_settlement_result, normalized_product_status,
+        optional_control_reason, optional_image_url, optional_string, order_audit_json,
+        product_audit_json, publish_seconds_contract_order_opened_event_if_needed,
+        publish_seconds_contract_order_settled_event_if_needed, required_reason,
+        resolve_settlement_outcome, route_limit, route_offset, settlement_payout_amount,
         validate_create_product_request, validate_product_stake, validate_stake_amount,
         validate_update_product_request,
     },
@@ -56,6 +59,7 @@ use crate::{
 };
 use bigdecimal::BigDecimal;
 use redis::aio::ConnectionManager;
+use serde_json::json;
 use sqlx::{MySql, Pool};
 
 /// 从应用状态取出 MySQL 连接池的克隆句柄，供只读路由直接使用。
@@ -598,15 +602,32 @@ pub(crate) async fn settle_order(
     let entry_price = order.entry_price.as_ref().ok_or_else(|| {
         AppError::Validation("seconds contract entry price is required for settlement".to_owned())
     })?;
-    let result = settlement_result_from_prices(&order.direction, entry_price, &snapshot.price)?;
+    // 人工结算与自动结算共用同一控制口径：订单级优先于用户级，控制目标与市场冲突时按判定价入账。
+    let order_control = infrastructure::select_order_control(&mut tx, order.id).await?;
+    let user_control = if order_control.is_none() {
+        infrastructure::select_user_control(&mut tx, order.user_id).await?
+    } else {
+        None
+    };
+    let resolution = resolve_settlement_outcome(
+        &order.direction,
+        entry_price,
+        &snapshot.price,
+        order_control.as_deref(),
+        user_control.as_deref(),
+    )?;
+    let result = resolution.result.as_str();
     if requested_result
         .as_deref()
         .is_some_and(|expected| expected != result)
     {
         return Err(AppError::Conflict(
-            "requested seconds contract result does not match the selected price".to_owned(),
+            "requested seconds contract result does not match the effective settlement result"
+                .to_owned(),
         ));
     }
+    let market_price = (resolution.controlled && resolution.settlement_price != snapshot.price)
+        .then_some(snapshot.price.clone());
 
     let before_json = Some(order_audit_json(&order, BigDecimal::from(0)));
     let payout_amount = settlement_payout_amount(&order, result, stake_asset_precision);
@@ -650,7 +671,15 @@ pub(crate) async fn settle_order(
         Some(&payout_amount),
     )
     .await?;
-    infrastructure::mark_order_settled(&mut tx, order.id, result, &snapshot).await?;
+    infrastructure::mark_order_settled(
+        &mut tx,
+        order.id,
+        result,
+        &resolution.settlement_price,
+        market_price.as_ref(),
+        &snapshot,
+    )
+    .await?;
     let settled_order = infrastructure::load_order_by_id(&mut tx, order.id).await?;
     infrastructure::insert_admin_audit_log_in_tx(
         &mut tx,
@@ -698,6 +727,138 @@ pub(crate) async fn settle_order_with_events(
         is_new_settlement,
     );
     Ok(response)
+}
+
+/// 订单级控输控赢：代理或后台在订单到期前指定该单必胜或必输，也可用 `clear` 撤销控制。
+/// 事务顺序固定为锁订单、确认仍为 opened、写订单控制列、追加控制流水；管理员操作再补一条后台审计。
+/// 订单已结算或已转人工审核时返回冲突，不覆盖既有终态；本用例不动钱包、不改结算价、不触发派奖。
+/// 控制是否真正生效由到期结算读取订单列决定，因此代理必须在该单结算前完成设置。
+pub(crate) async fn set_order_control(
+    pool: Option<&Pool<MySql>>,
+    order_id: u64,
+    actor: SecondsContractControlActor,
+    request: SetSecondsContractOrderControlRequest,
+) -> AppResult<SecondsContractControlResponse> {
+    let control_result = normalize_control_result(&request.result)?;
+    let reason = optional_control_reason(request.reason.clone())?;
+    let pool = require_mysql_pool(pool)?;
+    let mut tx = pool.begin().await?;
+    let order = infrastructure::lock_order_by_id(&mut tx, order_id).await?;
+    if order.status != "opened" {
+        return Err(AppError::Conflict(
+            "seconds contract order is no longer open for control".to_owned(),
+        ));
+    }
+    let write = SecondsContractOrderControlWrite {
+        order_id,
+        control_result: control_result.clone(),
+        actor,
+        reason: reason.clone(),
+    };
+    infrastructure::update_order_control_in_tx(&mut tx, &write).await?;
+    infrastructure::insert_control_event_in_tx(
+        &mut tx,
+        &SecondsContractControlEventWrite {
+            scope: "order",
+            order_id: Some(order_id),
+            user_id: order.user_id,
+            control_result: control_result.clone(),
+            actor,
+            reason: reason.clone(),
+        },
+    )
+    .await?;
+    if let SecondsContractControlActor::Admin(admin_id) = actor {
+        infrastructure::insert_admin_audit_log_in_tx(
+            &mut tx,
+            admin_id,
+            "seconds_contract_order.control",
+            "seconds_contract_order",
+            order_id,
+            Some(order_audit_json(&order, BigDecimal::from(0))),
+            Some(json!({ "control_result": control_result })),
+            reason.clone(),
+        )
+        .await?;
+    }
+    let control_at = infrastructure::database_now(&mut tx).await?;
+    tx.commit().await?;
+    Ok(SecondsContractControlResponse {
+        scope: "order".to_owned(),
+        order_id: Some(order_id),
+        user_id: order.user_id,
+        control_result,
+        actor_type: actor.actor_type().to_owned(),
+        actor_id: actor.actor_id(),
+        reason,
+        control_at,
+    })
+}
+
+/// 用户级控输控赢：在该用户名下所有未设置订单级控制的秒合约订单上生效，`clear` 表示取消。
+/// 事务先锁用户行做存在性检查并串行化同一用户的并发设置，再 upsert 或删除唯一控制记录。
+/// 每次设置与取消都追加控制流水，管理员来源额外写后台审计；本用例不触碰任何存量订单状态。
+pub(crate) async fn set_user_control(
+    pool: Option<&Pool<MySql>>,
+    user_id: u64,
+    actor: SecondsContractControlActor,
+    request: SetSecondsContractUserControlRequest,
+) -> AppResult<SecondsContractControlResponse> {
+    let control_result = normalize_control_result(&request.result)?;
+    let reason = optional_control_reason(request.reason.clone())?;
+    let pool = require_mysql_pool(pool)?;
+    let mut tx = pool.begin().await?;
+    infrastructure::lock_user_for_control_in_tx(&mut tx, user_id).await?;
+    let write = SecondsContractUserControlWrite {
+        user_id,
+        actor,
+        reason: reason.clone(),
+    };
+    match control_result.as_deref() {
+        Some(result) => {
+            infrastructure::upsert_user_control_in_tx(&mut tx, &write, result).await?;
+        }
+        None => {
+            infrastructure::delete_user_control_in_tx(&mut tx, user_id).await?;
+        }
+    }
+    infrastructure::insert_control_event_in_tx(
+        &mut tx,
+        &SecondsContractControlEventWrite {
+            scope: "user",
+            order_id: None,
+            user_id,
+            control_result: control_result.clone(),
+            actor,
+            reason: reason.clone(),
+        },
+    )
+    .await?;
+    if let SecondsContractControlActor::Admin(admin_id) = actor {
+        infrastructure::insert_admin_audit_log_in_tx(
+            &mut tx,
+            admin_id,
+            "seconds_contract_user.control",
+            "user",
+            user_id,
+            None,
+            Some(json!({ "control_result": control_result })),
+            reason.clone(),
+        )
+        .await?;
+    }
+    let control_at = infrastructure::database_now(&mut tx).await?;
+    tx.commit().await?;
+    Ok(SecondsContractControlResponse {
+        scope: "user".to_owned(),
+        order_id: None,
+        user_id,
+        control_result,
+        actor_type: actor.actor_type().to_owned(),
+        actor_id: actor.actor_id(),
+        reason,
+        control_at,
+    })
 }
 
 /// 按认证用户读取秒合约订单历史，用户编号来自令牌解析，绝不通过订单标识跨用户返回记录。

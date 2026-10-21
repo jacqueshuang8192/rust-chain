@@ -8,7 +8,8 @@ import {
   getAgentUserMarginPositions,
   getAgentUserMarginOrders,
   getAgentUserSpotOrders,
-  getAgentUserSecondsContractOrders
+  getAgentUserSecondsContractOrders,
+  getAgentSecondsUserControl
 } from '../api/agent';
 import { AgentUserPortfolioPage } from './UserPortfolioPage';
 import { authStore } from '../auth/authStore';
@@ -18,7 +19,10 @@ vi.mock('../api/agent', () => ({
   getAgentUserMarginPositions: vi.fn(),
   getAgentUserMarginOrders: vi.fn(),
   getAgentUserSpotOrders: vi.fn(),
-  getAgentUserSecondsContractOrders: vi.fn()
+  getAgentUserSecondsContractOrders: vi.fn(),
+  getAgentSecondsUserControl: vi.fn(),
+  setAgentSecondsOrderControl: vi.fn(),
+  setAgentSecondsUserControl: vi.fn()
 }));
 
 const getAssetsMock = vi.mocked(getAgentUserAssets);
@@ -26,6 +30,7 @@ const getMarginMock = vi.mocked(getAgentUserMarginPositions);
 const getMarginOrdersMock = vi.mocked(getAgentUserMarginOrders);
 const getSpotMock = vi.mocked(getAgentUserSpotOrders);
 const getSecondsMock = vi.mocked(getAgentUserSecondsContractOrders);
+const getSecondsControlMock = vi.mocked(getAgentSecondsUserControl);
 const now = 1_735_732_800_000;
 
 function renderPortfolio() {
@@ -63,6 +68,9 @@ describe('AgentUserPortfolioPage', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    getSecondsControlMock.mockResolvedValue({
+      user_id: 42, active: false, control_result: null, actor_type: null, actor_id: null, reason: null, control_at: null
+    });
     getMarginOrdersMock.mockImplementation(async () => ({
       orders: (await getMarginMock(42)).positions.map((row) => ({ ...row, order_type: 'limit', entry_price: null, limit_price: '90' })),
       total: 1

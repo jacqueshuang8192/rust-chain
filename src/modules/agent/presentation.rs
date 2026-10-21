@@ -176,6 +176,10 @@ pub(crate) struct AgentUserSecondsContractOrderResponse {
     pub(crate) settlement_price: Option<BigDecimal>,
     pub(crate) status: String,
     pub(crate) result: Option<String>,
+    /// 该单是否被代理或后台指定了必胜/必输；未设置为 `None`。
+    pub(crate) control_result: Option<String>,
+    /// 控制来源，`admin` 或 `agent`；未设置时为 `None`。
+    pub(crate) control_actor_type: Option<String>,
     #[serde(with = "unix_millis")]
     pub(crate) expires_at: DateTime<Utc>,
     #[serde(with = "unix_millis")]
@@ -353,4 +357,35 @@ pub(crate) struct AgentConvertStatsResponse {
     pub(crate) completed_orders: i64,
     pub(crate) total_from_amount: BigDecimal,
     pub(crate) total_to_amount: BigDecimal,
+}
+
+/// 代理设置秒合约控输控赢的请求体；`result` 取 `win`、`loss` 或表示取消的 `clear`。
+/// 原因在业务上必填，会随控制写入该订单或该用户的控制流水。
+#[derive(Debug, Deserialize)]
+pub(crate) struct AgentSecondsControlRequest {
+    /// 目标结算结果。
+    pub(crate) result: String,
+    /// 操作原因，必填。
+    pub(crate) reason: Option<String>,
+}
+
+/// 用户级控制查询响应；`active=false` 时其余字段全为空，前端据此展示未启用状态。
+/// 时间列统一输出毫秒时间戳，与控制设置接口保持同一口径。
+#[derive(Debug, Serialize)]
+pub(crate) struct AgentSecondsUserControlResponse {
+    /// 受控用户编号。
+    pub(crate) user_id: u64,
+    /// 是否存在生效中的用户级控制。
+    pub(crate) active: bool,
+    /// 当前控制结果，`win` 或 `loss`。
+    pub(crate) control_result: Option<String>,
+    /// 设置来源，`admin` 或 `agent`。
+    pub(crate) actor_type: Option<String>,
+    /// 设置人编号。
+    pub(crate) actor_id: Option<u64>,
+    /// 设置原因。
+    pub(crate) reason: Option<String>,
+    /// 设置时刻，毫秒时间戳；未设置时为空。
+    #[serde(default, with = "option_unix_millis")]
+    pub(crate) control_at: Option<DateTime<Utc>>,
 }

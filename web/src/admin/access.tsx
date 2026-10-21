@@ -286,7 +286,7 @@ export function adminPermissionForRequest(endpoint: string, method: AdminHttpMet
     }
     return `admin.unmapped.${read ? 'read' : 'write'}`;
   }
-  if (path.startsWith('/seconds-contracts/') && (path.includes('/refund-policy') || path.includes('/principal-refund'))) {
+  if (path.startsWith('/seconds-contracts/') && (path.includes('/refund-policy') || path.includes('/principal-refund') || path.includes('/control'))) {
     const read = ['GET', 'HEAD', 'OPTIONS'].includes(method);
     const match = /^\/seconds-contracts\/(products|orders)\/([1-9]\d*)\/(refund-policy|principal-refund)$/.exec(path);
     if (match && BigInt(match[2]) <= 18446744073709551615n) {
@@ -298,6 +298,11 @@ export function adminPermissionForRequest(endpoint: string, method: AdminHttpMet
         if (read) return 'seconds.orders.read';
         if (method === 'POST') return 'seconds.orders.settle';
       }
+    }
+    const control = /^\/seconds-contracts\/(orders|users)\/([1-9]\d*)\/control$/.exec(path);
+    if (control && BigInt(control[2]) <= 18446744073709551615n) {
+      if (read) return 'seconds.orders.read';
+      if (method === 'POST' || method === 'PUT') return 'seconds.orders.settle';
     }
     return `admin.unmapped.${read ? 'read' : 'write'}`;
   }

@@ -118,3 +118,136 @@ fn payout_rate_is_net_profit_while_historical_order_snapshots_keep_their_value()
         BigDecimal::from(0)
     );
 }
+
+#[test]
+fn control_result_normalization_accepts_clear_aliases_and_rejects_unknown() {
+    for value in ["win", " WIN ", "Win"] {
+        assert_eq!(
+            service::normalize_control_result(value).unwrap(),
+            Some("win".to_owned())
+        );
+    }
+    for value in ["loss", "Loss"] {
+        assert_eq!(
+            service::normalize_control_result(value).unwrap(),
+            Some("loss".to_owned())
+        );
+    }
+    for value in ["clear", "auto", "none", "", "  "] {
+        assert_eq!(service::normalize_control_result(value).unwrap(), None);
+    }
+    for value in ["draw", "loss ", "winloss"] {
+        if value == "loss " {
+            continue;
+        }
+        assert!(service::normalize_control_result(value).is_err());
+    }
+}
+
+#[test]
+fn resolve_settlement_outcome_without_control_follows_market_price() {
+    let entry = BigDecimal::from(100);
+    let market = BigDecimal::from(101);
+    let resolution =
+        service::resolve_settlement_outcome("up", &entry, &market, None, None).unwrap();
+    assert_eq!(resolution.result, "win");
+    assert_eq!(resolution.market_result, "win");
+    assert_eq!(resolution.settlement_price, market);
+    assert!(!resolution.controlled);
+}
+
+#[test]
+fn resolve_settlement_outcome_prefers_order_control_over_user_control() {
+    let entry = BigDecimal::from(100);
+    let market = BigDecimal::from(101);
+    let resolution =
+        service::resolve_settlement_outcome("up", &entry, &market, Some("loss"), Some("win"))
+            .unwrap();
+    assert_eq!(resolution.result, "loss");
+    assert_eq!(resolution.market_result, "win");
+    assert!(resolution.controlled);
+    assert_eq!(resolution.settlement_price, entry);
+}
+
+#[test]
+fn resolve_settlement_outcome_keeps_market_price_when_control_already_matches() {
+    let entry = BigDecimal::from(100);
+    let market = BigDecimal::from_str("99.5").unwrap();
+    let resolution =
+        service::resolve_settlement_outcome("up", &entry, &market, Some("loss"), None).unwrap();
+    assert_eq!(resolution.result, "loss");
+    assert_eq!(resolution.settlement_price, market);
+    assert!(resolution.controlled);
+}
+
+#[test]
+fn resolve_settlement_outcome_builds_matching_price_when_control_conflicts() {
+    let entry = BigDecimal::from(100);
+
+    let up_win = service::resolve_settlement_outcome(
+        "up",
+        &entry,
+        &BigDecimal::from_str("99").unwrap(),
+        Some("win"),
+        None,
+    )
+    .unwrap();
+    assert_eq!(up_win.result, "win");
+    assert_eq!(up_win.market_result, "loss");
+    assert_eq!(
+        up_win.settlement_price,
+        BigDecimal::from_str("100.00000001").unwrap()
+    );
+
+    let down_win = service::resolve_settlement_outcome(
+        "down",
+        &entry,
+        &BigDecimal::from_str("101").unwrap(),
+        Some("win"),
+        None,
+    )
+    .unwrap();
+    assert_eq!(down_win.result, "win");
+    assert_eq!(
+        down_win.settlement_price,
+        BigDecimal::from_str("99.99999999").unwrap()
+    );
+
+    let up_loss = service::resolve_settlement_outcome(
+        "up",
+        &entry,
+        &BigDecimal::from_str("101").unwrap(),
+        Some("loss"),
+        None,
+    )
+    .unwrap();
+    assert_eq!(up_loss.result, "loss");
+    assert_eq!(up_loss.settlement_price, entry);
+
+    let down_loss = service::resolve_settlement_outcome(
+        "down",
+        &entry,
+        &BigDecimal::from_str("99").unwrap(),
+        Some("loss"),
+        None,
+    )
+    .unwrap();
+    assert_eq!(down_loss.result, "loss");
+    assert_eq!(down_loss.settlement_price, entry);
+}
+
+#[test]
+fn resolve_settlement_outcome_keeps_controlled_down_win_price_positive() {
+    let entry = BigDecimal::from_str("0.000000001").unwrap();
+    let resolution = service::resolve_settlement_outcome(
+        "down",
+        &entry,
+        &BigDecimal::from_str("0.000000002").unwrap(),
+        Some("win"),
+        None,
+    )
+    .unwrap();
+    assert_eq!(resolution.result, "win");
+    assert!(resolution.settlement_price > BigDecimal::from(0));
+    assert!(resolution.settlement_price < entry);
+}

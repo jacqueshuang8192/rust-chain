@@ -30,6 +30,7 @@ import { StatusTag } from '../shared/StatusTag';
 import { TimestampText } from '../shared/TimestampText';
 import { SecondsOrderCountdown } from '../shared/SecondsOrderCountdown';
 import { UserWalletRecords } from '../shared/UserWalletRecords';
+import { SecondsControlActions, UserSecondsControlPanel } from './SecondsControl';
 import './UserPortfolioPage.css';
 
 const { Text } = Typography;
@@ -182,7 +183,7 @@ const spotColumns: Array<ColumnProps<AgentUserSpotOrder>> = [
   { dataIndex: 'updated_at', key: 'updated_at', title: '更新时间', render: (value) => <TimestampText value={value} /> }
 ];
 
-const secondsColumns: Array<ColumnProps<AgentUserSecondsContractOrder>> = [
+const secondsColumns = (refresh: () => void): Array<ColumnProps<AgentUserSecondsContractOrder>> => [
   { dataIndex: 'id', key: 'id', title: '订单ID', width: 100 },
   { dataIndex: 'symbol', key: 'symbol', title: '交易对', width: 140 },
   {
@@ -205,6 +206,14 @@ const secondsColumns: Array<ColumnProps<AgentUserSecondsContractOrder>> = [
   { dataIndex: 'entry_price', key: 'entry_price', render: (value) => <AmountText appendAsset={false} value={typeof value === 'string' ? value : null} />, title: '开仓价' },
   { dataIndex: 'settlement_price', key: 'settlement_price', render: (value) => <AmountText appendAsset={false} value={typeof value === 'string' ? value : null} />, title: '结算价' },
   { dataIndex: 'result', key: 'result', render: (value) => <StatusTag value={typeof value === 'string' ? value : null} />, title: '输赢' },
+  {
+    key: 'control', title: '控输控赢', width: 150,
+    render: (_, record) => <SecondsControlActions
+      current={record.control_result === 'win' || record.control_result === 'loss' ? record.control_result : null}
+      disabled={record.status !== 'opened'}
+      onDone={refresh}
+      orderId={record.id} />
+  },
   { dataIndex: 'expires_at', key: 'expires_at', render: (value) => <TimestampText value={typeof value === 'number' ? value : null} />, title: '到期时间' },
   { dataIndex: 'created_at', key: 'created_at', render: (value) => <TimestampText value={typeof value === 'number' ? value : null} />, title: '创建时间' },
   { dataIndex: 'settled_at', key: 'settled_at', render: (value) => <TimestampText value={typeof value === 'number' ? value : null} />, title: '结算时间' }
@@ -341,6 +350,7 @@ function UserPortfolio() {
 
       {activeTab === 'seconds' ? (
         <div aria-labelledby="semiTabseconds" id="semiTabPanelseconds" role="tabpanel" tabIndex={0}>
+          <UserSecondsControlPanel userId={userId} onChanged={seconds.refresh} />
           <div className="agent-portfolio-filters">
               <label>秒合约订单状态
                 <AdminSelect
@@ -352,7 +362,7 @@ function UserPortfolio() {
               </label>
           </div>
           <DataTable
-            columns={secondsColumns}
+            columns={secondsColumns(seconds.refresh)}
             data={seconds.data?.orders ?? []}
             error={seconds.error}
             loading={seconds.loading}

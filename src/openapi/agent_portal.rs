@@ -199,6 +199,10 @@ pub(super) struct AgentUserSecondsContractOrderResponse {
     status: String,
     #[schema(pattern = "^(win|loss)$", required = true)]
     result: Option<String>,
+    #[schema(pattern = "^(win|loss)$", required = true)]
+    control_result: Option<String>,
+    #[schema(pattern = "^(admin|agent)$", required = true)]
+    control_actor_type: Option<String>,
     #[schema(format = Int64)]
     expires_at: i64,
     #[schema(format = Int64)]

@@ -1,3 +1,17 @@
+## 2026-10-21 14:48 - 秒合约控单取消必填原因
+
+- 完成内容：控输控赢设置不再强制填写原因。订单级与用户级请求的 `reason` 变为可选，空白或缺失归一为 `None`：订单 `control_reason` 写 NULL、用户控制表与控制流水 `reason` 写空串、后台审计原因留空；代理与后台控制响应中的 `reason` 改为可空，代理用户页只在原因非空时展示。代理控制弹窗的“确认控制”不再因原因为空而禁用；后台秒合约订单的控赢/控输/取消控制复用 `ConfirmAction` 新增的 `reasonOptional`，同样允许空原因；超过审计长度上限的文本仍在提交前拒绝。
+- 修改文件：`src/modules/seconds_contract/{application,infrastructure,presentation,repository,service}.rs`、`src/modules/agent/application/seconds_control.rs`、`tests/agent_routes/seconds_control.rs`、`web/src/api/agent.ts`、`web/src/agent/{SecondsControl.tsx,SecondsControl.test.tsx}`、`web/src/shared/{ConfirmAction.tsx,ConfirmAction.test.tsx}`、`web/src/admin/resources/actions/secondsContract.tsx`、`.trellis/spec/backend/seconds-contracts.md`。
+- 验证结果：`cargo check --all-targets --all-features`、`cargo test --lib`、严格 Clippy、`cargo fmt --all -- --check` 通过；Web `tsc -b` 与代理相关测试 58/58 通过（含无原因直接控单、空白原因落 NULL 回显）。代理路由集成测试仍需 `DATABASE_URL`，本机跳过。
+- 后续事项：无。
+
+## 2026-10-21 13:54 - 代理后台秒合约控输控赢
+
+- 完成内容：秒合约新增订单级与用户级控输控赢。结算结果解析顺序为订单级控制 → 用户级控制 → 真实行情；控制与行情方向一致时直接采用真实价，冲突时订单 `settlement_price` 写入判定价（赢单 `开仓价±0.00000001`，输单取开仓价），真实报价另存 `settlement_market_price` 供对账，确保客户端看到的结算价与输赢一致。自动 worker 与后台人工结算共用同一解析函数，人工结算不会再绕过控制。代理门户新增 `POST /seconds-contract-orders/:order_id/control` 与 `GET|PUT /users/:user_id/seconds-contract-control`，后台新增对应 `/seconds-contracts/orders/:id/control` 与 `/seconds-contracts/users/:user_id/control`；设置/取消只对 `opened` 订单生效，代理只能操作物化路径子树内用户，越界统一 404、已结算/审核中返回 409。每次操作写订单控制列、用户控制表与追加式控制流水，管理员操作另写后台审计。代理团队订单列表与用户页回显控制状态，提供控赢/控输/取消弹窗与用户级默认控制面板。
+- 修改文件：`migrations/0156_seconds_contract_result_controls.sql`；`src/modules/seconds_contract/{application,infrastructure,presentation,repository,routes,service}.rs`；`src/workers/seconds_contract_settlement.rs`；`src/modules/agent/{application,application/seconds_control.rs,infrastructure,infrastructure/team_orders.rs,presentation,routes,routes/seconds_control.rs}`；`src/modules/admin/service/access_control.rs`；`src/openapi/agent_portal.rs`；`tests/agent_routes.rs`、`tests/agent_routes/seconds_control.rs`、`tests/unit_src/src_modules_seconds_contract_tests.rs`；`web/src/api/agent.ts`、`web/src/agent/{SecondsControl.tsx,SecondsControl.test.tsx,TeamOrdersPage.tsx,UserPortfolioPage.tsx,UserPortfolioPage.test.tsx}`、`web/src/admin/{access.tsx,audit/auditPresentation.ts,dashboard/DashboardPage.tsx,resources/actions/secondsContract.tsx}`；`.trellis/spec/backend/seconds-contracts.md`。
+- 验证结果：`cargo test --lib` 532/532（含新增控制归一化、优先级与四种方向/结果判定价单测）、`cargo check --all-targets --all-features`、严格 Clippy `-D warnings`、架构 11/11、文档 1/1、`cargo fmt --all -- --check` 通过；Web `pnpm test` 1136/1136、`tsc -b`、`eslint .` 通过。新增代理路由集成测试 `tests/agent_routes/seconds_control.rs` 已编译，但本机未设置 `DATABASE_URL`，运行时会跳过，未做真实 MySQL 验证；迁移 0156 未在真实库执行。
+- 后续事项：部署前需执行迁移 0156；建议在具备隔离 MySQL 的环境补跑 `cargo test --test agent_routes` 与秒合约结算 worker 集成测试；后台订单列表暂未回显控制状态（代理端与审计流水可见），如需运营在后台核对可后续补字段与列。
+
 ## 2026-10-09 22:45 - 秒合约改用 Redis 实时缓存开仓与结算
 
 - 完成内容：秒合约开仓移除 60 秒行情年龄保护，仍要求 Redis 缓存存在、交易对身份匹配、价格可解析且为正；普通 `opened` 订单到期后直接读取 Redis 当前价，不再等待 5 秒历史事件窗口。结算记录原始 `observed_at`、`source=redis` 和缓存载荷 SHA-256，订单、钱包、流水、平台分录和结算证据同事务提交；缺缓存/非法缓存/事务失败按 1 秒重试，成功重放不重新取价、不重复派奖。保留旧 `manual_review` 的历史证据恢复和退款规则；默认扫描间隔改为 1 秒，启动时要求 MySQL 与 Redis 同时存在；外部行情原有“写 Redis 后再广播”顺序不变。

@@ -13,10 +13,12 @@ type ConfirmActionProps = {
   description?: string;
   modalWidth?: number | string;
   onConfirm: (reason: string) => Promise<void> | void;
+  /** 允许不填原因直接确认；用于不强制审计说明的操作，例如秒合约控输控赢。 */
+  reasonOptional?: boolean;
   title: string;
 };
 
-export function ConfirmAction({ actionAriaLabel, actionText = '执行', confirmText = '确认', dangerous, description, disabled, modalWidth, onConfirm, title }: ConfirmActionProps) {
+export function ConfirmAction({ actionAriaLabel, actionText = '执行', confirmText = '确认', dangerous, description, disabled, modalWidth, onConfirm, reasonOptional = false, title }: ConfirmActionProps) {
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const [visible, setVisible] = useState(false);
@@ -34,7 +36,7 @@ export function ConfirmAction({ actionAriaLabel, actionText = '执行', confirmT
 
   async function handleConfirm() {
     const trimmed = reason.trim();
-    if (!trimmed) {
+    if (!trimmed && !reasonOptional) {
       return;
     }
 
@@ -63,7 +65,7 @@ export function ConfirmAction({ actionAriaLabel, actionText = '执行', confirmT
         confirmLoading={submitting}
         maskClosable={false}
         motion={false}
-        okButtonProps={{ 'aria-label': confirmText, disabled: reason.trim().length === 0, type: destructive ? 'danger' : 'primary' }}
+        okButtonProps={{ 'aria-label': confirmText, disabled: !reasonOptional && reason.trim().length === 0, type: destructive ? 'danger' : 'primary' }}
         okText={confirmText}
         onCancel={closeModal}
         onOk={handleConfirm}
@@ -72,13 +74,13 @@ export function ConfirmAction({ actionAriaLabel, actionText = '执行', confirmT
         width={modalWidth}
       >
         {description ? <p>{description}</p> : null}
-        <Text type="secondary">请输入非空原因后继续。</Text>
+        <Text type="secondary">{reasonOptional ? '原因可选填，留空只在审计中记录操作人与时间。' : '请输入非空原因后继续。'}</Text>
         {error ? <div role="alert"><Text type="danger">{error}</Text></div> : null}
         <TextArea
           aria-label="操作原因"
           autosize
           onChange={setReason}
-          placeholder="请输入操作原因"
+          placeholder={reasonOptional ? '操作原因（可选）' : '请输入操作原因'}
           style={{ marginTop: 12 }}
           value={reason}
         />

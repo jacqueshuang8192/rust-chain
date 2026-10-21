@@ -33,6 +33,7 @@ use axum::{
 
 mod coin_applications;
 mod recharges;
+mod seconds_control;
 mod team_orders;
 mod token_issuance;
 mod wallet_records;
@@ -46,6 +47,7 @@ pub fn routes() -> Router<AppState> {
         .merge(token_issuance::routes())
         .merge(recharges::routes())
         .merge(team_orders::routes())
+        .merge(seconds_control::routes())
         .merge(wallet_records::routes())
         .route("/me", get(me))
         .route("/dashboard", get(dashboard))

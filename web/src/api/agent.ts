@@ -214,6 +214,8 @@ export type AgentUserSecondsContractOrder = Record<string, unknown> & {
   settlement_price: string | null;
   status: AgentSecondsContractOrderStatus;
   result: 'win' | 'loss' | null;
+  control_result?: 'win' | 'loss' | null;
+  control_actor_type?: 'admin' | 'agent' | null;
   expires_at: number;
   created_at: number;
   settled_at: number | null;
@@ -357,7 +359,8 @@ export async function listAgentFinancialRows<T extends Record<string, unknown>>(
     });
     Object.entries(contract.nullableEnumFields ?? {}).forEach(([field, allowed]) => {
       const enumValue = row[field];
-      assertContract(enumValue === null || (typeof enumValue === 'string' && allowed.includes(enumValue)), field, `枚举 ${allowed.join('/')} 或 null`);
+      // 缺失字段按“旧后端未返回”处理，避免新增可空枚举字段阻断滚动升级。
+      assertContract(enumValue === undefined || enumValue === null || (typeof enumValue === 'string' && allowed.includes(enumValue)), field, `枚举 ${allowed.join('/')} 或 null`);
     });
   });
   return { rows: rows as T[], total: value.total };
@@ -494,11 +497,79 @@ export const agentSecondsOrderContract: AgentFinancialRowContract = {
       direction: ['up', 'down'],
       status: ['opened', 'settled', 'manual_review', 'refunded']
     },
-    nullableEnumFields: { result: ['win', 'loss'] }
+    nullableEnumFields: { result: ['win', 'loss'], control_result: ['win', 'loss'], control_actor_type: ['admin', 'agent'] }
 };
 
-export function getAgentInviteCodes(): Promise<AgentInviteCodesResponse> {
-  return agentRequest<AgentInviteCodesResponse>('/agent/api/v1/invite-codes');
+/** 秒合约控输控赢目标；`clear` 表示取消当前控制。 */
+export type AgentSecondsControlResult = 'win' | 'loss' | 'clear';
+
+/** 设置控制后的回执，回显作用域、受控对象与落库时刻。 */
+export type AgentSecondsControlResponse = {
+  scope: 'order' | 'user';
+  order_id: number | null;
+  user_id: number;
+  control_result: 'win' | 'loss' | null;
+  actor_type: 'admin' | 'agent';
+  actor_id: number;
+  reason: string | null;
+  control_at: number;
+};
+
+/** 用户级控制查询结果；未启用时除 `user_id`、`active` 外均为空。 */
+export type AgentSecondsUserControlResponse = {
+  user_id: number;
+  active: boolean;
+  control_result: 'win' | 'loss' | null;
+  actor_type: 'admin' | 'agent' | null;
+  actor_id: number | null;
+  reason: string | null;
+  control_at: number | null;
+};
+
+function secondsControlReason(reason: string): string {
+  const value = reason.trim();
+  if (value.length > 255) throw new Error('操作原因最多 255 个字符');
+  return value;
+}
+
+/** 对单笔秒合约订单设置必胜、必输或取消控制，订单必须仍处于进行中。 */
+export async function setAgentSecondsOrderControl(
+  orderId: number,
+  result: AgentSecondsControlResult,
+  reason: string
+): Promise<AgentSecondsControlResponse> {
+  requiredSafeInteger(orderId, '订单ID', 1);
+  const value = await agentRequest<AgentSecondsControlResponse>(
+    `/agent/api/v1/seconds-contract-orders/${encodeURIComponent(String(orderId))}/control`,
+    { method: 'POST', body: JSON.stringify({ result, reason: secondsControlReason(reason) }) }
+  );
+  return value;
+}
+
+/** 设置用户级默认控制，作用于该用户后续所有秒合约订单。 */
+export async function setAgentSecondsUserControl(
+  userId: number,
+  result: AgentSecondsControlResult,
+  reason: string
+): Promise<AgentSecondsControlResponse> {
+  requiredSafeInteger(userId, '用户ID', 1);
+  const value = await agentRequest<AgentSecondsControlResponse>(
+    `/agent/api/v1/users/${encodeURIComponent(String(userId))}/seconds-contract-control`,
+    { method: 'PUT', body: JSON.stringify({ result, reason: secondsControlReason(reason) }) }
+  );
+  return value;
+}
+
+/** 读取用户在子树内当前生效的控制设置。 */
+export async function getAgentSecondsUserControl(userId: number): Promise<AgentSecondsUserControlResponse> {
+  requiredSafeInteger(userId, '用户ID', 1);
+  return agentRequest<AgentSecondsUserControlResponse>(
+    `/agent/api/v1/users/${encodeURIComponent(String(userId))}/seconds-contract-control`
+  );
+}
+
+
+export function getAgentInviteCodes(): Promise<AgentInviteCodesResponse> {  return agentRequest<AgentInviteCodesResponse>('/agent/api/v1/invite-codes');
 }
 
 export function createAgentInviteCode(usageLimit?: number): Promise<AgentInviteCode> {

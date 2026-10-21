@@ -15,7 +15,8 @@ use crate::{
             },
             service::{
                 SETTLEMENT_PRICE_WINDOW_SECONDS as EVENT_PRICE_WINDOW_SECONDS,
-                seconds_contract_payout_amount, settlement_result_from_prices,
+                resolve_settlement_outcome, seconds_contract_payout_amount,
+                settlement_result_from_prices,
             },
         },
     },
@@ -518,7 +519,33 @@ async fn settle_order_by_id(
     let entry_price = order.entry_price.as_ref().ok_or_else(|| {
         AppError::Validation("seconds contract entry price is required for settlement".to_owned())
     })?;
-    let result = settlement_result_from_prices(&order.direction, entry_price, &snapshot.price)?;
+    // 控制在订单锁之后读取：代理设置控制同样要抢这把锁，读到即代表该单最终生效的规则。
+    let order_control = infrastructure::select_order_control(&mut tx, order.id).await?;
+    let user_control = if order_control.is_none() {
+        infrastructure::select_user_control(&mut tx, order.user_id).await?
+    } else {
+        None
+    };
+    let resolution = resolve_settlement_outcome(
+        &order.direction,
+        entry_price,
+        &snapshot.price,
+        order_control.as_deref(),
+        user_control.as_deref(),
+    )?;
+    let result = resolution.result.as_str();
+    if resolution.controlled {
+        info!(
+            order_id = order.id,
+            result,
+            market_result = %resolution.market_result,
+            market_price = %snapshot.price,
+            settlement_price = %resolution.settlement_price,
+            "秒合约订单按控输控赢结果结算"
+        );
+    }
+    let market_price = (resolution.controlled && resolution.settlement_price != snapshot.price)
+        .then_some(snapshot.price.clone());
     let precision = infrastructure::load_asset_precision_scale(&mut tx, order.stake_asset).await?;
     let payout_amount =
         seconds_contract_payout_amount(&order.stake_amount, &order.payout_rate, result, precision);
@@ -556,7 +583,15 @@ async fn settle_order_by_id(
         Some(&payout_amount),
     )
     .await?;
-    infrastructure::mark_order_settled(&mut tx, order.id, result, &snapshot).await?;
+    infrastructure::mark_order_settled(
+        &mut tx,
+        order.id,
+        result,
+        &resolution.settlement_price,
+        market_price.as_ref(),
+        &snapshot,
+    )
+    .await?;
     let event = SecondsContractSettlementEvent {
         user_id: order.user_id,
         order_id: order.id,
@@ -566,7 +601,7 @@ async fn settle_order_by_id(
         direction: order.direction,
         stake_amount: order.stake_amount,
         payout_amount,
-        settlement_price: snapshot.price,
+        settlement_price: resolution.settlement_price.clone(),
         settlement_price_tick_id: snapshot.id,
         settlement_price_source: snapshot.source,
         settlement_price_observed_at: snapshot.observed_at,

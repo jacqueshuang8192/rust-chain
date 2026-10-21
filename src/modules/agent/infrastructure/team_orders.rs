@@ -114,7 +114,8 @@ fn query(
             "orders.product_id, orders.pair_id, pairs.symbol, orders.stake_asset, \
              assets.symbol AS stake_asset_symbol, orders.direction, orders.stake_amount, \
              orders.duration_seconds, orders.payout_rate, orders.entry_price, \
-             orders.settlement_price, orders.status, orders.result, orders.expires_at, \
+             orders.settlement_price, orders.status, orders.result, orders.control_result, \
+             orders.control_actor_type, orders.expires_at, \
              orders.created_at, orders.settled_at",
             "seconds_contract_orders orders JOIN trading_pairs pairs ON pairs.id = orders.pair_id \
              JOIN assets ON assets.id = orders.stake_asset",

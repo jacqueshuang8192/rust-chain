@@ -147,7 +147,9 @@ pub(crate) fn required_admin_permission(method: &str, raw_path: &str) -> Option<
         );
     }
     if path.starts_with("/seconds-contracts/")
-        && (path.contains("/refund-policy") || path.contains("/principal-refund"))
+        && (path.contains("/refund-policy")
+            || path.contains("/principal-refund")
+            || path.contains("/control"))
     {
         let read = matches!(method, "GET" | "HEAD" | "OPTIONS");
         let parts = path.split('/').collect::<Vec<_>>();
@@ -162,6 +164,10 @@ pub(crate) fn required_admin_permission(method: &str, raw_path: &str) -> Option<
                 ("products", "refund-policy", "PATCH") => "seconds.products.write",
                 ("orders", "principal-refund", _) if read => "seconds.orders.read",
                 ("orders", "principal-refund", "POST") => "seconds.orders.settle",
+                ("orders", "control", _) if read => "seconds.orders.read",
+                ("orders", "control", "POST") => "seconds.orders.settle",
+                ("users", "control", _) if read => "seconds.orders.read",
+                ("users", "control", "PUT") => "seconds.orders.settle",
                 _ => {
                     if read {
                         "admin.unmapped.read"

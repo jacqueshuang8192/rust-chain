@@ -396,6 +396,113 @@ pub(crate) fn settlement_result_from_prices(
     }
 }
 
+/// 归一化控输控赢的目标结果：`win`/`loss` 表示指定胜负，`clear`、`auto`、`none` 或空白表示取消控制。
+/// 返回值 `Some` 即“该作用域存在生效中的控制”，调用方不要在结算时把空串当成合法结果。
+/// 与人工结算的 `normalize_settlement_result` 分开：后者只允许 win/loss，不接受清除语义。
+pub(crate) fn normalize_control_result(value: &str) -> AppResult<Option<String>> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "win" => Ok(Some("win".to_owned())),
+        "loss" => Ok(Some("loss".to_owned())),
+        "clear" | "auto" | "none" | "" => Ok(None),
+        _ => Err(AppError::Validation(
+            "seconds contract control result must be win, loss or clear".to_owned(),
+        )),
+    }
+}
+
+/// 受控结算的判定价与市场价之间的步长，即一亿分之一，用于把价格严格放到开仓价的某一侧。
+/// 该步长足够小，使受控单的判定价看起来仍然贴近真实行情，同时保证胜负判定没有平局歧义。
+fn control_price_step() -> BigDecimal {
+    BigDecimal::from(1i64) / BigDecimal::from(100_000_000i64)
+}
+
+/// 一次结算的最终判定：对外结果、写入订单的判定价、真实市场价推导出的结果，以及是否受控结算。
+/// `market_result` 保留真实行情视角，供审计与对账核对控制是否与市场方向冲突。
+#[derive(Debug, Clone)]
+pub(crate) struct SecondsContractSettlementResolution {
+    /// 实际用于派奖的结果，受控时等于控制目标。
+    pub(crate) result: String,
+    /// 写入订单的结算价；受控且与市场方向冲突时为判定价，否则等于市场价。
+    pub(crate) settlement_price: BigDecimal,
+    /// 仅按真实市场价推导出的结果，不受控制影响。
+    pub(crate) market_result: String,
+    /// 本次结算是否由订单级或用户级控制决定。
+    pub(crate) controlled: bool,
+}
+
+/// 解析到期结算的最终结果：订单级控制优先于用户级控制，两者都缺失时按真实市场价判定。
+/// 控制目标与市场方向一致时直接用市场价，避免无意义的改价；冲突时生成贴边判定价。
+/// 本函数不读数据库也不改钱包，真实市场价由调用方在同一事务内取定后传入。
+pub(crate) fn resolve_settlement_outcome(
+    direction: &str,
+    entry_price: &BigDecimal,
+    market_price: &BigDecimal,
+    order_control: Option<&str>,
+    user_control: Option<&str>,
+) -> AppResult<SecondsContractSettlementResolution> {
+    let market_result =
+        settlement_result_from_prices(direction, entry_price, market_price)?.to_owned();
+    let control = order_control.or(user_control);
+    let Some(control) = control else {
+        return Ok(SecondsContractSettlementResolution {
+            result: market_result.clone(),
+            settlement_price: market_price.clone(),
+            market_result,
+            controlled: false,
+        });
+    };
+    if control == market_result {
+        return Ok(SecondsContractSettlementResolution {
+            result: control.to_owned(),
+            settlement_price: market_price.clone(),
+            market_result,
+            controlled: true,
+        });
+    }
+    let settlement_price = control_price_for(direction, entry_price, control)?;
+    Ok(SecondsContractSettlementResolution {
+        result: control.to_owned(),
+        settlement_price,
+        market_result,
+        controlled: true,
+    })
+}
+
+/// 生成与目标结果严格一致的判定价：赢单落在开仓价的有利一侧，输单直接落在开仓价上。
+/// 结算规则把平价判为输，因此输单不需要跨过开仓价，价格观感更接近真实行情。
+/// 生成后会立即用同一胜负函数自检，任何不满足目标的结果都返回内部错误而不是继续派奖。
+fn control_price_for(
+    direction: &str,
+    entry_price: &BigDecimal,
+    control: &str,
+) -> AppResult<BigDecimal> {
+    let step = control_price_step();
+    let price = match (control, direction) {
+        ("win", "up") => entry_price.clone() + step,
+        ("win", "down") => {
+            let candidate = entry_price.clone() - step;
+            if candidate > 0 {
+                candidate
+            } else {
+                entry_price.clone() / BigDecimal::from(2i64)
+            }
+        }
+        ("loss", "up") | ("loss", "down") => entry_price.clone(),
+        _ => {
+            return Err(AppError::Validation(
+                "seconds contract direction must be up or down".to_owned(),
+            ));
+        }
+    };
+    crate::numeric::ensure_amount_storage(&price, "seconds controlled settlement price")?;
+    if settlement_result_from_prices(direction, entry_price, &price)? != control {
+        return Err(AppError::Internal(
+            "seconds contract controlled settlement price does not match result".to_owned(),
+        ));
+    }
+    Ok(price)
+}
+
 /// 计算秒合约结算入账额，是整个模块唯一的赔付口径来源。
 /// 结果为 `win` 时返回 `本金 + 本金 × 赔率`，即含本金的总入账额，`payout_rate` 按净收益率理解；
 /// 其他结果（含 `loss`）返回按同一精度规整后的零，代表本金已在开仓时扣走且不再退回。
@@ -657,6 +764,17 @@ pub(crate) fn required_reason(reason: Option<String>) -> AppResult<String> {
         ));
     };
     validate_reason_len(Some(reason.as_str()))?;
+    Ok(reason)
+}
+
+/// 控输控赢的原因可选：空白或缺失都归一为 `None`，填了则保留裁剪后的文本并校验长度。
+/// 与产品配置的 `required_reason` 区分开，控制操作只要求可追溯（订单控制列、控制流水、审计都有记录），
+/// 不强制运营每次填写说明；超长文本仍在进入事务前拒绝，避免落库被静默截断。
+pub(crate) fn optional_control_reason(reason: Option<String>) -> AppResult<Option<String>> {
+    let reason = optional_string(reason);
+    if let Some(value) = reason.as_ref() {
+        validate_reason_len(Some(value.as_str()))?;
+    }
     Ok(reason)
 }
 

@@ -71,5 +71,16 @@ describe('ConfirmAction', () => {
     await userEvent.click(screen.getByRole('button',{name:'保存'}));
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
+  it('confirms without a reason when the caller marks the reason optional', async () => {
+    const user = userEvent.setup();
+    const action = vi.fn().mockResolvedValue(undefined);
+    render(<ConfirmAction actionText="控赢" reasonOptional title="控赢（该单结算必胜）" onConfirm={action} />);
+    await user.click(screen.getByRole('button', { name: '控赢' }));
+    const confirm = await screen.findByRole('button', { name: '确认' });
+    expect(confirm).not.toBeDisabled();
+    expect(screen.getByText('原因可选填，留空只在审计中记录操作人与时间。')).toBeVisible();
+    await user.click(confirm);
+    await waitFor(() => expect(action).toHaveBeenCalledWith(''));
+  });
 
 });

@@ -19,6 +19,8 @@ use super::{
         list_admin_products as list_admin_products_use_case,
         list_user_orders as list_user_orders_use_case,
         open_order_with_events as open_order_with_events_use_case,
+        set_order_control as set_order_control_use_case,
+        set_user_control as set_user_control_use_case,
         settle_order_with_events as settle_order_with_events_use_case,
         update_product as update_product_use_case,
         update_product_status as update_product_status_use_case,
@@ -28,11 +30,14 @@ use super::{
         AdminSecondsContractProductsResponse, CreateSecondsContractProductRequest,
         DeleteSecondsContractProductRequest, ListOrdersQuery, ListQuery,
         OpenSecondsContractOrderRequest, OpenSecondsContractOrderResponse,
-        SecondsContractOrderResponse, SecondsContractOrdersResponse,
-        SecondsContractProductResponse, SecondsContractProductsResponse,
-        SettleSecondsContractOrderRequest, SettleSecondsContractOrderResponse,
-        UpdateSecondsContractProductRequest, UpdateSecondsContractProductStatusRequest,
+        SecondsContractControlResponse, SecondsContractOrderResponse,
+        SecondsContractOrdersResponse, SecondsContractProductResponse,
+        SecondsContractProductsResponse, SetSecondsContractOrderControlRequest,
+        SetSecondsContractUserControlRequest, SettleSecondsContractOrderRequest,
+        SettleSecondsContractOrderResponse, UpdateSecondsContractProductRequest,
+        UpdateSecondsContractProductStatusRequest,
     },
+    repository::SecondsContractControlActor,
     service::{admin_id_from_subject, route_limit, route_offset, user_id_from_subject},
 };
 use crate::{
@@ -44,7 +49,7 @@ use axum::{
     Json, Router,
     extract::{Path, Query, State},
     http::StatusCode,
-    routing::{get, patch, post},
+    routing::{get, patch, post, put},
 };
 
 mod refund;
@@ -85,6 +90,14 @@ pub fn admin_routes() -> Router<AppState> {
         .route("/seconds-contracts/orders", get(list_admin_orders))
         .route("/seconds-contracts/orders/:id", get(get_admin_order))
         .route("/seconds-contracts/orders/:id/settle", post(settle_order))
+        .route(
+            "/seconds-contracts/orders/:id/control",
+            post(set_order_control),
+        )
+        .route(
+            "/seconds-contracts/users/:user_id/control",
+            put(set_user_control),
+        )
 }
 
 /// 处理用户端秒合约产品目录请求，返回全部可下单产品及其周期档位。
@@ -275,4 +288,46 @@ async fn settle_order(
     )
     .await?;
     Ok(Json(response))
+}
+
+/// 处理后台设置单笔秒合约订单控输控赢的请求，订单必须仍处于进行中，已结算或审核中返回冲突。
+/// 该入口只写控制列与控制流水，不动资金；真正的派奖发生在到期结算读取该控制结果时。
+/// 管理员编号与必填原因一并落入订单控制列与后台审计，便于事后追责。
+async fn set_order_control(
+    AdminAuth(claims): AdminAuth,
+    State(state): State<AppState>,
+    Path(order_id): Path<u64>,
+    Json(request): Json<SetSecondsContractOrderControlRequest>,
+) -> AppResult<Json<SecondsContractControlResponse>> {
+    let admin_id = admin_id_from_subject(&claims.sub)?;
+    Ok(Json(
+        set_order_control_use_case(
+            state.mysql.as_ref(),
+            order_id,
+            SecondsContractControlActor::Admin(admin_id),
+            request,
+        )
+        .await?,
+    ))
+}
+
+/// 处理后台设置用户级控输控赢的请求，作用于该用户之后开仓的秒合约订单。
+/// 请求体中的 `clear` 会删除该用户的控制设置；每次设置与取消都追加控制流水。
+/// 本接口不改存量订单，也不触发任何结算或资金变更。
+async fn set_user_control(
+    AdminAuth(claims): AdminAuth,
+    State(state): State<AppState>,
+    Path(user_id): Path<u64>,
+    Json(request): Json<SetSecondsContractUserControlRequest>,
+) -> AppResult<Json<SecondsContractControlResponse>> {
+    let admin_id = admin_id_from_subject(&claims.sub)?;
+    Ok(Json(
+        set_user_control_use_case(
+            state.mysql.as_ref(),
+            user_id,
+            SecondsContractControlActor::Admin(admin_id),
+            request,
+        )
+        .await?,
+    ))
 }

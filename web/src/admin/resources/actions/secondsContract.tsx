@@ -457,12 +457,27 @@ export function SecondsOrderRowActions({ helpers, record }: { helpers: RowAction
     helpers.reload();
   }
 
+  async function control(result: 'win' | 'loss' | 'clear', reason: string) {
+    await submitAction(result === 'clear' ? '取消控输控赢' : result === 'win' ? '控赢' : '控输', () =>
+      apiRequest(`/admin/api/v1/seconds-contracts/orders/${orderId}/control`, {
+        method: 'POST',
+        body: JSON.stringify({ result, reason })
+      })
+    );
+    helpers.reload();
+  }
+
   return (
     <>
       <SecondsPrincipalRefundAction helpers={helpers} record={record} />
       <Button disabled={!orderId} onClick={() => openRecordDetail('/admin/api/v1/seconds-contracts/orders', orderId, helpers)} size="small" theme="borderless">
         查看详情
       </Button>
+      <AdminRequestActionBoundary endpoint={`/admin/api/v1/seconds-contracts/orders/${orderId}/control`} method="POST">
+        <ConfirmAction actionText="控赢" disabled={!orderId || !canSettle} reasonOptional title="控赢（该单结算必胜）" onConfirm={(reason) => control('win', reason)} />
+        <ConfirmAction actionText="控输" disabled={!orderId || !canSettle} reasonOptional title="控输（该单结算必输）" onConfirm={(reason) => control('loss', reason)} />
+        <ConfirmAction actionText="取消控制" dangerous disabled={!orderId || !canSettle} reasonOptional title="取消控输控赢" onConfirm={(reason) => control('clear', reason)} />
+      </AdminRequestActionBoundary>
       <AdminRequestActionBoundary endpoint={`/admin/api/v1/seconds-contracts/orders/${orderId}/settle`} method="POST">
         {needsReview ? (
           <ConfirmAction actionText="恢复结算" disabled={!orderId} title="依据历史行情恢复结算" onConfirm={(reason) => settle('auto', reason)} />
