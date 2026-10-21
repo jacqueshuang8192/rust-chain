@@ -10062,3 +10062,10 @@
 - 修改文件：`mobile/src/components/SpotHoldingCard.vue`、`mobile/src/views/TradeView.vue`、`mobile/tests/spot-holdings-presentation.test.ts`、`mobile/tests/fixtures/numeric-browser.mjs`、`.trellis/spec/mobile/backend-integration.md`及本任务记录。
 - 验证结果：最终Mobile release:gate通过896/896、类型、PWA/Tauri Web构建/制品/包体/治理；行为测试覆盖USDT过滤不改原钱包、精确估值、过期恢复和定时器清理。Ego明暗320/390/448px无横溢、只显示BTC且买单USDT余额保留，2.8总量/2.5可用/0.3冻结锁定正确、零写请求；截图已查看，最后将最新价单位移至数值下方对齐基线后重跑完整门禁通过。
 - 后续事项：保存本地提交并归档，未推送或部署，未验证生产接口/原生设备；本轮预览及Ego空间已关闭，独立Cloudflare目录和`.vite/`保留。
+
+## 2026-10-21 12:04 - 现货持仓导航栏样式优化
+
+- 完成内容：spot-account-tabs字号调整为15px/窄屏14px，优化标签间距与3px选中下划线，右侧历史入口独立44px圆角点击区域；保留48px行高、焦点状态及现有跳转行为。
+- 修改文件：`mobile/src/views/TradeView.vue`、`.trellis/tasks/10-21-refine-spot-account-navigation-tabs/`及本记录。
+- 验证结果：Mobile release:gate通过896/896、类型、PWA/Tauri Web构建/制品/包体/治理；Ego明暗320/390/448px无横溢，点击区44px、字号15/14px和选中线宽均符合预期，两张截图已查看；diff及任务校验通过。
+- 后续事项：保存本地提交并归档，未推送或部署；预览与Ego空间已关闭，保留独立Cloudflare目录与`.vite/`。

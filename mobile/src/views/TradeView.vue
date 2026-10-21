@@ -3339,8 +3339,8 @@ onBeforeUnmount(() => {
 .spot-account-tabs {
   align-items: center;
   display: grid;
-  gap: 14px;
-  grid-template-columns: auto minmax(0, 1fr) 44px;
+  gap: 24px;
+  grid-template-columns: auto auto minmax(44px, 1fr);
   min-height: 48px;
   padding: 0 16px;
 }
@@ -3351,10 +3351,10 @@ onBeforeUnmount(() => {
   border: 0;
   color: var(--muted);
   display: inline-flex;
-  font-size: 12px;
-  gap: 4px;
+  font-size: 15px;
+  gap: 6px;
   min-height: 44px;
-  min-width: 0;
+  min-width: 44px;
   padding: 0;
   position: relative;
   white-space: nowrap;
@@ -3373,17 +3373,25 @@ onBeforeUnmount(() => {
 .spot-account-tabs .active::after {
   background: var(--accent);
   border-radius: 999px;
-  bottom: 0;
+  bottom: 2px;
   content: "";
-  height: 2px;
-  left: 10px;
+  height: 3px;
+  left: 0;
   position: absolute;
-  width: 18px;
+  width: 100%;
 }
 
 .spot-account-tabs button:last-child {
   justify-content: center;
+  justify-self: end;
+  width: 44px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
 }
+
+.spot-account-tabs button:hover { color: var(--text); }
+.spot-account-tabs button:active { background: var(--surface-2); }
 
 .spot-holdings-panel {
   min-height: 232px;
@@ -5985,12 +5993,12 @@ html[data-theme='dark'] .contract-trade {
   }
 
   .spot-account-tabs {
-    gap: 8px;
+    gap: 20px;
     padding-inline: 12px;
   }
 
   .spot-account-tabs :is(button, .spot-account-current) {
-    font-size: 10px;
+    font-size: 14px;
   }
 
   .spot-holdings-context,
