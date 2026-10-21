@@ -601,3 +601,36 @@ Compact asset cards show exact total holdings plus available and frozen/locked b
 ### Next Steps
 
 - None - task complete
+
+
+## Session 77: Reference-style spot holdings
+
+**Date**: 2026-10-21
+**Task**: Reference-style spot holdings
+**Branch**: `main`
+
+### Summary
+
+Flat three-column holding rows with equity valuation, unavailable cost placeholder and latest price; hide USDT only in holdings. Exact valuation expiry and wallet isolation covered. Mobile release gate896/896 and six theme/width browser checks passed. Local commit only.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `7a53bb2` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
