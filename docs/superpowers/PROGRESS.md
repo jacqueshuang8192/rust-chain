@@ -10055,3 +10055,10 @@
 - 修改文件：`mobile/src/components/SpotHoldingCard.vue`、`mobile/src/views/TradeView.vue`、中英文消息、`mobile/tests/pencil-trading-product-selected-parity.test.ts`、`.trellis/spec/mobile/backend-integration.md`及本任务记录。
 - 验证结果：Mobile release:gate通过894/894、类型、PWA/Tauri Web构建/制品/包体/治理；原内联方案超源文件预算后提取组件解决，未提高预算。Ego明暗主题320/390/448px无页面或卡片横溢，超大余额和冻结锁定精确总量正确、零写请求，两张截图已查看。diff与任务校验通过。
 - 后续事项：保存本地提交并归档；未推送或部署，未验证生产接口/原生设备。本轮预览与Ego空间已关闭，保留独立Cloudflare任务和`.vite/`。
+
+## 2026-10-21 11:49 - 现货持仓参考图分栏与隐藏USDT
+
+- 完成内容：现货持仓改为参考图平铺币种标题、币种权益/成本价/最新价三列及余额明细；显示精确USDT估值、可用和冻结锁定。列表排除USDT但保留买单可用余额及资产页。接口无成本/PnL，成本显示—且不编造收益；估值沿用发行价格时效规则。
+- 修改文件：`mobile/src/components/SpotHoldingCard.vue`、`mobile/src/views/TradeView.vue`、`mobile/tests/spot-holdings-presentation.test.ts`、`mobile/tests/fixtures/numeric-browser.mjs`、`.trellis/spec/mobile/backend-integration.md`及本任务记录。
+- 验证结果：最终Mobile release:gate通过896/896、类型、PWA/Tauri Web构建/制品/包体/治理；行为测试覆盖USDT过滤不改原钱包、精确估值、过期恢复和定时器清理。Ego明暗320/390/448px无横溢、只显示BTC且买单USDT余额保留，2.8总量/2.5可用/0.3冻结锁定正确、零写请求；截图已查看，最后将最新价单位移至数值下方对齐基线后重跑完整门禁通过。
+- 后续事项：保存本地提交并归档，未推送或部署，未验证生产接口/原生设备；本轮预览及Ego空间已关闭，独立Cloudflare目录和`.vite/`保留。

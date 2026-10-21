@@ -2576,3 +2576,18 @@ quote/contract errors, unknown/late frames, and listed-only new-coin opportuniti
   logo fallback, and wrapping numeric columns. Keep current-pair filtering and
   loading/error/guest/empty branches in TradeView. Cards align to the top rather
   than stretching inside the panel's minimum height.
+
+### Reference-style spot holding rows
+
+- Current-pair spot holdings exclude USDT, without changing the underlying wallet
+  collection used for order balances or Assets. Cost basis is not supplied by the
+  wallet API: display an em dash and omit PnL rather than deriving fictitious costs.
+- Flat rows show equity quantity, cost placeholder and latest USDT price, followed
+  by available and frozen/locked balances. Estimated equity uses walletTotal and
+  estimateWalletAsset; missing/expired issuance prices never fall back to ticker.
+- A component-owned 10-second clock invalidates expired issuance values; clear
+  its timer on unmount. Prices use up to8 decimals; USDT valuations use2, retaining
+  tiny-nonzero thresholds. Keep localized labels and wrapping three-column layout.
+- Verify spot-holdings-presentation tests for USDT exclusion without wallet mutation,
+  exact total, expiry/recovery and timer cleanup; use numeric-browser fixture's
+  optional spot-holdings flag for isolated actual-page rendering.

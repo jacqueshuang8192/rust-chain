@@ -4,7 +4,8 @@ import { client, persistAuthTokens } from '/src/api/client.ts'
 const large = '9007199254740993.000000000000000001'
 const atom = '0.000000000000000001'
 const now = Date.now()
-const target = new URLSearchParams(location.search).get('route') || '/swap'
+const previewParams = new URLSearchParams(location.search)
+const target = previewParams.get('route') || '/swap'
 window.__numericRequests = []
 window.WebSocket = class extends EventTarget {
   readyState = 0
@@ -43,7 +44,7 @@ client.defaults.adapter = async (config) => {
     amount: large, interest_rate: atom, term_days: 7, collateral_amount: null, status: 'disbursed',
     interest_amount: atom, repayment_amount: large, due_at: now + 604_800_000, created_at: now,
   }] }
-  else if (path.endsWith('/wallet/accounts')) data = { accounts: [wallet] }
+  else if (path.endsWith('/wallet/accounts')) data = { accounts: previewParams.has('spot-holdings') ? [wallet, { ...wallet, asset_id: 2, symbol: 'BTC', available: '2.5', frozen: '0.1', locked: '0.2', issuance_valuation: { price_usdt: '83141.24', expires_at: now + 120000 } }] : [wallet] }
   else if (path.endsWith('/margin/wallets')) data = { wallets: [], positions: [], cross_accounts: [] }
   else if (path.endsWith('/prediction/config')) data = { allowed_assets: [{ asset_id: 1, asset_symbol: 'USDT', max_payout_amount: large }] }
   else if (path.endsWith('/prediction/markets')) data = { markets: [{

@@ -254,6 +254,7 @@ const isFavorite = computed(() => marketFavorites.isFavorite(pairSymbol.value))
 const favoriteSaving = computed(() => marketFavorites.isPending(pairSymbol.value))
 const spotVisibleBalances = computed(() => spotWallets.value.filter((wallet) => (
   [baseAsset.value, quoteAsset.value].includes(wallet.symbol)
+  && wallet.symbol !== 'USDT'
   && wallet.availableText && wallet.frozenText && wallet.lockedText
   && hasBalance(wallet.availableText, wallet.frozenText, wallet.lockedText)
 )))
