@@ -183,8 +183,8 @@ pub(crate) struct SecondsContractOrderInsert {
     pub(crate) duration_seconds: u32,
     /// 该周期的赔率快照，结算时按此值而非产品当前配置计算赔付。
     pub(crate) payout_rate: BigDecimal,
-    /// 下单时固化的交易对价格精度，受控判定价按它换算尾数步长。
-    pub(crate) price_precision: i32,
+    /// 下单时固化的交易对价格精度，受控判定价按它换算尾数步长；列定义为 `INT UNSIGNED`。
+    pub(crate) price_precision: u32,
     /// 服务端从行情缓存取得的开仓价，客户端上送值一律不采纳。
     pub(crate) entry_price: BigDecimal,
     /// 下单幂等键，与用户编号共同构成唯一约束，是防重复扣款的依据。

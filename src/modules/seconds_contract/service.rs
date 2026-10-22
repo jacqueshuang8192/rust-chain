@@ -412,15 +412,23 @@ pub(crate) fn normalize_control_result(value: &str) -> AppResult<Option<String>>
     }
 }
 
+/// 校验交易对价格精度落在受支持的 0 到 18 位之间。
+/// 越界属于交易对配置错误，返回内部错误而不是截断或套用固定精度，避免判定价尾数被静默改口径。
+pub(crate) fn validate_price_precision(price_precision: i32) -> AppResult<()> {
+    if (0..=18).contains(&price_precision) {
+        Ok(())
+    } else {
+        Err(AppError::Internal(
+            "seconds contract pair price precision is invalid".to_owned(),
+        ))
+    }
+}
+
 /// 由交易对价格精度换算出最小价格步长，即 `10^-price_precision`。
 /// 受控判定价只允许在开仓价上偏移这个步长的整数倍，保证写入的仍是该交易对可表示的有效价格。
 /// 精度越界属于交易对配置错误，返回内部错误而不是用固定步长兜底。
 pub(crate) fn price_step_for_precision(price_precision: i32) -> AppResult<BigDecimal> {
-    if !(0..=18).contains(&price_precision) {
-        return Err(AppError::Internal(
-            "seconds contract pair price precision is invalid".to_owned(),
-        ));
-    }
+    validate_price_precision(price_precision)?;
     if price_precision == 0 {
         return Ok(BigDecimal::from(1i64));
     }

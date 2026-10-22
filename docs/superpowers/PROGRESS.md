@@ -1,3 +1,10 @@
+## 2026-10-23 03:06 - 修复秒合约结算读取订单价格精度解码失败
+
+- 完成内容：线上秒合约结算持续失败，报 `decoding column 0: mismatched types; Rust type core::option::Option<i32> (as SQL type INT) is not compatible with SQL type INT UNSIGNED`，扫描数 1、失败数 1、按重试时间反复重排。原因是迁移 0157 的 `seconds_contract_orders.price_precision` 定义为 `INT UNSIGNED`，读取却按有符号 `Option<i32>` 解码。现改为显式 `CAST(price_precision AS SIGNED)` 后用 `Option<i64>` 解码并收敛为业务精度，读取口径不再依赖列的符号属性；开仓写入侧按无符号定义绑定，并新增 0..18 精度范围校验，越界在开仓阶段即拒绝而不是留到结算。
+- 修改文件：`src/modules/seconds_contract/{infrastructure.rs,repository.rs,application.rs,service.rs}`、`.trellis/spec/backend/seconds-contracts.md`、`docs/superpowers/PROGRESS.md`。
+- 验证结果：`cargo check --all-targets --all-features`、严格 Clippy、`cargo test --lib seconds_contract` 21/21、`cargo fmt --all -- --check` 通过。本机无 `DATABASE_URL`，未在真实 MySQL 上复现该查询；修复依据是列定义与 sqlx 类型映射，部署后需看结算日志确认解码错误消失。
+- 后续事项：部署后确认订单 51 等失败单在重试中正常结算；若仍有同类解码错误，按同一思路排查其余 UNSIGNED 列。
+
 ## 2026-10-22 06:27 - 秒合约控单尾数按交易对精度固化到订单
 
 - 完成内容：受控判定价的尾数步长改为按「该单下单时固化的交易对价格精度」计算，而不是结算时临时读取交易对当前配置。迁移 0157 为 `seconds_contract_orders` 增加 `price_precision`；开仓锁定产品时一并读取 `trading_pairs.price_precision` 并写入订单快照；自动结算与后台人工结算都优先用订单快照换算 `10^-price_precision`，只有迁移前落库、快照为空的存量订单才回落到交易对当前精度。这样每个交易对的尾数各自不同且与该单下单时一致，后台调整价格精度也不会改变已开仓订单的判定价口径。
@@ -10118,3 +10125,31 @@
 - 修改文件：`mobile/src/components/SpotHoldingCard.vue`、本任务目录及本记录。
 - 验证结果：Mobile release:gate通过896/896、类型、PWA/Tauri Web构建/制品/预算/治理，diff与任务上下文检查通过；仅删除两条边框声明，未重拍截图。
 - 后续事项：保存本地提交并归档，未推送或部署；独立Cloudflare目录与`.vite/`保留。
+
+## 2026-10-22 18:36 - 秒合约持续待结算初步排查
+
+- 完成内容：核对自动结算启动、到期扫描、Redis 报价、失败重试及前端对账链路；尚未确认实际故障原因，保存可继续排查的任务与证据。未修改业务代码或生产数据。
+- 修改文件：`.trellis/tasks/10-22-diagnose-seconds-orders-stuck-pending-settlement/prd.md`、该任务 `research/diagnosis.md`、本记录。
+- 验证结果：移动端/PC 秒合约对账相关 Node 测试 14/14 通过；本地 Docker daemon 不可连接，未执行真实 MySQL/Redis 结算集成测试，未验证线上恢复。
+- 后续事项：取得受影响订单号、币种、环境及结算错误日志后定位并修复；任务保持 planning，未提交、推送或部署。
+
+## 2026-10-23 00:00 - 秒合约代理控制关联排查（时间未采集）
+
+- 完成内容：根据用户线上控制变更线索，确认代理指定输赢配置参与自动结算及判定价格计算；仍缺实际错误日志，未确认根因。
+- 修改文件：当前秒合约排查任务 prd.md、research/diagnosis.md、本记录。
+- 验证结果：只读核对 worker、代理控制路由及应用层引用；无业务代码改动，未新增运行测试或验证线上恢复。
+- 后续事项：明确修改配置还是部署代码，取得结算 error；限定后续修复为真实行情结算及依赖一致性，不增强指定输赢或改价能力。
+
+## 2026-10-23 02:33 - 代理后台持续待结算场景确认
+
+- 完成内容：确认修改代码部署后，代理后台整页刷新仍待结算；核对倒计时、页面缓存和迁移启动方式，页面自动刷新不足以解释本次问题。未修改业务代码。
+- 修改文件：秒合约诊断任务 prd.md、research/diagnosis.md、本记录。
+- 验证结果：web 下执行 npm test -- --run src/shared/SecondsOrderCountdown.test.tsx src/agent/TeamOrdersPage.test.tsx src/agent/UserPortfolioPage.test.tsx，3 文件 35/35 通过；git diff --check 通过。未验证线上实际订单与数据库。
+- 后续事项：获取 API 结算错误和迁移容器日志，确认普通结算链路的部署一致性；无提交、推送或部署。
+
+## 2026-10-23 02:46 - 定位订单51结算类型不匹配
+
+- 完成内容：用户线上日志与订单精度字段定义、Rust读取和worker调用位置吻合，确认有符号/无符号解码错误会在结算写入前中断并重试。
+- 修改文件：秒合约诊断任务 prd.md、research/diagnosis.md、本记录。
+- 验证结果：静态核对迁移0157与读取函数；git diff --check通过。无业务代码修改，未执行真实数据库回归，未验证线上恢复。
+- 后续事项：不恢复指定输赢/改价能力，可继续处理真实行情结算路径；未提交、推送、部署。

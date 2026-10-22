@@ -963,19 +963,30 @@ pub(crate) async fn load_pair_price_precision(
 }
 
 /// 读取订单在下单时固化的交易对价格精度，供受控判定价换算尾数步长。
+/// 该列定义为 `INT UNSIGNED`，这里显式 `CAST(... AS SIGNED)` 再按有符号整数解码，
+/// 使读取口径不依赖列的符号属性，避免列类型与 Rust 类型不匹配导致整批结算解码失败。
 /// 存量订单该列为空时返回 `None`，由调用方回落到交易对当前精度，而不是用固定精度兜底。
 /// 只读当前行值，调用方应已持有订单行锁，避免读到与结算价不一致的精度快照。
 pub(crate) async fn select_order_price_precision(
     tx: &mut Transaction<'_, MySql>,
     order_id: u64,
 ) -> AppResult<Option<i32>> {
-    Ok(sqlx::query_scalar::<_, Option<i32>>(
-        "SELECT price_precision FROM seconds_contract_orders WHERE id = ?",
+    let stored = sqlx::query_scalar::<_, Option<i64>>(
+        "SELECT CAST(price_precision AS SIGNED) FROM seconds_contract_orders WHERE id = ?",
     )
     .bind(order_id)
     .fetch_optional(&mut **tx)
     .await?
-    .flatten())
+    .flatten();
+    stored
+        .map(|value| {
+            i32::try_from(value).map_err(|_| {
+                AppError::Internal(
+                    "seconds contract order price precision is out of range".to_owned(),
+                )
+            })
+        })
+        .transpose()
 }
 
 /// 在开仓事务内插入订单行并返回自增主键，状态硬编码为 `opened`，结算价与结果留空待到期填写。

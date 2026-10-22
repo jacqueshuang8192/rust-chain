@@ -719,7 +719,9 @@ strict receipt validation; both locale families and ledger mappers are checked.
   precision 2, `down` plus `loss` gives `65532.44 + n × 0.01`). The step is
   taken from the pair price precision snapshotted on the order at open time
   (`seconds_contract_orders.price_precision`); rows written before that snapshot
-  existed fall back to the pair's current precision. The client never
+  existed fall back to the pair's current precision. That column is
+  `INT UNSIGNED`, so the read path casts it to signed before decoding — a
+  decoding failure there aborts the whole settlement batch. The client never
   sees a price that contradicts the result, while `settlement_market_price`
   keeps the real quote for reconciliation.
 - Both the automatic worker and manual settlement use the same resolution

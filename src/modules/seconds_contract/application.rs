@@ -40,8 +40,8 @@ use super::{
         publish_seconds_contract_order_opened_event_if_needed,
         publish_seconds_contract_order_settled_event_if_needed, required_reason,
         resolve_settlement_outcome, route_limit, route_offset, settlement_payout_amount,
-        validate_create_product_request, validate_product_stake, validate_stake_amount,
-        validate_update_product_request,
+        validate_create_product_request, validate_price_precision, validate_product_stake,
+        validate_stake_amount, validate_update_product_request,
     },
 };
 pub(crate) mod refund;
@@ -438,6 +438,11 @@ pub(crate) async fn open_order(
         )))
         .ok_or_else(|| AppError::Validation("seconds expiry exceeds timestamp range".to_owned()))?;
     crate::time::ensure_timestamp_storage(&expires_at, "seconds expires_at")?;
+    // 价格精度随订单固化，先确认它落在受支持范围，再按订单列的无符号定义写入。
+    validate_price_precision(product.pair_price_precision)?;
+    let price_precision = u32::try_from(product.pair_price_precision).map_err(|_| {
+        AppError::Internal("seconds contract pair price precision is out of range".to_owned())
+    })?;
     let order = SecondsContractOrderInsert {
         user_id,
         product_id: product.id,
@@ -447,7 +452,7 @@ pub(crate) async fn open_order(
         stake_amount: request.stake_amount.clone(),
         duration_seconds: product.duration_seconds,
         payout_rate: product.payout_rate.clone(),
-        price_precision: product.pair_price_precision,
+        price_precision,
         entry_price,
         idempotency_key,
         expires_at,
