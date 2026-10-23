@@ -738,3 +738,36 @@ Removed cost price, aligned two-column holding metrics and secondary balances, t
 ### Next Steps
 
 - 部署前解决已记录门禁，并配置节点/地址、执行迁移和逐网络实链验收。
+
+
+## Session 81: Unified recharge redesign and local validation
+
+**Date**: 2026-10-23
+**Task**: Unified recharge redesign and local validation
+**Branch**: `main`
+
+### Summary
+
+Unified quick and on-chain recharge workspaces; direct per-network address imports and migration 0160; retired permanent allocation and observation credit. MySQL, route, withdrawal, frontend and browser regressions passed. Existing Web total JS budget remains over limit. No remote push, production deployment or live-chain transfer.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6e9c946` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

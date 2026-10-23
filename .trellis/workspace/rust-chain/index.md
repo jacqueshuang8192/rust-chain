@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 80
+- **Total Sessions**: 81
 - **Last Active**: 2026-10-23
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~740 | Active |
+| `journal-2.md` | ~773 | Active |
 | `journal-1.md` | ~1985 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 81 | 2026-10-23 | Unified recharge redesign and local validation | `6e9c946` | `main` |
 | 80 | 2026-10-23 | 限时链上充值实现与提交推送 | `c453041` | `main` |
 | 79 | 2026-10-21 | Simplify spot holding layout without dividers | `f1d1eca`, `49dfd18` | `main` |
 | 78 | 2026-10-21 | Spot account tabs styling | `6000b84` | `main` |
