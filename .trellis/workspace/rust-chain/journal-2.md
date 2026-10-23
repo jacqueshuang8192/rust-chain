@@ -771,3 +771,36 @@ Unified quick and on-chain recharge workspaces; direct per-network address impor
 ### Next Steps
 
 - None - task complete
+
+
+## Session 82: Recharge configuration and agent funding records
+
+**Date**: 2026-10-24
+**Task**: Recharge configuration and agent funding records
+**Branch**: `main`
+
+### Summary
+
+Implemented independent multi-asset chain recharge editors and subtree-scoped agent deposit/withdrawal records. Verified Web 1164 tests, type/lint/build, Rust check/fmt/production Clippy, isolated MySQL and real browser desktop/narrow flows. Existing JS budget and unrelated full agent-suite failures documented. Archived current task; no push, deployment or live-chain transfer.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `bb0111a` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
