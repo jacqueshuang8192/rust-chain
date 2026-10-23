@@ -49,6 +49,6 @@
 
 Mobile/PC 真实 SFC 行为测试及本地浏览器页面使用隔离响应。Mobile 完整 release gate、PC 类型与构建通过。Web 类型、lint、全量/新增定向行为、策略、覆盖率和最终构建通过，包体预算仍是发布阻塞：本次 2,743,238 bytes，独立 HEAD 基线 2,721,886 bytes，限制 2,600,000 bytes；本次增加 21,352 bytes，未提高后台预算。
 
-后端生产 lib/bins 严格 Clippy 与架构/文档检查通过；全目标严格 Clippy 被既有秒合约测试的 `cmp_owned` 阻塞，`numeric_contract` 被既有新币 `TradeQuote` 字段阻塞。本次未改这些无关功能，详细命令与结果见[任务交付记录](../../.trellis/tasks/10-23-timed-chain-deposits/research/delivery.md)。
+后端生产 lib/bins 严格 Clippy 与架构/文档检查通过；全目标严格 Clippy 被既有秒合约测试的 `cmp_owned` 阻塞，`numeric_contract` 被既有新币 `TradeQuote` 字段阻塞。本次未改这些无关功能，详细命令与结果见[任务交付记录](../../.trellis/tasks/archive/2026-10/10-23-timed-chain-deposits/research/delivery.md)。
 
-上线前仍需配置真实地址/节点，并在受控环境逐网络验证实际转账、确认数、到账延迟、断线续扫和人工核对。本次没有提交、推送或生产部署。
+上线前仍需配置真实地址/节点，并在受控环境逐网络验证实际转账、确认数、到账延迟、断线续扫和人工核对。实现已按用户授权提交，推送核验见 `PROGRESS.md`；本次未进行生产部署。

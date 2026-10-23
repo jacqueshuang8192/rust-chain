@@ -79,7 +79,7 @@
 
 ## Delivery Status
 
-- 实现及本地业务验收完成；任务未提交/归档，保持 in_progress 记录未完成发布事项。
+- 实现及本地业务验收完成；已按用户授权保存功能提交 `c453041` 并归档实现任务。推送核验另记于 `docs/superpowers/PROGRESS.md`；归档不代表已部署或完成实链验收。
 - 真实节点与真实转账尚未验收。Tron 仅 TRC20，原生 TRX 暂不开放；Solana 仅经典 SPL；EVM 原生币依赖 callTracer。
 - 三项仓库既有门禁仍需单独解决：Web 总包体、秒合约测试 Clippy、新币金额 DTO guard；详见交付记录，未修改无关功能。
 - 部署配置说明：docs/superpowers/timed-chain-deposits.md。
