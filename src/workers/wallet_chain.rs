@@ -11,7 +11,7 @@ use crate::{
     error::{AppError, AppResult},
     infra::secrets::decrypt_optional_secret,
     modules::wallet::{
-        application::{normalize_deposit_network, observe_deposit},
+        application::normalize_deposit_network,
         infrastructure::{
             HttpWalletChainGateway, NewWalletChainEventDeadLetter, confirm_withdrawal_in_tx,
             insert_wallet_chain_event_dead_letter, insert_withdrawal_broadcast_audit_in_tx,
@@ -21,7 +21,6 @@ use crate::{
             mark_withdrawal_unknown_broadcast_in_tx, release_authoritatively_not_accepted_in_tx,
             schedule_withdrawal_after_not_accepted_in_tx, update_withdrawal_chain_progress_in_tx,
         },
-        presentation::ObserveDepositRequest,
         repository::{
             WalletChainBroadcastCommand, WalletChainDepositObservation, WalletChainGateway,
             WalletChainGatewayError, WalletChainGatewayErrorClass,
@@ -222,26 +221,9 @@ pub async fn run_once_with_gateway(
             continue;
         }
         for observation in &page.deposits {
-            match process_deposit_observation(pool, &expected_network, observation).await {
-                Ok(()) => summary.deposit_observed += 1,
-                Err(error) if is_transient_chain_event_error(&error) => {
-                    page_failed = true;
-                    summary.gateway_failed += 1;
-                    warn!(
-                        network = %expected_network,
-                        tx_hash = %observation.tx_hash,
-                        event_index = observation.event_index,
-                        %error,
-                        "链上充值事件处理失败，停页等待重试"
-                    );
-                    break;
-                }
-                Err(error) => {
-                    dead_letter_deposit_observation(pool, &chain_gateway, observation, &error)
-                        .await?;
-                    summary.event_dead_lettered += 1;
-                }
-            }
+            let error = AppError::Validation("legacy deposits are retired; on-chain deposits require scanner evidence and an order".into());
+            dead_letter_deposit_observation(pool, &chain_gateway, observation, &error).await?;
+            summary.event_dead_lettered += 1;
         }
         if !page_failed && let Some(cursor) = page.next_cursor {
             update_gateway_cursor(pool, chain_gateway.id, &cursor).await?;
@@ -985,42 +967,6 @@ async fn process_withdrawal_observation(
         }
     }
     tx.commit().await?;
-    Ok(())
-}
-
-/// 规范化链网关充值回执并调用钱包充值观察用例，把网关侧的字符串金额转成定点数后交给幂等入账。
-/// 回执网络先归一再与网关配置网络比对，不一致返回冲突，避免把某条链的到账记到另一条链的地址上。
-/// 金额解析失败返回校验错误，属于确定性拒绝，会由调用方写入死信而不是无限重试。
-/// 链事件唯一键由网络、交易哈希和事件序号构成，重放去重与确认阈值判定都在钱包上下文内完成。
-/// 入账事务由钱包上下文持有，本函数不加锁、不改余额，也不判断确认数是否达标。
-async fn process_deposit_observation(
-    pool: &Pool<MySql>,
-    expected_network: &str,
-    observation: &WalletChainDepositObservation,
-) -> AppResult<()> {
-    let observed_network = normalize_deposit_network(&observation.network)?;
-    if observed_network != expected_network {
-        return Err(AppError::Conflict(format!(
-            "deposit event network {observed_network} does not match gateway {expected_network}"
-        )));
-    }
-    let amount = crate::numeric::parse_decimal_input(&observation.amount)
-        .map_err(|_| AppError::Validation("wallet gateway deposit amount is invalid".to_owned()))?;
-    observe_deposit(
-        pool,
-        ObserveDepositRequest {
-            asset_symbol: observation.asset_symbol.clone(),
-            network: observed_network,
-            address: observation.address.clone(),
-            memo: observation.memo.clone(),
-            tx_hash: observation.tx_hash.clone(),
-            event_index: observation.event_index,
-            amount,
-            block_height: observation.block_height,
-            confirmations: observation.confirmations,
-        },
-    )
-    .await?;
     Ok(())
 }
 

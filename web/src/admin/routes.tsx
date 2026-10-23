@@ -21,11 +21,13 @@ function resourceRoute(path: string, resourceKey: ResourceConfigKey): RouteObjec
         : resourceKey === 'secondsOrders' || resourceKey === 'marginPositions'
           ? (await import('./resources/TradingResourcePage')).TradingResourcePage
           : ResourcePage;
+      const Recharge = resourceKey === 'walletDeposits' || resourceKey === 'quickRechargeOrders'
+        ? (await import('./deposits/RechargeWorkspace')).RechargeWorkspace : null;
       return {
         Component: function AdminResourceRoute() {
           return (
             <AdminPermissionBoundary permission={permission}>
-              <Page config={resourceConfigs[resourceKey]} />
+              {Recharge ? <Recharge kind={resourceKey === 'quickRechargeOrders' ? 'quick' : 'chain'}><Page config={resourceConfigs[resourceKey]} /></Recharge> : <Page config={resourceConfigs[resourceKey]} />}
             </AdminPermissionBoundary>
           );
         }
@@ -56,6 +58,14 @@ function guardedLazyRoute(path: string, load: () => Promise<ComponentType>): Rou
       };
     }
   };
+}
+
+function rechargeRoute(path: string, kind: 'chain' | 'quick', load: () => Promise<ComponentType>): RouteObject {
+  return guardedLazyRoute(path, async () => {
+    const Page = await load();
+    const { RechargeWorkspace } = await import('./deposits/RechargeWorkspace');
+    return function RechargePage() { return <RechargeWorkspace kind={kind}><Page /></RechargeWorkspace>; };
+  });
 }
 
 export const adminRoutes: RouteObject[] = [
@@ -106,16 +116,21 @@ export const adminRoutes: RouteObject[] = [
   guardedLazyRoute('home/carousel', async () => (await import('./actions/HomeCarouselPage')).HomeCarouselPage),
   resourceRoute('assets', 'assets'),
   resourceRoute('wallet/accounts', 'walletAccounts'),
-  resourceRoute('wallet/deposit-network-configs', 'depositNetworkConfigs'),
-  resourceRoute('wallet/deposit-address-pool', 'depositAddressPool'),
-  guardedLazyRoute(
-    'wallet/quick-recharge',
-    async () => (await import('./actions/QuickRechargeConfigPage')).QuickRechargeConfigPage
-  ),
-  resourceRoute('wallet/quick-recharge-orders', 'quickRechargeOrders'),
-  guardedLazyRoute('wallet/deposit-settings', async () => (await import('./deposits/DepositSettingsPage')).DepositSettingsPage),
-  guardedLazyRoute('wallet/deposit-receipts', async () => (await import('./deposits/DepositReviewPage')).DepositReviewPage),
-  resourceRoute('wallet/deposits', 'walletDeposits'),
+  resourceRoute('wallet/withdrawal-networks', 'depositNetworkConfigs'),
+  rechargeRoute('wallet/quick-recharge', 'quick', async () => (await import('./actions/QuickRechargeConfigPage')).QuickRechargeConfigPage),
+  resourceRoute('wallet/quick-recharge/orders', 'quickRechargeOrders'),
+  rechargeRoute('wallet/chain-recharge', 'chain', async () => (await import('./deposits/DepositSettingsPage')).DepositSettingsPage),
+  rechargeRoute('wallet/chain-recharge/addresses', 'chain', async () => (await import('./deposits/DepositSettingsPage')).DepositSettingsPage),
+  rechargeRoute('wallet/chain-recharge/records', 'chain', async () => (await import('./deposits/DepositReviewPage')).DepositReviewPage),
+  resourceRoute('wallet/chain-recharge/ledger', 'walletDeposits'),
+  ...[
+    ['deposit-network-configs', 'withdrawal-networks'],
+    ['deposit-address-pool', 'chain-recharge/addresses'],
+    ['deposit-settings', 'chain-recharge'],
+    ['deposit-receipts', 'chain-recharge/records'],
+    ['deposits', 'chain-recharge/ledger'],
+    ['quick-recharge-orders', 'quick-recharge/orders']
+  ].map(([old, current]) => ({ path: `wallet/${old}`, element: <Navigate to={`/admin/wallet/${current}`} replace /> })),
   resourceRoute('wallet/withdrawals', 'walletWithdrawals'),
   guardedLazyRoute('wallet/withdrawal-policies', async () => (await import('./actions/WithdrawalPolicyPage')).WithdrawalPolicyPage),
   resourceRoute('wallet/ledger', 'walletLedger'),

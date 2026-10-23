@@ -59,7 +59,7 @@ struct Block {
 
 /// 各网络独立认领持久租约并并行读取；单网失败记录脱敏原因，其他网络继续，未处理完绝不推进游标。
 pub(crate) async fn run_once(pool: &Pool<MySql>, key: Option<&str>) -> AppResult<u64> {
-    let configs=sqlx::query_as::<_,ScannerConfig>("SELECT network,endpoint_encrypted,api_key_encrypted,confirmations,revision,cursor_json FROM wallet_deposit_scanners WHERE enabled=TRUE AND endpoint_encrypted IS NOT NULL ORDER BY network").fetch_all(pool).await?;
+    let configs=sqlx::query_as::<_,ScannerConfig>("SELECT network,endpoint_encrypted,api_key_encrypted,confirmations,revision,cursor_json FROM wallet_deposit_scanners WHERE endpoint_encrypted IS NOT NULL ORDER BY network").fetch_all(pool).await?;
     let results = stream::iter(
         configs
             .into_iter()

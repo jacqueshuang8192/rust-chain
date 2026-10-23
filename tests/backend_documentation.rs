@@ -46,8 +46,12 @@ const HIGH_RISK_ENTRY_POINTS: &[(&str, &str)] = &[
         "confirm_withdrawal_in_tx",
     ),
     (
-        "src/modules/wallet/infrastructure/deposits.rs",
-        "observe_deposit_event",
+        "src/modules/wallet/infrastructure/timed_deposits/settlement.rs",
+        "observe_scanned",
+    ),
+    (
+        "src/modules/wallet/infrastructure/timed_deposits/settlement.rs",
+        "review",
     ),
     (
         "src/modules/wallet/infrastructure/deposits.rs",

@@ -150,7 +150,35 @@ pub(crate) async fn save_asset(
     storage::settings::save_asset(pool, admin_id, &request).await
 }
 
-/// 只把运营明确选中的未分配库存纳入共享模式；配置保存和审计由同一存储事务负责。
+/// 按网络规范完整地址批次后原子导入；去重不改变已有地址的启停状态，无永久用户绑定。
+pub(crate) async fn import_addresses(
+    pool: &Pool<MySql>,
+    admin_id: u64,
+    mut request: ImportSharedAddresses,
+) -> AppResult<()> {
+    request.network = super::normalize_deposit_network(&request.network)?;
+    request.reason = reason(request.reason)?;
+    if request.addresses.is_empty() || request.addresses.len() > 500 {
+        return Err(AppError::Validation(
+            "provide between 1 and 500 addresses".into(),
+        ));
+    }
+    request.addresses = request
+        .addresses
+        .iter()
+        .map(|address| canonical_address(&request.network, address).map_err(AppError::Validation))
+        .collect::<AppResult<std::collections::BTreeSet<_>>>()?
+        .into_iter()
+        .collect();
+    storage::settings::import_addresses(pool, admin_id, &request).await
+}
+
+/// 地址管理权限只读取收款地址，不借用网络配置权限或旧库存 API。
+pub(crate) async fn addresses(pool: &Pool<MySql>) -> AppResult<Vec<SharedAddressView>> {
+    storage::settings::addresses(pool).await
+}
+
+/// 仅切换已存在收款地址的准入状态；配置保存和审计由同一存储事务负责。
 pub(crate) async fn save_address(
     pool: &Pool<MySql>,
     admin_id: u64,

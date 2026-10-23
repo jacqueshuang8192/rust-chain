@@ -27,7 +27,6 @@ use super::{
         create_withdrawal_quote as create_withdrawal_quote_use_case,
         create_withdrawal_request as create_withdrawal_request_use_case,
         fail_withdrawal as fail_withdrawal_use_case,
-        get_or_assign_deposit_address as get_or_assign_deposit_address_use_case,
         get_return_history as get_return_history_use_case,
         get_today_return as get_today_return_use_case,
         list_admin_deposits as list_admin_deposits_use_case,
@@ -38,18 +37,17 @@ use super::{
         list_wallet_accounts as list_wallet_accounts_use_case,
         list_wallet_ledger as list_wallet_ledger_use_case,
         list_withdraw_assets as list_withdraw_assets_use_case, mysql_pool,
-        normalize_deposit_networks_query_asset, observe_deposit as observe_deposit_use_case,
-        reject_withdrawal as reject_withdrawal_use_case,
+        normalize_deposit_networks_query_asset, reject_withdrawal as reject_withdrawal_use_case,
         reverse_deposit as reverse_deposit_use_case, validate_return_history_days,
     },
     presentation::{
         AdminWalletListQuery, AdminWalletWithdrawalsResponse, BroadcastWithdrawalRequest,
         ConfirmWithdrawalRequest, CreateWithdrawalQuoteRequest, CreateWithdrawalRequest,
-        DepositAddressRequest, DepositAddressResponse, DepositAssetsResponse, DepositNetworksQuery,
-        DepositNetworksResponse, FailWithdrawalRequest, ObserveDepositRequest, ReturnHistoryQuery,
-        ReturnHistoryResponse, ReverseDepositRequest, ReviewWithdrawalRequest, TodayReturnResponse,
-        WalletAccountsResponse, WalletDepositEventResponse, WalletDepositsResponse,
-        WalletLedgerQuery, WalletLedgerResponse, WalletWithdrawalQuery, WalletWithdrawalResponse,
+        DepositAssetsResponse, DepositNetworksQuery, DepositNetworksResponse,
+        FailWithdrawalRequest, ReturnHistoryQuery, ReturnHistoryResponse, ReverseDepositRequest,
+        ReviewWithdrawalRequest, TodayReturnResponse, WalletAccountsResponse,
+        WalletDepositEventResponse, WalletDepositsResponse, WalletLedgerQuery,
+        WalletLedgerResponse, WalletWithdrawalQuery, WalletWithdrawalResponse,
         WalletWithdrawalsResponse, WithdrawalQuoteResponse, WithdrawalRequestResponse,
     },
 };
@@ -71,10 +69,6 @@ pub fn routes() -> Router<AppState> {
         .route("/wallet/deposit-assets", get(list_deposit_assets))
         .route("/wallet/deposit-networks", get(list_deposit_networks))
         .route("/wallet/withdraw-assets", get(list_withdraw_assets))
-        .route(
-            "/wallet/deposit-address",
-            post(get_or_assign_deposit_address),
-        )
         .route(
             "/wallet/withdrawals",
             get(list_user_withdrawals).post(create_withdrawal_request),
@@ -99,23 +93,7 @@ pub fn admin_routes() -> Router<AppState> {
         .route("/wallet/withdrawals/:id/confirm", post(confirm_withdrawal))
         .route("/wallet/withdrawals/:id/fail", post(fail_withdrawal))
         .route("/wallet/deposits", get(list_admin_deposits))
-        .route("/wallet/deposits/observe", post(observe_deposit))
         .route("/wallet/deposits/:id/reverse", post(reverse_deposit))
-}
-
-/// 处理充值地址申请：解析令牌用户，把资产与网络交给分配用例，返回复用或新分配的地址。
-/// 用例内部保证同一用户同一地址组不会轮换地址，因此重复调用通常返回同一条记录。
-/// 地址池耗尽会由用例返回未找到，路由层不做重试也不降级到其他网络。
-async fn get_or_assign_deposit_address(
-    UserAuth(claims): UserAuth,
-    State(state): State<AppState>,
-    Json(request): Json<DepositAddressRequest>,
-) -> AppResult<Json<DepositAddressResponse>> {
-    let user_id = user_id_from_subject(&claims.sub)?;
-    let pool = mysql_pool(&state)?;
-    let address = get_or_assign_deposit_address_use_case(&pool, user_id, request).await?;
-
-    Ok(Json(address))
 }
 
 /// 返回可充值资产清单。这里只校验令牌合法性并丢弃解析出的用户编号，因为资产配置对所有登录用户一致。
@@ -376,20 +354,6 @@ async fn list_admin_deposits(
 ) -> AppResult<Json<WalletDepositsResponse>> {
     Ok(Json(
         list_admin_deposits_use_case(&mysql_pool(&state)?, query).await?,
-    ))
-}
-
-/// 后台手工上报一笔链上充值观测，与链网关 worker 走完全相同的幂等入账用例。
-/// 事件身份由网络、交易哈希和事件序号唯一确定，重复上报只单调推进确认数，达到阈值时才首次增加可用余额。
-/// 同一身份若带着不同地址、金额或备注再次上报，会返回冲突而不是覆盖既有事件。
-/// 请求体不含用户编号，入账对象由链上地址反查已分配用户决定，因此地址未分配时直接返回未找到。
-async fn observe_deposit(
-    AdminAuth(_claims): AdminAuth,
-    State(state): State<AppState>,
-    Json(request): Json<ObserveDepositRequest>,
-) -> AppResult<Json<WalletDepositEventResponse>> {
-    Ok(Json(
-        observe_deposit_use_case(&mysql_pool(&state)?, request).await?,
     ))
 }
 

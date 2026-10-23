@@ -549,66 +549,21 @@ describe('resourceConfigs create actions', () => {
     });
   });
 
-  it('configures the deposit address pool without internal ID columns', () => {
-    const config = resourceConfigs.depositAddressPool;
-    const columnKeys = config.columns.map((column) => column.key);
-
-    expect(config.title).toBe('充值地址池');
-    expect(config.endpoint).toBe('/admin/api/v1/deposit-address-pool');
-    expect(config.responseKey).toBe('addresses');
-    expect(config.showJsonAction).toBe(false);
-    expectFilter(config, 'address_group_code', { label: '地址集合编号' });
-    expectFilter(config, 'network', {
-      label: '网络',
-      type: 'select',
-      options: [
-        { label: 'ETH', value: 'eth' },
-        { label: 'Base', value: 'base' },
-        { label: 'Tron', value: 'tron' },
-        { label: 'BTC', value: 'btc' },
-        { label: 'Solana', value: 'solana' }
-      ]
-    });
-    expectFilter(config, 'status', {
-      label: '状态',
-      type: 'select',
-      options: [
-        { label: '可用', value: 'available' },
-        { label: '已分配', value: 'assigned' },
-        { label: '禁用', value: 'disabled' }
-      ]
-    });
-    expect(columnKeys).toEqual([
-      'network',
-      'address_group_code',
-      'address',
-      'asset_symbols',
-      'status',
-      'assigned_user_email',
-      'assigned_asset_symbol',
-      'assigned_at',
-      'memo',
-      'remark',
-      'updated_at'
-    ]);
-    expect(columnKeys).not.toContain('id');
-    expect(columnKeys).not.toContain('assigned_user_id');
-  });
 
   it('configures deposit network configs for dynamic address groups', () => {
     const config = resourceConfigs.depositNetworkConfigs;
     const columnKeys = config.columns.map((column) => column.key);
 
-    expect(config.title).toBe('充值网络配置');
+    expect(config.title).toBe('提现网络配置');
     expect(config.endpoint).toBe('/admin/api/v1/deposit-network-configs');
     expect(config.responseKey).toBe('configs');
     expect(config.showJsonAction).toBe(false);
     expectFilter(config, 'network', { label: '网络', type: 'select' });
-    expectFilter(config, 'address_group_code', { label: '地址集合编号' });
+    expect(config.filters.some((filter) => filter.key === 'address_group_code')).toBe(false);
     expectFilter(config, 'asset_symbol', { label: '资产符号' });
     expect(columnKeys).toContain('network');
     expect(columnKeys).toContain('display_name');
-    expect(columnKeys).toContain('address_group_code');
+    expect(columnKeys).not.toContain('address_group_code');
     expect(columnKeys).toContain('asset_symbols');
     expect(columnKeys).toContain('status');
   });
@@ -1349,168 +1304,8 @@ describe('resourceConfigs create actions', () => {
     );
   });
 
-  it('creates deposit address pool entries with Semi form controls', async () => {
-    const user = userEvent.setup();
-    render(<ResourcePage config={resourceConfigs.depositAddressPool} />);
 
-    await user.click(await screen.findByRole('button', { name: '添加充值地址' }));
-    const dialog = await findActionSheet('添加充值地址');
-    expectCreateModalSize(dialog, 'extra-wide');
-    expect(within(dialog).getByText('地址规则')).toBeInTheDocument();
-    expect(within(dialog).getByText('地址明细')).toBeInTheDocument();
-    expect(within(dialog).getByText('地址 1')).toBeInTheDocument();
-    await selectSemiOption(user, dialog, '网络', 'Base');
-    await selectSemiOption(user, dialog, '支持币种', 'USDT - Tether（ID: 12）');
-    expect(within(dialog).getByLabelText('地址集合编号')).toHaveValue('A');
-    fireEvent.change(within(dialog).getAllByLabelText('充值地址')[0], { target: { value: '0x1234567890abcdef1234567890abcdef12345678' } });
-    fireEvent.change(within(dialog).getAllByLabelText('Memo / Tag')[0], { target: { value: 'memo-1' } });
-    fireEvent.change(within(dialog).getAllByLabelText('备注')[0], { target: { value: 'pool address' } });
-    await user.click(within(dialog).getByRole('button', { name: '新增一行' }));
-    expect(within(dialog).getByText('地址 2')).toBeInTheDocument();
-    fireEvent.change(within(dialog).getAllByLabelText('充值地址')[1], { target: { value: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd' } });
-    fireEvent.change(within(dialog).getAllByLabelText('Memo / Tag')[1], { target: { value: 'memo-2' } });
-    fireEvent.change(within(dialog).getAllByLabelText('备注')[1], { target: { value: 'backup pool address' } });
-    await user.click(within(dialog).getByRole('button', { name: '提交添加' }));
-    fireEvent.change(await screen.findByLabelText('操作原因'), { target: { value: 'create deposit address' } });
-    await user.click(await screen.findByRole('button', { name: '确认' }));
 
-    await waitFor(() => {
-      expect(apiRequestMock).toHaveBeenCalledWith('/admin/api/v1/deposit-address-pool/batch', expect.objectContaining({ method: 'POST' }));
-    });
-    const request = apiRequestMock.mock.calls.find(([path, init]) => path === '/admin/api/v1/deposit-address-pool/batch' && init && 'method' in init)?.[1];
-    expect(request).toBeDefined();
-    expect(JSON.parse(String(request?.body))).toEqual({
-      network: 'base',
-      address_group_code: 'A',
-      asset_symbols: ['USDT'],
-      status: 'available',
-      entries: [
-        {
-          address: '0x1234567890abcdef1234567890abcdef12345678',
-          memo: 'memo-1',
-          remark: 'pool address'
-        },
-        {
-          address: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
-          memo: 'memo-2',
-          remark: 'backup pool address'
-        }
-      ],
-      reason: 'create deposit address'
-    });
-  });
-
-  it('imports deposit address pool entries from a file before submitting', async () => {
-    const user = userEvent.setup();
-    render(<ResourcePage config={resourceConfigs.depositAddressPool} />);
-
-    await user.click(await screen.findByRole('button', { name: '添加充值地址' }));
-    const dialog = await findActionSheet('添加充值地址');
-    expect(within(dialog).getByText('导入文件')).toBeInTheDocument();
-    await selectSemiOption(user, dialog, '网络', 'Tron');
-    await selectSemiOption(user, dialog, '支持币种', 'USDT - Tether（ID: 12）');
-    const fileInput = dialog.querySelector('input[type="file"]') as HTMLInputElement | null;
-    expect(fileInput).toBeInTheDocument();
-    expect(fileInput).toHaveAttribute('accept', '.csv,.txt');
-
-    const importContent = ['充值地址,Memo / Tag,备注', '0x1111111111111111111111111111111111111111,memo-a,主地址', 'TImportedAddress\tmemo-b\t备用地址'].join('\n');
-    const importFile = new File([importContent], 'deposit-addresses.csv', { type: 'text/csv' });
-    Object.defineProperty(importFile, 'text', { value: async () => importContent });
-
-    fireEvent.change(fileInput as HTMLInputElement, { target: { files: [importFile] } });
-
-    await waitFor(() => {
-      expect(within(dialog).getByText('地址 2')).toBeInTheDocument();
-    });
-    expect(within(dialog).getAllByLabelText('充值地址')[0]).toHaveValue('0x1111111111111111111111111111111111111111');
-    expect(within(dialog).getAllByLabelText('Memo / Tag')[0]).toHaveValue('memo-a');
-    expect(within(dialog).getAllByLabelText('备注')[0]).toHaveValue('主地址');
-    expect(within(dialog).getAllByLabelText('充值地址')[1]).toHaveValue('TImportedAddress');
-    expect(within(dialog).getAllByLabelText('Memo / Tag')[1]).toHaveValue('memo-b');
-    expect(within(dialog).getAllByLabelText('备注')[1]).toHaveValue('备用地址');
-
-    await user.click(within(dialog).getByRole('button', { name: '提交添加' }));
-    await user.type(await screen.findByLabelText('操作原因'), 'import deposit addresses');
-    await user.click(await screen.findByRole('button', { name: '确认' }));
-
-    await waitFor(() => {
-      expect(apiRequestMock).toHaveBeenCalledWith('/admin/api/v1/deposit-address-pool/batch', expect.objectContaining({ method: 'POST' }));
-    });
-    const request = apiRequestMock.mock.calls.find(([path, init]) => path === '/admin/api/v1/deposit-address-pool/batch' && init && 'method' in init)?.[1];
-    expect(request).toBeDefined();
-    expect(JSON.parse(String(request?.body))).toEqual({
-      network: 'tron',
-      address_group_code: 'C',
-      asset_symbols: ['USDT'],
-      status: 'available',
-      entries: [
-        {
-          address: '0x1111111111111111111111111111111111111111',
-          memo: 'memo-a',
-          remark: '主地址'
-        },
-        {
-          address: 'TImportedAddress',
-          memo: 'memo-b',
-          remark: '备用地址'
-        }
-      ],
-      reason: 'import deposit addresses'
-    });
-  });
-
-  it('shows deposit address details and reclaims assigned rows', async () => {
-    const user = userEvent.setup();
-    listAdminResourceMock.mockImplementation(async (endpoint, responseKey) => {
-      if (endpoint === '/admin/api/v1/deposit-address-pool') {
-        const rows = [
-          {
-            id: 101,
-            network: 'tron',
-            address: 'TAssignedAddress',
-            asset_symbol: null,
-            asset_symbols: [],
-            status: 'assigned',
-            assigned_user_email: 'user@example.test',
-            assigned_asset_symbol: 'USDT',
-            assigned_at: 1_700_000_000_000,
-            memo: 'memo',
-            remark: 'remark',
-            updated_at: 1_700_000_100_000
-          }
-        ];
-        return { rows, raw: { [responseKey]: rows } };
-      }
-
-      return { rows: [], raw: {} };
-    });
-    apiRequestMock.mockImplementation(async (path) => {
-      if (path === '/admin/api/v1/deposit-address-pool/101') {
-        return { id: 101, status: 'assigned', address: 'TAssignedAddress' };
-      }
-      return {};
-    });
-
-    render(<ResourcePage config={resourceConfigs.depositAddressPool} />);
-
-    expect(await screen.findByText('TAssignedAddress')).toBeInTheDocument();
-    await waitForLazyResourceActions();
-    expect(screen.getByRole('button', { name: '修改' })).toBeDisabled();
-    await user.click(screen.getByRole('button', { name: '查看详情' }));
-    await waitFor(() => {
-      expect(apiRequestMock).toHaveBeenCalledWith('/admin/api/v1/deposit-address-pool/101', { signal: expect.any(AbortSignal) });
-    });
-    await user.click(screen.getByRole('button', { name: '回收' }));
-    await user.type(await screen.findByLabelText('操作原因'), 'reclaim address');
-    await user.click(await screen.findByRole('button', { name: '确认' }));
-
-    await waitFor(() => {
-      expect(apiRequestMock).toHaveBeenCalledWith('/admin/api/v1/deposit-address-pool/101/reclaim', {
-        method: 'POST',
-        body: JSON.stringify({ reason: 'reclaim address' })
-      });
-    });
-  });
 
   it('uses dropdown filters, localized type labels, details, and safe edits on assets', async () => {
     const user = userEvent.setup();

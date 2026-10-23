@@ -24,7 +24,7 @@ fn evidence(order: &DepositOrder, value: &str) -> ChainReceipt {
         tx_hash: uuid::Uuid::now_v7().simple().to_string(),
         event_index: 0,
         asset_kind: "token".into(),
-        token_address: "0x1111111111111111111111111111111111111111".into(),
+        token_address: order.token_address.clone(),
         address: order.address.clone(),
         amount: amount(value),
         block_height: 100,
@@ -85,7 +85,7 @@ async fn timed_deposit_database_reservations_and_accounting() {
                 .last_insert_id(),
         );
     }
-    sqlx::query("UPDATE deposit_network_configs SET asset_symbols_json=NULL WHERE network='eth'")
+    sqlx::query("UPDATE deposit_network_configs SET status='disabled',asset_symbols_json=JSON_ARRAY('UNRELATED') WHERE network='eth'")
         .execute(&pool)
         .await
         .unwrap();
@@ -96,7 +96,7 @@ async fn timed_deposit_database_reservations_and_accounting() {
             network: "eth".into(),
             asset_symbol: symbol.clone(),
             asset_kind: "token".into(),
-            token_address: "0x1111111111111111111111111111111111111111".into(),
+            token_address: format!("0x{:040x}", asset + 9_000_000),
             decimals: 18,
             enabled: true,
             expected_revision: 0,
@@ -105,23 +105,113 @@ async fn timed_deposit_database_reservations_and_accounting() {
     )
     .await
     .unwrap();
-    let mut addresses = vec![];
-    for index in 0..10 {
-        let address = format!("0x{:040x}", asset * 100 + index);
-        let id=sqlx::query("INSERT INTO deposit_address_pool (network,address_group_code,address,asset_symbol) VALUES ('eth','evm',?,?)").bind(&address).bind(&symbol).execute(&pool).await.unwrap().last_insert_id();
-        app::save_address(
-            &pool,
-            admin,
-            id,
-            SaveSharedAddress {
-                enabled: true,
-                reason: "test shared inventory".into(),
-            },
-        )
+    // Only this fixture's addresses are active. New pool admission is independent of legacy inventory/configs.
+    sqlx::query("UPDATE wallet_deposit_shared_addresses SET enabled=FALSE WHERE network='eth'")
+        .execute(&pool)
         .await
         .unwrap();
-        addresses.push(id);
+    let addresses: Vec<String> = (0..10)
+        .map(|index| format!("0x{:040x}", asset * 100 + index))
+        .collect();
+    let import = || ImportSharedAddresses {
+        network: "eth".into(),
+        addresses: addresses.clone(),
+        reason: "test direct addresses".into(),
+    };
+    app::import_addresses(&pool, admin, import()).await.unwrap();
+    app::import_addresses(&pool, admin, import()).await.unwrap();
+    let stored = app::addresses(&pool).await.unwrap();
+    assert_eq!(
+        stored
+            .iter()
+            .filter(|a| a.network == "eth" && a.enabled)
+            .count(),
+        10
+    );
+    let first_id = stored
+        .iter()
+        .find(|a| a.address == addresses[0] && a.network == "eth")
+        .unwrap()
+        .pool_id;
+    app::save_address(
+        &pool,
+        admin,
+        first_id,
+        SaveSharedAddress {
+            enabled: false,
+            reason: "pause one address".into(),
+        },
+    )
+    .await
+    .unwrap();
+    app::import_addresses(&pool, admin, import()).await.unwrap();
+    assert!(
+        !app::addresses(&pool)
+            .await
+            .unwrap()
+            .iter()
+            .find(|a| a.pool_id == first_id)
+            .unwrap()
+            .enabled
+    );
+    let next = format!("0x{:040x}", asset * 100 + 99);
+    for (auditor, entries) in [
+        (admin, vec![next.clone(), "invalid".into()]),
+        (u64::MAX, vec![next.clone()]),
+    ] {
+        assert!(
+            app::import_addresses(
+                &pool,
+                auditor,
+                ImportSharedAddresses {
+                    network: "eth".into(),
+                    addresses: entries,
+                    reason: "atomic validation and audit".into()
+                }
+            )
+            .await
+            .is_err()
+        );
+        assert!(
+            !app::addresses(&pool)
+                .await
+                .unwrap()
+                .iter()
+                .any(|a| a.address == next)
+        );
     }
+    app::save_address(
+        &pool,
+        admin,
+        first_id,
+        SaveSharedAddress {
+            enabled: true,
+            reason: "resume address".into(),
+        },
+    )
+    .await
+    .unwrap();
+    // The same EVM address is independently configured on Base, never shared by legacy address groups.
+    app::import_addresses(
+        &pool,
+        admin,
+        ImportSharedAddresses {
+            network: "base".into(),
+            addresses: vec![addresses[0].clone()],
+            reason: "independent network".into(),
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        app::addresses(&pool)
+            .await
+            .unwrap()
+            .iter()
+            .filter(|a| a.address == addresses[0])
+            .count(),
+        2
+    );
     sqlx::query("UPDATE wallet_deposit_scanners SET enabled=TRUE,endpoint_encrypted='test-only',last_scan_at=CURRENT_TIMESTAMP(6),last_error=NULL WHERE network='eth'").execute(&pool).await.unwrap();
     assert!(
         app::options(&pool)
@@ -251,6 +341,40 @@ async fn timed_deposit_database_reservations_and_accounting() {
             .status,
         "credited"
     );
+    app::save_scanner(
+        &pool,
+        admin,
+        "eth",
+        "0123456789abcdef0123456789abcdef",
+        SaveScanner {
+            enabled: false,
+            endpoint: None,
+            api_key: None,
+            confirmations: 12,
+            expected_revision: current_revision,
+            reason: "stop new deposits".into(),
+        },
+    )
+    .await
+    .unwrap();
+    assert!(
+        app::options(&pool)
+            .await
+            .unwrap()
+            .iter()
+            .all(|o| o.network != "eth")
+    );
+    assert!(
+        app::create_order(&pool, users[0], request(&symbol, "555", "closed-network"))
+            .await
+            .is_err()
+    );
+    assert!(
+        settlement::observe_scanned(&pool, &paid, current_revision)
+            .await
+            .is_err()
+    );
+    let current_revision = current_revision + 1;
     paid.confirmations = 1;
     let receipt_id = settlement::observe_scanned(&pool, &paid, current_revision)
         .await
@@ -263,7 +387,10 @@ async fn timed_deposit_database_reservations_and_accounting() {
         "pending"
     );
     paid.confirmations = 12;
-    settlement::observe(&pool, &paid).await.unwrap();
+    settlement::observe_scanned(&pool, &paid, current_revision)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE wallet_deposit_scanners SET enabled=TRUE,last_scan_at=CURRENT_TIMESTAMP(6) WHERE network='eth'").execute(&pool).await.unwrap();
     settlement::observe(&pool, &paid).await.unwrap();
     assert_eq!(
         app::get_order(&pool, None, different.id)
@@ -503,7 +630,7 @@ async fn timed_deposit_database_reservations_and_accounting() {
             .status,
         "credited"
     );
-    // Readiness and inventory are explicit, and a permanent allocator cannot claim enrolled addresses.
+    // Readiness closes admission independently of the withdrawal network configuration.
     sqlx::query(
         "UPDATE wallet_deposit_scanners SET last_error='node unavailable' WHERE network='eth'",
     )
@@ -522,8 +649,6 @@ async fn timed_deposit_database_reservations_and_accounting() {
             .await
             .is_err()
     );
-    let assigned:i64=sqlx::query_scalar("SELECT COUNT(*) FROM deposit_address_pool WHERE asset_symbol=? AND assigned_user_id IS NOT NULL").bind(&symbol).fetch_one(&pool).await.unwrap();
-    assert_eq!(assigned, 0);
     // A successful confirmed-block checkpoint survives restart; stale heads and reorgs retain the cursor.
     let server = wiremock::MockServer::start().await;
     let reorg = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
@@ -555,7 +680,7 @@ async fn timed_deposit_database_reservations_and_accounting() {
         "eth",
         key,
         SaveScanner {
-            enabled: true,
+            enabled: false,
             endpoint: Some(server.uri()),
             api_key: None,
             confirmations: 12,
@@ -573,6 +698,17 @@ async fn timed_deposit_database_reservations_and_accounting() {
             .await
             .unwrap();
     assert_eq!(checkpoint.0["height"], 101);
+    assert!(
+        app::options(&pool)
+            .await
+            .unwrap()
+            .iter()
+            .all(|o| o.network != "eth")
+    );
+    sqlx::query("UPDATE wallet_deposit_scanners SET enabled=TRUE WHERE network='eth'")
+        .execute(&pool)
+        .await
+        .unwrap();
     assert!(
         app::options(&pool)
             .await
@@ -621,5 +757,24 @@ async fn timed_deposit_database_reservations_and_accounting() {
             .await
             .unwrap();
     assert!(error.unwrap().contains("historical orders"));
+    let event_id: u64 =
+        sqlx::query_scalar("SELECT deposit_event_id FROM wallet_deposit_orders WHERE id=?")
+            .bind(same_second.id)
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    for _ in 0..2 {
+        let event = crate::modules::wallet::infrastructure::reverse_deposit_event(
+            &pool,
+            event_id,
+            "test reorganization",
+        )
+        .await
+        .unwrap();
+        assert_eq!(event.status, "reversed");
+    }
+    let reversals: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM wallet_ledger WHERE ref_type='wallet_deposit_event' AND ref_id=? AND change_type='deposit_reorg_reverse'").bind(event_id.to_string()).fetch_one(&pool).await.unwrap();
+    assert_eq!(reversals, 1);
+    sqlx::query("UPDATE deposit_network_configs SET status='active',asset_symbols_json=NULL WHERE network='eth'").execute(&pool).await.unwrap();
     pool.close().await;
 }

@@ -1,0 +1,7 @@
+.recharge-workspace { min-width: 0; }
+.recharge-workspace > .semi-tabs-bar { padding-inline: var(--admin-space-xl); }
+.recharge-workspace .semi-tabs-pane { min-width: 0; }
+.recharge-workspace .semi-card { min-width: 0; }
+.deposit-network-toolbar { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; }
+.deposit-network-toolbar > div { width: 260px; max-width: 100%; }
+.deposit-network-toolbar label { display: block; margin-bottom: 8px; }

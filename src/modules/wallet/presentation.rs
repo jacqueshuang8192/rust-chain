@@ -47,23 +47,6 @@ where
 }
 
 #[derive(Debug, Deserialize)]
-pub struct DepositAddressRequest {
-    pub asset_symbol: String,
-    pub network: String,
-}
-
-#[derive(Debug, Serialize)]
-pub struct DepositAddressResponse {
-    pub id: u64,
-    pub asset_symbol: String,
-    pub network: String,
-    pub address: String,
-    pub memo: Option<String>,
-    #[serde(with = "unix_millis")]
-    pub assigned_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Deserialize)]
 pub struct CreateWithdrawalQuoteRequest {
     pub asset_symbol: String,
     pub network: String,
@@ -219,22 +202,6 @@ pub struct ConfirmWithdrawalRequest {
 #[derive(Debug, Deserialize)]
 pub struct FailWithdrawalRequest {
     pub reason: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct ObserveDepositRequest {
-    pub asset_symbol: String,
-    pub network: String,
-    pub address: String,
-    pub memo: Option<String>,
-    pub tx_hash: String,
-    #[serde(default)]
-    pub event_index: u32,
-    #[serde(deserialize_with = "crate::numeric::deserialize_decimal")]
-    pub amount: BigDecimal,
-    pub block_height: Option<u64>,
-    #[serde(default)]
-    pub confirmations: u32,
 }
 
 #[derive(Debug, Deserialize)]

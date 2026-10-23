@@ -55,9 +55,7 @@ const CreateUserAction = lazy(async () => ({ default: (await import('./actions/u
 const UserRowActions = lazy(async () => ({ default: (await import('./actions/users')).UserRowActions }));
 const AssetRowActions = lazy(async () => ({ default: (await import('./actions/wallet')).AssetRowActions }));
 const CreateAssetAction = lazy(async () => ({ default: (await import('./actions/wallet')).CreateAssetAction }));
-const CreateDepositAddressPoolAction = lazy(async () => ({ default: (await import('./actions/wallet')).CreateDepositAddressPoolAction }));
 const CreateDepositNetworkConfigAction = lazy(async () => ({ default: (await import('./actions/wallet')).CreateDepositNetworkConfigAction }));
-const DepositAddressPoolRowActions = lazy(async () => ({ default: (await import('./actions/wallet')).DepositAddressPoolRowActions }));
 const DepositNetworkConfigRowActions = lazy(async () => ({ default: (await import('./actions/wallet')).DepositNetworkConfigRowActions }));
 const DepositRowActions = lazy(async () => ({ default: (await import('./actions/wallet')).DepositRowActions }));
 const QuickRechargeOrderRowActions = lazy(async () => ({ default: (await import('./actions/wallet')).QuickRechargeOrderRowActions }));
@@ -121,11 +119,6 @@ const depositNetworkLabels = {
 const depositNetworkConfigStatusLabels = {
   active: '启用',
   disabled: '停用'
-};
-const depositAddressStatusLabels = {
-  available: '可用',
-  assigned: '已分配',
-  disabled: '禁用'
 };
 const walletWithdrawalStatusLabels = {
   pending_review: '待审核',
@@ -206,12 +199,6 @@ const depositNetworkConfigStatusFilter: FilterField = {
   label: '状态',
   type: 'select',
   options: Object.entries(depositNetworkConfigStatusLabels).map(([value, label]) => ({ label, value }))
-};
-const depositAddressStatusFilter: FilterField = {
-  key: 'status',
-  label: '状态',
-  type: 'select',
-  options: Object.entries(depositAddressStatusLabels).map(([value, label]) => ({ label, value }))
 };
 const quickRechargeStatusFilter: FilterField = {
   key: 'status',
@@ -568,11 +555,11 @@ export const resourceConfigs = {
     ]
   },
   depositNetworkConfigs: {
-    title: '充值网络配置',
+    title: '提现网络配置',
     actions: ({ reload }) => <CreateDepositNetworkConfigAction onCreated={reload} />,
     endpoint: '/admin/api/v1/deposit-network-configs',
     responseKey: 'configs',
-    filters: [depositNetworkFilter, { key: 'address_group_code', label: '地址集合编号' }, depositNetworkConfigStatusFilter, { key: 'asset_symbol', label: '资产符号' }, limitFilter],
+    filters: [depositNetworkFilter, depositNetworkConfigStatusFilter, { key: 'asset_symbol', label: '资产符号' }, limitFilter],
     rowActions: (record, helpers) => (
       <AdminRequestActionBoundary endpoint={`/admin/api/v1/deposit-network-configs/${String(record.id ?? '')}`} method="PATCH">
         <DepositNetworkConfigRowActions helpers={helpers} record={record} />
@@ -582,33 +569,9 @@ export const resourceConfigs = {
     columns: [
       { key: 'network', title: '网络', valueMap: depositNetworkLabels },
       { key: 'display_name', title: '显示名称' },
-      { key: 'address_group_code', title: '地址集合编号' },
-      { key: 'address_group_name', title: '地址集合名称' },
-      { key: 'asset_symbols', title: '支持充值币种', render: (record) => <DepositAssetSymbolList fallback={null} value={record.asset_symbols} /> },
+      { key: 'asset_symbols', title: '支持提现币种', render: (record) => <DepositAssetSymbolList fallback={null} value={record.asset_symbols} /> },
       { key: 'status', title: '状态', valueMap: depositNetworkConfigStatusLabels },
       { key: 'sort_order', title: '排序' },
-      { key: 'updated_at', title: '更新时间', type: 'timestamp' }
-    ]
-  },
-  depositAddressPool: {
-    title: '充值地址池',
-    actions: ({ reload }) => <CreateDepositAddressPoolAction onCreated={reload} />,
-    endpoint: '/admin/api/v1/deposit-address-pool',
-    responseKey: 'addresses',
-    filters: [depositNetworkFilter, { key: 'address_group_code', label: '地址集合编号' }, depositAddressStatusFilter, { key: 'asset_symbol', label: '资产符号' }, emailFilter, { key: 'address', label: '充值地址' }, limitFilter],
-    rowActions: (record, helpers) => <DepositAddressPoolRowActions helpers={helpers} record={record} />,
-    showJsonAction: false,
-    columns: [
-      { key: 'network', title: '网络', valueMap: depositNetworkLabels },
-      { key: 'address_group_code', title: '地址集合编号' },
-      { key: 'address', title: '充值地址' },
-      { key: 'asset_symbols', title: '限定资产', render: (record) => <DepositAssetSymbolList fallback={record.asset_symbol} value={record.asset_symbols} /> },
-      { key: 'status', title: '状态', valueMap: depositAddressStatusLabels },
-      { key: 'assigned_user_email', title: '绑定用户邮箱' },
-      { key: 'assigned_asset_symbol', title: '绑定资产' },
-      { key: 'assigned_at', title: '绑定时间', type: 'timestamp' },
-      { key: 'memo', title: 'Memo / Tag' },
-      { key: 'remark', title: '备注' },
       { key: 'updated_at', title: '更新时间', type: 'timestamp' }
     ]
   },
@@ -1406,7 +1369,6 @@ const SERVER_PAGED_ENDPOINTS = new Set([
   '/admin/api/v1/convert/orders',
   '/admin/api/v1/convert/pairs',
   '/admin/api/v1/countries',
-  '/admin/api/v1/deposit-address-pool',
   '/admin/api/v1/deposit-network-configs',
   '/admin/api/v1/earn/categories',
   '/admin/api/v1/earn/products',

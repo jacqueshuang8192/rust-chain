@@ -34,7 +34,8 @@ struct MatchOrder {
     expires_at: DateTime<Utc>,
 }
 
-/// 扫描入账先锁网络并核对配置版本；停用或改配置后，旧节点任务不能继续提交证据和资金变更。
+/// 扫描入账先锁网络并核对节点存在及配置版本；关闭新单准入仍处理历史订单，旧版本节点任务不得提交。
+/// 以不可变链证据匹配历史付款窗口，歧义转人工；订单、钱包、流水和平台分录同事务提交，回放不重复入账。
 pub(crate) async fn observe_scanned(
     pool: &Pool<MySql>,
     receipt: &ChainReceipt,
@@ -57,12 +58,12 @@ async fn process_receipt(
     let mut tx = pool.begin().await?;
     lock_network(&mut tx, &receipt.network).await?;
     if let Some(expected) = expected_revision {
-        let (enabled, revision): (bool, u64) =
-            sqlx::query_as("SELECT enabled,revision FROM wallet_deposit_scanners WHERE network=?")
+        let (configured, revision): (bool, u64) =
+            sqlx::query_as("SELECT endpoint_encrypted IS NOT NULL,revision FROM wallet_deposit_scanners WHERE network=?")
                 .bind(&receipt.network)
                 .fetch_one(&mut *tx)
                 .await?;
-        if !enabled || revision != expected {
+        if !configured || revision != expected {
             return Err(AppError::Conflict(
                 "deposit scanner configuration changed during scan".into(),
             ));

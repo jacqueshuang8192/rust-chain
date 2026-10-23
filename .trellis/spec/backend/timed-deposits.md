@@ -3,18 +3,22 @@
 ## 1. Scope / Trigger
 
 Applies to amount-first deposits on Ethereum (`eth`), Base (`base`), Tron,
-Bitcoin (`btc`) and Solana. Existing permanently assigned addresses and quick
-recharge providers retain their separate paths. No signing, custody or sweeps.
+Bitcoin (`btc`) and Solana. Only quick recharge and amount-first on-chain
+recharge remain. Permanent address allocation and legacy observation credit are
+retired in this test environment. No signing, custody or sweeps.
 
 ## 2. Signatures
 
-- Migrations `0158_timed_chain_deposits.sql` and `0159_timed_deposit_text_identity.sql`.
+- Migrations `0158_timed_chain_deposits.sql`, `0159_timed_deposit_text_identity.sql`
+  and `0160_independent_recharge_addresses.sql`. The shared table owns its IDs;
+  existing order references are preserved without legacy inventory inserts.
 - Tables: `wallet_deposit_scanners`, `wallet_deposit_chain_assets`,
   `wallet_deposit_shared_addresses`, `wallet_deposit_orders`, `wallet_deposit_receipts`.
 - User `GET /api/v1/wallet/deposit-options`; `GET|POST /api/v1/wallet/deposit-orders`;
   `GET /api/v1/wallet/deposit-orders/:id`.
 - Admin `GET /admin/api/v1/wallet/deposit-settings`, `PUT .../scanners/:network`,
-  `PUT .../assets`, `PUT .../addresses/:id`; `GET .../deposit-orders[/:id]`,
+  `PUT .../assets`, `GET|POST .../addresses`, `PUT .../addresses/:id`;
+  `GET .../deposit-orders[/:id]`,
   `GET .../deposit-receipts`, `POST .../deposit-receipts/:id/review`.
 - Lists use `limit` (1..100), `offset`, `status`, `network`, `asset_symbol`,
   exact `order_no`. Receipt order filters refer to its associated candidate/order.
@@ -41,14 +45,24 @@ network, asset and exact amount; it returns the original deadline even after
 expiry. New keys create new reservations. The clients preserve an uncertain
 submission key in sessionStorage until successful resolution.
 
-Chain identity and decimals are immutable. Assets require explicit native/token
-identity, active platform asset/deposit flag, network whitelist, available
-unassigned shared inventory and a successful caught-up scan within 120 seconds
-with no recorded error. Mapping/address additions clear readiness and fence old
-leases. Each receipt also rechecks enabled/revision under the network lock, so
-a stale in-flight node task cannot commit financial changes after configuration
-changes. Previously permanent/reclaimed inventory cannot enter the shared pool;
-legacy allocation excludes enrolled rows and old inventory edits are blocked.
+Chain identity and decimals are immutable. Admission requires an explicit native/token
+identity, active platform asset/deposit flag, enabled shared address and scanner,
+and a successful caught-up scan within 120 seconds with no recorded error.
+Legacy `deposit_network_configs` and `deposit_address_pool` do not participate.
+Scanner `enabled` means accepting new orders; every configured endpoint continues
+scanning historical orders even when this flag is false. Receipt processing
+rechecks endpoint presence and revision under the network lock, so stale in-flight
+node tasks cannot commit financial changes after configuration changes.
+
+Direct import takes `{network,addresses:string[],reason}` with 1..500 input rows.
+Validate and canonicalize the full batch, deduplicate, then lock the network and
+insert new shared rows plus audit in one transaction. Duplicate rows are skipped;
+reimport never re-enables disabled addresses. Audit failure rolls back the batch.
+Additions clear readiness and fence old leases. A network owns its address
+identities independently; importing an EVM address on ETH does not enable Base.
+`PUT .../addresses/:id` only changes `enabled` on an existing shared row (404 if
+absent); it never enrolls an old inventory ID or edits chain identity. Disabling
+an address/asset affects new orders only; historical scanner identities remain.
 
 Canonical EVM addresses are lowercase; Base58 identities retain case. Text
 columns use utf8mb4_unicode_ci for SQLx String metadata; SHA256 keys preserve
@@ -78,7 +92,7 @@ receipt remains; it does not erase unpaid combination history.
 `CREDENTIAL_ENCRYPTION_KEY` is the existing 32-byte key. Node URL/API key are
 encrypted and never returned, audited or logged. Blank updates preserve them.
 Permissions: `wallet.networks` for settings/mappings, `wallet.address_pool` for
-shared-address writes, `wallet.deposits` for orders/evidence, `.review` for review.
+shared-address reads/writes, `wallet.deposits` for orders/evidence, `.review` for review.
 
 Supported adapter boundaries:
 
@@ -103,6 +117,9 @@ checkpoint repair; there is no UI button silently skipping blocks.
 | Numeric JSON amount | 422 transport rejection |
 | Invalid amount/key/identity/precision | 400 validation |
 | No ready scanner/mapping/inventory | No selectable option; creation rejected |
+| Empty/oversize/invalid import batch | 400; no rows or audit committed |
+| Valid duplicate import | 204; existing state unchanged |
+| Legacy allocation/inventory/observation route | 404; no financial side effect |
 | Same amount occupies all addresses | 409; unchanged amount |
 | Same key, changed request | 409 |
 | Other user's order | 404; list omits it |
@@ -126,7 +143,9 @@ checkpoint repair; there is no UI button silently skipping blocks.
 
 - Isolated MySQL: migrations twice, concurrent allocation, full pool, expiry,
   permanent idempotency, scope filtering, delayed scan, ambiguity/review,
-  duplicate evidence, fee/journal balance, audit rollback and cursor recovery.
+  duplicate evidence, fee/journal balance, audit rollback and cursor recovery;
+  direct import atomicity/duplicates, cross-network independence, legacy allowlist
+  independence, and disabled-admission scanning/settlement with revision fencing.
 - RPC fixtures: wrong chain, successful/failed/internal calls, complete Tron
   receipts, independent BTC outputs, genuine Solana program/mint identities,
   temporary token accounts, ordered bounded slot lists and reorganization.
@@ -135,7 +154,8 @@ checkpoint repair; there is no UI button silently skipping blocks.
 - Mobile and PC: actual SFC behavior, uncertain retry key, exact large numbers,
   session-change stale response rejection, restored orders and expired QR removal.
 - Admin: exact preview, immutable revision, secret omission, explicit target/reason,
-  failed drafts retained and assigned inventory rejected. No mock proves live-chain receipt.
+  failed drafts retained, direct import preview, address-only permissions and
+  selected-network retention after save. No mock proves live-chain receipt.
 
 ## 7. Wrong vs Correct
 

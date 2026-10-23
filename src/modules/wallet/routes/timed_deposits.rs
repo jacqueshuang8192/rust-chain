@@ -36,6 +36,10 @@ pub(super) fn admin_routes() -> Router<AppState> {
             put(save_scanner),
         )
         .route("/wallet/deposit-settings/assets", put(save_asset))
+        .route(
+            "/wallet/deposit-settings/addresses",
+            get(addresses).post(import_addresses),
+        )
         .route("/wallet/deposit-settings/addresses/:id", put(save_address))
         .route("/wallet/deposit-orders", get(admin_orders))
         .route("/wallet/deposit-orders/:id", get(admin_order))
@@ -159,5 +163,20 @@ async fn review(
     Json(r): Json<ReviewDepositReceipt>,
 ) -> AppResult<StatusCode> {
     app::review(&mysql_pool(&state)?, admin_id_from_subject(&c.sub)?, id, r).await?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+async fn addresses(
+    AdminAuth(_): AdminAuth,
+    State(state): State<AppState>,
+) -> AppResult<Json<Vec<SharedAddressView>>> {
+    Ok(Json(app::addresses(&mysql_pool(&state)?).await?))
+}
+async fn import_addresses(
+    AdminAuth(c): AdminAuth,
+    State(state): State<AppState>,
+    Json(r): Json<ImportSharedAddresses>,
+) -> AppResult<StatusCode> {
+    app::import_addresses(&mysql_pool(&state)?, admin_id_from_subject(&c.sub)?, r).await?;
     Ok(StatusCode::NO_CONTENT)
 }

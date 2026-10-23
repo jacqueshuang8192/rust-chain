@@ -28,7 +28,7 @@ import {
   type WalletLedgerRequestOptions,
 } from '@/core/walletLedger'
 
-import type { DepositAddress, DepositAsset, DepositNetwork, WalletAccount } from '@/core/types'
+import type { DepositAsset, DepositNetwork, WalletAccount } from '@/core/types'
 import {
   isWithdrawalDecimalString,
   withdrawalQuoteAmountsAreConsistent,
@@ -280,13 +280,6 @@ interface BackendDepositNetwork {
   display_name?: string | null
 }
 
-interface BackendDepositAddress {
-  asset_symbol: string
-  network: string
-  address: string
-  memo?: string | null
-}
-
 interface BackendWalletAccount {
   issuance_valuation?: unknown
   asset_id?: number
@@ -385,20 +378,6 @@ export async function fetchDepositNetworks(
 /** 钱包目录可能受账号或地区策略影响，因此按当前内存会话隔离，不跨 token 共享。 */
 function walletReferenceKey(url: string, params: Readonly<Record<string, unknown>> = {}): string {
   return createReferenceRequestKey(url, params, `wallet:${readAuthSessionSnapshot().scope || 'guest'}`)
-}
-
-export async function createDepositAddress(assetSymbol: string, network: string, minimum = 0): Promise<DepositAddress> {
-  const response = await client.post<BackendDepositAddress>(requestUrl('/wallet/deposit-address'), {
-    asset_symbol: assetSymbol.toUpperCase(),
-    network,
-  })
-  return {
-    assetSymbol: response.data.asset_symbol.toUpperCase(),
-    network: response.data.network,
-    address: response.data.address,
-    memo: response.data.memo || undefined,
-    minDepositAmount: minimum,
-  }
 }
 
 export async function fetchWalletAccounts(): Promise<StrictWalletAccount[]> {

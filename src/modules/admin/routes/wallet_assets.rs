@@ -1,4 +1,4 @@
-//! 承载资产定义、钱包账户与流水查询、充值网络配置以及充值地址池管理的 HTTP 传输入口。
+//! 承载资产定义、钱包账户与流水查询以及提现网络目录管理的 HTTP 传输入口。
 //!
 //! 这组入口横跨「配置」和「资金」两类语义：资产与充值网络属于配置，钱包账户和流水属于资金只读视图，
 //! 地址池则介于两者之间，因为地址状态直接决定用户能拿到哪个充值地址。路由本身只做提取与转发，
@@ -28,22 +28,6 @@ pub(super) fn routes() -> Router<AppState> {
         .route(
             "/deposit-network-configs/:id",
             patch(update_deposit_network_config),
-        )
-        .route(
-            "/deposit-address-pool",
-            get(list_deposit_address_pool).post(create_deposit_address_pool),
-        )
-        .route(
-            "/deposit-address-pool/batch",
-            post(create_deposit_address_pool_batch),
-        )
-        .route(
-            "/deposit-address-pool/:id",
-            get(get_deposit_address_pool).patch(update_deposit_address_pool),
-        )
-        .route(
-            "/deposit-address-pool/:id/reclaim",
-            post(reclaim_deposit_address_pool),
         )
 }
 
@@ -141,7 +125,7 @@ async fn list_wallet_ledger(
     ))
 }
 
-/// 处理 GET /deposit-network-configs，按网络、地址组、状态和资产符号检索充值网络配置。
+/// 处理 GET /deposit-network-configs，按网络、地址组、状态和资产符号检索提现网络配置。
 /// 各筛选项均按写入口径先规范化再匹配；查询不锁配置也不锁地址池，更不会去探测链上网络的可用性。
 async fn list_deposit_network_configs(
     _auth: AdminAuth,
@@ -179,91 +163,6 @@ async fn update_deposit_network_config(
     let admin_id = admin_id_from_subject(&claims.sub)?;
     Ok(Json(
         update_deposit_network_config_use_case(state.mysql.clone(), admin_id, config_id, request)
-            .await?,
-    ))
-}
-
-/// 处理 GET /deposit-address-pool，按网络、地址组、状态、资产、已分配用户、邮箱和地址文本检索地址池。
-/// 网络、地址组、状态与资产会先规范化，地址与邮箱作为原文匹配条件；读取不锁地址，
-/// 因此返回的分配状态可能在响应送达前就被并发的地址领取动作改变。
-async fn list_deposit_address_pool(
-    _auth: AdminAuth,
-    State(state): State<AppState>,
-    Query(query): Query<AdminDepositAddressPoolQuery>,
-) -> AppResult<Json<AdminDepositAddressPoolResponseList>> {
-    Ok(Json(
-        list_deposit_address_pool_use_case(state.mysql.clone(), query).await?,
-    ))
-}
-
-/// 处理 GET /deposit-address-pool/:id，读取单个充值地址的网络、地址组、允许资产、占用用户与备注。
-/// 查询不使用 `FOR UPDATE`，因此不能用它来抢占地址；地址缺失返回未找到，也不会校验链上地址有效性。
-async fn get_deposit_address_pool(
-    _auth: AdminAuth,
-    State(state): State<AppState>,
-    Path(address_id): Path<u64>,
-) -> AppResult<Json<AdminDepositAddressPoolResponse>> {
-    Ok(Json(
-        get_deposit_address_pool_use_case(state.mysql.clone(), address_id).await?,
-    ))
-}
-
-/// 处理 POST /deposit-address-pool，向指定网络和地址组投入单个可分配充值地址。
-/// 请求必须携带审计原因；应用层先确认资产存在、读取网络配置并校验资产在该网络白名单内，
-/// 未显式给出地址组时沿用网络配置的缺省组。状态缺省为 available，地址重复会撞唯一约束而不是接管既有分配。
-async fn create_deposit_address_pool(
-    AdminAuth(claims): AdminAuth,
-    State(state): State<AppState>,
-    Json(request): Json<CreateDepositAddressPoolRequest>,
-) -> AppResult<Json<AdminDepositAddressPoolResponse>> {
-    let admin_id = admin_id_from_subject(&claims.sub)?;
-    Ok(Json(
-        create_deposit_address_pool_use_case(state.mysql.clone(), admin_id, request).await?,
-    ))
-}
-
-/// 处理 POST /deposit-address-pool/batch，一次向同一网络、地址组和资产范围投入多条地址。
-/// 与单条入口的关键差异是整批共用一个事务且逐条写审计，任一条地址插入失败会回滚整批，
-/// 因此不会出现部分成功；批内重复或与既有地址冲突同样导致整批失败，需要剔除冲突项后重提。
-async fn create_deposit_address_pool_batch(
-    AdminAuth(claims): AdminAuth,
-    State(state): State<AppState>,
-    Json(request): Json<CreateDepositAddressPoolBatchRequest>,
-) -> AppResult<Json<AdminDepositAddressPoolBatchResponse>> {
-    let admin_id = admin_id_from_subject(&claims.sub)?;
-    Ok(Json(
-        create_deposit_address_pool_batch_use_case(state.mysql.clone(), admin_id, request).await?,
-    ))
-}
-
-/// 处理 PATCH /deposit-address-pool/:id，修改地址本身及其网络、地址组、资产范围与备注。
-/// 应用层锁定后若发现地址已处于 assigned 状态会直接拒绝，必须先调用回收入口，
-/// 以免把用户正在使用的充值地址在后台悄悄改写；请求必须携带审计原因且为整体覆盖。
-async fn update_deposit_address_pool(
-    AdminAuth(claims): AdminAuth,
-    State(state): State<AppState>,
-    Path(address_id): Path<u64>,
-    Json(request): Json<UpdateDepositAddressPoolRequest>,
-) -> AppResult<Json<AdminDepositAddressPoolResponse>> {
-    let admin_id = admin_id_from_subject(&claims.sub)?;
-    Ok(Json(
-        update_deposit_address_pool_use_case(state.mysql.clone(), admin_id, address_id, request)
-            .await?,
-    ))
-}
-
-/// 处理 POST /deposit-address-pool/:id/reclaim，把已分配的充值地址收回为可再分配状态。
-/// 请求必须携带审计原因；只有处于 assigned 状态的地址可回收，其余状态返回校验错误，因此重复回收不会成功两次。
-/// 回收只清空分配相关字段而不改地址、网络等自身配置，也不会迁移或找回该地址上的链上资产。
-async fn reclaim_deposit_address_pool(
-    AdminAuth(claims): AdminAuth,
-    State(state): State<AppState>,
-    Path(address_id): Path<u64>,
-    Json(request): Json<ReclaimDepositAddressPoolRequest>,
-) -> AppResult<Json<AdminDepositAddressPoolResponse>> {
-    let admin_id = admin_id_from_subject(&claims.sub)?;
-    Ok(Json(
-        reclaim_deposit_address_pool_use_case(state.mysql.clone(), admin_id, address_id, request)
             .await?,
     ))
 }

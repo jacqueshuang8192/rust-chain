@@ -1,0 +1,6 @@
+{"file": ".trellis/spec/backend/timed-deposits.md", "reason": "Exact reservation, scanner readiness, direct import and settlement contracts"}
+{"file": ".trellis/spec/backend/deposit-addresses.md", "reason": "Legacy allocator retirement and unchanged withdrawal directory"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Architecture, transaction and verification requirements"}
+{"file": ".trellis/spec/admin/ui-system.md", "reason": "Permissioned workspace, forms and draft behavior"}
+{"file": ".trellis/spec/mobile/index.md", "reason": "Client contracts and closest validation"}
+{"file": ".trellis/tasks/10-23-unified-recharge-flow/research/integration.md", "reason": "Final scope and integration decisions"}

@@ -1410,13 +1410,35 @@ See [the backend version boundary](../backend/token-issuance-v2.md).
   include full creation confirmation/retry, record empty/error/rules, fixed seed,
   and desktop/390/320 layouts. See backend v2 spec for transaction and rollout.
 
-## Timed Deposit Operations
+## Unified Recharge Operations
 
-Follow [the timed deposit contract](../backend/timed-deposits.md). Separate
-node/asset configuration, explicit shared-inventory enrollment and receipt
-review permissions. Never echo node secrets; blank means preserve. Pin revision
-through failed saves and keep a single dirty editor category with navigation
-protection. Search actual `order_no`; display internal IDs only as explicitly
-labelled action references. Review never preselects a candidate as proof of
-ownership: read an explicit target, show actual amount/fee and chain identity,
-and require a reason. Actual backend matching/confirmation checks remain final.
+Follow [the timed deposit contract](../backend/timed-deposits.md). The wallet
+sidebar exposes only `快速充值` and `链上充值` for recharge. Quick recharge hosts
+configuration and orders; chain recharge hosts network/receiving configuration,
+orders/receipt review and ledger tabs. Old recharge URLs redirect; withdrawal
+network configuration remains a separate entry.
+
+Tabs are routed and independently authorized; mount only the selected page.
+`wallet.networks` controls node/asset settings, `wallet.address_pool` controls
+address reads/writes, and `wallet.deposits` controls orders/evidence. Address-only
+operators enter `/admin/wallet/chain-recharge/addresses` and request only the
+address endpoint, never network secrets/settings. Navigation falls back to an
+authorized related path; read permission alone never exposes write actions.
+
+Select a network once, then configure its node, explicit chain asset mappings
+and directly paste 1..500 receiving addresses. Keep the selected network after
+save/refetch. No permanent assignment, inventory ID preview, address-group
+fallback or separate enrollment form remains. Preview complete address/network
+inputs, require a reason, and explain atomic rejection and duplicate preservation.
+
+Never echo node secrets; blank means preserve. Pin revision through failed saves;
+retain draft/reason on 409. Keep one dirty editor category, including pasted
+addresses, with navigation protection. `接受新充值订单` controls admission, not
+historical scanning; disabling addresses/assets preserves in-flight processing.
+
+Search actual `order_no`; display internal IDs only as labelled action references.
+Review never preselects a candidate as proof of ownership: read an explicit target,
+show actual amount/fee and chain identity, and require a reason. Backend matching
+and confirmation checks remain final. Preserve desktop/390/320 layouts, contained
+horizontal table scrolling and accessible labels. Tests cover permission-specific
+tabs, direct import payloads, revisions, drafts, secrets and unchanged quick recharge.

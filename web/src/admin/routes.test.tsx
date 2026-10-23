@@ -42,9 +42,9 @@ describe('adminRoutes', () => {
     ['agent-commission-rules', 'agentCommissionRules'],
     ['assets', 'assets'],
     ['wallet/accounts', 'walletAccounts'],
-    ['wallet/deposit-network-configs', 'depositNetworkConfigs'],
-    ['wallet/deposit-address-pool', 'depositAddressPool'],
-    ['wallet/quick-recharge-orders', 'quickRechargeOrders'],
+    ['wallet/withdrawal-networks', 'depositNetworkConfigs'],
+    ['wallet/chain-recharge/ledger', 'walletDeposits'],
+    ['wallet/quick-recharge/orders', 'quickRechargeOrders'],
     ['wallet/ledger', 'walletLedger'],
     ['loan/products', 'loanProducts'],
     ['loan/orders', 'loanOrders'],
@@ -61,7 +61,7 @@ describe('adminRoutes', () => {
     async () => {
       const resourceRoutes = adminRoutes.filter((route) => Boolean((route.handle as { resourceKey?: string } | undefined)?.resourceKey));
       // Two lock/release resources now share a permission-scoped tab workbench.
-      expect(resourceRoutes.length).toBeGreaterThanOrEqual(38);
+      expect(resourceRoutes.length).toBeGreaterThanOrEqual(37);
       resourceRoutes.forEach((route) => {
         expect(typeof route.lazy).toBe('function');
         expect(route.element).toBeUndefined();
@@ -79,7 +79,7 @@ describe('adminRoutes', () => {
     ['system/smtp', 'SmtpConfigPage'],
     ['system/uploads', 'UploadConfigPage'],
     ['system/brand', 'PlatformBrandPage'],
-    ['wallet/quick-recharge', 'QuickRechargeConfigPage'],
+    ['wallet/quick-recharge', 'RechargePage'],
     ['system/security-policy', 'SecurityPolicyPage'],
     ['system/legal-documents', 'RegistrationLegalPage'],
     ['account/security', 'AdminTwoFactorPage'],
@@ -106,13 +106,19 @@ describe('adminRoutes', () => {
 
   it('keeps legacy workflow URLs as eager compatibility redirects', () => {
     const eagerRoutes = adminRoutes.filter((route) => route.path && route.element);
-    expect(eagerRoutes.map((route) => route.path)).toEqual([
+    expect(eagerRoutes.map((route) => route.path).sort()).toEqual([
       'users/kyc',
       'prediction/assets',
       'prediction/sync-logs',
       'market/strategies/actions',
-      'system/two-factor'
-    ]);
+      'system/two-factor',
+      'wallet/deposit-network-configs',
+      'wallet/deposit-address-pool',
+      'wallet/deposit-settings',
+      'wallet/deposit-receipts',
+      'wallet/deposits',
+      'wallet/quick-recharge-orders'
+    ].sort());
     expect(
       Object.fromEntries(
         eagerRoutes.map((route) => [

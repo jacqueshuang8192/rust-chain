@@ -32,8 +32,8 @@ function renderAdminLayout(initialEntry = '/admin/dashboard', access: AdminAcces
           { path: 'prediction/settings', element: <div>竞猜配置内容</div> },
           { path: 'prediction/sync', element: <div>竞猜同步运行内容</div> },
           { path: 'news', element: <div>新闻内容</div> },
-          { path: 'wallet/deposit-network-configs', element: <div>充值网络配置内容</div> },
-          { path: 'wallet/deposit-address-pool', element: <div>充值地址池内容</div> },
+          { path: 'wallet/withdrawal-networks', element: <div>提现网络配置内容</div> },
+          { path: 'wallet/chain-recharge/addresses', element: <div>充值地址池内容</div> },
           { path: 'loan/products', element: <div>贷款产品内容</div> },
           { path: 'loan/orders', element: <div>贷款订单内容</div> },
           { path: 'system/countries', element: <div>国家配置内容</div> },
@@ -83,7 +83,7 @@ describe('AdminLayout', () => {
 
     [
       { group: '用户与代理', children: ['用户管理', 'KYC 审核队列', 'KYC 规则配置', '代理管理', '代理佣金', '佣金规则'] },
-      { group: '钱包资产', children: ['资产管理', '钱包账户', '充值网络配置', '充值地址池', '钱包流水'] },
+      { group: '钱包资产', children: ['资产管理', '钱包账户', '提现网络', '链上充值', '钱包流水'] },
       { group: '贷款管理', children: ['贷款产品', '贷款订单'] },
       { group: '竞猜管理', children: ['竞猜配置', '竞猜市场', '竞猜订单', '同步运行'] },
       { group: '现货交易', children: ['现货订单', '现货成交'] },
@@ -190,11 +190,11 @@ describe('AdminLayout', () => {
   });
 
   it('activates the deposit address pool navigation entry', () => {
-    renderAdminLayout('/admin/wallet/deposit-address-pool');
+    renderAdminLayout('/admin/wallet/chain-recharge/addresses');
 
     const groupButton = screen.getByRole('menuitem', { name: /钱包资产/ });
     expect(groupButton).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('menuitem', { name: '充值地址池' })).toHaveClass('semi-navigation-item-selected');
+    expect(screen.getByRole('menuitem', { name: '链上充值' })).toHaveClass('semi-navigation-item-selected');
     expect(screen.getByText('充值地址池内容')).toBeInTheDocument();
   });
 

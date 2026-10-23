@@ -146,6 +146,14 @@ pub struct SaveChainAsset {
 
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
+pub struct ImportSharedAddresses {
+    pub network: String,
+    pub addresses: Vec<String>,
+    pub reason: String,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
 pub struct SaveSharedAddress {
     pub enabled: bool,
     pub reason: String,

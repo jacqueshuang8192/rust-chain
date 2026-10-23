@@ -1,0 +1,31 @@
+{
+  "id": "unified-recharge-flow",
+  "name": "unified-recharge-flow",
+  "title": "Unify recharge into quick recharge and timed on-chain deposits",
+  "description": "",
+  "status": "in_progress",
+  "dev_type": "fullstack",
+  "scope": "wallet-recharge",
+  "package": null,
+  "priority": "P2",
+  "creator": "rust-chain",
+  "assignee": "rust-chain",
+  "createdAt": "2026-10-23",
+  "completedAt": null,
+  "branch": "main",
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "migrations/0160_independent_recharge_addresses.sql",
+    "src/modules/wallet/infrastructure/timed_deposits",
+    "web/src/admin/deposits",
+    "docs/superpowers/timed-chain-deposits.md"
+  ],
+  "notes": "Implemented and locally verified; known Web total JS budget remains over limit. No live-chain transfer or deployment. See research/delivery.md.",
+  "meta": {}
+}

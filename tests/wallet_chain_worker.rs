@@ -1131,7 +1131,7 @@ impl WalletChainGateway for DepositPageGateway {
 }
 
 #[tokio::test]
-async fn wallet_chain_worker_dead_letters_poison_deposit_but_halts_on_transient_failure()
+async fn wallet_chain_worker_retires_legacy_deposits_without_crediting_assigned_addresses()
 -> Result<(), Box<dyn Error>> {
     let Some(pool) = mysql_pool_or_skip().await? else {
         return Ok(());
@@ -1218,7 +1218,7 @@ async fn wallet_chain_worker_dead_letters_poison_deposit_but_halts_on_transient_
             confirmations: 0,
         };
 
-    // 未分配地址的毒性事件进入死信，后续正常事件与游标不再被阻塞。
+    // 所有旧网关充值回执进入死信，已永久分配的地址也不能绕过订单归属入账。
     let gateway = DepositPageGateway {
         page: WalletChainPollPage {
             next_cursor: Some("dl-cursor-1".to_owned()),
@@ -1234,8 +1234,8 @@ async fn wallet_chain_worker_dead_letters_poison_deposit_but_halts_on_transient_
         },
     };
     let first = run_once_with_gateway(&pool, None, &gateway, config).await?;
-    assert_eq!(first.deposit_observed, 1);
-    assert_eq!(first.event_dead_lettered, 1);
+    assert_eq!(first.deposit_observed, 0);
+    assert_eq!(first.event_dead_lettered, 2);
     assert_eq!(first.gateway_failed, 0);
     let (cursor,): (Option<String>,) = sqlx::query_as(
         "SELECT last_deposit_cursor FROM wallet_chain_gateways WHERE network = 'base'",
@@ -1243,12 +1243,12 @@ async fn wallet_chain_worker_dead_letters_poison_deposit_but_halts_on_transient_
     .fetch_one(&pool)
     .await?;
     assert_eq!(cursor.as_deref(), Some("dl-cursor-1"));
-    let (good_status,): (String,) =
-        sqlx::query_as("SELECT status FROM wallet_deposit_events WHERE tx_hash = ?")
+    let credited: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM wallet_deposit_events WHERE tx_hash=?")
             .bind(&good_tx_hash)
             .fetch_one(&pool)
             .await?;
-    assert_eq!(good_status, "observed");
+    assert_eq!(credited, 0);
     let dead_letters = list_wallet_chain_event_dead_letters(&pool, Some("base"), 50).await?;
     let record = dead_letters
         .iter()
@@ -1256,10 +1256,14 @@ async fn wallet_chain_worker_dead_letters_poison_deposit_but_halts_on_transient_
         .expect("poison deposit should be dead lettered");
     assert_eq!(record.event_kind, "deposit");
     assert_eq!(record.event_index, Some(0));
-    assert!(record.failure_reason.contains("not found"));
+    assert!(
+        record
+            .failure_reason
+            .contains("legacy deposits are retired")
+    );
     assert_eq!(record.payload_json.0["asset_symbol"], symbol.as_str());
 
-    // 数据库层拒绝（memo 超长）按瞬态失败处理：停页、不推进游标、不写死信。
+    // 旧回执内容不再进入资金写入；保留证据并继续提现网关游标。
     let transient_tx_hash = format!("0xtransient{}", Uuid::now_v7().simple());
     let gateway = DepositPageGateway {
         page: WalletChainPollPage {
@@ -1274,23 +1278,25 @@ async fn wallet_chain_worker_dead_letters_poison_deposit_but_halts_on_transient_
     };
     let second = run_once_with_gateway(&pool, None, &gateway, config).await?;
     assert_eq!(second.deposit_observed, 0);
-    assert_eq!(second.event_dead_lettered, 0);
-    assert_eq!(second.gateway_failed, 1);
+    assert_eq!(second.event_dead_lettered, 1);
+    assert_eq!(second.gateway_failed, 0);
     let (cursor,): (Option<String>,) = sqlx::query_as(
         "SELECT last_deposit_cursor FROM wallet_chain_gateways WHERE network = 'base'",
     )
     .fetch_one(&pool)
     .await?;
-    assert_eq!(cursor.as_deref(), Some("dl-cursor-1"));
+    assert_eq!(cursor.as_deref(), Some("dl-cursor-2"));
     let dead_letters = list_wallet_chain_event_dead_letters(&pool, Some("base"), 50).await?;
     assert!(
         dead_letters
             .iter()
-            .all(|record| record.tx_hash.as_deref() != Some(transient_tx_hash.as_str()))
+            .any(|record| record.tx_hash.as_deref() == Some(transient_tx_hash.as_str()))
     );
 
-    sqlx::query("DELETE FROM wallet_chain_event_dead_letters WHERE tx_hash = ?")
+    sqlx::query("DELETE FROM wallet_chain_event_dead_letters WHERE tx_hash IN (?, ?, ?)")
         .bind(&poison_tx_hash)
+        .bind(&good_tx_hash)
+        .bind(&transient_tx_hash)
         .execute(&pool)
         .await?;
     sqlx::query("DELETE FROM wallet_deposit_events WHERE tx_hash = ?")

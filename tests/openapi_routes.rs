@@ -393,15 +393,11 @@ async fn openapi_json_exposes_first_batch_contract() {
         "/api/v1/user/fund-password/reset",
         "/api/v1/wallet/deposit-assets",
         "/api/v1/wallet/withdraw-assets",
-        "/api/v1/wallet/deposit-address",
         "/admin/api/v1/smtp/config",
         "/admin/api/v1/smtp/configs",
         "/admin/api/v1/smtp/configs/{id}",
         "/admin/api/v1/smtp/delivery-settings",
         "/admin/api/v1/smtp/test",
-        "/admin/api/v1/deposit-address-pool",
-        "/admin/api/v1/deposit-address-pool/{id}",
-        "/admin/api/v1/deposit-address-pool/{id}/reclaim",
         "/admin/api/v1/quick-recharge/config",
         "/admin/api/v1/quick-recharge/config/test",
         "/admin/api/v1/quick-recharge/orders",
@@ -409,6 +405,16 @@ async fn openapi_json_exposes_first_batch_contract() {
         assert!(openapi["paths"].get(path).is_some(), "missing path {path}");
     }
 
+    for retired in [
+        "/api/v1/wallet/deposit-address",
+        "/admin/api/v1/wallet/deposits/observe",
+        "/admin/api/v1/deposit-address-pool",
+    ] {
+        assert!(
+            openapi["paths"].get(retired).is_none(),
+            "retired path {retired}"
+        );
+    }
     assert!(operation_has_bearer_security(
         &openapi,
         "/api/v1/user/profile",
@@ -436,12 +442,12 @@ async fn openapi_json_exposes_first_batch_contract() {
     ));
     assert!(operation_has_bearer_security(
         &openapi,
-        "/api/v1/wallet/deposit-address",
+        "/api/v1/wallet/deposit-orders",
         "post"
     ));
     assert!(operation_has_bearer_security(
         &openapi,
-        "/admin/api/v1/deposit-address-pool",
+        "/admin/api/v1/wallet/deposit-settings/addresses",
         "post"
     ));
     assert!(operation_has_bearer_security(
@@ -1293,11 +1299,6 @@ async fn openapi_json_documents_user_2fa_security_policy_contract() {
         ),
         ("/admin/api/v1/wallet/deposits", ["get"].as_slice(), true),
         (
-            "/admin/api/v1/wallet/deposits/observe",
-            ["post"].as_slice(),
-            true,
-        ),
-        (
             "/admin/api/v1/wallet/deposits/{id}/reverse",
             ["post"].as_slice(),
             true,
@@ -1363,7 +1364,7 @@ async fn openapi_json_documents_user_2fa_security_policy_contract() {
         "BroadcastWithdrawalRequest",
         "ConfirmWithdrawalRequest",
         "FailWithdrawalRequest",
-        "ObserveDepositRequest",
+        "ImportSharedAddresses",
         "ReverseDepositRequest",
         "WalletDepositEventResponse",
         "WalletDepositsResponse",

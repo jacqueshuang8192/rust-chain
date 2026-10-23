@@ -37,7 +37,6 @@ async fn timed_deposit_routes_enforce_exact_amount_ownership_and_admin_permissio
         .unwrap();
     let contract = format!("0x{:040x}", asset + 1_000_000);
     let address = format!("0x{:040x}", asset + 2_000_000);
-    let inventory=sqlx::query("INSERT INTO deposit_address_pool (network,address_group_code,address,asset_symbol) VALUES ('eth','evm',?,?)").bind(&address).bind(&symbol).execute(&pool).await.unwrap().last_insert_id();
     let state = AppState::new(settings.clone()).with_mysql(pool.clone());
     let app = Router::new()
         .nest("/api/v1", routes())
@@ -83,9 +82,9 @@ async fn timed_deposit_routes_enforce_exact_amount_ownership_and_admin_permissio
         call(
             &app,
             Some(&admin_token),
-            "PUT",
-            &format!("/admin/api/v1/wallet/deposit-settings/addresses/{inventory}"),
-            json!({"enabled":true,"reason":"local route inventory"})
+            "POST",
+            "/admin/api/v1/wallet/deposit-settings/addresses",
+            json!({"network":"eth","addresses":[address],"reason":"local direct import"})
         )
         .await
         .status(),
@@ -174,4 +173,75 @@ async fn timed_deposit_routes_enforce_exact_amount_ownership_and_admin_permissio
         .status(),
         StatusCode::FORBIDDEN
     );
+    sqlx::query("UPDATE admin_roles SET permissions=JSON_ARRAY('wallet.address_pool.read','wallet.address_pool.write') WHERE id=?").bind(role).execute(&pool).await.unwrap();
+    assert_eq!(
+        call(
+            &app,
+            Some(&admin_token),
+            "GET",
+            "/admin/api/v1/wallet/deposit-settings/addresses",
+            Value::Null
+        )
+        .await
+        .status(),
+        StatusCode::OK
+    );
+    assert_eq!(
+        call(
+            &app,
+            Some(&admin_token),
+            "GET",
+            "/admin/api/v1/wallet/deposit-settings",
+            Value::Null
+        )
+        .await
+        .status(),
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        call(
+            &app,
+            Some(&admin_token),
+            "POST",
+            "/admin/api/v1/wallet/deposit-settings/addresses",
+            json!({"network":"eth","addresses":[address],"reason":"address role"})
+        )
+        .await
+        .status(),
+        StatusCode::NO_CONTENT
+    );
+    sqlx::query(
+        "UPDATE admin_roles SET permissions=JSON_ARRAY('wallet.address_pool.read') WHERE id=?",
+    )
+    .bind(role)
+    .execute(&pool)
+    .await
+    .unwrap();
+    assert_eq!(
+        call(
+            &app,
+            Some(&admin_token),
+            "POST",
+            "/admin/api/v1/wallet/deposit-settings/addresses",
+            json!({"network":"eth","addresses":[address],"reason":"read role cannot write"})
+        )
+        .await
+        .status(),
+        StatusCode::FORBIDDEN
+    );
+    for (path, token) in [
+        ("/api/v1/wallet/deposit-address", &user_token),
+        ("/admin/api/v1/wallet/deposits/observe", &admin_token),
+        ("/admin/api/v1/deposit-address-pool", &admin_token),
+        ("/admin/api/v1/deposit-address-pool/batch", &admin_token),
+        ("/admin/api/v1/deposit-address-pool/1/reclaim", &admin_token),
+    ] {
+        assert_eq!(
+            call(&app, Some(token), "POST", path, json!({}))
+                .await
+                .status(),
+            StatusCode::NOT_FOUND,
+            "retired path {path}"
+        );
+    }
 }

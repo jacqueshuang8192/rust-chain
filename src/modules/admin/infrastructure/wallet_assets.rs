@@ -96,30 +96,6 @@ pub(crate) struct AdminDepositNetworkConfigWrite {
     pub(crate) sort_order: i32,
 }
 
-#[derive(Debug)]
-pub(crate) struct AdminDepositAddressPoolListFilter {
-    pub(crate) network: Option<String>,
-    pub(crate) address_group_code: Option<String>,
-    pub(crate) status: Option<String>,
-    pub(crate) asset_symbol: Option<String>,
-    pub(crate) assigned_user_id: Option<u64>,
-    pub(crate) email: Option<String>,
-    pub(crate) address: Option<String>,
-    pub(crate) limit: u32,
-    pub(crate) offset: u32,
-}
-
-#[derive(Debug)]
-pub(crate) struct AdminDepositAddressPoolWrite {
-    pub(crate) network: String,
-    pub(crate) address_group_code: String,
-    pub(crate) address: String,
-    pub(crate) asset_symbols: Vec<String>,
-    pub(crate) status: String,
-    pub(crate) memo: Option<String>,
-    pub(crate) remark: Option<String>,
-}
-
 #[derive(Debug, sqlx::FromRow)]
 pub(crate) struct AdminWalletRow {
     pub(crate) available: BigDecimal,
@@ -573,8 +549,8 @@ pub(crate) async fn list_admin_wallet_ledger(
     .await
 }
 
-/// 分页查询充值网络配置，返回符合调用方筛选条件的记录及相同谓词下的总数。
-/// 充值网络配置列表与计数通过连接池分别执行且均不加锁；并发写入可能造成页数据与总数快照不同，SQL 或字段映射失败直接返回错误。
+/// 分页查询提现网络配置，返回符合调用方筛选条件的记录及相同谓词下的总数。
+/// 提现网络配置列表与计数通过连接池分别执行且均不加锁；并发写入可能造成页数据与总数快照不同，SQL 或字段映射失败直接返回错误。
 pub(crate) async fn list_admin_deposit_network_configs(
     pool: &Pool<MySql>,
     filter: AdminDepositNetworkConfigListFilter,
@@ -615,24 +591,8 @@ pub(crate) async fn list_admin_deposit_network_configs(
     .await
 }
 
-/// 按网络代码从连接池读取充值网络配置并映射为应用层所需的完整记录。
-/// 充值网络配置不追加行锁，查询不创建事务；记录缺失时返回空值，SQL 或字段解码失败直接返回错误，不产生审计副作用。
-pub(crate) async fn load_deposit_network_config_by_network(
-    pool: &Pool<MySql>,
-    network: &str,
-) -> AppResult<AdminDepositNetworkConfigResponse> {
-    let mut builder = admin_deposit_network_config_query();
-    builder.push(" WHERE network = ");
-    builder.push_bind(network.to_owned());
-    builder
-        .build_query_as::<AdminDepositNetworkConfigResponse>()
-        .fetch_optional(pool)
-        .await?
-        .ok_or_else(|| AppError::Validation("deposit network config is missing".to_owned()))
-}
-
-/// 在调用方事务中插入充值网络配置并返回或保留数据库写入结果。
-/// 充值网络配置数据库唯一键冲突会映射为业务冲突；调用方持有提交边界并负责同事务审计，任一 SQL 失败使所属用例回滚。
+/// 在调用方事务中插入提现网络配置并返回或保留数据库写入结果。
+/// 提现网络配置数据库唯一键冲突会映射为业务冲突；调用方持有提交边界并负责同事务审计，任一 SQL 失败使所属用例回滚。
 pub(crate) async fn insert_admin_deposit_network_config_in_tx(
     tx: &mut Transaction<'_, MySql>,
     input: AdminDepositNetworkConfigWrite,
@@ -655,8 +615,8 @@ pub(crate) async fn insert_admin_deposit_network_config_in_tx(
     Ok(result.last_insert_id())
 }
 
-/// 在调用方事务中按传入主键或筛选条件更新充值网络配置，写入应用层已决定的目标字段。
-/// 充值网络配置更新不检查受影响行数，唯一键冲突映射为业务冲突；调用方须先完成所需锁定和状态校验，并负责提交、回滚及同事务审计。
+/// 在调用方事务中按传入主键或筛选条件更新提现网络配置，写入应用层已决定的目标字段。
+/// 提现网络配置更新不检查受影响行数，唯一键冲突映射为业务冲突；调用方须先完成所需锁定和状态校验，并负责提交、回滚及同事务审计。
 pub(crate) async fn update_admin_deposit_network_config_in_tx(
     tx: &mut Transaction<'_, MySql>,
     config_id: u64,
@@ -687,8 +647,8 @@ pub(crate) async fn update_admin_deposit_network_config_in_tx(
     Ok(())
 }
 
-/// 按传入主键或筛选条件从调用方事务快照读取充值网络配置并映射为应用层所需的完整记录。
-/// 充值网络配置不追加行锁，由调用方持有事务且本读取不提交；记录缺失时返回未找到，SQL 或字段解码失败直接返回错误，不产生审计副作用。
+/// 按传入主键或筛选条件从调用方事务快照读取提现网络配置并映射为应用层所需的完整记录。
+/// 提现网络配置不追加行锁，由调用方持有事务且本读取不提交；记录缺失时返回未找到，SQL 或字段解码失败直接返回错误，不产生审计副作用。
 pub(crate) async fn load_deposit_network_config_in_tx(
     tx: &mut Transaction<'_, MySql>,
     config_id: u64,
@@ -703,8 +663,8 @@ pub(crate) async fn load_deposit_network_config_in_tx(
         .ok_or(AppError::NotFound)
 }
 
-/// 在调用方事务中按传入主键或筛选条件以 `FOR UPDATE` 锁定充值网络配置并返回一致的修改前快照。
-/// 充值网络配置锁由调用方事务持有至结束；函数不自行提交，记录缺失返回未找到，SQL 或解码失败交由外层回滚。
+/// 在调用方事务中按传入主键或筛选条件以 `FOR UPDATE` 锁定提现网络配置并返回一致的修改前快照。
+/// 提现网络配置锁由调用方事务持有至结束；函数不自行提交，记录缺失返回未找到，SQL 或解码失败交由外层回滚。
 pub(crate) async fn lock_deposit_network_config_in_tx(
     tx: &mut Transaction<'_, MySql>,
     config_id: u64,
@@ -730,187 +690,6 @@ pub(crate) async fn ensure_asset_symbols_exist(
         ensure_asset_symbol_exists(pool, symbol).await?;
     }
     Ok(())
-}
-
-/// 按网络、地址组、状态、资产、用户和地址片段分页检索充值地址池。
-/// 调用方负责管理员权限；资产筛选同时覆盖地址默认资产、已分配资产及 JSON 白名单。
-/// 列表和计数复用同一组谓词，不启事务、不锁定或回收地址，也不改变任何分配关系。
-/// 查询失败无副作用；结果按更新时间和主键稳定倒序，供后台审计与运维查看。
-pub(crate) async fn list_admin_deposit_address_pool(
-    pool: &Pool<MySql>,
-    filter: AdminDepositAddressPoolListFilter,
-) -> AppResult<(Vec<AdminDepositAddressPoolResponse>, i64)> {
-    let mut rows = admin_deposit_address_pool_query();
-    let mut total = QueryBuilder::<MySql>::new(
-        r#"SELECT COUNT(*)
-           FROM deposit_address_pool addresses
-           LEFT JOIN users assigned_users ON assigned_users.id = addresses.assigned_user_id"#,
-    );
-    for builder in [&mut rows, &mut total] {
-        builder.push(" WHERE 1 = 1");
-        if let Some(network) = filter.network.clone() {
-            builder.push(" AND addresses.network = ");
-            builder.push_bind(network);
-        }
-        if let Some(address_group_code) = filter.address_group_code.clone() {
-            builder.push(" AND addresses.address_group_code = ");
-            builder.push_bind(address_group_code);
-        }
-        if let Some(status) = filter.status.clone() {
-            builder.push(" AND addresses.status = ");
-            builder.push_bind(status);
-        }
-        if let Some(asset_symbol) = filter.asset_symbol.clone() {
-            builder.push(" AND (addresses.asset_symbol = ");
-            builder.push_bind(asset_symbol.clone());
-            builder.push(" OR addresses.assigned_asset_symbol = ");
-            builder.push_bind(asset_symbol.clone());
-            builder.push(" OR JSON_CONTAINS(addresses.asset_symbols_json, JSON_QUOTE(");
-            builder.push_bind(asset_symbol);
-            builder.push("))");
-            builder.push(")");
-        }
-        if let Some(user_id) = filter.assigned_user_id {
-            push_user_id_filter(builder, "addresses.assigned_user_id", user_id);
-        }
-        push_user_email_filter(builder, "addresses.assigned_user_id", filter.email.clone());
-        if let Some(address) = filter.address.clone() {
-            builder.push(" AND addresses.address LIKE ");
-            builder.push_bind(format!("%{address}%"));
-        }
-    }
-
-    fetch_admin_page(
-        pool,
-        rows,
-        total,
-        " ORDER BY addresses.updated_at DESC, addresses.id DESC",
-        filter.limit,
-        filter.offset,
-    )
-    .await
-}
-
-/// 按传入主键或筛选条件从连接池读取充值地址池并映射为应用层所需的完整记录。
-/// 充值地址池不追加行锁，查询不创建事务；记录缺失时返回未找到，SQL 或字段解码失败直接返回错误，不产生审计副作用。
-pub(crate) async fn load_deposit_address_pool(
-    pool: &Pool<MySql>,
-    address_id: u64,
-) -> AppResult<AdminDepositAddressPoolResponse> {
-    let mut builder = admin_deposit_address_pool_query();
-    builder.push(" WHERE addresses.id = ");
-    builder.push_bind(address_id);
-    builder
-        .build_query_as::<AdminDepositAddressPoolResponse>()
-        .fetch_optional(pool)
-        .await?
-        .ok_or(AppError::NotFound)
-}
-
-/// 在调用方事务中插入充值地址池并返回或保留数据库写入结果。
-/// 充值地址池数据库唯一键冲突会映射为业务冲突；调用方持有提交边界并负责同事务审计，任一 SQL 失败使所属用例回滚。
-pub(crate) async fn insert_deposit_address_pool_in_tx(
-    tx: &mut Transaction<'_, MySql>,
-    input: AdminDepositAddressPoolWrite,
-) -> AppResult<AdminDepositAddressPoolResponse> {
-    let result = sqlx::query(
-        r#"INSERT INTO deposit_address_pool
-           (network, address_group_code, address, asset_symbol, asset_symbols_json, status, memo, remark)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)"#,
-    )
-    .bind(&input.network)
-    .bind(&input.address_group_code)
-    .bind(&input.address)
-    .bind(deposit_address_pool_legacy_asset_symbol(&input.asset_symbols))
-    .bind(deposit_asset_symbols_json(&input.asset_symbols))
-    .bind(&input.status)
-    .bind(&input.memo)
-    .bind(&input.remark)
-    .execute(&mut **tx)
-    .await
-    .map_err(map_duplicate_deposit_address_error)?;
-    load_deposit_address_pool_in_tx(tx, result.last_insert_id()).await
-}
-
-/// 在调用方事务中按传入主键或筛选条件更新充值地址池，写入应用层已决定的目标字段。
-/// 充值地址池更新不检查受影响行数，唯一键冲突映射为业务冲突；调用方须先完成所需锁定和状态校验，并负责提交、回滚及同事务审计。
-pub(crate) async fn update_deposit_address_pool_in_tx(
-    tx: &mut Transaction<'_, MySql>,
-    address_id: u64,
-    input: AdminDepositAddressPoolWrite,
-) -> AppResult<()> {
-    sqlx::query(
-        r#"UPDATE deposit_address_pool
-           SET network = ?, address_group_code = ?, address = ?, asset_symbol = ?, asset_symbols_json = ?, status = ?, memo = ?, remark = ?
-           WHERE id = ?"#,
-    )
-    .bind(&input.network)
-    .bind(&input.address_group_code)
-    .bind(&input.address)
-    .bind(deposit_address_pool_legacy_asset_symbol(&input.asset_symbols))
-    .bind(deposit_asset_symbols_json(&input.asset_symbols))
-    .bind(&input.status)
-    .bind(&input.memo)
-    .bind(&input.remark)
-    .bind(address_id)
-    .execute(&mut **tx)
-    .await
-    .map_err(map_duplicate_deposit_address_error)?;
-    Ok(())
-}
-
-/// 在调用方事务中针对地址回收更新充值地址池，写入应用层已决定的目标字段。
-/// 充值地址池更新不检查受影响行数；调用方须先完成所需锁定和状态校验，并负责提交、回滚及同事务审计。
-pub(crate) async fn reclaim_deposit_address_pool_in_tx(
-    tx: &mut Transaction<'_, MySql>,
-    address_id: u64,
-) -> AppResult<()> {
-    sqlx::query(
-        r#"UPDATE deposit_address_pool
-           SET status = 'available',
-               assigned_user_id = NULL,
-               assigned_user_email = NULL,
-               assigned_asset_symbol = NULL,
-               assigned_at = NULL
-           WHERE id = ?"#,
-    )
-    .bind(address_id)
-    .execute(&mut **tx)
-    .await?;
-    Ok(())
-}
-
-/// 按传入主键或筛选条件从调用方事务快照读取充值地址池并映射为应用层所需的完整记录。
-/// 充值地址池不追加行锁，由调用方持有事务且本读取不提交；记录缺失时返回未找到，SQL 或字段解码失败直接返回错误，不产生审计副作用。
-pub(crate) async fn load_deposit_address_pool_in_tx(
-    tx: &mut Transaction<'_, MySql>,
-    address_id: u64,
-) -> AppResult<AdminDepositAddressPoolResponse> {
-    let mut builder = admin_deposit_address_pool_query();
-    builder.push(" WHERE addresses.id = ");
-    builder.push_bind(address_id);
-    builder
-        .build_query_as::<AdminDepositAddressPoolResponse>()
-        .fetch_optional(&mut **tx)
-        .await?
-        .ok_or(AppError::NotFound)
-}
-
-/// 在调用方事务中按传入主键或筛选条件以 `FOR UPDATE` 锁定充值地址池并返回一致的修改前快照。
-/// 充值地址池锁由调用方事务持有至结束；函数不自行提交，记录缺失返回未找到，SQL 或解码失败交由外层回滚。
-pub(crate) async fn lock_deposit_address_pool_in_tx(
-    tx: &mut Transaction<'_, MySql>,
-    address_id: u64,
-) -> AppResult<AdminDepositAddressPoolResponse> {
-    let mut builder = admin_deposit_address_pool_query();
-    builder.push(" WHERE addresses.id = ");
-    builder.push_bind(address_id);
-    builder.push(" FOR UPDATE");
-    builder
-        .build_query_as::<AdminDepositAddressPoolResponse>()
-        .fetch_optional(&mut **tx)
-        .await?
-        .ok_or(AppError::NotFound)
 }
 
 /// 在调用方事务中锁定或创建代理钱包账户，增加可用余额并追加对应后台钱包流水。
@@ -1074,31 +853,6 @@ fn admin_deposit_network_config_query() -> QueryBuilder<'static, MySql> {
     )
 }
 
-fn admin_deposit_address_pool_query() -> QueryBuilder<'static, MySql> {
-    QueryBuilder::<MySql>::new(
-        r#"SELECT addresses.id,
-                  addresses.network,
-                  addresses.address_group_code,
-                  addresses.address,
-                  addresses.asset_symbol,
-                  COALESCE(
-                      addresses.asset_symbols_json,
-                      IF(addresses.asset_symbol IS NULL, JSON_ARRAY(), JSON_ARRAY(addresses.asset_symbol))
-                  ) AS asset_symbols,
-                  addresses.status,
-                  addresses.assigned_user_id,
-                  COALESCE(addresses.assigned_user_email, assigned_users.email) AS assigned_user_email,
-                  addresses.assigned_asset_symbol,
-                  addresses.assigned_at,
-                  addresses.memo,
-                  addresses.remark,
-                  addresses.created_at,
-                  addresses.updated_at
-           FROM deposit_address_pool addresses
-           LEFT JOIN users assigned_users ON assigned_users.id = addresses.assigned_user_id"#,
-    )
-}
-
 fn map_duplicate_asset_error(error: sqlx::Error) -> AppError {
     if is_mysql_duplicate_key(&error) {
         AppError::Conflict("asset already exists".to_owned())
@@ -1115,14 +869,6 @@ fn map_duplicate_deposit_network_config_error(error: sqlx::Error) -> AppError {
     }
 }
 
-fn map_duplicate_deposit_address_error(error: sqlx::Error) -> AppError {
-    if is_mysql_duplicate_key(&error) {
-        AppError::Conflict("deposit address already exists".to_owned())
-    } else {
-        AppError::Database(error)
-    }
-}
-
 async fn ensure_asset_symbol_exists(pool: &Pool<MySql>, symbol: &str) -> AppResult<()> {
     let exists = sqlx::query_scalar::<_, i64>(
         "SELECT COUNT(*) FROM assets WHERE symbol = ? AND status = 'active'",
@@ -1134,13 +880,6 @@ async fn ensure_asset_symbol_exists(pool: &Pool<MySql>, symbol: &str) -> AppResu
         return Err(AppError::NotFound);
     }
     Ok(())
-}
-
-fn deposit_address_pool_legacy_asset_symbol(asset_symbols: &[String]) -> Option<String> {
-    match asset_symbols {
-        [symbol] => Some(symbol.clone()),
-        _ => None,
-    }
 }
 
 fn deposit_asset_symbols_json(asset_symbols: &[String]) -> Option<SqlxJson<Vec<String>>> {

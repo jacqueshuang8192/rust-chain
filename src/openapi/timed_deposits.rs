@@ -63,9 +63,27 @@ fn receipts() {}
     responses((status=204,description="保存成功")))]
 fn review() {}
 
+#[utoipa::path(get, path="/admin/api/v1/wallet/deposit-settings/addresses", tag="timed-deposits", security(("bearerAuth"=[])), responses((status=200,body=[SharedAddressView])))]
+fn addresses() {}
+
+#[utoipa::path(post, path="/admin/api/v1/wallet/deposit-settings/addresses", tag="timed-deposits", security(("bearerAuth"=[])), request_body=ImportSharedAddresses, responses((status=204,description="导入成功")))]
+fn import_addresses() {}
+
 #[derive(OpenApi)]
 #[openapi(paths(
-    options, create, list, get, settings, scanner, asset, address, admin_list, admin_get, receipts,
+    options,
+    create,
+    list,
+    get,
+    addresses,
+    import_addresses,
+    settings,
+    scanner,
+    asset,
+    address,
+    admin_list,
+    admin_get,
+    receipts,
     review
 ))]
 pub(super) struct TimedDepositsApiDoc;

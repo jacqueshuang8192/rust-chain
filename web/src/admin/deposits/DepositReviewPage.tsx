@@ -1,7 +1,6 @@
 import { Button, Card, Modal, Space, Typography } from '@douyinfe/semi-ui';
 import { useQuery } from '@tanstack/react-query';
 import { useRef, useState, useSyncExternalStore } from 'react';
-import { Link } from 'react-router-dom';
 import { apiRequest } from '../../api/client';
 import { authStore } from '../../auth/authStore';
 import { PageHeader } from '../../layouts/PageHeader';
@@ -24,11 +23,11 @@ function ReviewList({ identity }: { identity: string }) {
     const data = await apiRequest<unknown>(`${base}/deposit-${mode}?limit=20&offset=${offset}${status ? `&status=${encodeURIComponent(status)}` : ''}${orderNo ? `&order_no=${encodeURIComponent(orderNo)}` : ''}`);
     return mode === 'receipts' ? parsePage(data, parseReceipt) : parsePage(data, parseOrder);
   }, enabled: Boolean(identity), refetchOnWindowFocus: false });
-  return <><PageHeader title="链上充值订单与到账核对" description="过期未付组合再次收到款项时，必须核对付款人及订单归属。错额、迟到和分笔款项保留独立证据；人工入账使用实际到账金额并扣除订单手续费。" actions={<Button onClick={() => { void query.refetch(); }}>刷新</Button>} />
+  return <main className="exchange-page admin-action-page"><PageHeader title="链上充值订单与到账核对" description="过期未付组合再次收到款项时，必须核对付款人及订单归属。错额、迟到和分笔款项保留独立证据；人工入账使用实际到账金额并扣除订单手续费。" actions={<Button onClick={() => { void query.refetch(); }}>刷新</Button>} />
     <Space wrap><AdminSelect ariaLabel="充值记录类型" value={mode} optionList={[{ value: 'receipts', label: '链上到账证据' }, { value: 'orders', label: '充值订单' }]} onChange={(value) => { setMode(value); setStatus(''); setOffset(0); }} />
       <AdminSelect ariaLabel="充值状态筛选" value={status} optionList={[{ value: '', label: '全部状态' }, ...(mode === 'receipts' ? ['review', 'observed', 'credited', 'ignored'] : ['pending', 'expired', 'review', 'credited', 'reversed']).map((value) => ({ value, label: labels[value] }))]} onChange={(value) => { setStatus(value); setOffset(0); }} />
       <form onSubmit={(event) => { event.preventDefault(); setOrderNo(orderSearch.trim()); setOffset(0); }}><Space><AdminTextInput ariaLabel="充值订单号搜索" placeholder="输入用户提供的完整充值订单号" value={orderSearch} onChange={setOrderSearch} /><Button htmlType="submit">查找订单号</Button></Space></form>
-      <Link to="/admin/wallet/deposit-settings">监听与地址配置</Link><Link to="/admin/wallet/deposits">已入账流水与冲正</Link></Space>
+</Space>
     {query.error ? <p role="alert">{adminErrorMessage(query.error)}</p> : null}
     {query.isPending ? <p>正在加载记录…</p> : null}
     {query.data?.items.map((row) => <Card key={row.id} style={{ marginTop: 16, overflowWrap: 'anywhere' }} title={`${'order_no' in row ? row.order_no : `到账证据 #${row.id}`} · ${labels[row.status] || row.status}`}>
@@ -39,7 +38,7 @@ function ReviewList({ identity }: { identity: string }) {
     {query.data && !query.data.items.length ? <p>暂无符合条件的记录</p> : null}
     <Space style={{ marginTop: 16 }}><Button disabled={offset === 0 || query.isFetching} onClick={() => setOffset(Math.max(0, offset - 20))}>上一页</Button><Typography.Text>共 {query.data?.total ?? '—'} 条</Typography.Text><Button disabled={!query.data || offset + query.data.items.length >= query.data.total || query.isFetching} onClick={() => setOffset(offset + 20)}>下一页</Button></Space>
     {selected ? <ReceiptReview key={selected.id} receipt={selected} close={() => setSelected(null)} saved={async () => { setSelected(null); await query.refetch(); }} /> : null}
-  </>;
+  </main>;
 }
 function ReceiptReview({ receipt, close, saved }: { receipt: Receipt; close: () => void; saved: () => Promise<void> }) {
   const [targetId, setTargetId] = useState(''); const [target, setTarget] = useState<Order | null>(null); const [error, setError] = useState(''); const [loading, setLoading] = useState(false);

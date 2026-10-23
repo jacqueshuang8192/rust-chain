@@ -30,9 +30,9 @@ struct Rule {
     confirmations: u32,
 }
 
-/// 仅展示配置齐全且监听近期成功的资产网络；启用数据库白名单和币种开关都必须满足。
+/// 仅展示配置齐全且监听近期成功的资产网络；链资产映射和平台币种开关都必须满足。
 pub(crate) async fn options(pool: &Pool<MySql>) -> AppResult<Vec<DepositOption>> {
-    Ok(sqlx::query_as("SELECT c.asset_symbol,c.network,n.display_name,LEAST(a.precision_scale,c.decimals) AS precision_scale,a.min_deposit_amount,a.deposit_fee,s.confirmations AS required_confirmations FROM wallet_deposit_chain_assets c JOIN assets a ON a.id=c.asset_id JOIN wallet_deposit_scanners s ON s.network=c.network JOIN deposit_network_configs n ON n.network=c.network WHERE c.enabled=TRUE AND s.enabled=TRUE AND s.endpoint_encrypted IS NOT NULL AND s.last_error IS NULL AND s.last_scan_at>DATE_SUB(CURRENT_TIMESTAMP(6),INTERVAL 120 SECOND) AND n.status='active' AND (n.asset_symbols_json IS NULL OR JSON_LENGTH(n.asset_symbols_json)=0 OR JSON_CONTAINS(n.asset_symbols_json,JSON_QUOTE(c.asset_symbol))) AND a.status='active' AND a.deposit_enabled=TRUE AND EXISTS(SELECT 1 FROM wallet_deposit_shared_addresses p JOIN deposit_address_pool inventory ON inventory.id=p.pool_id WHERE p.network=c.network AND p.enabled=TRUE AND inventory.status='available' AND inventory.assigned_user_id IS NULL AND ((inventory.asset_symbols_json IS NULL AND (inventory.asset_symbol IS NULL OR inventory.asset_symbol=c.asset_symbol)) OR JSON_CONTAINS(inventory.asset_symbols_json,JSON_QUOTE(c.asset_symbol)))) ORDER BY a.symbol,n.sort_order")
+    Ok(sqlx::query_as("SELECT c.asset_symbol,c.network,CASE c.network WHEN 'eth' THEN 'Ethereum' WHEN 'base' THEN 'Base' WHEN 'btc' THEN 'Bitcoin' WHEN 'tron' THEN 'Tron' ELSE 'Solana' END AS display_name,LEAST(a.precision_scale,c.decimals) AS precision_scale,a.min_deposit_amount,a.deposit_fee,s.confirmations AS required_confirmations FROM wallet_deposit_chain_assets c JOIN assets a ON a.id=c.asset_id JOIN wallet_deposit_scanners s ON s.network=c.network WHERE c.enabled=TRUE AND s.enabled=TRUE AND s.endpoint_encrypted IS NOT NULL AND s.last_error IS NULL AND s.last_scan_at>DATE_SUB(CURRENT_TIMESTAMP(6),INTERVAL 120 SECOND) AND a.status='active' AND a.deposit_enabled=TRUE AND EXISTS(SELECT 1 FROM wallet_deposit_shared_addresses p WHERE p.network=c.network AND p.enabled=TRUE) ORDER BY a.symbol,c.network")
     .fetch_all(pool).await?)
 }
 
@@ -61,7 +61,7 @@ pub(crate) async fn create(
         tx.commit().await?;
         return get(pool, Some(user_id), id).await;
     }
-    let rule=sqlx::query_as::<_,Rule>("SELECT c.id,c.asset_id,c.asset_symbol,c.asset_kind,c.token_address,c.identity_key,c.decimals,a.precision_scale,a.min_deposit_amount,a.deposit_fee,s.confirmations FROM wallet_deposit_chain_assets c JOIN assets a ON a.id=c.asset_id JOIN wallet_deposit_scanners s ON s.network=c.network JOIN deposit_network_configs n ON n.network=c.network WHERE c.network=? AND c.asset_symbol=? AND c.enabled=TRUE AND a.status='active' AND a.deposit_enabled=TRUE AND n.status='active' AND (n.asset_symbols_json IS NULL OR JSON_LENGTH(n.asset_symbols_json)=0 OR JSON_CONTAINS(n.asset_symbols_json,JSON_QUOTE(c.asset_symbol))) AND s.enabled=TRUE AND s.endpoint_encrypted IS NOT NULL AND s.last_error IS NULL AND s.last_scan_at>DATE_SUB(CURRENT_TIMESTAMP(6),INTERVAL 120 SECOND) FOR SHARE").bind(&request.network).bind(&request.asset_symbol).fetch_optional(&mut *tx).await?.ok_or_else(||AppError::Validation("deposit network is not configured or scanner is unavailable".into()))?;
+    let rule=sqlx::query_as::<_,Rule>("SELECT c.id,c.asset_id,c.asset_symbol,c.asset_kind,c.token_address,c.identity_key,c.decimals,a.precision_scale,a.min_deposit_amount,a.deposit_fee,s.confirmations FROM wallet_deposit_chain_assets c JOIN assets a ON a.id=c.asset_id JOIN wallet_deposit_scanners s ON s.network=c.network WHERE c.network=? AND c.asset_symbol=? AND c.enabled=TRUE AND a.status='active' AND a.deposit_enabled=TRUE AND s.enabled=TRUE AND s.endpoint_encrypted IS NOT NULL AND s.last_error IS NULL AND s.last_scan_at>DATE_SUB(CURRENT_TIMESTAMP(6),INTERVAL 120 SECOND) FOR SHARE").bind(&request.network).bind(&request.asset_symbol).fetch_optional(&mut *tx).await?.ok_or_else(||AppError::Validation("deposit network is not configured or scanner is unavailable".into()))?;
     let precision = rule.precision_scale.min(rule.decimals);
     if request.amount <= 0
         || !amount_fits_asset_precision(&request.amount, precision)
@@ -74,8 +74,8 @@ pub(crate) async fn create(
     let fee = truncate_amount_to_asset_precision(&rule.deposit_fee, rule.precision_scale);
     deposit_net_credit_amount(&request.amount, &fee, rule.precision_scale)
         .map_err(AppError::Validation)?;
-    let candidate=sqlx::query_as::<_,(u64,String,String)>("SELECT p.pool_id,p.address,p.address_key FROM wallet_deposit_shared_addresses p JOIN deposit_address_pool inventory ON inventory.id=p.pool_id WHERE p.network=? AND p.enabled=TRUE AND inventory.status='available' AND inventory.assigned_user_id IS NULL AND ((inventory.asset_symbols_json IS NULL AND (inventory.asset_symbol IS NULL OR inventory.asset_symbol=?)) OR JSON_CONTAINS(inventory.asset_symbols_json,JSON_QUOTE(?))) AND NOT EXISTS(SELECT 1 FROM wallet_deposit_orders o WHERE o.network=p.network AND o.address_key=p.address_key AND o.identity_key=? AND o.amount=? AND o.expires_at>?) ORDER BY p.pool_id LIMIT 1 FOR UPDATE")
-        .bind(&request.network).bind(&request.asset_symbol).bind(&request.asset_symbol).bind(&rule.identity_key).bind(&request.amount).bind(now).fetch_optional(&mut *tx).await?
+    let candidate=sqlx::query_as::<_,(u64,String,String)>("SELECT p.pool_id,p.address,p.address_key FROM wallet_deposit_shared_addresses p WHERE p.network=? AND p.enabled=TRUE AND NOT EXISTS(SELECT 1 FROM wallet_deposit_orders o WHERE o.network=p.network AND o.address_key=p.address_key AND o.identity_key=? AND o.amount=? AND o.expires_at>?) ORDER BY p.pool_id LIMIT 1 FOR UPDATE")
+        .bind(&request.network).bind(&rule.identity_key).bind(&request.amount).bind(now).fetch_optional(&mut *tx).await?
         .ok_or_else(||AppError::Conflict("all addresses for this deposit amount are reserved; retry later".into()))?;
     let expires = crate::time::checked_expiry(now, RESERVATION_SECONDS as u64, "deposit expiry")?;
     let order_no = format!("CD{}", uuid::Uuid::now_v7().simple());

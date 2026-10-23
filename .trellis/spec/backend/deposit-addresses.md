@@ -1,66 +1,78 @@
-# Deposit Address Contracts
+# Recharge Addresses and Legacy Retirement
 
-> This document describes the legacy permanent allocator. Amount-first Mobile/PC
-> deposits use [Timed On-chain Deposits](./timed-deposits.md): explicit per-network
-> shared inventory, no automatic cross-network address-group fallback. Enrolled
-> rows must be excluded from permanent allocation and direct inventory edits.
+## 1. Scope / Trigger
 
-## Scenario: Configurable Deposit Network Address Groups
+The test environment uses only quick recharge and amount-first on-chain recharge.
+Permanent user address allocation is retired. See [Timed On-chain Deposits](./timed-deposits.md)
+for reservations, scanner evidence and settlement; this contract owns the removal
+boundary and the withdrawal directory that must remain unaffected.
 
-### 1. Scope / Trigger
+## 2. Signatures
 
-- Trigger: wallet deposit address allocation, admin deposit network configuration, or PC recharge network selection.
-- Applies when a network can share an address class with another network, such as Ethereum and Base sharing EVM addresses.
+- Active address APIs: `GET|POST /admin/api/v1/wallet/deposit-settings/addresses`
+  and `PUT /admin/api/v1/wallet/deposit-settings/addresses/:id`.
+- Retired: `POST /api/v1/wallet/deposit-address`,
+  `POST /admin/api/v1/wallet/deposits/observe`, and all old
+  `/admin/api/v1/deposit-address-pool` list/create/update/batch/reclaim routes
+  (including `/wallet/deposit-address-pool` aliases).
+- Retained for withdrawals: `GET /api/v1/wallet/deposit-networks?asset_symbol=USDT`
+  and Admin `/admin/api/v1/deposit-network-configs` list/create/update.
+- Storage: migration 0160 makes `wallet_deposit_shared_addresses.pool_id` an
+  independent AUTO_INCREMENT key and retains order foreign keys.
 
-### 2. Signatures
+## 3. Contracts
 
-- DB: `deposit_network_configs(network, display_name, address_group_code, address_group_name, asset_symbols_json, status, sort_order)`.
-- DB: `deposit_address_pool.address_group_code` is the allocation key for address inventory.
-- User API: `GET /api/v1/wallet/deposit-networks?asset_symbol=USDT`.
-- User API: `POST /api/v1/wallet/deposit-address` with `{ asset_symbol, network }`.
-- Admin API: `/admin/api/v1/deposit-network-configs` list/create/update.
-- Admin API: `/admin/api/v1/deposit-address-pool` and `/batch` accept `address_group_code`.
+Import `{network,addresses:["0x…"],reason}` directly into the selected network's
+shared addresses; do not create an intermediate inventory row or assign users.
+Networks do not inherit one another's address groups. On-chain options and order
+creation never query the legacy directory or inventory allowlists.
 
-### 3. Contracts
+`deposit_network_configs` continues to control withdrawal network selection and
+validation. Stored `address_group_code`/`address_group_name` fields and API shape
+remain intact; the Admin editor is `/admin/wallet/withdrawal-networks`, with no
+recharge inventory/group allocation controls. Mobile/PC retain the directory API
+for withdrawals and use `/wallet/deposit-options` for on-chain recharge.
 
-- `deposit_network_configs.network` remains the user-selected chain network key.
-- `address_group_code` is the address set/class key. Networks with the same group code share address inventory.
-- `asset_symbols_json` on network config limits which active deposit assets can use that network; `NULL` means no network-level asset restriction.
-- Address allocation must first load an active network config, validate the requested asset against it, then query `deposit_address_pool` by `address_group_code`.
-- API responses may return the requested network even when the physical address row was imported under another network in the same group.
+Historical tables/ledger entries are retained. The wallet chain gateway continues
+withdrawal broadcast/confirmation, but legacy deposit observations enter dead
+letters and cannot credit by a permanent user/address relationship. New deposits
+are credited exclusively from scanner evidence and explicit orders.
 
-### 4. Validation & Error Matrix
+## 4. Validation & Error Matrix
 
-- Missing active network config -> `VALIDATION_ERROR`.
-- Asset not included in network config `asset_symbols_json` -> `VALIDATION_ERROR`.
-- Disabled asset deposit switch -> `VALIDATION_ERROR: asset does not support deposit`.
-- Admin address pool `address_group_code` differs from the selected network config -> `VALIDATION_ERROR`.
-- Duplicate configured network -> `CONFLICT`.
+| Condition | Result |
+|---|---|
+| Old allocator, inventory or observe request | 404, no allocation or credit |
+| Unknown shared address ID on PUT | 404, no enrollment |
+| Invalid address anywhere in import | Reject entire batch |
+| Disabled old network/old inventory whitelist | No effect on new deposit admission |
+| Disabled withdrawal directory network | Existing withdrawal rejection remains |
+| Gateway legacy deposit receipt | Audited dead letter, no wallet increment |
 
-### 5. Good/Base/Bad Cases
+## 5. Good / Base / Bad Cases
 
-- Good: ETH and Base both point to group `A`; a user selecting Base can receive an EVM address imported under ETH.
-- Base: BTC points to group `B`; Tron points to group `C`; they do not share inventory.
-- Bad: hard-coding Base -> ETH fallback in application code instead of using `deposit_network_configs`.
+- Good: import ten ETH addresses directly, configure USDT identity and a healthy
+  scanner, then reserve exact coin quantities for 30 minutes.
+- Base: configure the same EVM address separately on Base; it belongs to that
+  network independently.
+- Bad: create permanent inventory rows, infer an owner from them, or use a
+  legacy network allowlist to hide a ready on-chain option.
 
-### 6. Tests Required
+## 6. Tests Required
 
-- Backend route tests should seed or upsert the relevant `deposit_network_configs` row before inserting address pool rows.
-- Address pool rows in tests must include `address_group_code`.
-- Legacy allocation tests retain `/wallet/deposit-networks`; the current timed
-  recharge UI must select only `/wallet/deposit-options` readiness results.
-- Admin resource tests should assert network config columns and `address_group_code` request payloads.
+- Isolated MySQL: apply migrations twice; direct import and audit rollback,
+  independently configured networks, no dependence on legacy network settings.
+- HTTP: old routes 404; independent address/network permissions; read-only users
+  cannot write. New options/order APIs preserve ownership and exact amounts.
+- Wallet gateway: legacy deposits dead-letter; withdrawal confirmation still
+  settles once. Withdrawal quote, limits, freeze, approval and cooling regressions.
+- UI: only two recharge entries; old URLs redirect, direct address form has no
+  inventory enrollment step; withdrawal editor and clients keep directory access.
 
-### 7. Wrong vs Correct
+## 7. Wrong vs Correct
 
-#### Wrong
+Wrong: `POST /wallet/deposit-address` to permanently assign a legacy row.
 
-```rust
-network IN ('base', 'eth')
-```
-
-#### Correct
-
-```rust
-WHERE address_group_code = network_config.address_group_code
-```
+Correct: `POST /wallet/deposit-orders` with
+`{asset_symbol:"USDT",network:"eth",amount:"100",idempotency_key:"unique-key"}`;
+server selects a shared address and returns the fixed expiry.

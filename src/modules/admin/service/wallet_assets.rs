@@ -1,4 +1,4 @@
-//! 资产定义、充值网络配置与充值地址池的纯业务规则层。
+//! 资产定义与提现网络配置的纯业务规则层。
 //!
 //! 本文件全部是不触库、不加锁的纯函数，职责分三类：把请求字段规范化成稳定的落库形态（符号大写、网络别名归一、
 //! 地址组代码大写）、校验单字段与跨字段约束（精度区间、非负金额、批次上限、资产是否在网络白名单内）、
@@ -232,7 +232,7 @@ pub(crate) fn validate_address_group_code(value: &str) -> AppResult<String> {
     Ok(code.to_ascii_uppercase())
 }
 
-/// 规范化充值网络配置状态，仅允许地址分配流程明确支持的生命周期代码。
+/// 规范化提现网络配置状态，仅允许提现准入明确支持的生命周期代码。
 /// 取值同样只有 active 与 disabled，但语义与资产状态不同：停用的网络会让该网络下所有地址无法通过准入校验。
 pub(crate) fn validate_deposit_network_config_status(value: &str) -> AppResult<String> {
     let Some(status) = optional_string(Some(value.to_owned())) else {
@@ -319,169 +319,6 @@ pub(crate) fn deposit_network_config_audit_json(
         "sort_order": config.sort_order,
         "created_at": config.created_at.timestamp_millis(),
         "updated_at": config.updated_at.timestamp_millis(),
-    })
-}
-
-#[derive(Debug)]
-pub(crate) struct NormalizedDepositAddressPoolEntry {
-    pub(crate) address: String,
-    pub(crate) memo: Option<String>,
-    pub(crate) remark: Option<String>,
-}
-
-/// 校验请求资产符号均受目标充值网络配置允许，并要求该网络配置处于 active。
-/// 请求或白名单任一为空时视为不限制；比较不区分大小写，不支持的首个资产返回校验错误，函数不锁配置行。
-/// 空白名单表示该网络不限资产，这是刻意放行而非疏漏，运营需要限制时必须显式配置资产列表。
-/// 由于不加锁，通过校验后到实际写入之间网络配置仍可能被并发改动，最终一致性依赖写事务本身。
-pub(crate) fn ensure_deposit_asset_symbols_allowed_by_network(
-    asset_symbols: &[String],
-    network_config: &AdminDepositNetworkConfigResponse,
-) -> AppResult<()> {
-    if network_config.status != "active" {
-        return Err(AppError::Validation(
-            "deposit network config is disabled".to_owned(),
-        ));
-    }
-    if asset_symbols.is_empty() || network_config.asset_symbols.0.is_empty() {
-        return Ok(());
-    }
-
-    let allowed = network_config
-        .asset_symbols
-        .0
-        .iter()
-        .map(|symbol| symbol.to_ascii_uppercase())
-        .collect::<HashSet<_>>();
-    let unsupported = asset_symbols
-        .iter()
-        .find(|symbol| !allowed.contains(symbol.as_str()));
-    if let Some(symbol) = unsupported {
-        return Err(AppError::Validation(format!(
-            "asset {symbol} does not support deposit network {}",
-            network_config.network
-        )));
-    }
-    Ok(())
-}
-
-/// 解析充值地址导入使用的地址组代码，缺省时采用网络配置值，显式值必须规范化后与配置一致。
-/// 配置值或请求值格式非法、二者不一致均返回校验错误；该纯函数不修改网络配置或地址池。
-/// 允许请求显式传值的意义在于让调用方自证预期，而不是提供覆盖能力，因此不一致时是报错而非以请求值为准。
-/// 比对发生在双方都规范化为大写之后，故大小写差异不会导致误判为不一致。
-pub(crate) fn resolve_deposit_address_group_code(
-    requested_group_code: Option<String>,
-    network_config: &AdminDepositNetworkConfigResponse,
-) -> AppResult<String> {
-    let configured_group_code = validate_address_group_code(&network_config.address_group_code)?;
-    let Some(requested_group_code) = requested_group_code else {
-        return Ok(configured_group_code);
-    };
-    let requested_group_code = validate_address_group_code(&requested_group_code)?;
-    if requested_group_code != configured_group_code {
-        return Err(AppError::Validation(
-            "address_group_code must match deposit network config".to_owned(),
-        ));
-    }
-    Ok(requested_group_code)
-}
-
-/// 去除充值地址首尾空白并限制 255 个字符；链格式、校验和及重复地址由具体网络/数据库约束确认。
-/// 这里刻意不按网络做地址格式校验，因此错链地址能通过本函数，误配风险需由运营录入流程与后续对账兜住。
-pub(crate) fn validate_deposit_address(value: &str) -> AppResult<String> {
-    let Some(address) = optional_string(Some(value.to_owned())) else {
-        return Err(AppError::Validation("address is required".to_owned()));
-    };
-    if address.chars().count() > 255 {
-        return Err(AppError::Validation("address is too long".to_owned()));
-    }
-    Ok(address)
-}
-
-/// 规范化一批充值地址导入项，返回去空地址及长度受限的 memo/remark。
-/// 批次必须为 1..=100 项且地址按原字符串区分重复；发现空地址、超长字段或批内重复即整体返回校验错误，不部分保留结果。
-/// memo 与 remark 的长度上限分别是 255 与 512 字符，二者均可缺省。
-/// 查重只在本批次内进行且区分大小写，与库中既有地址是否冲突要等到插入时由唯一约束判定。
-pub(crate) fn normalize_deposit_address_batch_entries(
-    entries: Vec<CreateDepositAddressPoolEntryRequest>,
-) -> AppResult<Vec<NormalizedDepositAddressPoolEntry>> {
-    if entries.is_empty() {
-        return Err(AppError::Validation(
-            "at least one deposit address is required".to_owned(),
-        ));
-    }
-    if entries.len() > 100 {
-        return Err(AppError::Validation(
-            "a single batch cannot contain more than 100 deposit addresses".to_owned(),
-        ));
-    }
-
-    let mut normalized_entries = Vec::with_capacity(entries.len());
-    let mut seen = HashSet::new();
-    for entry in entries {
-        let address = validate_deposit_address(&entry.address)?;
-        if !seen.insert(address.clone()) {
-            return Err(AppError::Validation(
-                "duplicate deposit address in batch".to_owned(),
-            ));
-        }
-        normalized_entries.push(NormalizedDepositAddressPoolEntry {
-            address,
-            memo: validate_optional_length(entry.memo, "memo", 255)?,
-            remark: validate_optional_length(entry.remark, "remark", 512)?,
-        });
-    }
-
-    Ok(normalized_entries)
-}
-
-/// 规范化地址池记录状态，区分可分配、已分配和禁用等既有生命周期代码。
-/// 接受 available、assigned、disabled 三个取值，是覆盖全部状态的宽松版本，主要供查询筛选使用；
-/// 后台手工写入必须改用只允许前两者之外的可设置状态的收紧版本。
-pub(crate) fn validate_deposit_address_status(value: &str) -> AppResult<String> {
-    let Some(status) = optional_string(Some(value.to_owned())) else {
-        return Err(AppError::Validation("status is required".to_owned()));
-    };
-    match status.as_str() {
-        "available" | "assigned" | "disabled" => Ok(status),
-        _ => Err(AppError::Validation(
-            "unsupported deposit address status".to_owned(),
-        )),
-    }
-}
-
-/// 在通用地址状态基础上进一步限制后台可手工设置的状态，仅允许 available 或 disabled。
-/// 已分配状态由地址分配事务维护，管理员不得通过此入口伪造或释放用户绑定。
-pub(crate) fn validate_deposit_address_assignable_status(value: &str) -> AppResult<String> {
-    let status = validate_deposit_address_status(value)?;
-    match status.as_str() {
-        "available" | "disabled" => Ok(status),
-        _ => Err(AppError::Validation(
-            "assigned status is managed by user allocation".to_owned(),
-        )),
-    }
-}
-
-/// 将充值地址、网络、地址组、允许资产、分配用户、状态、备注和时间映射为地址池审计快照。
-/// 地址本身会进入审计但不含私钥；应用层在插入、更新或回收事务中保存对应前后值。
-/// 快照同时保留兼容用的单资产字段和资产数组两种表示，便于比对历史记录与新版多资产配置。
-/// 分配相关字段在地址未被领取时为空，回收操作正是靠这几项从有值变为空来体现前后差异。
-pub(crate) fn deposit_address_pool_audit_json(address: &AdminDepositAddressPoolResponse) -> Value {
-    json!({
-        "id": address.id,
-        "network": address.network,
-        "address_group_code": address.address_group_code,
-        "address": address.address,
-        "asset_symbol": address.asset_symbol,
-        "asset_symbols": address.asset_symbols.0.clone(),
-        "status": address.status,
-        "assigned_user_id": address.assigned_user_id,
-        "assigned_user_email": address.assigned_user_email,
-        "assigned_asset_symbol": address.assigned_asset_symbol,
-        "assigned_at": address.assigned_at.map(|value| value.timestamp_millis()),
-        "memo": address.memo,
-        "remark": address.remark,
-        "created_at": address.created_at.timestamp_millis(),
-        "updated_at": address.updated_at.timestamp_millis(),
     })
 }
 

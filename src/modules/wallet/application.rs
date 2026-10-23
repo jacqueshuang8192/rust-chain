@@ -22,9 +22,8 @@ use crate::{
             presentation::{
                 AdminWalletListQuery, AdminWalletWithdrawalsResponse, BroadcastWithdrawalRequest,
                 ConfirmWithdrawalRequest, CreateWithdrawalQuoteRequest, CreateWithdrawalRequest,
-                DepositAddressRequest, DepositAddressResponse, DepositAssetResponse,
-                DepositNetworkResponse, DepositNetworksQuery, FailWithdrawalRequest,
-                ObserveDepositRequest, ReturnHistoryMissingPrice, ReturnHistoryPoint,
+                DepositAssetResponse, DepositNetworkResponse, DepositNetworksQuery,
+                FailWithdrawalRequest, ReturnHistoryMissingPrice, ReturnHistoryPoint,
                 ReturnHistoryResponse, ReturnHistorySummary, ReverseDepositRequest,
                 ReviewWithdrawalRequest, TodayReturnResponse, TodayReturnStatus,
                 WalletAccountResponse, WalletDepositEventResponse, WalletDepositsResponse,
@@ -107,61 +106,6 @@ pub(crate) fn normalize_deposit_networks_query_asset(
         .as_deref()
         .map(normalize_asset_symbol)
         .transpose()
-}
-
-/// 获取用户在指定资产、网络与地址组中的充值地址；已有分配直接复用，不轮换地址。
-/// 请求先完成资产/网络规范化并确认充值已启用；新分配会在单事务内锁定一条可用地址、读取用户邮箱并绑定用户。
-/// 地址池行锁保证并发请求不会把同一地址分配给多个用户；事务失败不改变库存，调用方可安全重试并读取既有分配。
-/// 本函数只更新本地地址池，不调用链网关，也不产生充值入账或外部消息。
-pub(crate) async fn get_or_assign_deposit_address(
-    pool: &Pool<MySql>,
-    user_id: u64,
-    request: DepositAddressRequest,
-) -> AppResult<DepositAddressResponse> {
-    let request = normalize_deposit_address_request(request)?;
-    let network_config = infrastructure::load_active_deposit_network_config(
-        pool,
-        &request.network,
-        &request.asset_symbol,
-    )
-    .await?;
-    infrastructure::ensure_deposit_enabled_asset(pool, &request.asset_symbol).await?;
-
-    if let Some(mut address) = infrastructure::load_user_deposit_address(
-        pool,
-        user_id,
-        &request.asset_symbol,
-        &network_config.address_group_code,
-        &request.network,
-    )
-    .await?
-    {
-        address.network = request.network;
-        return Ok(address);
-    }
-
-    // 地址池库存锁定、用户邮箱读取和分配写入必须在同一个事务中完成，避免同一地址被并发分配。
-    let mut tx = pool.begin().await?;
-    let candidate_id = infrastructure::lock_available_deposit_address(
-        &mut tx,
-        &request.asset_symbol,
-        &network_config.address_group_code,
-        &request.network,
-    )
-    .await?;
-    let assigned_user_email = infrastructure::load_user_email_in_tx(&mut tx, user_id).await?;
-    infrastructure::assign_deposit_address_in_tx(
-        &mut tx,
-        candidate_id,
-        user_id,
-        assigned_user_email,
-        &request.asset_symbol,
-    )
-    .await?;
-    let mut address = infrastructure::load_deposit_address_in_tx(&mut tx, candidate_id).await?;
-    tx.commit().await?;
-    address.network = request.network;
-    Ok(address)
 }
 
 /// 读取用户全部资产账户的 available/frozen/locked 当前快照，按资产代码升序返回并带出符号与图标。
@@ -1108,17 +1052,6 @@ pub(crate) async fn fail_withdrawal(
     Ok(withdrawal)
 }
 
-/// 规范链充值事件后按 network/tx_hash/event_index 幂等观察；仅达到服务端确认数时增加 available。
-/// 首次入账写正向 deposit 流水，frozen/locked 不变；重复事件只推进确认数且不二次入账。
-/// 基础设施拥有事件、钱包和流水事务，字段冲突、精度/最小额不符或 SQL 失败均不留下本次部分资金结果。
-pub(crate) async fn observe_deposit(
-    pool: &Pool<MySql>,
-    request: ObserveDepositRequest,
-) -> AppResult<WalletDepositEventResponse> {
-    let request = normalize_observe_deposit_request(request)?;
-    infrastructure::observe_deposit_event(pool, &request).await
-}
-
 /// 按充值编号执行幂等链重组冲正：available 足额时扣回原到账金额并写负向流水。
 /// 已冲正重放直接返回；状态不允许时冲突，available 不足则提交 manual_review 而不扣款、不写冲正流水。
 /// 事件、余额和流水事务由基础设施拥有，本应用入口只规范必填原因并转交处理。
@@ -1344,34 +1277,6 @@ fn normalize_chain_identifier(value: String, label: &str) -> AppResult<String> {
     Ok(value.to_owned())
 }
 
-/// 校验并归一链上充值观测请求，使外部观测在进入幂等入账前具备可比对的稳定形态。
-/// 金额必须严格为正，地址与交易哈希按链上标识规则校验，资产代码转大写，网络按别名表收敛到规范名。
-/// 备注做裁剪并把空白归一为缺省，因为备注参与事件身份一致性比对，空串与缺省必须视为同一含义。
-/// 事件序号、区块高度与确认数原样透传，本函数不判断确认是否达标，也不校验地址是否已分配给某个用户。
-/// 归一只保证形态，入账与否完全由基础设施在事务中按幂等键与确认阈值决定。
-fn normalize_observe_deposit_request(
-    request: ObserveDepositRequest,
-) -> AppResult<ObserveDepositRequest> {
-    if request.amount <= 0 {
-        return Err(AppError::Validation(
-            "deposit amount must be positive".to_owned(),
-        ));
-    }
-    let address = normalize_chain_identifier(request.address, "address")?;
-    let tx_hash = normalize_chain_identifier(request.tx_hash, "tx_hash")?;
-    Ok(ObserveDepositRequest {
-        asset_symbol: normalize_asset_symbol(&request.asset_symbol)?,
-        network: normalize_deposit_network(&request.network)?,
-        address,
-        memo: optional_string(request.memo),
-        tx_hash,
-        event_index: request.event_index,
-        amount: request.amount,
-        block_height: request.block_height,
-        confirmations: request.confirmations,
-    })
-}
-
 /// 判定数据库错误是否为唯一键冲突，用于把并发重放识别成可回读旧申请而非直接失败。
 /// 通过错误码判断，同时接受重复键专用码与完整性约束通用码；非数据库错误一律返回否。
 /// 仅在提现创建路径使用：命中后回读同幂等键的既有申请并重新核对参数，绝不重复冻结资金。
@@ -1379,28 +1284,6 @@ fn is_duplicate_key_error(error: &sqlx::Error) -> bool {
     error.as_database_error().is_some_and(|database_error| {
         matches!(database_error.code().as_deref(), Some("1062" | "23000"))
     })
-}
-
-/// 归一充值地址申请的资产代码与网络，两者都是必填项，任一格式非法即在查库前终止。
-/// 资产走大写与字符集校验，网络按别名表收敛，从而保证后续地址组匹配与既有分配复用使用同一口径。
-/// 该函数不判断资产是否开放充值、网络是否启用，也不检查两者组合是否被允许。
-fn normalize_deposit_address_request(
-    request: DepositAddressRequest,
-) -> AppResult<DepositAddressRequest> {
-    let asset_symbol = normalize_asset_symbol(&request.asset_symbol)?;
-    let network = normalize_deposit_network(&request.network)?;
-    Ok(DepositAddressRequest {
-        asset_symbol,
-        network,
-    })
-}
-
-/// 裁剪可空文本字段并把纯空白归一为缺省，专供充值备注这类参与身份比对的可选字段使用。
-/// 与查询参数归一实现相同但语义不同：这里的目的是让空备注与无备注在幂等比对中被视作同一取值。
-fn optional_string(value: Option<String>) -> Option<String> {
-    value
-        .map(|value| value.trim().to_owned())
-        .filter(|value| !value.is_empty())
 }
 
 #[cfg(test)]

@@ -70,14 +70,6 @@ interface BackendWithdrawalQuote {
     expires_at?: number
 }
 
-interface BackendDepositAddressResponse {
-    id: number
-    asset_symbol: string
-    network: string
-    address: string
-    memo?: string | null
-    assigned_at: number
-}
 
 interface BackendDepositAssetResponse {
     symbol: string
@@ -221,30 +213,6 @@ export async function fetchCoinNetworks(unit: string, purpose: AssetPurpose = 'd
     }
 }
 
-export async function getDepositAddress(unit: string, network?: string, options?: { signal?: AbortSignal }): Promise<{ data: { code: number, message: string, data: WalletAddress | null } }> {
-    const networkValue = backendNetworkValue(network || supportedDepositNetworks(unit)[0])
-    const res = await request.instance.post<BackendDepositAddressResponse>(backendApiUrl('/wallet/deposit-address'), {
-        asset_symbol: unit.toUpperCase(),
-        network: networkValue,
-    }, {
-        signal: options?.signal,
-    })
-    const asset = await fetchAssetSetting(res.data.asset_symbol, 'deposit', options)
-    const coin = defaultNetwork(res.data.asset_symbol, depositNetworkLabel(res.data.network), asset)
-    return {
-        data: {
-            code: 0,
-            message: 'success',
-            data: {
-                address: res.data.address,
-                qrcode: res.data.address,
-                unit: res.data.asset_symbol,
-                network: coin.name,
-                coin,
-            },
-        }
-    }
-}
 
 export async function fetchQuickRechargeConfig(): Promise<{ data: { code: number, message: string, data: QuickRechargeConfig } }> {
     const res = await request.instance.get<QuickRechargeConfig>(backendApiUrl('/wallet/quick-recharge/config'))

@@ -4,10 +4,7 @@ use super::{audit, lock_network};
 use crate::{
     error::{AppError, AppResult},
     infra::secrets::encrypt_secret_field,
-    modules::wallet::{
-        domain::timed_deposits::{canonical_address, identity_key},
-        presentation::timed_deposits::*,
-    },
+    modules::wallet::{domain::timed_deposits::identity_key, presentation::timed_deposits::*},
 };
 use serde_json::json;
 use sqlx::{MySql, Pool};
@@ -108,72 +105,71 @@ pub(crate) async fn save_asset(
     Ok(())
 }
 
-/// 把未永久分配过的库存显式纳入共享池；网络/地址快照永久保留，停用只禁止新订单，不删除历史归属。
+/// 地址表独立持有网络身份；按管理权限查询时不返回节点或凭据配置。
+pub(crate) async fn addresses(pool: &Pool<MySql>) -> AppResult<Vec<SharedAddressView>> {
+    Ok(sqlx::query_as("SELECT pool_id,network,address,enabled FROM wallet_deposit_shared_addresses ORDER BY network,pool_id").fetch_all(pool).await?)
+}
+
+/// 完整批次在网络锁内原子创建并审计；已有地址幂等跳过，停用地址不会因再次导入而开放。
+pub(crate) async fn import_addresses(
+    pool: &Pool<MySql>,
+    admin_id: u64,
+    request: &ImportSharedAddresses,
+) -> AppResult<()> {
+    let mut tx = pool.begin().await?;
+    lock_network(&mut tx, &request.network).await?;
+    let mut created = Vec::new();
+    for address in &request.addresses {
+        let key = identity_key(&[address]);
+        let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM wallet_deposit_shared_addresses WHERE network=? AND address_key=?)")
+            .bind(&request.network).bind(&key).fetch_one(&mut *tx).await?;
+        if exists {
+            continue;
+        }
+        let id = sqlx::query("INSERT INTO wallet_deposit_shared_addresses (network,address,address_key) VALUES (?,?,?)")
+            .bind(&request.network).bind(address).bind(key).execute(&mut *tx).await?.last_insert_id();
+        created.push(json!({"id": id, "address": address}));
+    }
+    if !created.is_empty() {
+        // 新增地址先使旧扫描失效，重新加载监听集合并追上区块后才开放新订单。
+        sqlx::query("UPDATE wallet_deposit_scanners SET last_scan_at=NULL,revision=revision+1,lease_token=NULL,lease_until=NULL WHERE network=?")
+            .bind(&request.network).execute(&mut *tx).await?;
+    }
+    audit(&mut tx,admin_id,"deposit_shared_address.import",0,None,
+        json!({"network":request.network,"created":created,"requested_count":request.addresses.len()}),&request.reason).await?;
+    tx.commit().await?;
+    Ok(())
+}
+
+/// 地址身份不可改写；停用仅阻止新订单，既有订单与迟到到账仍由原网络继续核对。
 pub(crate) async fn save_address(
     pool: &Pool<MySql>,
     admin_id: u64,
     pool_id: u64,
     request: &SaveSharedAddress,
 ) -> AppResult<()> {
-    let network =
-        sqlx::query_scalar::<_, String>("SELECT network FROM deposit_address_pool WHERE id=?")
-            .bind(pool_id)
-            .fetch_optional(pool)
-            .await?
-            .ok_or(AppError::NotFound)?;
+    let network = sqlx::query_scalar::<_, String>(
+        "SELECT network FROM wallet_deposit_shared_addresses WHERE pool_id=?",
+    )
+    .bind(pool_id)
+    .fetch_optional(pool)
+    .await?
+    .ok_or(AppError::NotFound)?;
     let mut tx = pool.begin().await?;
     lock_network(&mut tx, &network).await?;
-    let (locked_network, address, status, memo, assigned_user_id) =
-        sqlx::query_as::<_, (String, String, String, Option<String>, Option<u64>)>(
-            "SELECT network,address,status,memo,assigned_user_id FROM deposit_address_pool WHERE id=? FOR UPDATE",
-        )
+    let before = sqlx::query_as::<_,SharedAddressView>("SELECT pool_id,network,address,enabled FROM wallet_deposit_shared_addresses WHERE pool_id=? FOR UPDATE")
+        .bind(pool_id).fetch_one(&mut *tx).await?;
+    sqlx::query("UPDATE wallet_deposit_shared_addresses SET enabled=? WHERE pool_id=?")
+        .bind(request.enabled)
         .bind(pool_id)
-        .fetch_one(&mut *tx)
+        .execute(&mut *tx)
         .await?;
-    if locked_network != network {
-        return Err(AppError::Conflict(
-            "address network changed; reload first".into(),
-        ));
-    }
-    let before=sqlx::query_as::<_,SharedAddressView>("SELECT pool_id,network,address,enabled FROM wallet_deposit_shared_addresses WHERE pool_id=? FOR UPDATE").bind(pool_id).fetch_optional(&mut *tx).await?;
-    if let Some(old) = &before {
-        if request.enabled && (status != "available" || assigned_user_id.is_some()) {
-            return Err(AppError::Conflict(
-                "address inventory must be available".into(),
-            ));
-        }
-        sqlx::query("UPDATE wallet_deposit_shared_addresses SET enabled=? WHERE pool_id=?")
-            .bind(request.enabled)
-            .bind(old.pool_id)
-            .execute(&mut *tx)
-            .await?;
-    } else {
-        if status != "available"
-            || assigned_user_id.is_some()
-            || memo.as_deref().is_some_and(|m| !m.is_empty())
-        {
-            return Err(AppError::Conflict(
-                "only unused available addresses without a memo can enter this pool".into(),
-            ));
-        }
-        let reclaimed:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM admin_audit_logs WHERE target_type='deposit_address_pool' AND target_id=? AND action='deposit_address_pool.reclaim')").bind(pool_id.to_string()).fetch_one(&mut *tx).await?;
-        if reclaimed {
-            return Err(AppError::Conflict(
-                "a previously permanent user address cannot enter the shared pool".into(),
-            ));
-        }
-        let address = canonical_address(&network, &address).map_err(AppError::Validation)?;
-        let address_key = identity_key(&[&address]);
-        sqlx::query("INSERT INTO wallet_deposit_shared_addresses (pool_id,network,address,address_key,enabled) VALUES (?,?,?,?,?)").bind(pool_id).bind(&network).bind(address).bind(address_key).bind(request.enabled).execute(&mut *tx).await?;
-        // 新地址在扫描器重新加载库存后才能接单，避免轮询游标跨过它的首笔入账。
-        sqlx::query("UPDATE wallet_deposit_scanners SET last_scan_at=NULL,revision=revision+1,lease_token=NULL,lease_until=NULL WHERE network=?").bind(&network).execute(&mut *tx).await?;
-    }
     audit(
         &mut tx,
         admin_id,
         "deposit_shared_address.save",
         pool_id,
-        before.map(|v| json!(v)),
+        Some(json!(before)),
         json!({"pool_id":pool_id,"network":network,"enabled":request.enabled}),
         &request.reason,
     )

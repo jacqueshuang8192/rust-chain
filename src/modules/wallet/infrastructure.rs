@@ -28,10 +28,7 @@ pub(crate) use accounts_ledger::{
     list_wallet_accounts, list_wallet_ledger,
 };
 pub(crate) use deposits::{
-    assign_deposit_address_in_tx, ensure_deposit_enabled_asset, list_active_deposit_networks,
-    list_deposit_assets, list_deposit_events, list_withdraw_assets,
-    load_active_deposit_network_config, load_deposit_address_in_tx, load_user_deposit_address,
-    load_user_email_in_tx, lock_available_deposit_address, observe_deposit_event,
+    list_active_deposit_networks, list_deposit_assets, list_deposit_events, list_withdraw_assets,
     reverse_deposit_event,
 };
 pub(crate) use returns::{

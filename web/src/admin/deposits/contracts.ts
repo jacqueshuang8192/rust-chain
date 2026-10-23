@@ -10,7 +10,6 @@ export interface SharedAddress { pool_id: number; network: string; address: stri
 export interface Settings { scanners: Scanner[]; assets: Asset[]; addresses: SharedAddress[] }
 export interface Receipt { id: number; network: string; tx_hash: string; event_index: number; asset_kind: string; token_address: string; address: string; amount: string; block_height: number; block_hash: string; block_time: number; confirmations: number; status: string; review_reason: string | null; order_id: number | null; review_note: string | null }
 export interface Order { asset_kind: string; token_address: string; id: number; order_no: string; user_id: number; asset_symbol: string; network: string; address: string; amount: string; paid_amount: string | null; fee_amount: string; status: string; created_at: number; expires_at: number; required_confirmations: number; tx_hash: string | null }
-export interface Inventory { id: number; network: string; address: string; status: string; memo: string | null; assigned_user_id: number | null }
 const row = (value: unknown): Record<string, unknown> => { if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('响应格式无效'); return value as Record<string, unknown>; };
 const string = (value: unknown): string => { if (typeof value !== 'string') throw new Error('响应文本无效'); return value; };
 const integer = (value: unknown) => { if (typeof value !== 'number') throw new Error('响应数字无效'); return requiredSafeInteger(value, '响应编号'); };
@@ -35,6 +34,7 @@ export function parseOrder(value: unknown): Order {
 export function parsePage<T>(value: unknown, parse: (value: unknown) => T): { items: T[]; total: number } {
   const r = row(value); if (!Array.isArray(r.items)) throw new Error('充值列表响应无效'); return { items: r.items.map(parse), total: integer(r.total) };
 }
-export function parseInventory(value: unknown): Inventory {
-  const r = row(value); return { id: integer(r.id), network: string(r.network), address: string(r.address), status: string(r.status), memo: nullableText(r.memo), assigned_user_id: r.assigned_user_id === null ? null : integer(r.assigned_user_id) };
+export function parseAddresses(value: unknown): SharedAddress[] {
+  if (!Array.isArray(value)) throw new Error('收款地址响应不完整');
+  return value.map((value) => { const r = row(value); return { pool_id: integer(r.pool_id), network: string(r.network), address: string(r.address), enabled: bool(r.enabled) }; });
 }

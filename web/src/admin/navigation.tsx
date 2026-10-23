@@ -52,13 +52,9 @@ export const adminNavItems: AdminNavItem[] = [
     children: [
       { path: '/admin/assets', label: '资产管理' },
       { path: '/admin/wallet/accounts', label: '钱包账户' },
-      { path: '/admin/wallet/deposit-network-configs', label: '充值网络配置' },
-      { path: '/admin/wallet/deposit-address-pool', label: '充值地址池' },
-      { path: '/admin/wallet/quick-recharge', label: '快速充值配置' },
-      { path: '/admin/wallet/quick-recharge-orders', label: '快速充值订单' },
-      { path: '/admin/wallet/deposit-settings', label: '限时充值配置' },
-      { path: '/admin/wallet/deposit-receipts', label: '链上到账核对' },
-      { path: '/admin/wallet/deposits', label: '充值记录' },
+      { path: '/admin/wallet/quick-recharge', label: '快速充值', relatedPaths: ['/admin/wallet/quick-recharge/orders'] },
+      { path: '/admin/wallet/chain-recharge', label: '链上充值', relatedPaths: ['/admin/wallet/chain-recharge/addresses', '/admin/wallet/chain-recharge/records', '/admin/wallet/chain-recharge/ledger'] },
+      { path: '/admin/wallet/withdrawal-networks', label: '提现网络' },
       { path: '/admin/wallet/withdrawals', label: '提现审核' },
       { path: '/admin/wallet/withdrawal-policies', label: '提现策略' },
       { path: '/admin/wallet/ledger', label: '钱包流水' }

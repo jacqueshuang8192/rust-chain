@@ -82,14 +82,6 @@ export interface DepositNetwork {
   minDepositAmount: number
 }
 
-export interface DepositAddress {
-  assetSymbol: string
-  network: string
-  address: string
-  memo?: string
-  minDepositAmount: number
-}
-
 export interface WalletAccount {
   issuanceValuation?: import('./walletValuation').IssuanceValuation
   assetId: number
