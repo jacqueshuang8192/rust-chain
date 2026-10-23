@@ -701,3 +701,40 @@ Removed cost price, aligned two-column holding metrics and secondary balances, t
 ### Next Steps
 
 - None - task complete
+
+
+## Session 80: 限时链上充值实现与提交推送
+
+**Date**: 2026-10-23
+**Task**: 限时链上充值实现与提交推送
+**Branch**: `main`
+
+### Summary
+
+实现精确币种金额 30 分钟组合占用、五网络监听、歧义人工核对及 Mobile/PC/后台；按用户授权提交推送并归档。未部署，既有门禁及实链验收事项保留。
+
+### Main Changes
+
+- 按精确币种金额与网络/资产/地址组合占用 30 分钟，满池不改金额，到期释放，疑似迟付冲突转人工。
+- 五网络只读监听、持久游标、账务事务和三端充值/运营流程已经实现；部署配置与验证限制写入交付说明。
+- 功能提交 c453041 与归档提交 b47df25 已普通推送到 origin/main，并以 ls-remote 核验一致；无关任务及缓存保留。
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c453041` | (see git log) |
+
+### Testing
+
+- 本轮验证提交范围、diff、归档上下文、源码未变及远端哈希；沿用前轮核心 13/13（含真实 MySQL）、HTTP 1/1、旧充值 4/4、Mobile 901/901、后台 1137/1137 与浏览器验收。
+- 后台包体、既有秒合约测试 Clippy 和新币 DTO guard 仍未通过；未重跑无改动的业务测试。
+
+### Status
+
+[OK] **实现已提交推送并归档；未部署**
+
+### Next Steps
+
+- 部署前解决已记录门禁，并配置节点/地址、执行迁移和逐网络实链验收。
