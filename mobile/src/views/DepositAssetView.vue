@@ -8,6 +8,7 @@ import LoginRequiredState from '@/components/LoginRequiredState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { apiErrorMessage } from '@/api/client'
 import { fetchDepositAssets } from '@/api/wallet'
+import { fetchTimedDepositOptions } from '@/api/timedDeposits'
 import { useSessionStore } from '@/stores/session'
 import type { DepositAsset } from '@/core/types'
 
@@ -29,7 +30,7 @@ async function load(): Promise<void> {
   if (!session.isAuthenticated) return
   loading.value = true
   error.value = ''
-  try { assets.value = await fetchDepositAssets() } catch (reason) { error.value = apiErrorMessage(reason, t('deposit.assetLoadFailed')) } finally { loading.value = false }
+  try { const [metadata, options] = await Promise.all([fetchDepositAssets(), fetchTimedDepositOptions()]); assets.value = metadata.filter(asset => options.some(option => option.asset_symbol === asset.symbol)) } catch (reason) { error.value = apiErrorMessage(reason, t('deposit.assetLoadFailed')) } finally { loading.value = false }
 }
 
 function selectAsset(asset: DepositAsset) {

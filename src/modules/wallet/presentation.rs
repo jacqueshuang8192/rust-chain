@@ -6,6 +6,7 @@
 //! 本层只做结构声明与格式转换，不校验业务规则、不访问数据库，也不参与任何余额或状态变更。
 
 use super::WithdrawFeeTier;
+pub mod timed_deposits;
 use crate::modules::security::SecurityVerificationMethod;
 use crate::time::{option_unix_millis, unix_millis};
 use bigdecimal::BigDecimal;

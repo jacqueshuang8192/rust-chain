@@ -56,6 +56,8 @@ export const adminNavItems: AdminNavItem[] = [
       { path: '/admin/wallet/deposit-address-pool', label: '充值地址池' },
       { path: '/admin/wallet/quick-recharge', label: '快速充值配置' },
       { path: '/admin/wallet/quick-recharge-orders', label: '快速充值订单' },
+      { path: '/admin/wallet/deposit-settings', label: '限时充值配置' },
+      { path: '/admin/wallet/deposit-receipts', label: '链上到账核对' },
       { path: '/admin/wallet/deposits', label: '充值记录' },
       { path: '/admin/wallet/withdrawals', label: '提现审核' },
       { path: '/admin/wallet/withdrawal-policies', label: '提现策略' },

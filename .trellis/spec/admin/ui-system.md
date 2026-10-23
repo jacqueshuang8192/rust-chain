@@ -1409,3 +1409,14 @@ See [the backend version boundary](../backend/token-issuance-v2.md).
   `NewCoinMarketSetup`, plus resource/nav/permission contracts. Browser checks
   include full creation confirmation/retry, record empty/error/rules, fixed seed,
   and desktop/390/320 layouts. See backend v2 spec for transaction and rollout.
+
+## Timed Deposit Operations
+
+Follow [the timed deposit contract](../backend/timed-deposits.md). Separate
+node/asset configuration, explicit shared-inventory enrollment and receipt
+review permissions. Never echo node secrets; blank means preserve. Pin revision
+through failed saves and keep a single dirty editor category with navigation
+protection. Search actual `order_no`; display internal IDs only as explicitly
+labelled action references. Review never preselects a candidate as proof of
+ownership: read an explicit target, show actual amount/fee and chain identity,
+and require a reason. Actual backend matching/confirmation checks remain final.

@@ -111,7 +111,7 @@ test('充币与提币选择页锁定 44px 搜索、36px 币标和 60px 真实资
     assert.doesNotMatch(source, /asset-heading/)
   }
 
-  assert.match(sources.depositAsset, /assets\.value = await fetchDepositAssets\(\)/)
+  assert.match(sources.depositAsset, /Promise\.all\(\[fetchDepositAssets\(\), fetchTimedDepositOptions\(\)\]\)/)
   assert.match(sources.depositAsset, /item\.name\?\.toUpperCase\(\)\.includes\(keyword\)/)
   assert.match(sources.depositAsset, /asset\.name \|\| t\('deposit\.supported'\)/)
   assert.match(sources.withdrawAsset, /assets\.value = await fetchWithdrawalAssets\(\)/)
@@ -119,18 +119,20 @@ test('充币与提币选择页锁定 44px 搜索、36px 币标和 60px 真实资
 
 test('充币网络与地址页锁定选中摘要、56px 网络行、180px QR 和 48px 复制动作', () => {
   assert.match(sources.depositNetwork, /selectedAsset\.value = assets\.find/)
-  assert.match(sources.depositNetwork, /networks\.value = await fetchDepositNetworks\(props\.asset, minimum\.value\)/)
+  assert.match(sources.depositNetwork, /await fetchTimedDepositOptions\(\)/)
   assert.doesNotMatch(sources.depositNetwork, /estimatedMinutes/)
   assert.match(sources.depositNetwork, /\.network-summary \{[\s\S]*?min-height: 48px/)
   assert.match(sources.depositNetwork, /\.network-list button \{[\s\S]*?height: 56px[\s\S]*?min-height: 56px/)
   assert.doesNotMatch(sources.depositNetwork, /network-note|<Info/)
 
-  assert.match(sources.depositDetail, /address\.value = await createDepositAddress\(props\.asset, props\.network, minimum\)/)
-  assert.match(sources.depositDetail, /toDataURL\(address\.value\.address/)
-  assert.match(sources.depositDetail, /\.deposit-detail \{[\s\S]*?gap: 14px/)
-  assert.match(sources.depositDetail, /\.deposit-detail__qr \{[\s\S]*?height: 180px[\s\S]*?width: 180px/)
-  assert.match(sources.depositDetail, /\.deposit-detail__copy \{[\s\S]*?height: 48px[\s\S]*?min-height: 48px/)
-  assert.match(sources.depositDetail, /navigator\.clipboard\.writeText\(address\.value\.address\)/)
+  const panel = read('../src/components/TimedDepositPanel.vue')
+  assert.match(sources.depositDetail, /<TimedDepositPanel/)
+  assert.match(panel, /createTimedDepositOrder\(chosen, exact, key, signal\)/)
+  assert.match(panel, /toDataURL\(order\.value\.address/)
+  assert.match(panel, /navigator\.clipboard\.writeText\(order\.value\.address\)/)
+  assert.match(panel, /v-if="payable && qr"/)
+  assert.match(panel, /min-height: 44px/)
+
 })
 
 test('提币表单保留真实网络、余额、完整字段焦点、验证和可访问复核层', () => {

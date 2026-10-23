@@ -7,6 +7,7 @@ mod accounts_ledger;
 mod deposits;
 mod returns;
 mod shared;
+pub(crate) mod timed_deposits;
 pub(crate) mod withdrawal_policy;
 mod withdrawals;
 

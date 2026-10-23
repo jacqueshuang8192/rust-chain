@@ -26,6 +26,9 @@ mod rate_limits;
 #[path = "wallet_routes/withdrawal_policy.rs"]
 mod withdrawal_policy;
 
+#[path = "wallet_routes/timed_deposits.rs"]
+mod timed_deposits;
+
 fn decimal(value: &str) -> BigDecimal {
     BigDecimal::from_str(value).unwrap()
 }

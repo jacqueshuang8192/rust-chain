@@ -1,0 +1,118 @@
+-- Exact token-amount reservations. Historical permanent assignments are not converted.
+CREATE TABLE wallet_deposit_scanners (
+    network VARCHAR(32) NOT NULL PRIMARY KEY,
+    enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    endpoint_encrypted TEXT NULL,
+    api_key_encrypted TEXT NULL,
+    confirmations INT UNSIGNED NOT NULL DEFAULT 12,
+    cursor_json JSON NULL,
+    revision BIGINT UNSIGNED NOT NULL DEFAULT 0,
+    last_scan_at TIMESTAMP(6) NULL,
+    last_error VARCHAR(255) NULL,
+    lease_token VARCHAR(64) NULL,
+    lease_until TIMESTAMP(6) NULL,
+    updated_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    CONSTRAINT chk_deposit_scanner_network CHECK (network IN ('eth','base','tron','btc','solana')),
+    CONSTRAINT chk_deposit_scanner_confirmations CHECK (confirmations BETWEEN 1 AND 10000)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='限时充值只读监听配置';
+INSERT INTO wallet_deposit_scanners (network, confirmations) VALUES
+    ('eth',12),('base',12),('tron',20),('btc',6),('solana',32);
+
+CREATE TABLE wallet_deposit_chain_assets (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    network VARCHAR(32) NOT NULL,
+    asset_id BIGINT UNSIGNED NOT NULL,
+    asset_symbol VARCHAR(32) NOT NULL,
+    asset_kind VARCHAR(16) NOT NULL,
+    token_address VARCHAR(255) NOT NULL DEFAULT '',
+    identity_key CHAR(64) NOT NULL,
+    decimals INT NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    revision BIGINT UNSIGNED NOT NULL DEFAULT 1,
+    UNIQUE KEY uq_deposit_chain_asset (network, asset_id),
+    UNIQUE KEY uq_deposit_chain_identity (network, identity_key),
+    FOREIGN KEY (network) REFERENCES wallet_deposit_scanners(network),
+    FOREIGN KEY (asset_id) REFERENCES assets(id),
+    CONSTRAINT chk_deposit_chain_kind CHECK (asset_kind IN ('native','token')),
+    CONSTRAINT chk_deposit_chain_decimals CHECK (decimals BETWEEN 0 AND 18)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='充值网络原生币及合约身份';
+
+CREATE TABLE wallet_deposit_shared_addresses (
+    pool_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+    network VARCHAR(32) NOT NULL,
+    address VARCHAR(255) NOT NULL,
+    address_key CHAR(64) NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    UNIQUE KEY uq_deposit_shared_address (network, address_key),
+    FOREIGN KEY (pool_id) REFERENCES deposit_address_pool(id),
+    FOREIGN KEY (network) REFERENCES wallet_deposit_scanners(network)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='显式纳入限时充值的地址库存';
+
+CREATE TABLE wallet_deposit_orders (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    order_no VARCHAR(64) NOT NULL,
+    user_id BIGINT UNSIGNED NOT NULL,
+    idempotency_key VARCHAR(128) COLLATE utf8mb4_bin NOT NULL,
+    asset_id BIGINT UNSIGNED NOT NULL,
+    asset_symbol VARCHAR(32) NOT NULL,
+    chain_asset_id BIGINT UNSIGNED NOT NULL,
+    network VARCHAR(32) NOT NULL,
+    asset_kind VARCHAR(16) NOT NULL,
+    token_address VARCHAR(255) NOT NULL,
+    identity_key CHAR(64) NOT NULL,
+    decimals INT NOT NULL,
+    precision_scale INT NOT NULL,
+    pool_id BIGINT UNSIGNED NOT NULL,
+    address VARCHAR(255) NOT NULL,
+    address_key CHAR(64) NOT NULL,
+    amount DECIMAL(38,18) NOT NULL,
+    fee_amount DECIMAL(38,18) NOT NULL,
+    required_confirmations INT UNSIGNED NOT NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'pending',
+    deposit_event_id BIGINT UNSIGNED NULL,
+    paid_amount DECIMAL(38,18) NULL,
+    created_at TIMESTAMP(6) NOT NULL,
+    expires_at TIMESTAMP(6) NOT NULL,
+    paid_at TIMESTAMP(6) NULL,
+    UNIQUE KEY uq_deposit_order_no (order_no),
+    UNIQUE KEY uq_deposit_order_request (user_id,idempotency_key),
+    INDEX idx_deposit_order_match (network,identity_key,address_key,amount,created_at),
+    INDEX idx_deposit_order_expiry (status,expires_at),
+    INDEX idx_deposit_order_user (user_id,id),
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (asset_id) REFERENCES assets(id),
+    FOREIGN KEY (chain_asset_id) REFERENCES wallet_deposit_chain_assets(id),
+    FOREIGN KEY (pool_id) REFERENCES wallet_deposit_shared_addresses(pool_id),
+    FOREIGN KEY (deposit_event_id) REFERENCES wallet_deposit_events(id),
+    CONSTRAINT chk_deposit_order_status CHECK (status IN ('pending','expired','review','credited','reversed')),
+    CONSTRAINT chk_deposit_order_amount CHECK (amount > 0 AND fee_amount >= 0 AND amount > fee_amount)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='保留历史归属的三十分钟充值订单';
+
+CREATE TABLE wallet_deposit_receipts (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    network VARCHAR(32) NOT NULL,
+    tx_hash VARCHAR(255) COLLATE utf8mb4_bin NOT NULL,
+    event_index INT UNSIGNED NOT NULL,
+    asset_kind VARCHAR(16) NOT NULL,
+    token_address VARCHAR(255) NOT NULL,
+    identity_key CHAR(64) NOT NULL,
+    address VARCHAR(255) NOT NULL,
+    address_key CHAR(64) NOT NULL,
+    amount DECIMAL(38,18) NOT NULL,
+    block_height BIGINT UNSIGNED NOT NULL,
+    block_hash VARCHAR(255) NOT NULL,
+    block_time TIMESTAMP(6) NOT NULL,
+    confirmations INT UNSIGNED NOT NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'review',
+    review_reason VARCHAR(255) NULL,
+    order_id BIGINT UNSIGNED NULL,
+    reviewed_by BIGINT UNSIGNED NULL,
+    review_note VARCHAR(500) NULL,
+    created_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    UNIQUE KEY uq_deposit_receipt_event (network,tx_hash,event_index),
+    INDEX idx_deposit_receipt_review (status,id),
+    FOREIGN KEY (order_id) REFERENCES wallet_deposit_orders(id),
+    FOREIGN KEY (reviewed_by) REFERENCES admin_users(id),
+    CONSTRAINT chk_deposit_receipt_status CHECK (status IN ('observed','review','credited','ignored'))
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='持久化链上收款证据与人工归属核对';

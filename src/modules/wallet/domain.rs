@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::cmp::Ordering;
 
+pub mod timed_deposits;
 pub mod withdrawal_policy;
 
 /// 钱包资产允许的最大小数位（数据库与链上金额展示统一约束）。

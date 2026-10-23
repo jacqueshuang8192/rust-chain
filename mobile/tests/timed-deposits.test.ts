@@ -1,0 +1,105 @@
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import test from 'node:test'
+import { compileScript, parse } from '@vue/compiler-sfc'
+import ts from 'typescript'
+import * as Vue from 'vue'
+import * as contract from '../src/core/timedDeposit.ts'
+import type { DepositOption, DepositOrder } from '../src/core/timedDeposit.ts'
+
+const option: DepositOption = { asset_symbol: 'ETH', network: 'eth', display_name: 'Ethereum', precision_scale: 18, min_deposit_amount: '0', deposit_fee: '0', required_confirmations: 12 }
+const order = (amount = '100', overrides: Partial<DepositOrder> = {}): DepositOrder => ({ id: 1, order_no: 'CD1', user_id: 9, asset_symbol: 'ETH', network: 'eth', address: `0x${'1'.repeat(40)}`, amount, fee_amount: '0', paid_amount: null, required_confirmations: 12, status: 'pending', tx_hash: null, created_at: Date.now(), expires_at: Date.now() + 1800000, paid_at: null, server_time: Date.now(), ...overrides })
+interface State {
+  amount: Vue.Ref<string>; order: Vue.Ref<DepositOrder | null>; qr: Vue.Ref<string>; payable: Vue.ComputedRef<boolean>; remaining: Vue.ComputedRef<number>; now: Vue.Ref<number>; error: Vue.Ref<string>; history: Vue.Ref<DepositOrder[]>;
+  submit(): Promise<void>; refresh(): Promise<void>; load(): Promise<void>; selectHistory(order: DepositOrder): void
+}
+const flush = async () => { for (let i = 0; i < 5; i += 1) { await new Promise(resolve => setImmediate(resolve)); await Vue.nextTick() } }
+function fixture(packageName: 'mobile' | 'pc', initial: DepositOrder[] = []) {
+  const writes: { amount: string; key: string }[] = []
+  let fail = false
+  let create = async (_option: DepositOption, amount: string, key: string) => { writes.push({ amount, key }); if (fail) throw new Error('response lost'); return order(amount) }
+  const api = {
+    fetchTimedDepositOptions: async () => [option],
+    fetchTimedDepositOrders: async () => ({ items: initial, total: initial.length }),
+    fetchTimedDepositOrder: async () => order(),
+    createTimedDepositOrder: (...args: [DepositOption, string, string]) => create(...args),
+  }
+  const source = readFileSync(new URL(`../../${packageName}/src/components/TimedDepositPanel.vue`, import.meta.url), 'utf8')
+  const compiled = compileScript(parse(source).descriptor, { id: 'timed-deposit-behavior' })
+  const output = ts.transpileModule(compiled.content, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
+  const cleanup: (() => void)[] = []; const timers = new Set<number>(); const memory = new Map<string, string>()
+  const modules: Record<string, unknown> = { vue: { ...Vue, onUnmounted: (fn: () => void) => cleanup.push(fn) }, 'vue-i18n': { useI18n: () => ({ t: (key: string) => key }) }, qrcode: { toDataURL: async () => 'data:image/png;base64,test' }, '../api/timedDeposits': api, '../core/timedDeposit': contract }
+  const exports: { default?: { setup(props: object, context: object): State } } = {}
+  new Function('require', 'exports', 'sessionStorage', 'setInterval', 'clearInterval', output)(
+    (name: string) => { assert.ok(Object.hasOwn(modules, name), name); return modules[name] }, exports,
+    { getItem: (key: string) => memory.get(key) ?? null, setItem: (key: string, value: string) => memory.set(key, value), removeItem: (key: string) => memory.delete(key) },
+    () => { const id = timers.size + 1; timers.add(id); return id }, (id: number) => timers.delete(id),
+  )
+  const props = Vue.reactive({ identity: 'user:9', asset: 'ETH', network: 'eth' })
+  const scope = Vue.effectScope()
+  const state = scope.run(() => exports.default!.setup(props, { expose() {} }))!
+  return { state, writes, props, timers, memory, fail(value: boolean) { fail = value }, create(fn: typeof create) { create = fn }, stop() { cleanup.forEach(fn => fn()); scope.stop() } }
+}
+
+for (const packageName of ['mobile', 'pc'] as const) {
+  test(`${packageName}: order creation requires explicit exact token input, retries retain identity`, async () => {
+    const f = fixture(packageName)
+    try {
+      await flush(); assert.equal(f.writes.length, 0); assert.equal(f.state.order.value?.id ?? null, null)
+      f.state.amount.value = '9007199254740993.000000000000000001'
+      f.fail(true); await f.state.submit(); assert.equal(f.writes.length, 1)
+      assert.equal(f.writes[0].amount, '9007199254740993.000000000000000001')
+      f.fail(false); await f.state.submit(); assert.equal(f.writes[0].key, f.writes[1].key)
+      assert.equal(f.state.order.value?.amount, '9007199254740993.000000000000000001')
+      assert.equal(f.memory.size, 0); assert.equal(f.state.payable.value, true)
+      await f.state.submit(); assert.equal(f.writes.length, 2)
+      f.state.now.value = f.state.order.value!.expires_at + 10; await Vue.nextTick()
+      assert.equal(f.state.payable.value, false); assert.equal(f.state.qr.value, '')
+    } finally { f.stop(); assert.equal(f.timers.size, 0) }
+  })
+  test(`${packageName}: refresh restores pending order and session change rejects late creation`, async () => {
+    const f = fixture(packageName, [order('50')])
+    try { await flush(); assert.equal(f.state.order.value?.amount, '50'); assert.equal(f.writes.length, 0) } finally { f.stop() }
+    const pending = fixture(packageName)
+    try {
+      await flush(); let resolve!: (value: DepositOrder) => void
+      pending.create(() => new Promise(done => { resolve = done }))
+      pending.state.amount.value = '50'; const writing = pending.state.submit()
+      pending.props.identity = ''; await Vue.nextTick(); resolve(order('50')); await writing; await flush()
+      assert.equal(pending.state.order.value, null); assert.equal(pending.state.qr.value, ''); assert.equal(pending.state.history.value.length, 0)
+    } finally { pending.stop() }
+  })
+}
+
+test('deposit contract preserves decimals and rejects numeric money, excess precision and unsafe IDs', () => {
+  assert.equal(contract.exactDepositAmount('1e-18'), '0.000000000000000001')
+  assert.equal(contract.exactDepositAmount('100.0000000000000000000'), '100')
+  assert.throws(() => contract.exactDepositAmount(100))
+  assert.throws(() => contract.exactDepositAmount('0.0000000000000000001'))
+  assert.throws(() => contract.validateDepositDraft('0.1', { ...option, deposit_fee: '0.1' }))
+  assert.throws(() => contract.mapDepositOrder({ ...order(), id: Number.MAX_SAFE_INTEGER + 1 }))
+  assert.throws(() => contract.mapDepositOrder({ ...order(), amount: 100 }))
+  assert.equal(contract.mapDepositOrder(order('9007199254740993.000000000000000001')).amount, '9007199254740993.000000000000000001')
+})
+
+test('PC recharge uses the persisted login generation for opaque access tokens', () => {
+  const source = readFileSync(new URL('../../pc/src/views/User/Recharge.vue', import.meta.url), 'utf8')
+  const compiled = compileScript(parse(source).descriptor, { id: 'pc-recharge-session' })
+  const output = ts.transpileModule(compiled.content, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
+  const user = Vue.reactive({ token: 'opaque-sa-token', isLoggedIn: true })
+  let sessionScope = 'login-generation-one'
+  const modules: Record<string, unknown> = {
+    vue: { ...Vue, onMounted() {} },
+    '@/components/TimedDepositPanel.vue': {}, '@/stores/user': { useUserStore: () => user },
+    '@/utils/authStorage': { readAuthSessionScope: () => sessionScope },
+    '@iconify/vue': {}, '@/api/wallet': {}, 'vue-toastification': { useToast: () => ({}) },
+    'vue-i18n': { useI18n: () => ({ t: (key: string) => key }) },
+  }
+  const exports: { default?: { setup(props: object, context: object): { depositIdentity: Vue.ComputedRef<string> } } } = {}
+  new Function('require', 'exports', output)((name: string) => { assert.ok(Object.hasOwn(modules, name), name); return modules[name] }, exports)
+  const state = exports.default!.setup({}, { expose() {} })
+  assert.equal(state.depositIdentity.value, sessionScope)
+  user.token = ''; assert.equal(state.depositIdentity.value, '')
+  sessionScope = 'login-generation-two'; user.token = 'another-opaque-token'
+  assert.equal(state.depositIdentity.value, sessionScope)
+})

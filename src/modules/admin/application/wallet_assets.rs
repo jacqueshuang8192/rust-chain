@@ -672,6 +672,15 @@ pub(crate) async fn update_admin_deposit_address_pool(
     // 已分配地址必须先回收再编辑，避免用户充值地址被后台直接改写。
     let mut tx = pool.begin().await?;
     let before = lock_deposit_address_pool_in_tx(&mut tx, address_id).await?;
+    let shared: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM wallet_deposit_shared_addresses WHERE pool_id=?)",
+    )
+    .bind(address_id)
+    .fetch_one(&mut *tx)
+    .await?;
+    if shared {
+        return Err(AppError::Conflict("shared deposit address is immutable; manage its enabled state in timed deposit settings".to_owned()));
+    }
     if before.status == "assigned" {
         return Err(AppError::Validation(
             "assigned deposit address must be reclaimed before editing".to_owned(),

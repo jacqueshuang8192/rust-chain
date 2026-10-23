@@ -33,6 +33,7 @@ mod registration_legal;
 mod seconds_refund;
 mod support;
 mod system_config;
+mod timed_deposits;
 mod token_issuance;
 mod user_security;
 mod wallet;
@@ -57,6 +58,7 @@ use self::withdrawal_policy::*;
 /// 文档在每次请求时由派生实现生成，不做鉴权也不读取共享状态，因此生产环境需要在网关侧决定是否对外开放。
 pub fn routes() -> Router<AppState> {
     let mut document = ApiDoc::openapi();
+    document.merge(timed_deposits::TimedDepositsApiDoc::openapi());
     document.merge(loan::LoanApiDoc::openapi());
     document.merge(financial_reconciliation::ReconciliationApiDoc::openapi());
     document.merge(seconds_refund::SecondsRefundApiDoc::openapi());

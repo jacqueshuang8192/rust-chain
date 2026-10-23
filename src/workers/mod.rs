@@ -23,6 +23,7 @@ pub mod market_retention;
 pub mod prediction_market_close;
 pub mod seconds_contract_settlement;
 pub mod synthetic_market;
+pub mod timed_deposits;
 pub mod unlock_scanner;
 pub mod wallet_chain;
 

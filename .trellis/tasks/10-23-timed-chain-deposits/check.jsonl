@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "DDD boundaries and executable verification"}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "Immutable migrations and SQLx string metadata"}
+{"file": ".trellis/spec/backend/timed-deposits.md", "reason": "Exact timed reservation and receipt settlement contracts"}
+{"file": ".trellis/spec/admin/ui-system.md", "reason": "Permissioned configuration and audited review"}
+{"file": ".trellis/spec/mobile/backend-integration.md", "reason": "Exact DTOs and session lifecycle"}
+{"file": ".trellis/spec/mobile/pwa-and-shell.md", "reason": "Mobile release and bundle gates"}
+{"file": ".trellis/tasks/10-23-timed-chain-deposits/research/epusdt-and-wallet.md", "reason": "Reference study and confirmed requirements"}

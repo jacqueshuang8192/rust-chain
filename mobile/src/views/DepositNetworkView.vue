@@ -7,18 +7,18 @@ import AssetMark from '@/components/AssetMark.vue'
 import LoginRequiredState from '@/components/LoginRequiredState.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { apiErrorMessage } from '@/api/client'
-import { fetchDepositAssets, fetchDepositNetworks } from '@/api/wallet'
-import { formatAmount } from '@/core/format'
+import { fetchDepositAssets } from '@/api/wallet'
+import { fetchTimedDepositOptions } from '@/api/timedDeposits'
+import type { DepositOption } from '@/core/timedDeposit'
 import { useSessionStore } from '@/stores/session'
-import type { DepositAsset, DepositNetwork } from '@/core/types'
+import type { DepositAsset } from '@/core/types'
 
 const props = defineProps<{ asset: string }>()
 const router = useRouter()
 const session = useSessionStore()
 const { t } = useI18n()
-const networks = ref<DepositNetwork[]>([])
+const networks = ref<DepositOption[]>([])
 const selectedAsset = ref<DepositAsset | null>(null)
-const minimum = ref(0)
 const error = ref('')
 const loading = ref(false)
 
@@ -29,8 +29,7 @@ async function load(): Promise<void> {
   try {
     const assets = await fetchDepositAssets()
     selectedAsset.value = assets.find((asset) => asset.symbol === props.asset.toUpperCase()) || null
-    minimum.value = selectedAsset.value?.minDepositAmount || 0
-    networks.value = await fetchDepositNetworks(props.asset, minimum.value)
+    networks.value = (await fetchTimedDepositOptions()).filter(item => item.asset_symbol === props.asset.toUpperCase())
   } catch (reason) {
     error.value = apiErrorMessage(reason, t('deposit.networkLoadFailed'))
   } finally {
@@ -38,7 +37,7 @@ async function load(): Promise<void> {
   }
 }
 
-function chooseNetwork(network: DepositNetwork) {
+function chooseNetwork(network: DepositOption) {
   void router.push({ name: 'deposit-detail', params: { asset: props.asset, network: network.network } })
 }
 
@@ -85,9 +84,9 @@ onMounted(() => { void load() })
         <div v-else-if="networks.length" class="network-list">
           <button v-for="network in networks" :key="network.network" type="button" @click="chooseNetwork(network)">
             <span>
-              <strong>{{ network.displayName }}</strong>
+              <strong>{{ network.display_name }}</strong>
               <small>
-                {{ t('deposit.minimum') }} · {{ formatAmount(network.minDepositAmount) }} {{ asset.toUpperCase() }}
+                {{ t('deposit.minimum') }} · {{ network.min_deposit_amount }} {{ asset.toUpperCase() }}
               </small>
             </span>
             <ChevronRight :size="16" aria-hidden="true" />

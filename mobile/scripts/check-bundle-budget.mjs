@@ -15,7 +15,9 @@ export const DEFAULT_BUNDLE_BUDGET = Object.freeze({
     css: { raw: 250 * KIB, gzip: 46 * KIB },
   },
   totals: {
-    js: { raw: 1_500 * KIB, gzip: 510 * KIB, count: 105 },
+    // Timed deposits add exact-amount validation, order recovery, and polling (2026-10-23).
+    // Keep entry and compressed limits unchanged; only the all-route raw budget grows 10 KiB.
+    js: { raw: 1_510 * KIB, gzip: 510 * KIB, count: 105 },
     css: { raw: 656 * KIB, gzip: 128 * KIB, count: 50 },
   },
 })

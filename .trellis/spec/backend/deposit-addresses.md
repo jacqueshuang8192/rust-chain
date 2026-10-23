@@ -1,5 +1,10 @@
 # Deposit Address Contracts
 
+> This document describes the legacy permanent allocator. Amount-first Mobile/PC
+> deposits use [Timed On-chain Deposits](./timed-deposits.md): explicit per-network
+> shared inventory, no automatic cross-network address-group fallback. Enrolled
+> rows must be excluded from permanent allocation and direct inventory edits.
+
 ## Scenario: Configurable Deposit Network Address Groups
 
 ### 1. Scope / Trigger
@@ -42,7 +47,8 @@
 
 - Backend route tests should seed or upsert the relevant `deposit_network_configs` row before inserting address pool rows.
 - Address pool rows in tests must include `address_group_code`.
-- PC tests should assert `/wallet/deposit-networks` is used for recharge network selection.
+- Legacy allocation tests retain `/wallet/deposit-networks`; the current timed
+  recharge UI must select only `/wallet/deposit-options` readiness results.
 - Admin resource tests should assert network config columns and `address_group_code` request payloads.
 
 ### 7. Wrong vs Correct

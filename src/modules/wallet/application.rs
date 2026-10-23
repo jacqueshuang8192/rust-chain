@@ -39,6 +39,7 @@ use crate::{
 };
 
 mod issuance_valuation;
+pub mod timed_deposits;
 pub(crate) mod withdrawal_policy;
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, TimeDelta, Utc};

@@ -113,6 +113,8 @@ export const adminRoutes: RouteObject[] = [
     async () => (await import('./actions/QuickRechargeConfigPage')).QuickRechargeConfigPage
   ),
   resourceRoute('wallet/quick-recharge-orders', 'quickRechargeOrders'),
+  guardedLazyRoute('wallet/deposit-settings', async () => (await import('./deposits/DepositSettingsPage')).DepositSettingsPage),
+  guardedLazyRoute('wallet/deposit-receipts', async () => (await import('./deposits/DepositReviewPage')).DepositReviewPage),
   resourceRoute('wallet/deposits', 'walletDeposits'),
   resourceRoute('wallet/withdrawals', 'walletWithdrawals'),
   guardedLazyRoute('wallet/withdrawal-policies', async () => (await import('./actions/WithdrawalPolicyPage')).WithdrawalPolicyPage),

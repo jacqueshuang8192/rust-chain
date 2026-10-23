@@ -10,6 +10,9 @@ use tower::ServiceExt;
 #[path = "openapi_routes/home_carousel.rs"]
 mod home_carousel;
 
+#[path = "openapi_routes/timed_deposits.rs"]
+mod timed_deposits;
+
 fn test_state() -> AppState {
     AppState::new(Settings {
         app_env: "test".to_owned(),

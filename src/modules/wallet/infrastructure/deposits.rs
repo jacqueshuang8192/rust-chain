@@ -218,6 +218,7 @@ pub(crate) async fn lock_available_deposit_address(
            FROM deposit_address_pool
            WHERE address_group_code = ?
              AND status = 'available'
+             AND NOT EXISTS (SELECT 1 FROM wallet_deposit_shared_addresses shared WHERE shared.pool_id = deposit_address_pool.id)
              AND (
                  (asset_symbols_json IS NULL AND (asset_symbol IS NULL OR asset_symbol = ?))
                  OR JSON_CONTAINS(asset_symbols_json, JSON_QUOTE(?))
@@ -780,6 +781,33 @@ async fn credit_deposit_event_in_tx(
         ));
     }
     Ok(())
+}
+
+/// 限时订单已在同事务锁定归属后调用本入口；先登记独立链事件，再复用钱包、流水和平台分录写入。
+/// 不依赖地址的当前所有人；外部事件唯一键冲突整体回滚，禁止覆盖永久充值或其他订单已有入账。
+pub(super) async fn credit_matched_order_in_tx(
+    tx: &mut Transaction<'_, MySql>,
+    event: &WalletDepositEventResponse,
+) -> AppResult<u64> {
+    if event.confirmations < event.required_confirmations {
+        return Err(AppError::Conflict(
+            "deposit confirmations are insufficient".to_owned(),
+        ));
+    }
+    crate::numeric::ensure_amount_storage(&event.amount, "deposit amount")?;
+    deposit_credit_amount(event)?;
+    let id = sqlx::query(
+        "INSERT INTO wallet_deposit_events (user_id,asset_id,asset_symbol,network,address,memo,tx_hash,event_index,amount,fee_amount,block_height,confirmations,required_confirmations,status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'observed')",
+    )
+    .bind(event.user_id).bind(event.asset_id).bind(&event.asset_symbol).bind(&event.network)
+    .bind(&event.address).bind(&event.memo).bind(&event.tx_hash).bind(event.event_index)
+    .bind(&event.amount).bind(&event.fee_amount).bind(event.block_height)
+    .bind(event.confirmations).bind(event.required_confirmations)
+    .execute(&mut **tx).await?.last_insert_id();
+    let mut saved = event.clone();
+    saved.id = id;
+    credit_deposit_event_in_tx(tx, &saved).await?;
+    Ok(id)
 }
 
 /// 用事件快照上的毛额和手续费算出实际入账净额；手续费为负或净额非正则拒绝。

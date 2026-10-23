@@ -310,6 +310,15 @@ async fn main() -> anyhow::Result<()> {
         });
     }
 
+    if state.mysql.is_some() {
+        let deposit_state = state.clone();
+        tokio::spawn(async move {
+            if let Err(error) = exchange_api::workers::timed_deposits::run_loop(deposit_state).await
+            {
+                tracing::error!(%error, "限时充值扫描循环已停止");
+            }
+        });
+    }
     let wallet_chain_config = wallet_chain::WalletChainWorkerConfig::from_env();
     if wallet_chain_config.enabled && state.mysql.is_some() {
         let wallet_chain_state = state.clone();

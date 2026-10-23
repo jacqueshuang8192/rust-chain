@@ -1,3 +1,31 @@
+## 2026-10-23 16:48 - 限时链上充值本地验收与交付说明完成
+
+- 完成内容：完成网络/资产/地址/精确金额占用 30 分钟、到期释放、歧义人工核对及五网络监听的本地验收；补齐 PC 非 JWT 令牌兼容、同秒到账人工核对、在途扫描配置版本锁内复核与回归。Mobile/PC 和后台配置/审核页面已接通，新增中文配置说明与完整交付记录。
+- 修改文件：前述限时充值后端/迁移/三端及测试；重点包括 `pc/src/views/User/Recharge.vue`、`mobile/tests/timed-deposits.test.ts`、`src/modules/wallet/infrastructure/timed_deposits/{settlement,scanners}.rs`、`web/src/admin/deposits/DepositReviewPage.tsx`、相关 `.trellis/spec/`、`docs/superpowers/timed-chain-deposits.md`、`.trellis/tasks/10-23-timed-chain-deposits/research/delivery.md` 与本记录。
+- 验证结果：显式隔离 MySQL 的限时充值测试 13/13（含一项完整实库场景）、真实 HTTP 路由 1/1、旧充值实库回归 4/4、OpenAPI 1/1；全目标全特性 check、生产 lib/bins 严格 Clippy、架构 11/11、文档 1/1、fmt 通过。Mobile 完整 release gate 901/901，最后新增 PC 回归后定向 6/6 与测试类型检查通过；PC 最终类型/构建通过。Web 全量 1137/1137、最后定向 5/5、类型/lint、策略 15/15、覆盖率 23/23 和最终构建通过。实际浏览器验证精确大数、Mobile 明暗 320/390/448 px、PC 真实 Recharge 非 JWT 登录和后台配置/人工核对均通过；diff、任务上下文及新文件文本检查通过。
+- 后续事项：未提交、推送、归档或部署，未做实链转账；上线仍需真实节点/地址配置与逐网络转账验收。Tron 仅 TRC20，Solana 仅经典 SPL，EVM 原生 ETH 需 callTracer。保留三项既有发布门禁：后台 JS 最终 2,743,238 bytes（HEAD 基线 2,721,886，预算 2,600,000，本次 +21,352）、秒合约测试 cmp_owned、新币 TradeQuote DTO guard；未修改无关模块或放宽后台预算。任务 Ego 空间、三个 Vite 和隔离 MySQL 已关闭，保留诊断数据及其他任务。
+
+## 2026-10-23 16:19 - 限时充值实库、权限与前台门禁验证
+
+- 完成内容：修复扫描确认数聚合的 SQLx 有符号类型不匹配；补游标续扫/重组/缺失恢复保护、Solana 高度列表与临时 token 账户处理、后台按订单号搜索及到账筛选、共享库存永久绑定检查，清理旧充值页无效样式。
+- 修改文件：限时充值 scanner/settings/orders/settlement/DTO/OpenAPI、后台充值页与行为测试、真实 MySQL 和 wallet route 测试、Mobile 充值详情及 bundle budget、任务上下文。
+- 验证结果：隔离 MySQL 迁移重复执行及充值核心 12/12、实际路由权限与用户隔离 1/1、钱包单测 83/83、架构 11/11、文档 guard 1/1 通过；后端全目标全特性 check 和生产 lib/bins 严格 Clippy 通过。Mobile 完整 release gate 通过，清理 2.1 KiB 旧 CSS；新增业务使全路由 raw JS 约 1506 KiB，因此该总额预算从 1500 调至 1510 KiB，入口/gzip/CSS 预算不变。Web 类型、lint、后台行为 5/5、策略 15/15、覆盖率 23/23 与构建通过。浏览器已验证大金额请求不丢精度、过期隐藏 QR/复制及窄屏无溢出。
+- 后续事项：继续后台和 PC 浏览器验证、规范和部署说明。全目标严格 Clippy 仍受原有秒合约测试 cmp_owned 告警影响；numeric_contract 因原有 new_coin TradeQuote 字段失败；Web 全包预算仍超 2600000 bytes，正在量化 HEAD 基线。未部署、未实链转账、未提交。
+
+## 2026-10-23 15:43 - 限时充值页面与链监听适配实现
+
+- 完成内容：按已确认的疑似冲突转人工核对规则实现限时订单、五网络适配器、监听 worker、后台节点/资产/共享地址配置与到账核对页面；Mobile/PC 改为明确输入币种数量后创建订单，支持服务端倒计时、订单恢复、轮询及幂等重试。Tron 仅开放 TRC20，原生 TRX 暂不开放；Ethereum/Base 原生 ETH 依赖 callTracer。
+- 修改文件：`src/modules/wallet/**/timed_deposits*`、`src/workers/timed_deposits.rs`、迁移 `0158`/`0159`、Mobile/PC 的 `timedDeposit` 合同/API/面板与充值入口、`web/src/admin/deposits/`、相关路由权限及测试。
+- 验证结果：Rust 初轮 all-targets/all-features 编译通过，金额/地址及四类 RPC 适配器模拟测试 9 项通过；Mobile/PC 类型检查、Web 类型检查和 ESLint 通过；两端真实 Vue setup 行为与相关钱包页面测试 19/19 通过。隔离 MySQL 已跑迁移与 10 地址并发分配，进一步测试发现二进制排序规则导致 SQLx String 解码失败，已新增不可变迁移 0159 以文本列＋SHA256 身份键修复，整体验证仍进行中。
+- 后续事项：继续真实 MySQL 账务/人工审核/回滚及游标恢复测试，补后台行为与权限测试、OpenAPI、完整质量门禁和配置说明。未使用生产数据库、未做真实转账、未提交或部署，当前任务仍 in_progress。
+
+## 2026-10-23 14:26 - 限时链上充值需求与参考源码调研
+
+- 完成内容：建立限时链上充值任务，核对 epusdt 提交 `aed4a970a28d734c8a35499496604b868a24ef7f` 的组合占用、过期释放、链上监听及补扫实现，对照当前永久地址分配与钱包入账链路形成改造计划。用户已确认按网络/币种/地址/精确金额组合占用 30 分钟、不同金额共用地址、同金额换地址、满池不加尾数，并确认首批接入 Ethereum、Base、Tron、Bitcoin、Solana 五个网络，仅开放具有明确链上配置的资产。指出过期未付组合复用后的付款人身份歧义，已提出人工核对或付款地址验证选项，等待用户选择。
+- 修改文件：`.trellis/tasks/10-23-timed-chain-deposits/prd.md`、该任务 `research/epusdt-and-wallet.md`、任务创建元数据、`docs/superpowers/PROGRESS.md`。
+- 验证结果：`python3 ./.trellis/scripts/task.py validate .trellis/tasks/10-23-timed-chain-deposits` 与 `git diff --check` 通过；源码通过 GitHub API 读取，未运行参考项目代码。仅完成需求文档与静态调研，未修改业务代码、未跑充值集成测试、未验证实链到账。
+- 后续事项：确认歧义到账归属策略后实施订单/占用、五链监听、后台配置与审核、Mobile/PC 金额输入与倒计时；再用隔离 MySQL 验证并发、到期、去重和账务，并明确节点配置与实链验收边界。任务保持 planning，未提交、推送或部署。
+
 ## 2026-10-23 03:06 - 修复秒合约结算读取订单价格精度解码失败
 
 - 完成内容：线上秒合约结算持续失败，报 `decoding column 0: mismatched types; Rust type core::option::Option<i32> (as SQL type INT) is not compatible with SQL type INT UNSIGNED`，扫描数 1、失败数 1、按重试时间反复重排。原因是迁移 0157 的 `seconds_contract_orders.price_precision` 定义为 `INT UNSIGNED`，读取却按有符号 `Option<i32>` 解码。现改为显式 `CAST(price_precision AS SIGNED)` 后用 `Option<i64>` 解码并收敛为业务精度，读取口径不再依赖列的符号属性；开仓写入侧按无符号定义绑定，并新增 0..18 精度范围校验，越界在开仓阶段即拒绝而不是留到结算。

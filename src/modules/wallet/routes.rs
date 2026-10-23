@@ -54,6 +54,7 @@ use super::{
     },
 };
 
+mod timed_deposits;
 mod withdrawal_policy;
 
 /// 组装用户端钱包路由：账户余额、今日收益、收益历史、资金流水、充提资产与网络、充值地址和提现申请。
@@ -62,6 +63,7 @@ mod withdrawal_policy;
 pub fn routes() -> Router<AppState> {
     Router::new()
         .merge(withdrawal_policy::user_routes())
+        .merge(timed_deposits::user_routes())
         .route("/wallet/accounts", get(list_accounts))
         .route("/wallet/today-return", get(get_today_return))
         .route("/wallet/return-history", get(get_return_history))
@@ -86,6 +88,7 @@ pub fn routes() -> Router<AppState> {
 pub fn admin_routes() -> Router<AppState> {
     Router::new()
         .merge(withdrawal_policy::admin_routes())
+        .merge(timed_deposits::admin_routes())
         .route("/wallet/withdrawals", get(list_admin_withdrawals))
         .route("/wallet/withdrawals/:id/approve", post(approve_withdrawal))
         .route("/wallet/withdrawals/:id/reject", post(reject_withdrawal))

@@ -19,85 +19,8 @@
       </div>
 
       <!-- Deposit Form -->
-      <div v-if="activeRechargeTab === 'normal'" class="p-6 space-y-6">
-        <div>
-          <label class="block text-sm font-medium text-muted-foreground mb-2">{{ t('wallet.select_coin') }}</label>
-          <div class="flex flex-wrap gap-2">
-            <button
-              v-for="coin in supportedCoins"
-              :key="coin"
-              @click="selectCoin(coin)"
-              class="px-4 py-2 rounded border transition-colors flex items-center gap-2"
-              :class="selectedCoin === coin ? 'bg-primary text-primary-foreground border-primary' : 'bg-background border-border hover:border-primary/50'"
-            >
-              <Icon :icon="getCoinIcon(coin)" />
-              {{ coin }}
-            </button>
-          </div>
-        </div>
-
-        <div v-if="loadingNetworks" class="py-4 flex justify-center">
-            <Icon icon="mdi:loading" class="animate-spin text-xl text-primary" />
-        </div>
-
-        <div v-else-if="availableNetworks.length > 0" class="animate-fade-in">
-             <label class="block text-sm font-medium text-muted-foreground mb-2">{{ t('wallet.select_network') }}</label>
-             <div class="flex flex-wrap gap-2">
-                <button
-                  v-for="network in availableNetworks"
-                  :key="network.networkKey || network.name"
-                  @click="selectNetwork(network)"
-                  class="px-3 py-1.5 text-sm rounded border transition-colors"
-                  :class="selectedNetworkKey === (network.networkKey || network.name) ? 'bg-primary/20 text-primary border-primary' : 'bg-background border-border hover:border-primary/50'"
-                >
-                  {{ network.name }}
-                </button>
-             </div>
-        </div>
-
-        <div v-if="loading" class="py-8 flex justify-center">
-            <Icon icon="mdi:loading" class="animate-spin text-3xl text-primary" />
-        </div>
-
-        <div v-else-if="walletData" class="space-y-6 animate-fade-in">
-            <div class="p-4 bg-muted/30 rounded-lg border border-border">
-                <div class="text-xs text-muted-foreground mb-1">{{ t('wallet.deposit_address') }}</div>
-                <div class="flex items-center gap-2">
-                    <code class="flex-1 bg-background p-3 rounded border border-border font-mono text-sm break-all">
-                        {{ walletData.address }}
-                    </code>
-                    <button @click="copyAddress" class="p-3 bg-primary/10 text-primary rounded hover:bg-primary/20 transition-colors" :title="t('wallet.copy_address')">
-                        <Icon icon="mdi:content-copy" />
-                    </button>
-                </div>
-            </div>
-
-            <div class="flex flex-col items-center justify-center p-6 border border-dashed border-border rounded-lg bg-background">
-                <div class="w-48 h-48 bg-white p-2 rounded mb-4 flex items-center justify-center">
-                     <img v-if="qrCodeUrl" :src="qrCodeUrl" :alt="t('wallet.qr_alt')" class="w-full h-full object-contain" />
-                     <div v-else class="text-slate-500 text-xs text-center space-y-2">
-                         <Icon icon="mdi:qrcode-scan" class="text-4xl mx-auto" />
-                         <div>{{ qrCodeError || t('wallet.qr_failed') }}</div>
-                     </div>
-                </div>
-                <p class="text-sm text-muted-foreground text-center">{{ t('wallet.scan_qr', { coin: selectedCoin, network: selectedNetwork }) }}</p>
-            </div>
-
-            <div class="space-y-2 text-sm text-muted-foreground bg-yellow-500/5 p-4 rounded border border-yellow-500/20">
-                <div class="flex items-start gap-2">
-                    <Icon icon="mdi:alert-circle-outline" class="text-yellow-500 mt-0.5" />
-                    <p>{{ t('wallet.deposit_warning', { coin: selectedCoin, network: selectedNetwork }) }}</p>
-                </div>
-                <div class="flex items-start gap-2">
-                    <Icon icon="mdi:information-outline" class="text-blue-500 mt-0.5" />
-                    <p>{{ t('wallet.minimum_deposit') }}: <span class="font-bold text-foreground">{{ walletData.coin.minRechargeAmount }} {{ walletData.unit || selectedCoin }}</span></p>
-                </div>
-                <div class="flex items-start gap-2">
-                    <Icon icon="mdi:cash-minus" class="text-blue-500 mt-0.5" />
-                    <p>{{ t('wallet.fee') }}: <span class="font-bold text-foreground">{{ walletData.coin.depositFee }} {{ walletData.unit || selectedCoin }}</span></p>
-                </div>
-            </div>
-        </div>
+      <div v-if="activeRechargeTab === 'normal'" class="p-6">
+        <TimedDepositPanel v-if="userStore.isLoggedIn" :identity="depositIdentity" />
       </div>
 
       <div v-else class="p-6 space-y-5">
@@ -195,58 +118,35 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
+import TimedDepositPanel from '@/components/TimedDepositPanel.vue'
+import { useUserStore } from '@/stores/user'
+import { readAuthSessionScope } from '@/utils/authStorage'
 import { Icon } from '@iconify/vue'
-import { toDataURL } from 'qrcode'
 import {
     createQuickRechargeOrder,
     fetchQuickRechargeConfig,
     fetchQuickRechargeOrders,
-    fetchSupportedCoins,
-    fetchCoinNetworks,
-    getDepositAddress,
     type QuickRechargeConfig,
     type QuickRechargeOrder,
     type QuickRechargeReturnTarget,
-    type WalletAddress,
-    type CoinNetwork,
 } from '@/api/wallet'
 import { useToast } from 'vue-toastification'
 import { useI18n } from 'vue-i18n'
 
 const toast = useToast()
 const { t } = useI18n()
-const supportedCoins = ref<string[]>([])
-const selectedCoin = ref<string>('')
-const availableNetworks = ref<CoinNetwork[]>([])
-const selectedNetwork = ref<string>('')
-const selectedNetworkKey = ref<string>('')
-const walletData = ref<WalletAddress | null>(null)
-const qrCodeUrl = ref('')
-const qrCodeError = ref('')
+const userStore = useUserStore()
+const depositIdentity = computed(() => {
+    if (!userStore.token) return ''
+    try { return readAuthSessionScope() }
+    catch { return '' }
+})
 const quickConfig = ref<QuickRechargeConfig | null>(null)
 const quickAmount = ref('')
 const quickOrder = ref<QuickRechargeOrder | null>(null)
 
-const loading = ref(false)
-const loadingNetworks = ref(false)
 const quickRechargeLoading = ref(false)
-let addressRequestGeneration = 0
-let addressRequestAbort: AbortController | null = null
-
-function isAbortError(error: unknown): boolean {
-    if (!error || typeof error !== 'object') return false
-    const candidate = error as { name?: string; code?: string }
-    return candidate.name === 'CanceledError' || candidate.name === 'AbortError' || candidate.code === 'ERR_CANCELED'
-}
-
-function beginAddressRequest(): { generation: number; signal: AbortSignal } {
-    addressRequestAbort?.abort()
-    addressRequestGeneration += 1
-    const controller = new AbortController()
-    addressRequestAbort = controller
-    return { generation: addressRequestGeneration, signal: controller.signal }
-}
 
 type QuickRechargeBridgeWindow = Window & {
     __TAURI__?: unknown
@@ -261,134 +161,6 @@ const rechargeTabs: Array<{ value: RechargeTab; labelKey: string }> = [
     { value: 'normal', labelKey: 'wallet.normal_deposit' },
     { value: 'quick', labelKey: 'wallet.quick_deposit' },
 ]
-
-const getCoinIcon = (coin: string) => {
-    switch(coin) {
-        case 'USDT': return 'mdi:currency-usd'
-        case 'BTC': return 'mdi:bitcoin'
-        case 'ETH': return 'mdi:ethereum'
-        default: return 'mdi:currency-usd-circle'
-    }
-}
-
-const loadCoins = async () => {
-    try {
-        const res = await fetchSupportedCoins()
-        if (res.data.code === 0) {
-            supportedCoins.value = res.data.data
-            if (supportedCoins.value.length > 0) {
-                selectCoin(supportedCoins.value[0])
-            }
-        }
-    } catch (e) {
-        console.error(e)
-        toast.error(t('wallet.load_coins_failed'))
-    }
-}
-
-const networkIdentity = (network: CoinNetwork | string) => {
-    if (typeof network === 'string') {
-        return { displayName: network, networkKey: network }
-    }
-    return { displayName: network.name, networkKey: network.networkKey || network.name }
-}
-
-const loadDepositAddress = async (networkKey: string, generation: number, signal: AbortSignal) => {
-    loading.value = true
-    walletData.value = null
-    qrCodeUrl.value = ''
-    qrCodeError.value = ''
-    try {
-        const res = await getDepositAddress(selectedCoin.value, networkKey, { signal })
-        if (generation !== addressRequestGeneration) return
-        if (res.data.code === 0) {
-            walletData.value = res.data.data
-            if (walletData.value?.address) {
-                await renderAddressQrCode(walletData.value.address)
-            }
-        } else {
-            toast.error(t('wallet.address_failed'))
-        }
-    } catch (e) {
-        if (isAbortError(e) || generation !== addressRequestGeneration) return
-        console.error(e)
-        toast.error(t('wallet.address_fetch_failed'))
-    } finally {
-        if (generation === addressRequestGeneration) {
-            loading.value = false
-        }
-    }
-}
-
-const selectCoin = async (coin: string) => {
-    selectedCoin.value = coin
-    selectedNetwork.value = ''
-    selectedNetworkKey.value = ''
-    walletData.value = null
-    qrCodeUrl.value = ''
-    qrCodeError.value = ''
-    availableNetworks.value = []
-
-    const { generation, signal } = beginAddressRequest()
-    loadingNetworks.value = true
-    try {
-        const res = await fetchCoinNetworks(coin, 'deposit', { signal })
-        if (generation !== addressRequestGeneration) return
-        if (res.data.code === 0 && res.data.data.length > 0) {
-            availableNetworks.value = res.data.data.filter(n => n.depositEnabled)
-            if (availableNetworks.value.length > 0) {
-                const { displayName, networkKey } = networkIdentity(availableNetworks.value[0])
-                selectedNetwork.value = displayName
-                selectedNetworkKey.value = networkKey
-                await loadDepositAddress(networkKey, generation, signal)
-            }
-        } else {
-             toast.warning(t('wallet.no_networks'))
-        }
-    } catch (e) {
-        if (isAbortError(e) || generation !== addressRequestGeneration) return
-        console.error(e)
-        toast.error(t('wallet.load_networks_failed'))
-    } finally {
-        if (generation === addressRequestGeneration) {
-            loadingNetworks.value = false
-        }
-    }
-}
-
-const selectNetwork = async (network: CoinNetwork | string) => {
-    const { displayName, networkKey } = networkIdentity(network)
-    selectedNetwork.value = displayName
-    selectedNetworkKey.value = networkKey
-    const { generation, signal } = beginAddressRequest()
-    await loadDepositAddress(networkKey, generation, signal)
-}
-
-const renderAddressQrCode = async (address: string) => {
-    qrCodeUrl.value = ''
-    qrCodeError.value = ''
-    try {
-        qrCodeUrl.value = await toDataURL(address, {
-            errorCorrectionLevel: 'M',
-            margin: 1,
-            width: 192,
-            color: {
-                dark: '#020617',
-                light: '#ffffff',
-            },
-        })
-    } catch (error) {
-        console.error('Failed to render deposit QR code', error)
-        qrCodeError.value = t('wallet.qr_failed')
-    }
-}
-
-const copyAddress = () => {
-    if (walletData.value?.address) {
-        navigator.clipboard.writeText(walletData.value.address)
-        toast.success(t('wallet.address_copied'))
-    }
-}
 
 const loadQuickRechargeConfig = async () => {
     try {
@@ -488,15 +260,10 @@ function formatQuickOrderTime(value: number) {
 }
 
 onMounted(() => {
-    loadCoins()
     loadQuickRechargeConfig()
     void loadQuickOrders()
 })
 
-onUnmounted(() => {
-    addressRequestAbort?.abort()
-    addressRequestGeneration += 1
-})
 </script>
 
 <style scoped>

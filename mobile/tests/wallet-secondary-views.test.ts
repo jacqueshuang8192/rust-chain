@@ -19,17 +19,13 @@ const sources = Object.fromEntries(
   Object.entries(viewFiles).map(([key, path]) => [key, readFileSync(new URL(path, import.meta.url), 'utf8')]),
 ) as Record<keyof typeof viewFiles, string>
 
-test('充值流程保留真实资产、网络、地址、二维码与复制合同', () => {
-  assert.match(sources.depositAsset, /assets\.value = await fetchDepositAssets\(\)/)
+test('充值流程读取真实资产与可用网络，并由限时订单面板创建地址', () => {
+  assert.match(sources.depositAsset, /Promise\.all\(\[fetchDepositAssets\(\), fetchTimedDepositOptions\(\)\]\)/)
   assert.match(sources.depositAsset, /name: 'deposit-network', params: \{ asset: asset\.symbol \}/)
-  assert.match(sources.depositNetwork, /await fetchDepositAssets\(\)/)
-  assert.match(sources.depositNetwork, /await fetchDepositNetworks\(props\.asset, minimum\.value\)/)
+  assert.match(sources.depositNetwork, /await fetchTimedDepositOptions\(\)/)
   assert.match(sources.depositNetwork, /name: 'deposit-detail', params: \{ asset: props\.asset, network: network\.network \}/)
-  assert.match(sources.depositDetail, /address\.value = await createDepositAddress\(props\.asset, props\.network, minimum\)/)
-  assert.match(sources.depositDetail, /toDataURL\(address\.value\.address/)
-  assert.match(sources.depositDetail, /navigator\.clipboard\.writeText\(address\.value\.address\)/)
-  assert.match(sources.depositDetail, /document\.execCommand\('copy'\)/)
-  assert.match(sources.depositDetail, /v-if="address\.memo"/)
+  assert.match(sources.depositDetail, /<TimedDepositPanel[^>]+:asset="asset"[^>]+:network="network"/)
+  assert.doesNotMatch(sources.depositDetail, /createDepositAddress/)
   assert.match(sources.depositDetail, /:fallback="\{ name: 'deposit-network', params: \{ asset \} \}"/)
 })
 

@@ -2591,3 +2591,22 @@ quote/contract errors, unknown/late frames, and listed-only new-coin opportuniti
 - Verify spot-holdings-presentation tests for USDT exclusion without wallet mutation,
   exact total, expiry/recovery and timer cleanup; use numeric-browser fixture's
   optional spot-holdings flag for isolated actual-page rendering.
+
+## Timed On-chain Deposits
+
+Use [the backend timed deposit contract](../backend/timed-deposits.md) for both
+Mobile and PC. Select readiness from `/wallet/deposit-options`, accept exact coin
+quantity text, and create an order only on explicit submit. Stable uncertain
+submission keys are scoped by session, asset, network and normalized amount.
+Use server_time to correct the 30-minute countdown; an old history row must not
+reset the clock. Expired/review orders hide QR and copy actions. Restore pending
+orders from history and reconcile by polling; abort old session/selection
+requests and clean up intervals. Fees and received amounts remain decimal text.
+PC Recharge uses `readAuthSessionScope()` with a reactive login/token dependency;
+access tokens may be opaque, so never decode them as JWT to enable the panel.
+The shared behavior test compiles both actual SFCs and the real PC Recharge setup. Browser fixture
+`mobile/tests/fixtures/timed-deposit-browser.html` replaces transport locally.
+
+The feature adds a small all-route JS cost: the raw total budget is 1510 KiB
+(previously 1500), with entry 480 KiB / 165 KiB gzip and total gzip 510 KiB
+unchanged. Remove retired detail CSS; the CSS 656 KiB budget is unchanged.

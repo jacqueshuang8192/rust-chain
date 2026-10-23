@@ -42,6 +42,7 @@ the feature contract for the business context being modified.
 | [External Market Fallback](./market-fallback.md) | Request-time Coinbase windows and provider/failure isolation | Active |
 | [External Market Pipeline](./external-market-pipeline.md) | Atomic Redis admission, durable FIFO consumers, legacy archive retirement and order-time cutoffs | Active |
 | [Market Price Retention](./market-price-retention.md) | Redis latest-only pricing/status, bounded generator checkpoints and permanent order evidence | Active |
+| [Timed On-chain Deposits](./timed-deposits.md) | Exact 30-minute reservations, five-network scanners and audited receipt attribution | Active |
 | [Deposit Address Contracts](./deposit-addresses.md) | Configurable deposit network address groups and address-pool allocation contracts | Active |
 | [Order Identifier Display Contract](./order-identifiers.md) | User-visible order numbers and internal ID separation across admin and PC UI | Active |
 | [Auth Session Contract](./auth-sessions.md) | sa-token-rust Redis session, refresh, extractor, and frontend Bearer compatibility contracts | Active |
