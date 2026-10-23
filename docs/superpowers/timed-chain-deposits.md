@@ -53,6 +53,6 @@
 
 后台页面使用真实组件和隔离响应验证直接导入、权限隔离及桌面/窄屏布局。五网络解析仍由 RPC 模拟数据覆盖；没有连接正式节点进行真实转账，浏览器页面测试也不代表生产端到端验收。
 
-最新命令、构建结果和既有门禁见[本次重构交付记录](../../.trellis/tasks/10-23-unified-recharge-flow/research/delivery.md)。上一轮限时引擎的完整记录见[初次交付](../../.trellis/tasks/archive/2026-10/10-23-timed-chain-deposits/research/delivery.md)，其中测试数量和包体数字仅代表那次交付。
+最新命令、构建结果和既有门禁见[本次重构交付记录](../../.trellis/tasks/archive/2026-10/10-23-unified-recharge-flow/research/delivery.md)。上一轮限时引擎的完整记录见[初次交付](../../.trellis/tasks/archive/2026-10/10-23-timed-chain-deposits/research/delivery.md)，其中测试数量和包体数字仅代表那次交付。
 
 上线前仍需应用新迁移、配置真实地址/节点，并逐网络验证实际转账、确认数、到账延迟、断线续扫和人工核对。本次没有生产部署或资金转账操作。
