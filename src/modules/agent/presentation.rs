@@ -5,6 +5,8 @@
 //! 代理端对外结构在此统一定义：时间列一律序列化为 Unix 毫秒时间戳，金额保持十进制不转浮点，
 //! 多数响应体同时派生 sqlx 行映射，字段名与查询别名严格对应，改名会同时影响 SQL 与接口契约。
 
+pub(crate) mod funding;
+
 use crate::time::{option_unix_millis, unix_millis};
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};

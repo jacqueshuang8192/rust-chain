@@ -624,3 +624,92 @@ navigation and read-only detail controls. Browser checks desktop/narrow containm
 Wrong: query the current project's orders without filtering user ownership.
 Correct: intersect every row/count query with the token-derived agent subtree,
 then apply optional project, branch and user filters.
+
+## Scenario: Read-Only Team Deposit And Withdrawal Records
+
+### 1. Scope / Trigger
+
+Agent reporting covers both quick/chain recharge orders and withdrawal requests
+for users owned by the authenticated agent and its descendant agents. Manual
+agent recharge applications remain a separate workflow.
+
+### 2. Signatures
+
+- GET `/agent/api/v1/funding/{kind}`, `kind=deposits|withdrawals`, returns
+  `{items: AgentFundingRecord[], total}`. No mutation or unscoped detail route.
+- UI `/agent/funding/deposits` and `/agent/funding/withdrawals`, with optional
+  `user_id` deep links from the team users page.
+- Common filters: `team_scope=all|own|descendants`, `agent_id`, `user_id`,
+  `record_id`, literal-substring `email`, `asset_symbol`, `network`, `status`,
+  `created_from`, `created_to`, `limit`, `offset`. Deposits additionally accept
+  `source=quick|chain` and exact `order_no`; withdrawals reject these filters.
+
+### 3. Contracts
+
+Every source branch, row and COUNT query joins user referrals to the direct
+owning agent and repeats the authenticated materialized-path predicate.
+`agent_id` can only select a branch inside that scope. Do not substitute the
+filter ID for the authenticated path or cache membership across requests.
+Rows sort by `created_at DESC, source DESC, id DESC`; frontend row keys combine
+source and ID because independent tables can share IDs. COUNT and rows share
+one expiry cutoff; like existing agent reports they do not promise a shared
+transaction snapshot during concurrent changes.
+
+Use allowlisted fields. No provider callbacks/payment URLs, idempotency keys,
+security methods, gateway requests or internal withdrawal review data appear.
+All amounts are Decimal strings (exponent notation is valid); times are UTC
+milliseconds; unknown amounts and dates stay null. `amount` is requested coin
+quantity or quick provider quote, `paid_amount` is received coin quantity,
+`fee` is the fee, and `credited_amount` is net quantity only when currently
+credited. Quick fiat quote uses separate `fiat_amount` and `fiat_currency`.
+Withdrawals expose `amount`, `fee`, `total_reserved`, persisted state and hash;
+`order_no` is null because they have no merchant order number. Display their
+ID explicitly as a record ID.
+
+Quick paid maps to `credited`. Chain event `reversed` and `manual_review`
+override order status; unpaid pending past expiry reads `expired`. Do not
+persist derived states while reading. Withdrawal pending is `pending_review`,
+never `pending`. No wallet creation, polling, broadcasts, audits or ledger
+writes occur in these routes. Details display only the already scoped row.
+
+Filters and details reset on kind/session/user-link changes. Hide old rows as
+soon as request context changes; reject late results from previous contexts.
+Errors must remain errors rather than successful empty states. Filter drafts
+are submitted explicitly and retained when advanced controls collapse.
+
+### 4. Validation & Error Matrix
+
+| Input / state | Result |
+| --- | --- |
+| Unknown query fields or invalid kind-specific filters | 400 before DB access |
+| ID outside 1..9007199254740991 | 400 |
+| limit outside 1..100 or offset above 100000 | 400 |
+| Invalid milliseconds or end <= start | 400 |
+| Missing / wrong-scope token, disabled ancestor | 401 / 403 / 401 |
+| Out-of-scope branch or user, unassigned or missing user | Empty items and zero total |
+| Unknown kind | 404 |
+| Numeric money / missing mandatory nullable fields in wire response | Frontend contract error |
+
+### 5. Good / Base / Bad Cases
+
+Good: a root agent sees a grandchild user's pending ETH order and an uncertain
+withdrawal without gaining review/broadcast powers. Base: unknown quick quote
+shows unavailable quantity and the original fiat quote separately. Bad: using
+wallet ledger alone loses pending/expired orders; displaying reversed chain
+orders as credited misrepresents current state.
+
+### 6. Tests Required
+
+`tests/agent_routes/funding.rs` uses real MySQL for parent/child/grandchild,
+sibling, other-tree, unassigned and reassigned user isolation; identical
+row/count filters, stable pagination, effective states, exact large money and
+unchanged financial snapshots. Validate malformed queries without a database.
+OpenAPI verifies protected read-only routes, decimal fields and nullable IDs.
+Web tests cover real filters, details, source-specific amounts, exact wire
+validation, failure states and late results after session/kind changes.
+
+### 7. Wrong vs Correct
+
+Wrong: UNION unscoped source tables, expose provider payloads, or reinterpret
+quick fiat payment as deposited coin quantity. Correct: scope each source,
+project explicit safe fields and render coin/fiat amounts with distinct units.

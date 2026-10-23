@@ -118,6 +118,16 @@ pub struct DepositSettings {
     pub scanners: Vec<ScannerView>,
     pub assets: Vec<ChainAssetView>,
     pub addresses: Vec<SharedAddressView>,
+    pub platform_assets: Vec<DepositPlatformAsset>,
+}
+
+/// 充值配置专用币种目录，仅返回选择映射和判断平台充值开关所需的公开字段。
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
+pub struct DepositPlatformAsset {
+    pub symbol: String,
+    pub status: String,
+    pub deposit_enabled: bool,
+    pub precision_scale: i32,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]

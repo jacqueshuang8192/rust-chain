@@ -1432,8 +1432,18 @@ fallback or separate enrollment form remains. Preview complete address/network
 inputs, require a reason, and explain atomic rejection and duplicate preservation.
 
 Never echo node secrets; blank means preserve. Pin revision through failed saves;
-retain draft/reason on 409. Keep one dirty editor category, including pasted
-addresses, with navigation protection. `接受新充值订单` controls admission, not
+retain draft/reason on 409. Use explicit network, multi-asset and address lists
+with independent SideSheet editors, not a global implicit dirty lock. Opening
+an editor pins its network, record and revision; cancel/discard protects local
+changes and navigation. Refresh is unavailable while an editor/save is active.
+Failed refresh disables new writes without erasing a pinned draft. New asset
+selection uses the minimal platform catalog, excludes already mapped symbols
+and explains platform recharge disabled status. ETH/18 (Ethereum/Base), BTC/8
+and SOL/9 are fixed native presets; Tron offers only TRC20. No token contract or
+decimals is guessed. Existing identity is copyable read-only text with a reason;
+only its enabled state is editable. Native identity is not an empty disabled
+contract input. Semi Modal action buttons need explicit Chinese aria-labels;
+Select visible labels use aria-labelledby. `接受新充值订单` controls admission, not
 historical scanning; disabling addresses/assets preserves in-flight processing.
 
 Search actual `order_no`; display internal IDs only as labelled action references.
@@ -1442,3 +1452,6 @@ show actual amount/fee and chain identity, and require a reason. Backend matchin
 and confirmation checks remain final. Preserve desktop/390/320 layouts, contained
 horizontal table scrolling and accessible labels. Tests cover permission-specific
 tabs, direct import payloads, revisions, drafts, secrets and unchanged quick recharge.
+At narrow widths, stack the Card header title above its action. Semi Card places
+the action inside `semi-card-header-wrapper`, so wrapping the outer header alone
+does not prevent title truncation; pass a non-ellipsis Typography title explicitly.

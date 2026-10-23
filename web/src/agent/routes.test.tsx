@@ -46,6 +46,7 @@ describe('agentRoutes', () => {
     ['support', 'AgentSupportPage'],
     ['users', 'AgentUsersPage'],
     ['orders/:kind', 'AgentTeamOrdersPage'],
+    ['funding/:kind', 'AgentFundingRecordsPage'],
     ['users/:userId/portfolio', 'AgentUserPortfolioPage'],
     ['users/:userId/recharge', 'AgentRechargePage'],
     ['recharges', 'AgentRechargePage'],

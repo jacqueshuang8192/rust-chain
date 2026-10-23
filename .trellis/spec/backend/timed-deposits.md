@@ -91,6 +91,11 @@ receipt remains; it does not erase unpaid combination history.
 
 `CREDENTIAL_ENCRYPTION_KEY` is the existing 32-byte key. Node URL/API key are
 encrypted and never returned, audited or logged. Blank updates preserve them.
+Full settings additionally return `platform_assets: [{symbol,status,deposit_enabled,precision_scale}]`.
+This minimal catalog is available under `wallet.networks.read` without
+`assets.read`; it contains no management-only asset fields. The full frontend
+contract requires the catalog, while address-only reads stay address-only.
+
 Permissions: `wallet.networks` for settings/mappings, `wallet.address_pool` for
 shared-address reads/writes, `wallet.deposits` for orders/evidence, `.review` for review.
 

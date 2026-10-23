@@ -1786,3 +1786,66 @@ async fn documents_admin_token_creation_and_readonly_record_contracts() {
         }
     }
 }
+
+#[tokio::test]
+async fn openapi_documents_scoped_funding_and_deposit_asset_catalog() {
+    let doc = openapi_json().await;
+    let path = "/agent/api/v1/funding/{kind}";
+    assert!(operation_has_bearer_security(&doc, path, "get"));
+    assert!(doc["paths"][path].get("post").is_none());
+    let parameters = doc["paths"][path]["get"]["parameters"].as_array().unwrap();
+    for name in [
+        "kind",
+        "team_scope",
+        "agent_id",
+        "user_id",
+        "source",
+        "order_no",
+        "record_id",
+        "status",
+        "created_from",
+        "created_to",
+        "limit",
+        "offset",
+    ] {
+        assert!(
+            parameters.iter().any(|p| p["name"] == name),
+            "missing {name}"
+        );
+    }
+    let schemas = &doc["components"]["schemas"];
+    let record = &schemas["AgentFundingRecord"];
+    for field in [
+        "amount",
+        "paid_amount",
+        "credited_amount",
+        "fee",
+        "total_reserved",
+        "fiat_amount",
+    ] {
+        let schema = record["properties"][field].to_string();
+        assert!(schema.contains("string"), "{field}: {schema}");
+        assert!(!schema.contains("number"), "{field}: {schema}");
+    }
+    assert!(
+        record["required"]
+            .as_array()
+            .unwrap()
+            .contains(&serde_json::json!("order_no"))
+    );
+    assert!(record["properties"].get("callback_payload_json").is_none());
+    assert!(record["properties"].get("security_method").is_none());
+    assert!(
+        schemas["DepositSettings"]["required"]
+            .as_array()
+            .unwrap()
+            .contains(&serde_json::json!("platform_assets"))
+    );
+    assert_eq!(
+        schemas["DepositPlatformAsset"]["properties"]
+            .as_object()
+            .unwrap()
+            .len(),
+        4
+    );
+}

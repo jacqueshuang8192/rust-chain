@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/backend/agent-hierarchy.md", "reason": "Agent subtree isolation and read-only funding projections"}
+{"file": ".trellis/spec/backend/timed-deposits.md", "reason": "Chain identity, settings catalog and precision contract"}
+{"file": ".trellis/spec/admin/ui-system.md", "reason": "Permission-aware editors, drafts and responsive layout"}
+{"file": ".trellis/spec/admin/resource-response-contract.md", "reason": "Strict API response validation"}
+{"file": ".trellis/tasks/10-24-recharge-config-agent-records/research/design.md", "reason": "Task design and acceptance plan"}

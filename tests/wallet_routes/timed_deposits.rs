@@ -132,6 +132,28 @@ async fn timed_deposit_routes_enforce_exact_amount_ownership_and_admin_permissio
         .await
         .unwrap();
     assert_eq!(visible["total"], 1);
+    // Network-only operators receive the minimal asset catalog without assets.read.
+    sqlx::query("UPDATE admin_roles SET permissions=JSON_ARRAY('wallet.networks.read') WHERE id=?")
+        .bind(role)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let response = call(
+        &app,
+        Some(&admin_token),
+        "GET",
+        "/admin/api/v1/wallet/deposit-settings",
+        Value::Null,
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::OK);
+    let config = body_json(response).await.unwrap();
+    let catalog = config["platform_assets"].as_array().unwrap();
+    let entry = catalog.iter().find(|row| row["symbol"] == symbol).unwrap();
+    assert!(entry["deposit_enabled"].is_boolean());
+    assert!(entry["precision_scale"].is_i64());
+    assert!(entry["status"].is_string());
+    assert_eq!(entry.as_object().unwrap().len(), 4);
     sqlx::query("UPDATE admin_roles SET permissions=JSON_ARRAY('wallet.deposits.read') WHERE id=?")
         .bind(role)
         .execute(&pool)

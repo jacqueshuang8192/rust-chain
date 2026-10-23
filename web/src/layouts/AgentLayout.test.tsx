@@ -23,6 +23,7 @@ function renderAgentLayout(initialEntry = '/agent/dashboard') {
           { path: 'support', element: <div>在线客服内容</div> },
           { path: 'users', element: <div>团队用户内容</div> },
           { path: 'orders/:kind', element: <div>团队订单内容</div> },
+          { path: 'funding/:kind', element: <div>团队充提内容</div> },
           { path: 'users/:userId/portfolio', element: <div>用户资产内容</div> },
           { path: 'users/:userId/recharge', element: <div>用户充值内容</div> },
           { path: 'recharges', element: <div>我的充值申请内容</div> }
@@ -73,6 +74,14 @@ describe('AgentLayout', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: '团队用户' }));
 
     expect(await screen.findByText('团队用户内容')).toBeInTheDocument();
+  });
+
+  it.each(['充值记录', '提现记录'])('opens %s and selects its navigation item', async (label) => {
+    renderAgentLayout();
+    fireEvent.click(screen.getByRole('menuitem', { name: label }));
+    expect(await screen.findByText('团队充提内容')).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: label })).toHaveClass('semi-navigation-item-selected');
+    expect(screen.getByRole('menuitem', { name: '我的充值申请' })).not.toHaveClass('semi-navigation-item-selected');
   });
 
   it('opens the online support workbench from the sidebar', async () => {

@@ -5,6 +5,8 @@
 //! 后续 SQL 一律以该路径为边界，客户端无法通过传参跨越到父级或兄弟代理团队。
 //! 只读用例不开显式事务，多次查询之间不保证同一数据库快照；改密和邀请码创建各自持有写事务。
 
+pub(crate) mod funding;
+
 use crate::{
     error::{AppError, AppResult},
     modules::{

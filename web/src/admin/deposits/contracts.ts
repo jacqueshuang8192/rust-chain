@@ -7,7 +7,8 @@ export const reviewReasons: Record<string, string> = { no_unique_amount_and_time
 export interface Scanner { network: string; enabled: boolean; endpoint_configured: boolean; api_key_configured: boolean; confirmations: number; revision: number; last_scan_at: number | null; last_error: string | null }
 export interface Asset { id: number; network: string; asset_symbol: string; asset_kind: string; token_address: string; decimals: number; enabled: boolean; revision: number }
 export interface SharedAddress { pool_id: number; network: string; address: string; enabled: boolean }
-export interface Settings { scanners: Scanner[]; assets: Asset[]; addresses: SharedAddress[] }
+export interface PlatformAsset { symbol: string; status: string; deposit_enabled: boolean; precision_scale: number }
+export interface Settings { scanners: Scanner[]; assets: Asset[]; addresses: SharedAddress[]; platform_assets: PlatformAsset[] }
 export interface Receipt { id: number; network: string; tx_hash: string; event_index: number; asset_kind: string; token_address: string; address: string; amount: string; block_height: number; block_hash: string; block_time: number; confirmations: number; status: string; review_reason: string | null; order_id: number | null; review_note: string | null }
 export interface Order { asset_kind: string; token_address: string; id: number; order_no: string; user_id: number; asset_symbol: string; network: string; address: string; amount: string; paid_amount: string | null; fee_amount: string; status: string; created_at: number; expires_at: number; required_confirmations: number; tx_hash: string | null }
 const row = (value: unknown): Record<string, unknown> => { if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('响应格式无效'); return value as Record<string, unknown>; };
@@ -18,8 +19,9 @@ const money = (value: unknown) => requiredDecimalText(string(value), '币种数�
 const nullableText = (value: unknown) => value === null ? null : string(value);
 export function parseSettings(value: unknown): Settings {
   const data = row(value);
-  if (!Array.isArray(data.scanners) || !Array.isArray(data.assets) || !Array.isArray(data.addresses)) throw new Error('充值配置响应不完整');
+  if (!Array.isArray(data.scanners) || !Array.isArray(data.assets) || !Array.isArray(data.addresses) || !Array.isArray(data.platform_assets)) throw new Error('充值配置响应不完整');
   return {
+    platform_assets: data.platform_assets.map((value) => { const r = row(value); return { symbol: string(r.symbol), status: string(r.status), deposit_enabled: bool(r.deposit_enabled), precision_scale: integer(r.precision_scale) }; }),
     scanners: data.scanners.map((value) => { const r = row(value); return { network: string(r.network), enabled: bool(r.enabled), endpoint_configured: bool(r.endpoint_configured), api_key_configured: bool(r.api_key_configured), confirmations: integer(r.confirmations), revision: integer(r.revision), last_scan_at: r.last_scan_at === null ? null : integer(r.last_scan_at), last_error: nullableText(r.last_error) }; }),
     assets: data.assets.map((value) => { const r = row(value); return { id: integer(r.id), network: string(r.network), asset_symbol: string(r.asset_symbol), asset_kind: string(r.asset_kind), token_address: string(r.token_address), decimals: integer(r.decimals), enabled: bool(r.enabled), revision: integer(r.revision) }; }),
     addresses: data.addresses.map((value) => { const r = row(value); return { pool_id: integer(r.pool_id), network: string(r.network), address: string(r.address), enabled: bool(r.enabled) }; })

@@ -18,6 +18,8 @@ use uuid::Uuid;
 
 #[path = "agent_routes/coin_applications.rs"]
 mod coin_applications;
+#[path = "agent_routes/funding.rs"]
+mod funding;
 #[path = "agent_routes/recharges.rs"]
 mod recharges;
 #[path = "agent_routes/seconds_control.rs"]

@@ -10,6 +10,8 @@ pub(crate) mod recharges;
 pub(crate) mod team_orders;
 pub(crate) mod wallet_records;
 
+pub(crate) mod funding;
+
 use crate::{
     error::{AppError, AppResult},
     modules::{

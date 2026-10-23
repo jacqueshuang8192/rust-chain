@@ -5,6 +5,8 @@
 //! 这里只放代理分销的行记录与写入入参结构，不含任何 SQL 与业务判断，
 //! 供基础设施层做查询映射、应用层做参数传递，读写两侧因此共享同一套字段口径。
 
+pub(crate) mod funding;
+
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
 
