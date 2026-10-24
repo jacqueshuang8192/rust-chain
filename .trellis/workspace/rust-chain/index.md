@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 85
-- **Last Active**: 2026-10-24
+- **Total Sessions**: 86
+- **Last Active**: 2026-10-25
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~905 | Active |
+| `journal-2.md` | ~938 | Active |
 | `journal-1.md` | ~1985 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 86 | 2026-10-25 | Chain deposit experience delivery | `430ce52` | `main` |
 | 85 | 2026-10-24 | Chain recharge setup and scan readiness | `d6f645a` | `main` |
 | 84 | 2026-10-24 | Docker artifact quota fix | `240d474` | `main` |
 | 83 | 2026-10-24 | Mainnet chain recharge presets | `8e6271a` | `main` |

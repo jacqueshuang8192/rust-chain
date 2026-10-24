@@ -903,3 +903,36 @@ Added node/asset/address/scan setup guide, per-method blockers, DB-clock freshne
 ### Next Steps
 
 - None - task complete
+
+
+## Session 86: Chain deposit experience delivery
+
+**Date**: 2026-10-25
+**Task**: Chain deposit experience delivery
+**Branch**: `main`
+
+### Summary
+
+Delivered mobile deposit redesign, independent order history, safe unpaid cancellation and admin receipt review repair. Mobile 907 and Web 1193 tests, isolated database/HTTP checks and browser acceptance passed. Existing Web bundle overage and unrelated all-targets Clippy warning remain documented. User authorized pushing origin/main; migration 0161 is required before release. Journal staging is scoped manually to exclude unrelated task directories.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `430ce52` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
