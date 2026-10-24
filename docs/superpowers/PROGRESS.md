@@ -10279,3 +10279,10 @@
 - 修改文件：`.github/workflows/docker-image.yml`、`tests/test_docker_workflow_outputs.py`、`.trellis/spec/backend/container-delivery.md`及本任务记录。
 - 验证结果：Python 24/24、Rust Docker 契约 10/10、source integrity、YAML 解析和 shellcheck 通过；actionlint v1.7.12（官方 release 校验 SHA256）通过。GitHub API 返回 404，未验证远程运行或 GHCR 发布。
 - 后续事项：保存本地提交；本轮未推送，未删除远程产物或调整计费。
+
+## 2026-10-24 16:31 - Docker Artifact 配额修复远程交付
+
+- 完成内容：按用户授权将修复提交 `240d474` 及归档记录纳入本次 origin/main 推送，附此交付记录一起发布。
+- 修改文件：`docs/superpowers/PROGRESS.md`；无新增业务或 workflow 改动。
+- 验证结果：推送前 fetch 确认远程无新提交、本地领先 3 个提交；沿用本轮 Python 24/24、Rust 10/10、actionlint、shellcheck 与源码完整性验证。
+- 后续事项：推送后核对远程 SHA；新版 workflow 的实际运行与镜像发布结果仍待 GitHub 验证，未清理远程存储或变更计费。
