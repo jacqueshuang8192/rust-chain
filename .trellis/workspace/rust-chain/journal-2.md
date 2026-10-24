@@ -870,3 +870,36 @@ Replaced artifact digest exchange with unique matrix job outputs and disabled op
 ### Next Steps
 
 - None - task complete
+
+
+## Session 85: Chain recharge setup and scan readiness
+
+**Date**: 2026-10-24
+**Task**: Chain recharge setup and scan readiness
+**Branch**: `main`
+
+### Summary
+
+Added node/asset/address/scan setup guide, per-method blockers, DB-clock freshness and cursor snapshot, provider-key drafts, idle-only refresh. Web 1190 tests, typecheck/lint/build, DB and Rust checks passed; browser desktop/390/320 verified. Existing bundle budget remains exceeded; no live-chain transfer or push.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d6f645a` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
