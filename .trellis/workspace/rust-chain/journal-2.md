@@ -936,3 +936,36 @@ Delivered mobile deposit redesign, independent order history, safe unpaid cancel
 ### Next Steps
 
 - None - task complete
+
+
+## Session 87: Tron listener HTTP diagnostics delivery
+
+**Date**: 2026-10-25
+**Task**: Tron listener HTTP diagnostics delivery
+**Branch**: `main`
+
+### Summary
+
+Preserved HTTP status and code-defined operation with safe Chinese operator hints. Verified 12 scanner tests, 11 architecture tests, production Clippy and formatting. User authorized push to origin/main. Deployment and actual TronGrid rejection cause remain unverified; no cursor, financial or schema changes. Journal staged manually to exclude unrelated task directories.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `a13c1d7` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
