@@ -25,6 +25,7 @@ pub(super) fn user_routes() -> Router<AppState> {
         .route("/wallet/deposit-options", get(options))
         .route("/wallet/deposit-orders", get(orders).post(create))
         .route("/wallet/deposit-orders/:id", get(order))
+        .route("/wallet/deposit-orders/:id/cancel", post(cancel))
 }
 
 /// 配置和人工核对使用钱包域独立权限映射；不开放任何匿名链上观测写入端点。
@@ -179,4 +180,14 @@ async fn import_addresses(
 ) -> AppResult<StatusCode> {
     app::import_addresses(&mysql_pool(&state)?, admin_id_from_subject(&c.sub)?, r).await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+async fn cancel(
+    UserAuth(c): UserAuth,
+    State(state): State<AppState>,
+    Path(id): Path<u64>,
+) -> AppResult<Json<DepositOrder>> {
+    Ok(Json(
+        app::cancel_order(&mysql_pool(&state)?, user_id_from_subject(&c.sub)?, id).await?,
+    ))
 }

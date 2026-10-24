@@ -6,6 +6,7 @@ async fn timed_deposit_openapi_preserves_decimal_text_and_protected_routes() {
     for (path, method) in [
         ("/api/v1/wallet/deposit-options", "get"),
         ("/api/v1/wallet/deposit-orders", "post"),
+        ("/api/v1/wallet/deposit-orders/{id}/cancel", "post"),
         ("/admin/api/v1/wallet/deposit-settings", "get"),
         ("/admin/api/v1/wallet/deposit-receipts/{id}/review", "post"),
     ] {

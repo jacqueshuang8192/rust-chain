@@ -95,8 +95,9 @@ test('钱包未登录态保留 Header 与 Body，并使用 fullPath 登录重定
     if (name === 'ledger') assert.match(source, /<div class="ledger-content">[\s\S]*?<LoginRequiredState/)
     else assert.match(source, /<div class="page-content [^"]+">[\s\S]*?<LoginRequiredState/)
     assert.match(source, /class="wallet-login-prompt"/)
-    assert.match(source, /\.wallet-login-prompt \{[\s\S]*?background-image: none;[\s\S]*?min-height: 72px/)
-    assert.match(source, /\.wallet-login-prompt :deep\(\.button\)[\s\S]*?min-height: 44px/)
+    const loginStyles = name.startsWith('deposit') ? read('../src/styles/deposit.css') : source
+    assert.match(loginStyles, /\.wallet-login-prompt \{[\s\S]*?background-image: none;[\s\S]*?min-height: 72px/)
+    assert.match(loginStyles, /\.wallet-login-prompt (?::deep\()?\.button[\s\S]*?min-height: 44px/)
   }
 
   assert.match(loginRequiredSource, /query: \{ redirect: route\.fullPath \}/)
@@ -117,7 +118,7 @@ test('充币与提币选择页锁定 44px 搜索、36px 币标和 60px 真实资
   assert.match(sources.withdrawAsset, /assets\.value = await fetchWithdrawalAssets\(\)/)
 })
 
-test('充币网络与地址页锁定选中摘要、56px 网络行、180px QR 和 48px 复制动作', () => {
+test('充币网络保留选中摘要与网络行，付款页仅在可付款状态展示真实二维码', () => {
   assert.match(sources.depositNetwork, /selectedAsset\.value = assets\.find/)
   assert.match(sources.depositNetwork, /await fetchTimedDepositOptions\(\)/)
   assert.doesNotMatch(sources.depositNetwork, /estimatedMinutes/)
@@ -130,7 +131,7 @@ test('充币网络与地址页锁定选中摘要、56px 网络行、180px QR 和
   assert.match(panel, /createTimedDepositOrder\(chosen, exact, key, signal\)/)
   assert.match(panel, /toDataURL\(order\.value\.address/)
   assert.match(panel, /navigator\.clipboard\.writeText\(order\.value\.address\)/)
-  assert.match(panel, /v-if="payable && qr"/)
+  assert.match(panel, /<div v-if="payable" class="deposit-payment">[\s\S]*?<img v-if="qr"/)
   assert.match(panel, /min-height: 44px/)
 
 })
@@ -203,7 +204,7 @@ test('交易记录使用正式通栏布局，提币记录和快捷充值继续�
 test('钱包返回合同使用业务父级，动态充币详情回到当前资产网络选择', () => {
   assert.match(sources.depositAsset, /:fallback="\{ name: 'assets' \}"/)
   assert.match(sources.depositNetwork, /:fallback="\{ name: 'deposit-asset' \}"/)
-  assert.match(sources.depositDetail, /:fallback="\{ name: 'deposit-network', params: \{ asset \} \}"/)
+  assert.match(sources.depositDetail, /name: 'deposit-network', params: \{ asset \}/)
   assert.match(sources.withdrawAsset, /:fallback="\{ name: 'assets' \}"/)
   assert.match(sources.withdraw, /:fallback="\{ name: 'withdraw-asset' \}"/)
   assert.match(sources.ledger, /:back-fallback="\{ name: 'assets' \}"/)

@@ -132,6 +132,27 @@ async fn timed_deposit_routes_enforce_exact_amount_ownership_and_admin_permissio
         .await
         .unwrap();
     assert_eq!(visible["total"], 1);
+    let cancel_path = format!("{detail}/cancel");
+    for (token, expected) in [
+        (None, StatusCode::UNAUTHORIZED),
+        (Some(admin_token.as_str()), StatusCode::FORBIDDEN),
+        (Some(other_token.as_str()), StatusCode::NOT_FOUND),
+    ] {
+        assert_eq!(
+            call(&app, token, "POST", &cancel_path, Value::Null)
+                .await
+                .status(),
+            expected
+        );
+    }
+    for _ in 0..2 {
+        let response = call(&app, Some(&user_token), "POST", &cancel_path, Value::Null).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let cancelled = body_json(response).await.unwrap();
+        assert_eq!(cancelled["status"], "cancelled");
+        assert!(cancelled["cancelled_at"].is_i64());
+        assert_eq!(cancelled["expires_at"], order["expires_at"]);
+    }
     // Network-only operators receive the minimal asset catalog without assets.read.
     sqlx::query("UPDATE admin_roles SET permissions=JSON_ARRAY('wallet.networks.read') WHERE id=?")
         .bind(role)

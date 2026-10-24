@@ -8,17 +8,20 @@ import * as contract from '../src/core/timedDeposit.ts'
 import type { DepositOption, DepositOrder } from '../src/core/timedDeposit.ts'
 
 const option: DepositOption = { asset_symbol: 'ETH', network: 'eth', display_name: 'Ethereum', precision_scale: 18, min_deposit_amount: '0', deposit_fee: '0', required_confirmations: 12 }
-const order = (amount = '100', overrides: Partial<DepositOrder> = {}): DepositOrder => ({ id: 1, order_no: 'CD1', user_id: 9, asset_symbol: 'ETH', network: 'eth', address: `0x${'1'.repeat(40)}`, amount, fee_amount: '0', paid_amount: null, required_confirmations: 12, status: 'pending', tx_hash: null, created_at: Date.now(), expires_at: Date.now() + 1800000, paid_at: null, server_time: Date.now(), ...overrides })
+const order = (amount = '100', overrides: Partial<DepositOrder> = {}): DepositOrder => ({ id: 1, order_no: 'CD1', user_id: 9, asset_symbol: 'ETH', network: 'eth', address: `0x${'1'.repeat(40)}`, amount, fee_amount: '0', paid_amount: null, required_confirmations: 12, status: 'pending', tx_hash: null, created_at: Date.now(), expires_at: Date.now() + 1800000, paid_at: null, cancelled_at: null, server_time: Date.now(), ...overrides })
 interface State {
   amount: Vue.Ref<string>; order: Vue.Ref<DepositOrder | null>; qr: Vue.Ref<string>; payable: Vue.ComputedRef<boolean>; remaining: Vue.ComputedRef<number>; now: Vue.Ref<number>; error: Vue.Ref<string>; history: Vue.Ref<DepositOrder[]>;
-  submit(): Promise<void>; refresh(): Promise<void>; load(): Promise<void>; selectHistory(order: DepositOrder): void
+  submit(): Promise<void>; refresh(): Promise<void>; load(): Promise<void>; selectHistory(order: DepositOrder): void; cancelOrder(): Promise<void>; askCancel(): void; confirmingCancel: Vue.Ref<boolean>; cancelError: Vue.Ref<string>
 }
 const flush = async () => { for (let i = 0; i < 5; i += 1) { await new Promise(resolve => setImmediate(resolve)); await Vue.nextTick() } }
 function fixture(packageName: 'mobile' | 'pc', initial: DepositOrder[] = []) {
   const writes: { amount: string; key: string }[] = []
   let fail = false
   let create = async (_option: DepositOption, amount: string, key: string) => { writes.push({ amount, key }); if (fail) throw new Error('response lost'); return order(amount) }
+  let cancellations = 0
+  let cancel = async (_id: number) => { cancellations += 1; return order('100', { status: 'cancelled', cancelled_at: Date.now() }) }
   const api = {
+    cancelTimedDepositOrder: (id: number) => cancel(id),
     fetchTimedDepositOptions: async () => [option],
     fetchTimedDepositOrders: async () => ({ items: initial, total: initial.length }),
     fetchTimedDepositOrder: async () => order(),
@@ -28,17 +31,17 @@ function fixture(packageName: 'mobile' | 'pc', initial: DepositOrder[] = []) {
   const compiled = compileScript(parse(source).descriptor, { id: 'timed-deposit-behavior' })
   const output = ts.transpileModule(compiled.content, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
   const cleanup: (() => void)[] = []; const timers = new Set<number>(); const memory = new Map<string, string>()
-  const modules: Record<string, unknown> = { vue: { ...Vue, onUnmounted: (fn: () => void) => cleanup.push(fn) }, 'vue-i18n': { useI18n: () => ({ t: (key: string) => key }) }, qrcode: { toDataURL: async () => 'data:image/png;base64,test' }, '../api/timedDeposits': api, '../core/timedDeposit': contract }
+  const modules: Record<string, unknown> = { vue: { ...Vue, onUnmounted: (fn: () => void) => cleanup.push(fn) }, 'vue-i18n': { useI18n: () => ({ t: (key: string) => key, locale: Vue.ref('zh-CN') }) }, '../core/modalDialog': { useModalDialog: () => ({ trapFocus() {} }) }, qrcode: { toDataURL: async () => 'data:image/png;base64,test' }, '../api/timedDeposits': api, '../core/timedDeposit': contract }
   const exports: { default?: { setup(props: object, context: object): State } } = {}
   new Function('require', 'exports', 'sessionStorage', 'setInterval', 'clearInterval', output)(
     (name: string) => { assert.ok(Object.hasOwn(modules, name), name); return modules[name] }, exports,
     { getItem: (key: string) => memory.get(key) ?? null, setItem: (key: string, value: string) => memory.set(key, value), removeItem: (key: string) => memory.delete(key) },
     () => { const id = timers.size + 1; timers.add(id); return id }, (id: number) => timers.delete(id),
   )
-  const props = Vue.reactive({ identity: 'user:9', asset: 'ETH', network: 'eth' })
+  const props = Vue.reactive({ identity: 'user:9', asset: 'ETH', network: 'eth', orderId: '' })
   const scope = Vue.effectScope()
-  const state = scope.run(() => exports.default!.setup(props, { expose() {} }))!
-  return { state, writes, props, timers, memory, fail(value: boolean) { fail = value }, create(fn: typeof create) { create = fn }, stop() { cleanup.forEach(fn => fn()); scope.stop() } }
+  const state = scope.run(() => exports.default!.setup(props, { expose() {}, emit() {} }))!
+  return { state, writes, props, timers, memory, api, get cancellations() { return cancellations }, cancel(fn: typeof cancel) { cancel = fn }, fail(value: boolean) { fail = value }, create(fn: typeof create) { create = fn }, stop() { cleanup.forEach(fn => fn()); scope.stop() } }
 }
 
 for (const packageName of ['mobile', 'pc'] as const) {
@@ -79,6 +82,8 @@ test('deposit contract preserves decimals and rejects numeric money, excess prec
   assert.throws(() => contract.validateDepositDraft('0.1', { ...option, deposit_fee: '0.1' }))
   assert.throws(() => contract.mapDepositOrder({ ...order(), id: Number.MAX_SAFE_INTEGER + 1 }))
   assert.throws(() => contract.mapDepositOrder({ ...order(), amount: 100 }))
+  assert.equal(contract.mapDepositOrder(order('1', { status: 'cancelled', cancelled_at: 1000 })).cancelled_at, 1000)
+  assert.throws(() => contract.mapDepositOrder({ ...order(), cancelled_at: undefined }))
   assert.equal(contract.mapDepositOrder(order('9007199254740993.000000000000000001')).amount, '9007199254740993.000000000000000001')
 })
 
@@ -102,4 +107,46 @@ test('PC recharge uses the persisted login generation for opaque access tokens',
   user.token = ''; assert.equal(state.depositIdentity.value, '')
   sessionScope = 'login-generation-two'; user.token = 'another-opaque-token'
   assert.equal(state.depositIdentity.value, sessionScope)
+})
+
+
+test('mobile: cancellation needs confirmation, hides QR, and ignores duplicate submission', async () => {
+  const f = fixture('mobile', [order()])
+  try {
+    await flush(); await f.state.cancelOrder(); assert.equal(f.cancellations, 0)
+    f.state.askCancel(); assert.equal(f.state.confirmingCancel.value, true)
+    await Promise.all([f.state.cancelOrder(), f.state.cancelOrder()]); await flush()
+    assert.equal(f.cancellations, 1); assert.equal(f.state.order.value?.status, 'cancelled')
+    assert.equal(f.state.payable.value, false); assert.equal(f.state.qr.value, '')
+    assert.equal(f.state.confirmingCancel.value, false)
+  } finally { f.stop() }
+})
+
+test('mobile: rejected cancellation preserves order with feedback; lost successful reply re-reads state', async () => {
+  const f = fixture('mobile', [order()])
+  try {
+    await flush(); f.cancel(async () => { throw new Error('conflict') }); f.state.askCancel()
+    await f.state.cancelOrder(); assert.equal(f.state.order.value?.status, 'pending')
+    assert.equal(f.state.cancelError.value, 'timedDeposit.cancelFailed')
+    f.api.fetchTimedDepositOrder = async () => order('100', { status: 'cancelled', cancelled_at: Date.now() })
+    await f.state.cancelOrder(); await flush()
+    assert.equal(f.state.order.value?.status, 'cancelled'); assert.equal(f.state.qr.value, '')
+    assert.equal(f.state.confirmingCancel.value, false)
+  } finally { f.stop() }
+})
+
+test('mobile: late cancellation response cannot leak across sessions, historical detail works without options', async () => {
+  const f = fixture('mobile', [order()])
+  try {
+    await flush(); let resolve!: (value: DepositOrder) => void
+    f.cancel(() => new Promise(done => { resolve = done })); f.state.askCancel()
+    const pending = f.state.cancelOrder(); f.props.identity = ''; await Vue.nextTick()
+    resolve(order('100', { status: 'cancelled', cancelled_at: Date.now() })); await pending; await flush()
+    assert.equal(f.state.order.value, null); assert.equal(f.state.confirmingCancel.value, false)
+    f.api.fetchTimedDepositOptions = async () => { throw new Error('network unavailable') }
+    f.api.fetchTimedDepositOrder = async () => order('50', { id: 8, status: 'cancelled', cancelled_at: Date.now() })
+    f.props.identity = 'user:10'; f.props.orderId = '8'; await flush()
+    assert.equal(Vue.unref(f.state.order)?.id, 8); assert.equal(f.state.payable.value, false)
+    f.props.orderId = 'invalid'; await flush(); assert.equal(f.state.order.value, null)
+  } finally { f.stop() }
 })

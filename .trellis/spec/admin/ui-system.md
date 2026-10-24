@@ -1488,3 +1488,17 @@ tabs, direct import payloads, revisions, drafts, secrets and unchanged quick rec
 At narrow widths, stack the Card header title above its action. Semi Card places
 the action inside `semi-card-header-wrapper`, so wrapping the outer header alone
 does not prevent title truncation; pass a non-ellipsis Typography title explicitly.
+
+
+### Receipt attribution lookup
+
+Deposit review accepts internal positive safe IDs and exact public CD order
+numbers. Order-number lookup must return exactly one exact match. Clear the
+previous target before every read and invalidate late responses when input
+changes or the panel unmounts. Candidate IDs are explicit read actions, never
+automatically selected payment owners. Show identity/address/time/confirmation
+blockers. A SideSheet contains evidence and target preview; a separate
+ConfirmAction requires the reason before credit/ignore. Freeze target controls
+and closing during confirmation/submission, prevent duplicate writes, and
+preserve backend atomic revalidation. Cancelled orders are eligible for explicit
+manual attribution only, with the cancellation history retained by the backend.

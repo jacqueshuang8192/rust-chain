@@ -19,3 +19,9 @@ export async function createTimedDepositOrder(option: DepositOption, draft: stri
   const { data } = await client.post(requestUrl('/wallet/deposit-orders'), { asset_symbol: option.asset_symbol, network: option.network, amount, idempotency_key: key }, { signal })
   return mapDepositOrder(data)
 }
+
+export async function cancelTimedDepositOrder(id: number, signal?: AbortSignal) {
+  if (!Number.isSafeInteger(id) || id <= 0) throw new TypeError('Invalid deposit order ID')
+  const { data } = await client.post(requestUrl(`/wallet/deposit-orders/${id}/cancel`), undefined, { signal })
+  return mapDepositOrder(data)
+}

@@ -9,13 +9,15 @@ retired in this test environment. No signing, custody or sweeps.
 
 ## 2. Signatures
 
-- Migrations `0158_timed_chain_deposits.sql`, `0159_timed_deposit_text_identity.sql`
-  and `0160_independent_recharge_addresses.sql`. The shared table owns its IDs;
+- Migrations `0158_timed_chain_deposits.sql`, `0159_timed_deposit_text_identity.sql`,
+  `0160_independent_recharge_addresses.sql` and
+  `0161_timed_deposit_cancellation.sql`. The shared table owns its IDs;
   existing order references are preserved without legacy inventory inserts.
 - Tables: `wallet_deposit_scanners`, `wallet_deposit_chain_assets`,
   `wallet_deposit_shared_addresses`, `wallet_deposit_orders`, `wallet_deposit_receipts`.
 - User `GET /api/v1/wallet/deposit-options`; `GET|POST /api/v1/wallet/deposit-orders`;
-  `GET /api/v1/wallet/deposit-orders/:id`.
+  `GET /api/v1/wallet/deposit-orders/:id`;
+  `POST /api/v1/wallet/deposit-orders/:id/cancel` (no body, returns DepositOrder).
 - Admin `GET /admin/api/v1/wallet/deposit-settings`, `PUT .../scanners/:network`,
   `PUT .../assets`, `GET|POST .../addresses`, `PUT .../addresses/:id`;
   `GET .../deposit-orders[/:id]`,
@@ -37,7 +39,20 @@ Network row lock precedes user/order/inventory locks; read CURRENT_TIMESTAMP
 **after** acquiring the lock. A reservation is `(network, chain identity,
 canonical address, exact amount)` for `[created_at,expires_at)` with a 1,800-second
 expiry. Different amounts share addresses; same amounts use another address.
-Full capacity returns 409 and never adds fractional suffixes. Paid combinations
+Full capacity returns 409 and never adds fractional suffixes.
+Authenticated owners may cancel an unexpired pending unpaid order. Cancel uses
+network -> order lock order, checks linked observed/review/credited receipts and
+unassigned exact matching evidence, and rejects detected payment/review/expiry
+with 409. Cross-user cancellation returns 404; missing/wrong-scope tokens return
+401/403. Repeat cancellation returns the original cancelled order. Cancellation
+writes only status and `cancelled_at` (nullable UTC milliseconds in DepositOrder),
+never wallet/ledger, never deleting original created_at/expires_at or request key.
+Allocation excludes rows with a cancellation timestamp even if later manually
+credited. Any matching cancelled history prevents automatic credit; overlapping
+windows stay unassigned review, and a unique candidate uses
+`cancelled_combination_requires_review`. This applies even when a transfer's
+block time precedes cancellation but observation arrives later. Manual audited
+credit remains possible and preserves cancelled_at. Paid combinations
 remain reserved until their original expiry. Cleanup labels do not own release.
 
 The `(user_id, SHA256(idempotency_key))` binding is permanent. Replay must match
@@ -138,6 +153,9 @@ checkpoint repair; there is no UI button silently skipping blocks.
 | Same amount occupies all addresses | 409; unchanged amount |
 | Same key, changed request | 409 |
 | Other user's order | 404; list omits it |
+| Cancel unexpired unpaid order | cancelled; same deadline, timestamp recorded, combination released |
+| Cancel detected/review/credited/expired order | 409; no financial changes |
+| Receive after cancellation/reuse | review; no automatic credit |
 | Missing token / wrong scope or permission | 401 / 403 |
 | Stale configuration revision | 409; retain editor draft/reason |
 | Duplicate receipt/review | Original result; no additional credit |
@@ -149,6 +167,7 @@ checkpoint repair; there is no UI button silently skipping blocks.
 
 ## 5. Good / Base / Bad Cases
 
+- Good: cancellation wins a race with scanning, so the receipt goes to review; if scanning wins, cancellation fails.
 - Good: twelve concurrent 100-token requests and ten addresses yield ten exact
   reservations and two conflicts; a 200-token request may reuse an address.
 - Base: a transfer included at minute 29 but observed after minute 30 still
@@ -165,6 +184,7 @@ checkpoint repair; there is no UI button silently skipping blocks.
   duplicate evidence, fee/journal balance, audit rollback and cursor recovery;
   direct import atomicity/duplicates, cross-network independence, legacy allowlist
   independence, and disabled-admission scanning/settlement with revision fencing.
+- Cancellation: owner isolation, repeat/replay, unchanged windows, immediate reuse, late/reused ambiguity, observed/review/expired rejection and concurrent scan/cancel; verify ledger unchanged on cancel and one entry after repeated manual credit.
 - RPC fixtures: wrong chain, successful/failed/internal calls, complete Tron
   receipts, independent BTC outputs, genuine Solana program/mint identities,
   temporary token accounts, ordered bounded slot lists and reorganization.
@@ -193,3 +213,7 @@ plus an application default when no rows exist.
 Wrong: show a green receiving status because `enabled=true` or a node URL was
 saved. Correct: display snapshot freshness separately from admission and list
 every unsatisfied network/asset/address prerequisite.
+
+Wrong: delete a cancelled order or rewrite its expiry to release its slot.
+Correct: retain its original window and cancellation timestamp, release allocation
+explicitly, and require manual attribution of later matching evidence.

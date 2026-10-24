@@ -1,4 +1,6 @@
 use super::*;
+#[path = "src_modules_wallet_timed_deposit_cancellation_tests.rs"]
+mod cancellation;
 use crate::modules::wallet::{
     application::timed_deposits as app, domain::timed_deposits::ChainReceipt,
     presentation::timed_deposits::*,
@@ -630,6 +632,7 @@ async fn timed_deposit_database_reservations_and_accounting() {
             .status,
         "credited"
     );
+    cancellation::verify_cancellation(&pool, admin, users[0], users[1], &symbol).await;
     // Readiness closes admission independently of the withdrawal network configuration.
     sqlx::query(
         "UPDATE wallet_deposit_scanners SET last_error='node unavailable' WHERE network='eth'",

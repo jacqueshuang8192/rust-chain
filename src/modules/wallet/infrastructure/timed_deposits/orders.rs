@@ -13,7 +13,7 @@ use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
 use sqlx::{MySql, Pool, QueryBuilder};
 
-const ORDER_SELECT: &str = "SELECT o.asset_kind,o.token_address,o.id,o.order_no,o.user_id,o.asset_symbol,o.network,o.address,o.amount,o.fee_amount,o.paid_amount,o.required_confirmations,CASE WHEN e.status='reversed' THEN 'reversed' WHEN e.status='manual_review' THEN 'review' WHEN o.status='pending' AND o.expires_at<=CURRENT_TIMESTAMP(6) THEN 'expired' ELSE o.status END AS status,e.tx_hash,o.created_at,o.expires_at,o.paid_at,CURRENT_TIMESTAMP(6) AS server_time FROM wallet_deposit_orders o LEFT JOIN wallet_deposit_events e ON e.id=o.deposit_event_id";
+const ORDER_SELECT: &str = "SELECT o.asset_kind,o.token_address,o.id,o.order_no,o.user_id,o.asset_symbol,o.network,o.address,o.amount,o.fee_amount,o.paid_amount,o.required_confirmations,CASE WHEN e.status='reversed' THEN 'reversed' WHEN e.status='manual_review' THEN 'review' WHEN o.status='pending' AND o.expires_at<=CURRENT_TIMESTAMP(6) THEN 'expired' ELSE o.status END AS status,e.tx_hash,o.created_at,o.expires_at,o.paid_at,o.cancelled_at,CURRENT_TIMESTAMP(6) AS server_time FROM wallet_deposit_orders o LEFT JOIN wallet_deposit_events e ON e.id=o.deposit_event_id";
 
 #[derive(sqlx::FromRow)]
 struct Rule {
@@ -74,7 +74,7 @@ pub(crate) async fn create(
     let fee = truncate_amount_to_asset_precision(&rule.deposit_fee, rule.precision_scale);
     deposit_net_credit_amount(&request.amount, &fee, rule.precision_scale)
         .map_err(AppError::Validation)?;
-    let candidate=sqlx::query_as::<_,(u64,String,String)>("SELECT p.pool_id,p.address,p.address_key FROM wallet_deposit_shared_addresses p WHERE p.network=? AND p.enabled=TRUE AND NOT EXISTS(SELECT 1 FROM wallet_deposit_orders o WHERE o.network=p.network AND o.address_key=p.address_key AND o.identity_key=? AND o.amount=? AND o.expires_at>?) ORDER BY p.pool_id LIMIT 1 FOR UPDATE")
+    let candidate=sqlx::query_as::<_,(u64,String,String)>("SELECT p.pool_id,p.address,p.address_key FROM wallet_deposit_shared_addresses p WHERE p.network=? AND p.enabled=TRUE AND NOT EXISTS(SELECT 1 FROM wallet_deposit_orders o WHERE o.network=p.network AND o.address_key=p.address_key AND o.identity_key=? AND o.amount=? AND o.expires_at>? AND o.cancelled_at IS NULL) ORDER BY p.pool_id LIMIT 1 FOR UPDATE")
         .bind(&request.network).bind(&rule.identity_key).bind(&request.amount).bind(now).fetch_optional(&mut *tx).await?
         .ok_or_else(||AppError::Conflict("all addresses for this deposit amount are reserved; retry later".into()))?;
     let expires = crate::time::checked_expiry(now, RESERVATION_SECONDS as u64, "deposit expiry")?;
@@ -167,4 +167,43 @@ pub(crate) async fn earliest_order_time(
             .fetch_one(pool)
             .await?,
     )
+}
+
+/// 本人取消与扫描入账共用网络锁；只释放未付款组合，永久保留原窗口及取消证据。
+pub(crate) async fn cancel(pool: &Pool<MySql>, user_id: u64, id: u64) -> AppResult<DepositOrder> {
+    let network: String =
+        sqlx::query_scalar("SELECT network FROM wallet_deposit_orders WHERE id=? AND user_id=?")
+            .bind(id)
+            .bind(user_id)
+            .fetch_optional(pool)
+            .await?
+            .ok_or(AppError::NotFound)?;
+    let mut tx = pool.begin().await?;
+    let now = lock_network(&mut tx, &network).await?;
+    let (status, expires, paid, event): (String, DateTime<Utc>, Option<BigDecimal>, Option<u64>) =
+        sqlx::query_as("SELECT status,expires_at,paid_amount,deposit_event_id FROM wallet_deposit_orders WHERE id=? AND user_id=? FOR UPDATE")
+        .bind(id).bind(user_id).fetch_optional(&mut *tx).await?.ok_or(AppError::NotFound)?;
+    if status != "cancelled" {
+        let evidence: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM wallet_deposit_receipts r JOIN wallet_deposit_orders o ON o.id=? WHERE r.status IN ('observed','review','credited') AND (r.order_id=o.id OR (r.order_id IS NULL AND r.network=o.network AND r.identity_key=o.identity_key AND r.address_key=o.address_key AND r.amount=o.amount AND r.block_time>=o.created_at))")
+            .bind(id).fetch_one(&mut *tx).await?;
+        if status != "pending"
+            || expires <= now
+            || paid.is_some()
+            || event.is_some()
+            || evidence > 0
+        {
+            return Err(AppError::Conflict(
+                "deposit order cannot be cancelled after expiry or payment detection".into(),
+            ));
+        }
+        sqlx::query(
+            "UPDATE wallet_deposit_orders SET status='cancelled',cancelled_at=? WHERE id=?",
+        )
+        .bind(now)
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+    }
+    tx.commit().await?;
+    get(pool, Some(user_id), id).await
 }

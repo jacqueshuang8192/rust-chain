@@ -1,19 +1,23 @@
 <script setup lang="ts">
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import LoginRequiredState from '@/components/LoginRequiredState.vue'
 import PageHeader from '@/components/PageHeader.vue'
+import DepositOrderHistory from '@/components/DepositOrderHistory.vue'
 import TimedDepositPanel from '@/components/TimedDepositPanel.vue'
 import { useSessionStore } from '@/stores/session'
-defineProps<{ asset: string; network: string }>()
+withDefaults(defineProps<{ asset?: string; network?: string; id?: string; history?: boolean }>(), { asset: '', network: '', id: '', history: false })
+const router = useRouter()
 const session = useSessionStore()
 const { t } = useI18n()
 </script>
 <template>
   <main class="page page--plain pencil-page wallet-pencil-page deposit-detail-pencil" data-pencil-source="w5htG TCN5A">
-    <PageHeader :back="true" :eyebrow="t('assets.deposit')" :fallback="{ name: 'deposit-network', params: { asset } }" :pencil="true" :subtitle="t('deposit.networkWarning')" :title="t('timedDeposit.title')" />
+    <PageHeader :back="true" :eyebrow="t('assets.deposit')" :fallback="id ? { name: 'deposit-orders' } : history ? { name: 'deposit-asset' } : { name: 'deposit-network', params: { asset } }" :pencil="true" :subtitle="t('deposit.networkWarning')" :title="t(id ? 'timedDeposit.order' : history ? 'timedDeposit.history' : 'timedDeposit.title')" />
     <div class="page-content deposit-detail">
       <LoginRequiredState class="wallet-login-prompt" v-if="!session.isAuthenticated" :description="t('deposit.detailLoginDescription')" />
-      <TimedDepositPanel v-else :identity="session.identityScope" :asset="asset" :network="network" />
+      <DepositOrderHistory v-else-if="history" :identity="session.identityScope" @select="router.push({ name: 'deposit-order', params: { id: $event } })" @create="router.push({ name: 'deposit-asset' })" />
+      <TimedDepositPanel v-else :identity="session.identityScope" :asset="asset" :network="network" :order-id="id" @history="router.push({ name: 'deposit-orders' })" />
     </div>
   </main>
 </template>
@@ -26,45 +30,6 @@ const { t } = useI18n()
   display: grid;
   gap: 14px;
   padding: 6px 20px calc(20px + env(safe-area-inset-bottom));
-}
-
-.wallet-login-prompt {
-  background: transparent;
-  background-image: none;
-  border: 0;
-  border-top: 1px solid var(--hairline);
-  gap: 10px;
-  grid-template-columns: 34px minmax(0, 1fr) auto;
-  min-height: 72px;
-  padding: 10px 0;
-}
-
-.wallet-login-prompt :deep(.login-required__icon) {
-  background: var(--accent-soft);
-  border: 0;
-  color: var(--positive);
-  height: 34px;
-  width: 34px;
-}
-
-.wallet-login-prompt :deep(.login-required__copy) {
-  gap: 2px;
-}
-
-.wallet-login-prompt :deep(.login-required__copy strong) {
-  font-size: 13px;
-}
-
-.wallet-login-prompt :deep(.login-required__copy p) {
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.4;
-}
-
-.wallet-login-prompt :deep(.button) {
-  border-radius: var(--wallet-pill-radius, 999px);
-  min-height: 44px;
-  padding-inline: 14px;
 }
 
 @media (max-width: 340px) {

@@ -45,6 +45,9 @@ pub struct DepositOrder {
     #[serde(with = "option_unix_millis")]
     #[schema(value_type = Option<i64>)]
     pub paid_at: Option<DateTime<Utc>>,
+    #[serde(with = "option_unix_millis")]
+    #[schema(value_type = Option<i64>)]
+    pub cancelled_at: Option<DateTime<Utc>>,
     #[serde(with = "unix_millis")]
     #[schema(value_type = i64)]
     pub server_time: DateTime<Utc>,

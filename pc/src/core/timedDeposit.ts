@@ -30,7 +30,7 @@ export function mapDepositOption(value: unknown): DepositOption {
 export function mapDepositOrder(value: unknown): DepositOrder {
   const row = object(value)
   const status = text(row.status)
-  if (!['pending','expired','review','credited','reversed'].includes(status)) throw new TypeError('Unknown deposit state')
+  if (!['pending','expired','cancelled','review','credited','reversed'].includes(status)) throw new TypeError('Unknown deposit state')
   return { id: depositInteger(row.id), user_id: depositInteger(row.user_id), order_no: text(row.order_no), asset_symbol: text(row.asset_symbol), network: text(row.network), address: text(row.address), amount: exactDepositAmount(row.amount), fee_amount: exactDepositAmount(row.fee_amount), paid_amount: row.paid_amount === null ? null : exactDepositAmount(row.paid_amount), required_confirmations: depositInteger(row.required_confirmations), status, tx_hash: row.tx_hash === null ? null : text(row.tx_hash), created_at: depositInteger(row.created_at), expires_at: depositInteger(row.expires_at), paid_at: row.paid_at === null ? null : depositInteger(row.paid_at), server_time: depositInteger(row.server_time) }
 }
 export function mapDepositPage(value: unknown): DepositPage {

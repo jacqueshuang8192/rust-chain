@@ -9,6 +9,7 @@ import { initializePwa } from './pwa'
 import './styles/base.css'
 import './styles/prototype-parity.css'
 import './styles/pencil-selected-pages.css'
+import './styles/deposit.css'
 import './styles/token-issuance.css'
 
 document.documentElement.dataset.performanceTier = detectPerformanceTier(globalThis.navigator)

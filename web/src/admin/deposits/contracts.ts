@@ -2,8 +2,8 @@ import { requiredDecimalText } from '../../shared/decimal';
 import { requiredSafeInteger } from '../../shared/integer';
 export const base = '/admin/api/v1/wallet';
 export const networkOptions = [{ value: 'eth', label: 'Ethereum' }, { value: 'base', label: 'Base' }, { value: 'tron', label: 'Tron（TRC20）' }, { value: 'btc', label: 'Bitcoin' }, { value: 'solana', label: 'Solana' }];
-export const labels: Record<string, string> = { pending: '待付款', expired: '已过期', review: '待核对', observed: '待确认', credited: '已入账', reversed: '已冲正', ignored: '已排除' };
-export const reviewReasons: Record<string, string> = { no_unique_amount_and_time_window: '金额或付款时间无法唯一匹配', additional_transfer_after_payment: '订单已入账后再次收到转账', expired_unpaid_combination_reused: '组合曾有过期未付订单，需核对付款归属', amount_exceeds_wallet_precision: '到账数量超过钱包精度', awaiting_confirmations: '等待确认数达标' };
+export const labels: Record<string, string> = { pending: '待付款', expired: '已过期', cancelled: '已取消', review: '待核对', observed: '待确认', credited: '已入账', reversed: '已冲正', ignored: '已排除' };
+export const reviewReasons: Record<string, string> = { cancelled_combination_requires_review: '组合存在取消记录，需核对付款归属', no_unique_amount_and_time_window: '金额或付款时间无法唯一匹配', additional_transfer_after_payment: '订单已入账后再次收到转账', expired_unpaid_combination_reused: '组合曾有过期未付订单，需核对付款归属', amount_exceeds_wallet_precision: '到账数量超过钱包精度', awaiting_confirmations: '等待确认数达标' };
 export interface Scanner { network: string; enabled: boolean; endpoint_configured: boolean; api_key_configured: boolean; confirmations: number; revision: number; last_scan_at: number | null; last_error: string | null; scan_fresh: boolean; cursor_height: number | null; checked_at: number }
 export interface Asset { id: number; network: string; asset_symbol: string; asset_kind: string; token_address: string; decimals: number; enabled: boolean; revision: number }
 export interface SharedAddress { pool_id: number; network: string; address: string; enabled: boolean }

@@ -7,7 +7,7 @@ export type FundingKind = typeof fundingKinds[number];
 export const fundingLabels: Record<FundingKind, string> = { deposits: '充值记录', withdrawals: '提现记录' };
 export const fundingSources = { quick: '快速充值', chain: '链上充值', withdrawal: '提现' };
 export const fundingStatuses: Record<FundingKind, Record<string, string>> = {
-  deposits: { created: '已创建', pending: '待付款', expired: '已过期', review: '待核对', credited: '已入账', reversed: '已冲正', failed: '失败' },
+  deposits: { created: '已创建', pending: '待付款', expired: '已过期', cancelled: '已取消', review: '待核对', credited: '已入账', reversed: '已冲正', failed: '失败' },
   withdrawals: { pending_review: '待审核', approved: '已批准', broadcasting: '广播中', unknown_broadcast: '广播结果待核实', broadcasted: '待链上确认', confirmed: '已完成', rejected: '已拒绝', failed: '失败', manual_review: '人工复核' }
 };
 export type FundingRecord = ApiRecord & {

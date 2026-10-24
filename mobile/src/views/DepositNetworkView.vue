@@ -209,45 +209,6 @@ onMounted(() => { void load() })
   margin: 0;
 }
 
-.wallet-login-prompt {
-  background: transparent;
-  background-image: none;
-  border: 0;
-  border-top: 1px solid var(--hairline);
-  gap: 10px;
-  grid-template-columns: 34px minmax(0, 1fr) auto;
-  min-height: 72px;
-  padding: 10px 0;
-}
-
-.wallet-login-prompt :deep(.login-required__icon) {
-  background: var(--accent-soft);
-  border: 0;
-  color: var(--positive);
-  height: 34px;
-  width: 34px;
-}
-
-.wallet-login-prompt :deep(.login-required__copy) {
-  gap: 2px;
-}
-
-.wallet-login-prompt :deep(.login-required__copy strong) {
-  font-size: 13px;
-}
-
-.wallet-login-prompt :deep(.login-required__copy p) {
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.4;
-}
-
-.wallet-login-prompt :deep(.button) {
-  border-radius: var(--wallet-pill-radius, 999px);
-  min-height: 44px;
-  padding-inline: 14px;
-}
-
 .spin {
   animation: spin .8s linear infinite;
 }

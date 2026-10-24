@@ -1,6 +1,6 @@
 /** Exact wire contract for timed on-chain deposits. No monetary Number round trips. */
 export interface DepositOption { asset_symbol: string; network: string; display_name: string; precision_scale: number; min_deposit_amount: string; deposit_fee: string; required_confirmations: number }
-export interface DepositOrder { id: number; order_no: string; user_id: number; asset_symbol: string; network: string; address: string; amount: string; fee_amount: string; paid_amount: string | null; required_confirmations: number; status: string; tx_hash: string | null; created_at: number; expires_at: number; paid_at: number | null; server_time: number }
+export interface DepositOrder { id: number; order_no: string; user_id: number; asset_symbol: string; network: string; address: string; amount: string; fee_amount: string; paid_amount: string | null; required_confirmations: number; status: string; tx_hash: string | null; created_at: number; expires_at: number; paid_at: number | null; cancelled_at: number | null; server_time: number }
 export interface DepositPage { items: DepositOrder[]; total: number }
 export function exactDepositAmount(value: unknown): string {
   if (typeof value !== 'string' || value.length > 256) throw new TypeError('Invalid exact deposit amount')
@@ -30,8 +30,8 @@ export function mapDepositOption(value: unknown): DepositOption {
 export function mapDepositOrder(value: unknown): DepositOrder {
   const row = object(value)
   const status = text(row.status)
-  if (!['pending','expired','review','credited','reversed'].includes(status)) throw new TypeError('Unknown deposit state')
-  return { id: depositInteger(row.id), user_id: depositInteger(row.user_id), order_no: text(row.order_no), asset_symbol: text(row.asset_symbol), network: text(row.network), address: text(row.address), amount: exactDepositAmount(row.amount), fee_amount: exactDepositAmount(row.fee_amount), paid_amount: row.paid_amount === null ? null : exactDepositAmount(row.paid_amount), required_confirmations: depositInteger(row.required_confirmations), status, tx_hash: row.tx_hash === null ? null : text(row.tx_hash), created_at: depositInteger(row.created_at), expires_at: depositInteger(row.expires_at), paid_at: row.paid_at === null ? null : depositInteger(row.paid_at), server_time: depositInteger(row.server_time) }
+  if (!['pending','expired','cancelled','review','credited','reversed'].includes(status)) throw new TypeError('Unknown deposit state')
+  return { id: depositInteger(row.id), user_id: depositInteger(row.user_id), order_no: text(row.order_no), asset_symbol: text(row.asset_symbol), network: text(row.network), address: text(row.address), amount: exactDepositAmount(row.amount), fee_amount: exactDepositAmount(row.fee_amount), paid_amount: row.paid_amount === null ? null : exactDepositAmount(row.paid_amount), required_confirmations: depositInteger(row.required_confirmations), status, tx_hash: row.tx_hash === null ? null : text(row.tx_hash), created_at: depositInteger(row.created_at), expires_at: depositInteger(row.expires_at), paid_at: row.paid_at === null ? null : depositInteger(row.paid_at), cancelled_at: row.cancelled_at === null ? null : depositInteger(row.cancelled_at), server_time: depositInteger(row.server_time) }
 }
 export function mapDepositPage(value: unknown): DepositPage {
   const row = object(value)

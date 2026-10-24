@@ -52,3 +52,35 @@ it('rejects malformed money and incomplete configuration responses', () => {
   expect(() => parseOrder({ ...target, id: Number.MAX_SAFE_INTEGER + 1 })).toThrow();
   expect(() => parseSettings({ scanners: [], assets: [] })).toThrow();
 });
+
+it('looks up the customer-facing order number and does not credit until explicit confirmation', async () => {
+  mocked.mockImplementation(async path => path.includes('deposit-orders?') ? { items: [target], total: 1 } : { items: [receipt], total: 1 });
+  const user = userEvent.setup(); show();
+  await user.click(await screen.findByRole('button', { name: '核对到账归属' }));
+  await user.type(screen.getByRole('textbox', { name: '目标充值订单编号' }), target.order_no);
+  await user.click(screen.getByRole('button', { name: '读取并核对目标订单' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: '确认归属并入账' })).toBeEnabled());
+  expect(mocked).toHaveBeenCalledWith('/admin/api/v1/wallet/deposit-orders?limit=2&offset=0&order_no=CD-review-target');
+  expect(mocked.mock.calls.every(([, init]) => !init?.method)).toBe(true);
+});
+it('clears a previously eligible target if re-reading fails and allows retry', async () => {
+  const user = userEvent.setup(); show();
+  await user.click(await screen.findByRole('button', { name: '核对到账归属' }));
+  await user.click(screen.getByRole('button', { name: '读取候选订单 #71' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: '确认归属并入账' })).toBeEnabled());
+  mocked.mockRejectedValueOnce(new Error('目标订单读取失败'));
+  await user.click(screen.getByRole('button', { name: '读取并核对目标订单' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('目标订单读取失败');
+  expect(screen.getByRole('button', { name: '确认归属并入账' })).toBeDisabled();
+  await user.click(screen.getByRole('button', { name: '读取并核对目标订单' }));
+  await waitFor(() => expect(screen.getByRole('button', { name: '确认归属并入账' })).toBeEnabled());
+});
+it('shows an explicit no-match result instead of silently disabling the order-number lookup', async () => {
+  mocked.mockImplementation(async path => path.includes('deposit-orders?') ? { items: [], total: 0 } : { items: [receipt], total: 1 });
+  const user = userEvent.setup(); show();
+  await user.click(await screen.findByRole('button', { name: '核对到账归属' }));
+  await user.type(screen.getByRole('textbox', { name: '目标充值订单编号' }), 'CD-missing');
+  await user.click(screen.getByRole('button', { name: '读取并核对目标订单' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('未找到唯一订单');
+  expect(screen.getByRole('button', { name: '确认归属并入账' })).toBeDisabled();
+});

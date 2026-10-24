@@ -49,6 +49,8 @@ const EXPECTED_ROUTE_NAMES = [
   'referrals',
   'assets',
   'deposit-asset',
+  'deposit-orders',
+  'deposit-order',
   'deposit-network',
   'deposit-detail',
   'withdraw-asset',

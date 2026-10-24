@@ -170,6 +170,13 @@ async fn funding_scope_status_precision_paging_and_no_writes() -> Result<(), Box
                 count * multiplier
             );
         }
+        if kind == "deposits" {
+            let (status, payload) =
+                agent_get_json(app.clone(), &root_token, format!("{path}?status=cancelled"))
+                    .await?;
+            assert_eq!(status, StatusCode::OK, "{payload}");
+            assert_eq!(payload["total"], 0);
+        }
         for agent in [root, sibling, other] {
             let (_, payload) = agent_get_json(
                 app.clone(),

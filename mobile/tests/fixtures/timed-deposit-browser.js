@@ -19,8 +19,11 @@ client.defaults.adapter = async (config) => {
   else if (config.method === 'post' && path.endsWith('/deposit-orders')) {
     const body = JSON.parse(config.data); fixture.posts.push(body)
     const now = Date.now()
-    data = { ...option, id: 1, user_id: 1, order_no: 'CD-local-9007199254740993', address: '0x1111111111111111111111111111111111111111', amount: body.amount, fee_amount: '0', paid_amount: null, status: 'pending', tx_hash: null, created_at: now, expires_at: now + 1800000, paid_at: null, server_time: now }
+    data = { ...option, id: 1, user_id: 1, order_no: 'CD-local-9007199254740993', address: '0x1111111111111111111111111111111111111111', amount: body.amount, fee_amount: '0', paid_amount: null, status: 'pending', tx_hash: null, created_at: now, expires_at: now + 1800000, paid_at: null, cancelled_at: null, server_time: now }
     fixture.orders = [data]
+  } else if (config.method === 'post' && path.endsWith('/deposit-orders/1/cancel')) {
+    fixture.orders[0].status = 'cancelled'; fixture.orders[0].cancelled_at = Date.now()
+    data = { ...fixture.orders[0], server_time: Date.now() }
   } else if (path.endsWith('/deposit-orders')) data = { items: fixture.orders.map(o => ({ ...o, server_time: Date.now() })), total: fixture.orders.length }
   else if (path.endsWith('/deposit-orders/1')) data = { ...fixture.orders[0], server_time: Date.now() }
   else throw new Error('Unexpected local fixture request: ' + path)

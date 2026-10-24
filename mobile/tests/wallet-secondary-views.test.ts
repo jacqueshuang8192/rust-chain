@@ -26,7 +26,7 @@ test('充值流程读取真实资产与可用网络，并由限时订单面板�
   assert.match(sources.depositNetwork, /name: 'deposit-detail', params: \{ asset: props\.asset, network: network\.network \}/)
   assert.match(sources.depositDetail, /<TimedDepositPanel[^>]+:asset="asset"[^>]+:network="network"/)
   assert.doesNotMatch(sources.depositDetail, /createDepositAddress/)
-  assert.match(sources.depositDetail, /:fallback="\{ name: 'deposit-network', params: \{ asset \} \}"/)
+  assert.match(sources.depositDetail, /name: 'deposit-network', params: \{ asset \}/)
 })
 
 test('提币流程保留真实资产路由、余额网络加载、校验和提交载荷', () => {
@@ -60,7 +60,7 @@ test('钱包二级页使用 HIPPO 变量、明暗主题焦点、状态和窄屏�
     const styles = scopedStyles(source)
     assert.match(styles, /@media \(max-width: 340px\)/)
     assert.match(styles, /env\(safe-area-inset-bottom\)/)
-    assert.match(styles, /var\(--(?:surface|surface-elevated|field-surface|soft|line|ink|muted|accent|positive|negative|focus)/)
+    assert.match(styles, /var\(--(?:page|surface|surface-elevated|field-surface|soft|line|ink|muted|accent|positive|negative|focus)/)
     if (name === 'walletLedger') {
       assert.match(styles, /--wallet-record-ink: #111714/)
       assert.match(styles, /:global\(html\[data-theme='dark'\] \.wallet-ledger-pencil\)/)
@@ -81,7 +81,7 @@ test('钱包二级页使用 HIPPO 变量、明暗主题焦点、状态和窄屏�
     assert.match(source, /:focus-within/)
   }
 
-  assert.match(sources.depositDetail, /height: 44px/)
+  assert.match(readFileSync(new URL('../src/components/TimedDepositPanel.vue', import.meta.url), 'utf8'), /min-height: 44px/)
   assert.match(sources.withdraw, /min-height: 44px/)
   assert.match(sources.walletLedger, /min-height: 44px/)
   assert.match(sources.quickRecharge, /min-height: 44px/)

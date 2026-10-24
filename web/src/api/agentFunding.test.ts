@@ -36,3 +36,9 @@ it.each([{ user_id: 0 }, { record_id: Number.MAX_SAFE_INTEGER + 1 }, { limit: 10
   const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock);
   await expect(getAgentFunding('deposits', query)).rejects.toThrow(); expect(fetchMock).not.toHaveBeenCalled();
 });
+
+it('accepts cancelled chain deposits without losing exact amounts', async () => {
+  const cancelled = { ...fundingFixture, source: 'chain', status: 'cancelled' };
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ items: [cancelled], total: 1 })));
+  await expect(getAgentFunding('deposits', { status: 'cancelled' })).resolves.toEqual({ items: [cancelled], total: 1 });
+});

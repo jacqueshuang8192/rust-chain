@@ -15,7 +15,7 @@ use serde_json::json;
 use sqlx::{MySql, Pool, QueryBuilder, Transaction};
 
 const RECEIPT_SELECT: &str = "SELECT id,network,tx_hash,event_index,asset_kind,token_address,address,amount,block_height,block_hash,block_time,confirmations,status,review_reason,order_id,review_note FROM wallet_deposit_receipts";
-const MATCH_SELECT: &str = "SELECT id,user_id,asset_id,asset_symbol,network,identity_key,address_key,address,amount,fee_amount,precision_scale,required_confirmations,status,created_at,expires_at FROM wallet_deposit_orders";
+const MATCH_SELECT: &str = "SELECT id,user_id,asset_id,asset_symbol,network,identity_key,address_key,address,amount,fee_amount,precision_scale,required_confirmations,status,created_at,expires_at,cancelled_at FROM wallet_deposit_orders";
 
 #[derive(sqlx::FromRow)]
 struct MatchOrder {
@@ -32,6 +32,7 @@ struct MatchOrder {
     status: String,
     created_at: DateTime<Utc>,
     expires_at: DateTime<Utc>,
+    cancelled_at: Option<DateTime<Utc>>,
 }
 
 /// 扫描入账先锁网络并核对节点存在及配置版本；关闭新单准入仍处理历史订单，旧版本节点任务不得提交。
@@ -121,7 +122,9 @@ async fn process_receipt(
         let unresolved = orders.iter().any(|old| {
             old.id != order.id && old.expires_at <= order.created_at && old.status != "credited"
         });
-        let reason = if order.status == "credited" {
+        let reason = if orders.iter().any(|old| old.cancelled_at.is_some()) {
+            Some("cancelled_combination_requires_review")
+        } else if order.status == "credited" {
             Some("additional_transfer_after_payment")
         } else if unresolved {
             Some("expired_unpaid_combination_reused")

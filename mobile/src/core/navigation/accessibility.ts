@@ -40,6 +40,8 @@ export const ROUTE_ACCESSIBILITY_TITLE_KEYS = Object.freeze({
   referrals: 'routeAccessibility.titles.referrals',
   assets: 'routeAccessibility.titles.assets',
   'deposit-asset': 'routeAccessibility.titles.depositAsset',
+  'deposit-orders': 'timedDeposit.history',
+  'deposit-order': 'timedDeposit.order',
   'deposit-network': 'routeAccessibility.titles.depositNetwork',
   'deposit-detail': 'routeAccessibility.titles.depositDetail',
   'withdraw-asset': 'routeAccessibility.titles.withdrawAsset',

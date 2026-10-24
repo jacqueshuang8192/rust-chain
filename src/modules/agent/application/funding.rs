@@ -84,7 +84,14 @@ fn normalize(kind: &str, query: AgentFundingQuery) -> AppResult<FundingFilter> {
     let status = text(query.status, 32)?;
     let allowed = if kind == FundingKind::Deposits {
         &[
-            "created", "pending", "expired", "review", "credited", "reversed", "failed",
+            "created",
+            "pending",
+            "cancelled",
+            "expired",
+            "review",
+            "credited",
+            "reversed",
+            "failed",
         ][..]
     } else {
         &[

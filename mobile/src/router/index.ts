@@ -74,6 +74,8 @@ const router = createRouter({
     { path: '/profile/referrals', name: 'referrals', component: ReferralsView, meta: { showBottomNav: false, depth: 1, backFallback: '/profile' } },
     { path: '/assets', name: 'assets', component: AssetsView, meta: { depth: 0 } },
     { path: '/assets/deposit', name: 'deposit-asset', component: DepositAssetView, meta: { showBottomNav: false, depth: 1, backFallback: '/assets' } },
+    { path: '/assets/deposit/orders', name: 'deposit-orders', component: DepositDetailView, props: { history: true }, meta: { showBottomNav: false, depth: 2, backFallback: '/assets/deposit' } },
+    { path: '/assets/deposit/orders/:id', name: 'deposit-order', component: DepositDetailView, props: true, meta: { showBottomNav: false, depth: 3, backFallback: '/assets/deposit/orders' } },
     { path: '/assets/deposit/:asset/networks', name: 'deposit-network', component: DepositNetworkView, props: true, meta: { showBottomNav: false, depth: 2, backFallback: '/assets/deposit' } },
     { path: '/assets/deposit/:asset/:network', name: 'deposit-detail', component: DepositDetailView, props: true, meta: { showBottomNav: false, depth: 3, backFallback: '/assets/deposit' } },
     { path: '/assets/withdraw', name: 'withdraw-asset', component: WithdrawAssetView, meta: { showBottomNav: false, depth: 1, backFallback: '/assets' } },

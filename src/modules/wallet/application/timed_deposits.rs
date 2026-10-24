@@ -230,3 +230,8 @@ pub async fn scan_once(pool: &Pool<MySql>, key: Option<&str>) -> AppResult<u64> 
     storage::orders::expire(pool).await?;
     storage::scanners::run_once(pool, key).await
 }
+
+/// 取消身份仅来自用户令牌；存储层原子校验付款证据，不能撤销已检测到的到账。
+pub async fn cancel_order(pool: &Pool<MySql>, user_id: u64, id: u64) -> AppResult<DepositOrder> {
+    storage::orders::cancel(pool, user_id, id).await
+}

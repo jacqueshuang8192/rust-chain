@@ -21,6 +21,11 @@ fn list() {}
     responses((status=200,body=DepositOrder)))]
 fn get() {}
 
+#[utoipa::path(post, path="/api/v1/wallet/deposit-orders/{id}/cancel", tag="timed-deposits", security(("bearerAuth"=[])),
+    params(("id"=u64,Path)),
+    responses((status=200,body=DepositOrder),(status=404,description="本人订单不存在"),(status=409,description="订单已到期或已检测到账")))]
+fn cancel() {}
+
 #[utoipa::path(get, path="/admin/api/v1/wallet/deposit-settings", tag="timed-deposits", security(("bearerAuth"=[])),
     responses((status=200,body=DepositSettings)))]
 fn settings() {}
@@ -75,6 +80,7 @@ fn import_addresses() {}
     create,
     list,
     get,
+    cancel,
     addresses,
     import_addresses,
     settings,

@@ -22,7 +22,7 @@ use utoipa::OpenApi;
         ("source"=Option<String>,Query,description="充值来源 quick | chain；提现不支持"),
         ("asset_symbol"=Option<String>,Query,description="币种，忽略大小写"),
         ("network"=Option<String>,Query,description="网络代码，忽略大小写"),
-        ("status"=Option<String>,Query,description="充值 created|pending|expired|review|credited|reversed|failed；提现 pending_review|approved|broadcasting|unknown_broadcast|broadcasted|confirmed|rejected|failed|manual_review"),
+        ("status"=Option<String>,Query,description="充值 created|pending|expired|cancelled|review|credited|reversed|failed；提现 pending_review|approved|broadcasting|unknown_broadcast|broadcasted|confirmed|rejected|failed|manual_review"),
         ("created_from"=Option<i64>,Query,description="开始（含），Unix毫秒，0..253402300799999"),
         ("created_to"=Option<i64>,Query,description="结束（不含），必须大于开始"),
         ("limit"=Option<u32>,Query,description="1..100，默认20"),
