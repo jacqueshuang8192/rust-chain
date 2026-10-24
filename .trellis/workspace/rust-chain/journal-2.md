@@ -804,3 +804,36 @@ Implemented independent multi-asset chain recharge editors and subtree-scoped ag
 ### Next Steps
 
 - None - task complete
+
+
+## Session 83: Mainnet chain recharge presets
+
+**Date**: 2026-10-24
+**Task**: Mainnet chain recharge presets
+**Branch**: `main`
+
+### Summary
+
+Added draft-only Ethereum, TRC20 and Solana node/asset presets with issuer identities and credential guards. Fixed preset popup animation race. Final 1182 Web tests, typecheck, lint, policy, coverage and build passed; real HTTP browser validation and narrow layouts passed. Existing bundle budget remains exceeded at 2754677 bytes (+5251). No push, deployment or real-chain transfer.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8e6271a` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

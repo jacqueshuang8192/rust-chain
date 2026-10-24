@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 82
+- **Total Sessions**: 83
 - **Last Active**: 2026-10-24
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~806 | Active |
+| `journal-2.md` | ~839 | Active |
 | `journal-1.md` | ~1985 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 83 | 2026-10-24 | Mainnet chain recharge presets | `8e6271a` | `main` |
 | 82 | 2026-10-24 | Recharge configuration and agent funding records | `bb0111a` | `main` |
 | 81 | 2026-10-23 | Unified recharge redesign and local validation | `6e9c946` | `main` |
 | 80 | 2026-10-23 | 限时链上充值实现与提交推送 | `c453041` | `main` |
