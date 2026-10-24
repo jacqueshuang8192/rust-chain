@@ -969,3 +969,36 @@ Preserved HTTP status and code-defined operation with safe Chinese operator hint
 ### Next Steps
 
 - None - task complete
+
+
+## Session 88: Chain scanner high availability delivery
+
+**Date**: 2026-10-25
+**Task**: Chain scanner high availability delivery
+**Branch**: `main`
+
+### Summary
+
+Implemented and verified primary/backup providers, multiple encrypted API keys, persistent request pacing and cooldowns, safe cursor-preserving failover, and admin configuration. Tests: 21 timed-deposit, 1 HTTP permission, 1197 Web, architecture/OpenAPI and static checks passed. Existing Web bundle excess unchanged. User authorized origin/main push; migration 0162 and coordinated frontend/backend release required; deployment and live-chain verification pending.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4f12402` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
