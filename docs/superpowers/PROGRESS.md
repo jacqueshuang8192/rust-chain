@@ -10335,3 +10335,17 @@
 - 修改文件：本任务 delivery.md 所列业务、测试及规范文件；任务交付文档与 docs/superpowers/PROGRESS.md。
 - 验证结果：fetch 确认远程与本地 HEAD 一致；沿用本轮 Mobile 907项、Web1193项、数据库/HTTP及浏览器验收结果；提交前执行 diff 检查与任务校验。既有 Web 包体及无关 all-targets Clippy 告警保留。
 - 后续事项：推送后核对远程 SHA；发布需先执行0161迁移并同步前后端版本，GitHub workflow、部署和真实链到账未验证。
+
+## 2026-10-25 03:35 - Tron 监听 HTTP 失败诊断修复
+
+- 完成内容：确认现有错误丢失 HTTP 状态和调用接口；补充网络、代码固定操作名、状态码及中文排查提示，区分鉴权/拒绝/限流/路径/上游异常；仍不回显密钥、节点完整 URL、响应正文或重定向地址。用户确认使用默认 TronGrid 且已配置 Key；尚未证实部署环境实际拒绝原因。
+- 修改文件：`src/modules/wallet/infrastructure/timed_deposits/scanners.rs`、`tests/unit_src/src_modules_wallet_timed_deposit_scanner_tests.rs`、`.trellis/spec/backend/timed-deposits.md`、`docs/superpowers/timed-chain-deposits.md`、本任务 PRD。
+- 验证结果：扫描器单元测试12/12、架构11/11、生产 cargo clippy --lib --bins -- -D warnings、cargo fmt --all -- --check、git diff --check及任务校验通过；本地数据库连接不可用，未获得部署环境 HTTP 响应，未做真实节点鉴权/到账验收。
+- 后续事项：改动尚未提交推送或部署；部署后依据具体 HTTP 状态和接口继续定位服务商拒绝原因，不能据当前通用错误认定密钥失效或宣称监听恢复。无需新迁移，扫描游标与资金规则未变。
+
+## 2026-10-25 03:52 - Tron 监听诊断修复远程交付
+
+- 完成内容：按用户授权提交 HTTP 状态/失败接口/脱敏排查提示及回归测试，连同任务归档和会话记录纳入 origin/main 推送。
+- 修改文件：本轮扫描器、测试、充值规范及说明；本任务记录和 `docs/superpowers/PROGRESS.md`。
+- 验证结果：沿用扫描器12/12、架构11/11、生产Clippy与fmt通过结果；提交前检查差异与任务上下文，推送后核对远程SHA。
+- 后续事项：更新后端后读取具体 HTTP 状态及失败接口，继续定位 TronGrid 拒绝原因；监听恢复、GitHub CI和部署结果尚未验证，无需新迁移。

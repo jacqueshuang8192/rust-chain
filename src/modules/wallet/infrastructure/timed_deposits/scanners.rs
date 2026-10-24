@@ -224,13 +224,27 @@ async fn scan(
 }
 
 impl Node {
-    async fn post(&self, path: &str, body: Value) -> AppResult<Value> {
+    async fn post(&self, path: &'static str, body: Value) -> AppResult<Value> {
+        self.post_operation(path, path, body).await
+    }
+
+    // 操作名只接受代码常量；不能从节点 URL、请求参数或上游响应提取诊断文本。
+    async fn post_operation(
+        &self,
+        path: &'static str,
+        operation: &'static str,
+        body: Value,
+    ) -> AppResult<Value> {
         let url = if path.is_empty() {
             self.endpoint.clone()
         } else {
             format!("{}{path}", self.endpoint.trim_end_matches('/'))
         };
-        let mut request = self.client.post(url).json(&body);
+        let mut request = self
+            .client
+            .post(url)
+            .header(reqwest::header::ACCEPT, "application/json")
+            .json(&body);
         if let Some(key) = &self.api_key {
             request = if self.network == "tron" {
                 request.header("TRON-PRO-API-KEY", key)
@@ -238,12 +252,18 @@ impl Node {
                 request.bearer_auth(key)
             };
         }
-        let mut response = request
-            .send()
-            .await
-            .map_err(|_| failure("chain node request failed"))?;
+        let mut response = request.send().await.map_err(|error| {
+            let hint = if error.is_timeout() {
+                "请求超时，请检查节点响应与服务器网络"
+            } else if error.is_connect() {
+                "连接失败，请检查 DNS、TLS 与服务器网络"
+            } else {
+                "请求发送失败，请检查节点地址与凭据格式"
+            };
+            failure(&format!("{} {operation}：{hint}", self.network))
+        })?;
         if !response.status().is_success() {
-            return Err(failure("chain node returned a non-success HTTP status"));
+            return Err(self.http_failure(operation, response.status()));
         }
         if response
             .content_length()
@@ -269,10 +289,38 @@ impl Node {
         }
         Ok(value)
     }
-    async fn rpc(&self, method: &str, params: Value) -> AppResult<Value> {
+    // HTTP 状态与固定提示可持久化；不回显原始错误体、Location、URL 或请求密钥。
+    fn http_failure(&self, operation: &str, status: reqwest::StatusCode) -> AppError {
+        let trongrid = self.network == "tron"
+            && reqwest::Url::parse(&self.endpoint)
+                .is_ok_and(|url| url.host_str() == Some("api.trongrid.io"));
+        let hint = match status.as_u16() {
+            401 => "鉴权失败，请检查 API Key 是否有效及其请求头配置",
+            403 if trongrid => "TronGrid 拒绝请求，请检查 API Key 的 IP/接口白名单、请求频率和额度",
+            403 => "访问被拒绝，请检查节点权限、IP 白名单、调用额度或网关限制",
+            404 | 405 => "接口不存在或请求方式不支持，请检查节点基础地址和接口权限",
+            429 => "请求限流或额度耗尽，请检查服务商用量及是否共用 API Key，等待额度恢复",
+            500..=599 => "节点或上游网关异常，请检查服务商状态及节点可用性",
+            300..=399 => "节点返回重定向，请填写最终 API 地址；监听器不会转发凭据到重定向地址",
+            _ => "节点拒绝请求，请检查节点配置和服务商控制台",
+        };
+        let credential = if self.api_key.is_some() {
+            "已配置"
+        } else {
+            "未配置"
+        };
+        failure(&format!(
+            "{} {operation} HTTP {}：{hint}（API Key {credential}）",
+            self.network,
+            status.as_u16()
+        ))
+    }
+
+    async fn rpc(&self, method: &'static str, params: Value) -> AppResult<Value> {
         let response = self
-            .post(
+            .post_operation(
                 "",
+                method,
                 json!({"jsonrpc":"2.0","id":1,"method":method,"params":params}),
             )
             .await?;

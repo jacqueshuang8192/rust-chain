@@ -225,3 +225,121 @@ async fn bitcoin_node_url_supports_basic_auth_without_exposing_credentials() {
     authenticated.endpoint = server.uri().replacen("http://", "http://local:fixture@", 1);
     assert_eq!(bitcoin::head(&authenticated).await.unwrap(), 100);
 }
+
+#[tokio::test]
+async fn tron_http_failures_preserve_status_operation_and_never_expose_credentials() {
+    use wiremock::{Mock, ResponseTemplate, matchers};
+    let server = wiremock::MockServer::start().await;
+    for (status, hint) in [
+        (401, "鉴权失败"),
+        (403, "访问被拒绝"),
+        (404, "接口不存在"),
+        (405, "请求方式不支持"),
+        (429, "请求限流"),
+        (502, "上游网关异常"),
+        (302, "重定向"),
+        (418, "节点拒绝请求"),
+    ] {
+        server.reset().await;
+        Mock::given(matchers::method("POST"))
+            .and(matchers::path("/private-endpoint/wallet/getnowblock"))
+            .and(matchers::header("TRON-PRO-API-KEY", "private-api-key"))
+            .and(matchers::header("accept", "application/json"))
+            .respond_with(
+                ResponseTemplate::new(status)
+                    .insert_header("Location", "https://invalid.example/private-location")
+                    .set_body_string("<html>private-api-key private-response-secret</html>"),
+            )
+            .expect(1)
+            .mount(&server)
+            .await;
+        let mut configured = node(&server, "tron");
+        configured.endpoint = format!("{}/private-endpoint", server.uri());
+        configured.api_key = Some("private-api-key".into());
+        configured.client = reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .build()
+            .unwrap();
+        let error = configured
+            .post("/wallet/getnowblock", json!({}))
+            .await
+            .unwrap_err();
+        let AppError::Internal(message) = error else {
+            panic!("expected safe scanner diagnostic");
+        };
+        assert!(message.contains(&format!("tron /wallet/getnowblock HTTP {status}")));
+        assert!(message.contains(hint), "{message}");
+        assert!(message.contains("API Key 已配置"));
+        assert!(message.chars().count() <= 255);
+        for secret in ["private-", "<html>", &server.uri()] {
+            assert!(!message.contains(secret), "{message}");
+        }
+        server.verify().await;
+    }
+}
+
+#[tokio::test]
+async fn tron_request_keeps_api_key_header_and_successful_json() {
+    use wiremock::{Mock, ResponseTemplate, matchers};
+    let server = wiremock::MockServer::start().await;
+    Mock::given(matchers::path("/wallet/getnowblock"))
+        .and(matchers::header("TRON-PRO-API-KEY", "saved-test-key"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"blockID":"confirmed"})))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let mut configured = node(&server, "tron");
+    configured.api_key = Some("saved-test-key".into());
+    assert_eq!(
+        configured
+            .post("/wallet/getnowblock", json!({}))
+            .await
+            .unwrap(),
+        json!({"blockID":"confirmed"})
+    );
+    let requests = server.received_requests().await.unwrap();
+    assert!(!requests[0].headers.contains_key("authorization"));
+}
+
+#[tokio::test]
+async fn node_rpc_http_failure_identifies_method_without_echoing_params() {
+    let server = wiremock::MockServer::start().await;
+    wiremock::Mock::given(wiremock::matchers::method("POST"))
+        .respond_with(wiremock::ResponseTemplate::new(429))
+        .mount(&server)
+        .await;
+    let error = node(&server, "eth")
+        .rpc("eth_getLogs", json!(["private-request-param"]))
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("eth eth_getLogs HTTP 429"));
+    assert!(error.contains("API Key 未配置"));
+    assert!(!error.contains("private-request-param"));
+}
+
+#[tokio::test]
+async fn trongrid_403_hint_is_host_scoped_and_does_not_assert_key_is_invalid() {
+    let server = wiremock::MockServer::start().await;
+    let mut configured = node(&server, "tron");
+    configured.endpoint = "https://api.trongrid.io/private-path?api_key=private-key".into();
+    configured.api_key = Some("private-key".into());
+    let message = configured
+        .http_failure(
+            "/wallet/gettransactioninfobyblocknum",
+            reqwest::StatusCode::FORBIDDEN,
+        )
+        .to_string();
+    assert!(message.contains("TronGrid"));
+    assert!(message.contains("IP/接口白名单"));
+    assert!(message.contains("请求频率和额度"));
+    assert!(!message.contains("private-"));
+    assert!(message.chars().count() <= 255);
+    configured.endpoint = "https://api.trongrid.io.invalid.example".into();
+    assert!(
+        !configured
+            .http_failure("/wallet/getnowblock", reqwest::StatusCode::FORBIDDEN)
+            .to_string()
+            .contains("TronGrid")
+    );
+}

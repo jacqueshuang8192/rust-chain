@@ -140,6 +140,20 @@ order admission. RPC errors do not advance the cursor; replayed completed events
 are idempotent. Reorganization recovery requires reconciliation and a reviewed
 checkpoint repair; there is no UI button silently skipping blocks.
 
+### Scanner HTTP diagnostics
+
+`Node::post_operation(path: &'static str, operation: &'static str, body: Value)`
+retains code-defined operation names for REST and JSON-RPC calls. Non-2xx
+failures persist the network, operation, numeric HTTP status and a fixed Chinese
+operator hint in `wallet_deposit_scanners.last_error` (within 255 characters).
+Only the API-key presence flag is shown. Never echo node URLs, request params,
+API-key values, response bodies, redirect locations or raw reqwest errors.
+Redirects remain disabled. A 403 is not proof of an invalid key: the exact
+`api.trongrid.io` host receives a checklist covering permission, IP/method
+restrictions, request frequency and quota; other hosts use a generic hint.
+Transport failures identify timeout/connect/other without echoing the URL.
+No HTTP failure advances the cursor or marks the scanner ready.
+
 ## 4. Validation & Error Matrix
 
 | Condition | Required result |
@@ -164,6 +178,10 @@ checkpoint repair; there is no UI button silently skipping blocks.
 | Cursor missing with historical orders | Pause; require explicit recovery |
 | Settings timestamp is null/stale | `scan_fresh=false`; no healthy UI label |
 | Settings read | Return persisted height and DB check time; no cursor mutation |
+| Node HTTP 401 / 403 | Preserve status/operation; authentication / access-check hint |
+| Node HTTP 404 / 405 | Preserve status/operation; base URL and method-check hint |
+| Node HTTP 429 / 5xx / 3xx | Rate/quota / upstream availability / final API URL hint; no redirect |
+| Transport failure | Safe timeout/connect/send category; no raw URL or error |
 
 ## 5. Good / Base / Bad Cases
 
@@ -185,6 +203,10 @@ checkpoint repair; there is no UI button silently skipping blocks.
   direct import atomicity/duplicates, cross-network independence, legacy allowlist
   independence, and disabled-admission scanning/settlement with revision fencing.
 - Cancellation: owner isolation, repeat/replay, unchanged windows, immediate reuse, late/reused ambiguity, observed/review/expired rejection and concurrent scan/cancel; verify ledger unchanged on cancel and one entry after repeated manual credit.
+- HTTP fixtures: preserve status/operation for 401/403/404/405/429/5xx/3xx;
+  assert TRON-PRO-API-KEY header and successful JSON remain intact, diagnostic
+  length fits persistence, secrets/body/Location/parameters stay absent, and
+  TronGrid hints require exact host identity.
 - RPC fixtures: wrong chain, successful/failed/internal calls, complete Tron
   receipts, independent BTC outputs, genuine Solana program/mint identities,
   temporary token accounts, ordered bounded slot lists and reorganization.
@@ -217,3 +239,8 @@ every unsatisfied network/asset/address prerequisite.
 Wrong: delete a cancelled order or rewrite its expiry to release its slot.
 Correct: retain its original window and cancellation timestamp, release allocation
 explicitly, and require manual attribution of later matching evidence.
+
+Wrong: collapse all provider rejections into "non-success HTTP status", or
+append upstream JSON/HTML to make it more useful. Correct: report the numeric
+status and code-defined operation with safe fixed guidance; obtain the actual
+provider account evidence before claiming a specific operational root cause.
