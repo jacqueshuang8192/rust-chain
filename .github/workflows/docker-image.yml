@@ -11,6 +11,8 @@ on:
 
 env:
   REGISTRY_IMAGE: ghcr.io/${{ github.repository }}
+  # Build records are optional artifacts; publishing must not depend on their quota.
+  DOCKER_BUILD_RECORD_UPLOAD: "false"
 
 jobs:
   quality-gate:
@@ -135,6 +137,9 @@ jobs:
     permissions:
       contents: read
       packages: write
+    outputs:
+      digest_amd64: ${{ steps.digest.outputs.digest_amd64 }}
+      digest_arm64: ${{ steps.digest.outputs.digest_arm64 }}
     strategy:
       fail-fast: false
       matrix:
@@ -181,18 +186,22 @@ jobs:
           cache-to: type=gha,mode=max,scope=backend-image-${{ matrix.arch }}
 
       - name: Export digest
+        id: digest
+        env:
+          ARCH: ${{ matrix.arch }}
+          DIGEST: ${{ steps.build.outputs.digest }}
         run: |
-          mkdir -p /tmp/digests
-          digest="${{ steps.build.outputs.digest }}"
-          touch "/tmp/digests/${digest#sha256:}"
-
-      - name: Upload digest
-        uses: actions/upload-artifact@v4
-        with:
-          name: digests-${{ matrix.arch }}
-          path: /tmp/digests/*
-          if-no-files-found: error
-          retention-days: 1
+          set -euo pipefail
+          case "$ARCH" in
+            amd64|arm64) ;;
+            *) echo "Unexpected architecture: $ARCH" >&2; exit 1 ;;
+          esac
+          if [[ ! "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "Missing or invalid image digest for $ARCH" >&2
+            exit 1
+          fi
+          # Matrix completion order is arbitrary; each arch owns a distinct key.
+          printf 'digest_%s=%s\n' "$ARCH" "$DIGEST" >> "$GITHUB_OUTPUT"
 
   publish-manifest:
     name: Publish multi-platform manifest
@@ -212,13 +221,6 @@ jobs:
 
       - name: Verify source integrity
         run: python3 scripts/source_integrity_gate.py
-
-      - name: Download digests
-        uses: actions/download-artifact@v4
-        with:
-          pattern: digests-*
-          path: /tmp/digests
-          merge-multiple: true
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -246,20 +248,32 @@ jobs:
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Create manifest list and tags
-        working-directory: /tmp/digests
         env:
           IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
+          AMD64_DIGEST: ${{ needs.publish-platform.outputs.digest_amd64 }}
+          ARM64_DIGEST: ${{ needs.publish-platform.outputs.digest_arm64 }}
         run: |
+          set -euo pipefail
+          source_args=()
+          for digest in "$AMD64_DIGEST" "$ARM64_DIGEST"; do
+            if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              echo "Both architecture digests are required to publish" >&2
+              exit 1
+            fi
+            source_args+=("${REGISTRY_IMAGE}@${digest}")
+          done
+          if [[ "$AMD64_DIGEST" == "$ARM64_DIGEST" ]]; then
+            echo "Architecture digests must be distinct" >&2
+            exit 1
+          fi
           tag_args=()
           while IFS= read -r tag; do
-            tag_args+=("-t" "$tag")
+            [[ -n "$tag" ]] && tag_args+=("-t" "$tag")
           done <<< "$IMAGE_TAGS"
-
-          source_args=()
-          for digest in *; do
-            source_args+=("${REGISTRY_IMAGE}@sha256:${digest}")
-          done
-
+          if (( ${#tag_args[@]} == 0 )); then
+            echo "No image tags were generated" >&2
+            exit 1
+          fi
           docker buildx imagetools create "${tag_args[@]}" "${source_args[@]}"
 
       - name: Inspect published manifest

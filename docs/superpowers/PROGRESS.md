@@ -10272,3 +10272,10 @@
 - 修改文件：`docs/superpowers/PROGRESS.md`（推送记录）；无新增业务改动。
 - 验证结果：fetch 后远程无新增提交，本地领先 3 个提交；git diff --check 通过，git push origin main 成功。沿用本轮 1182 项测试及构建验证，既有包体超限仍保留。
 - 后续事项：无待推送功能；未部署，真实节点密钥及实链到账仍需环境验收。
+
+## 2026-10-24 16:24 - Docker 发布移除 Artifact 配额依赖
+
+- 完成内容：将双架构摘要上传改为独立 job outputs，发布前检查完整性；关闭可选 Docker 构建记录上传，保留质量门禁、缓存和标签规则。
+- 修改文件：`.github/workflows/docker-image.yml`、`tests/test_docker_workflow_outputs.py`、`.trellis/spec/backend/container-delivery.md`及本任务记录。
+- 验证结果：Python 24/24、Rust Docker 契约 10/10、source integrity、YAML 解析和 shellcheck 通过；actionlint v1.7.12（官方 release 校验 SHA256）通过。GitHub API 返回 404，未验证远程运行或 GHCR 发布。
+- 后续事项：保存本地提交；本轮未推送，未删除远程产物或调整计费。

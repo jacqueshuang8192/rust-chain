@@ -476,3 +476,61 @@ publication unchanged. Record actual image/CI verification limits separately.
 Wrong: `RUN --mount=type=cache,target=/usr/local/cargo/registry cargo build --locked`.
 Correct: persist `cargo fetch --locked` in a manifest-only stage, then inherit it
 and run `cargo build --locked --offline` after source copies.
+
+## Scenario: Publish Without GitHub Artifact Storage
+
+### 1. Scope / Trigger
+
+Apply to Docker workflow digest transport or optional build records, especially
+when CreateArtifact fails due to account storage quota.
+
+### 2. Signatures
+
+- Workflow env `DOCKER_BUILD_RECORD_UPLOAD: "false"` disables optional Docker
+  build record artifact uploads for both PR and publishing matrix jobs.
+- `publish-platform.outputs.digest_amd64` and `digest_arm64` map to the `digest`
+  step's corresponding outputs; each matrix child writes only its own key.
+- Export receives `ARCH` and `DIGEST` via env and writes `digest_<arch>=<sha256>`
+  to `GITHUB_OUTPUT`.
+- Manifest receives both outputs through `needs.publish-platform.outputs` envs.
+
+### 3. Contracts
+
+Keep native architecture runners, push-by-digest, final tag policy, integrity and
+quality gates, existing permissions and GHA build cache. No artifact upload or
+download is necessary to transport two small digests. Matrix outputs must have
+unique keys because job completion order is not guaranteed. Do not use one shared
+digest output, mutable architecture tags, or continue-on-error to hide missing
+builds. This does not clean old artifacts or adjust account billing/storage.
+
+### 4. Validation & Error Matrix
+
+| Input / condition | Behavior |
+|---|---|
+| amd64 or arm64 and lowercase sha256 with 64 hex characters | Export that architecture's key |
+| Unknown architecture, empty/malformed digest or newline injection | Fail before writing output |
+| Both valid distinct digests and metadata tags | Publish all tags from both immutable sources |
+| Either digest absent/invalid, duplicate digests or no tags | Fail before Docker create |
+| Registry create fails | Preserve non-zero exit status |
+
+### 5. Good / Base / Bad Cases
+
+Good: both matrix completion orders yield the same named output map.
+Base: PR builds run checks and builds without publishing or uploading records.
+Bad: empty digest file upload still depends on exhausted artifact quota even with
+one-day retention; skipping that failure would lose a required architecture.
+
+### 6. Tests Required
+
+`tests/test_docker_workflow_outputs.py` executes the actual workflow Bash with
+isolated output files and a Docker recorder, covering both completion orders,
+invalid exports, exact tag/source argv, missing inputs and registry failures.
+Run source-integrity tests, Docker image contracts, YAML/actionlint and shellcheck.
+Local checks do not establish GitHub runner aggregation or GHCR publication success;
+verify a new run on the corrected workflow revision after pushing.
+
+### 7. Wrong vs Correct
+
+Wrong: upload digest files, then suppress CreateArtifact failure.
+Correct: expose distinct matrix outputs and require both validated immutable
+identities before creating the manifest. Disable optional build records separately.
