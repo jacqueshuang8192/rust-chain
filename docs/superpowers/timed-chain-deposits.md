@@ -7,7 +7,7 @@
 1. 应用尚未执行的迁移 `0158_timed_chain_deposits.sql`、`0159_timed_deposit_text_identity.sql` 和 `0160_independent_recharge_addresses.sql`。不要修改已应用文件。0160 将收款地址从旧永久库存中独立出来，自行生成编号，保留已有链上订单的地址引用。
 2. 配置现有 `CREDENTIAL_ENCRYPTION_KEY`，要求 32 字节并持久保管。节点地址与 API 密钥加密存库；后台留空表示保留，不回显原值。
 3. 打开“钱包资产 → 链上充值 → 网络与收款配置”，选择 Ethereum、Base、Tron、Bitcoin 或 Solana，点击“编辑监听配置”填写只读节点与确认数。
-4. 在“监听币种”点击“新增监听币种”。例如 Ethereum 先添加原生 ETH（自动填 18 位精度），再分别选择 USDT、USDC，填写各自在 Ethereum 的真实主网合约和 decimals，后续仍可继续添加。币种选项来自平台资产；若未找到，先在资产管理创建后刷新本页。合约不自动预填，资产简称不代表链上身份。已有映射通过“编辑 / 启停”管理，合约与精度固定并显示不可修改原因。
+4. 在“监听币种”点击“新增监听币种”。例如 Ethereum 先添加原生 ETH（自动填 18 位精度），再分别选择 USDT、USDC，填写各自在 Ethereum 的真实主网合约和 decimals，后续仍可继续添加。币种选项来自平台资产；若未找到，先在资产管理创建后刷新本页。可显式选择下文主网预设填入合约和精度，也可手动填写；资产简称不代表链上身份。已有映射通过“编辑 / 启停”管理，合约与精度固定并显示不可修改原因。
 5. 在“收款地址”点击“添加收款地址”，在独立面板粘贴地址，每行一个，单次最多 500 个。每网可先放 10 个，后续继续添加，没有 10 个硬上限。重复地址跳过，已停用地址不会因重复导入重新启用；任一地址无效则整批不保存。无需库存编号或二次纳入。Ethereum/Base 即使使用相同地址，也要分别添加到各自网络。
 6. 检查平台资产的充值开关、最低充值数量、固定手续费和精度。数量必须高于手续费且满足链上及钱包精度，钱包最多 18 位小数。旧网络白名单、旧地址库存和地址组不再参与充值准入；“提现网络”只维护提现所需目录。
 7. 开启“接受新充值订单”，等待最近追上区块的成功时间。节点未同步、报错或成功时间超过 120 秒时，不接受新订单。节点已配置时会持续监听，关闭接单开关、停用地址或资产都不影响已创建订单的到账核对。配置更新及新增地址会清除就绪状态，重新追上区块后才能接单。
@@ -29,6 +29,34 @@
 | Solana | SOL、经典 SPL Token | mainnet-beta 的完整 finalized `jsonParsed` 区块、inner instructions、mint 元数据、slot/区块时间；Token2022 暂不开放 |
 
 节点凭据可放在节点 URL 的受控鉴权路径中；API 密钥字段在 Tron 使用 `TRON-PRO-API-KEY`，其他网络使用 Bearer。Bitcoin Core 的用户密码鉴权可使用节点 URL 的 Basic Auth 信息，务必使用受信网络或 TLS 代理。所有地址只需要收款地址，系统不接收私钥。
+
+## 主网节点与币种预设（2026-10-24）
+
+在“编辑监听配置”选择“主网节点预设”，或在“新增监听币种”选择“主网币种预设”。选择只填充草稿，填写操作原因并确认保存后生效；接单状态不会自动改变，已有币种身份不能通过预设覆盖。列表缺少平台币种时，先在资产管理创建再刷新。
+
+| 网络 | 节点预设 | 确认深度 | 币种预设 |
+|---|---|---|---|
+| Ethereum | Alchemy HTTP，替换 URL 中 `{API_KEY}` | 12 | ETH / 18、USDT / 6、USDC / 6 |
+| Tron / TRC20 | `https://api.trongrid.io`，密钥填 API 密钥框 | 20 | USDT / 6 |
+| Solana | 公共主网或 Helius（替换 URL 中 `{API_KEY}`） | 32 finalized slots | SOL / 9、USDT / 6、USDC / 6 |
+
+Ethereum Alchemy 模板为 `https://eth-mainnet.g.alchemy.com/v2/{API_KEY}`；Helius 模板为 `https://mainnet.helius-rpc.com/?api-key={API_KEY}`。这两项的密钥直接放入 URL，下方 Bearer 密钥框无需重复填写。占位符未替换时不能保存。TronGrid 使用 `TRON-PRO-API-KEY` 请求头。密钥框留空保留已有密钥。
+
+Solana 公共节点 `https://api.mainnet-beta.solana.com` 是真实主网，仅适合测试接入，持续完整区块扫描可能受限流影响。专用节点也需确认方法权限与额度；Ethereum 原生 ETH 监听必须支持 `debug_traceBlockByHash` / `callTracer`，Solana 需要 finalized 完整 jsonParsed 区块和 mint 查询。预设不是节点可用性或实际到账保证。
+
+| 网络 / 币种 | 主网合约或 mint | 精度 |
+|---|---|---|
+| Ethereum USDT | `0xdac17f958d2ee523a2206206994597c13d831ec7` | 6 |
+| Ethereum USDC | `0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48` | 6 |
+| Tron USDT | `TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t` | 6 |
+| Solana USDT | `Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB` | 6 |
+| Solana USDC | `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v` | 6 |
+
+ETH 和 SOL 为原生币，无合约或 mint。收款地址仍需自行添加，预设不生成地址或私钥。
+
+本轮验证与限制见[主网预设交付记录](../../.trellis/tasks/archive/2026-10/10-24-chain-recharge-presets/research/delivery.md)。
+
+参考 [epusdt 固定版本](https://github.com/GMWalletApp/epusdt/blob/aed4a970a28d734c8a35499496604b868a24ef7f/src/model/dao/mdb_table_init.go)，并核对 [Tether](https://tether.to/en/supported-protocols/)、[Circle](https://developers.circle.com/stablecoins/usdc-contract-addresses)、[TronGrid](https://developers.tron.network/reference/select-network)、[Solana](https://solana.com/docs/references/clusters)、[Alchemy](https://www.alchemy.com/docs/reference/debug-traceblockbyhash) 和 [Helius](https://www.helius.dev/docs/api-reference/rpc/http/getblock)。本项目使用 HTTP 扫描，未照搬上游 Ethereum WebSocket 地址和较低确认数。
 
 ## 自动入账与人工核对
 

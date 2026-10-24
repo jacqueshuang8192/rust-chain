@@ -7,12 +7,9 @@ import { parseSafeInteger } from '../../shared/integer';
 import { createModalProps } from '../resources/actions/shared';
 import { UnsavedChangesGuard } from '../settings';
 import { base, networkOptions, type Asset, type PlatformAsset, type Scanner } from './contracts';
+import { assetPresets, hasCredentialPlaceholder, nativeAssets, nodePresets } from './presets';
 
 export const networkLabel = (network: string) => networkOptions.find(row => row.value === network)?.label ?? network;
-const nativeAssets: Record<string, { symbol: string; decimals: number }> = {
-  eth: { symbol: 'ETH', decimals: 18 }, base: { symbol: 'ETH', decimals: 18 },
-  btc: { symbol: 'BTC', decimals: 8 }, solana: { symbol: 'SOL', decimals: 9 }
-};
 type EditorControls = { dirty: () => void; busy: boolean; setBusy: (busy: boolean) => void };
 
 /** 编辑器固定打开时的配置快照；取消、浏览器关闭和站内跳转均保护草稿。 */
@@ -40,9 +37,22 @@ export function ScannerForm({ scanner, dirty, busy, setBusy, saved }: CommonProp
   const [endpoint, setEndpoint] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [confirmations, setConfirmations] = useState(String(scanner.confirmations));
+  const [presetId, setPresetId] = useState('');
+  const presets = nodePresets.filter(row => row.network === scanner.network);
+  const preset = presets.find(row => row.id === presetId);
   const count = parseSafeInteger(confirmations, 1, 10000);
-  const error = count === null ? '确认数必须为 1 至 10000 的整数' : enabled && !scanner.endpoint_configured && !endpoint.trim() ? '开启新订单前，请填写监听节点地址' : '';
+  const error = hasCredentialPlaceholder(endpoint) ? '请将节点地址中的 API_KEY 占位符替换为自己的真实密钥' : count === null ? '确认数必须为 1 至 10000 的整数' : enabled && !scanner.endpoint_configured && !endpoint.trim() ? '开启新订单前，请填写监听节点地址' : '';
   return <div className="deposit-edit-form">
+    {presets.length ? <div className="deposit-preset">
+      <label id="node-preset-label">主网节点预设</label>
+      <AdminSelect motion={false} ariaLabel="主网节点预设" ariaLabelledBy="node-preset-label" disabled={busy} value={presetId} optionList={[{ value: '', label: '手动配置 / 保留已有节点' }, ...presets.map(row => ({ value: row.id, label: row.label }))]} onChange={value => {
+        setPresetId(value);
+        const next = presets.find(row => row.id === value);
+        if (next) { dirty(); setEndpoint(next.endpoint); setConfirmations(String(next.confirmations)); }
+      }} />
+      <p className="muted">选择后只填入节点地址和确认深度，可继续编辑；不会自动保存或切换接单状态。已有节点在确认保存后才被替换，密钥框留空仍保留原值。</p>
+      {preset ? <><p>{preset.note}</p><a href={preset.source} target="_blank" rel="noopener noreferrer">查看节点官方说明</a></> : null}
+    </div> : null}
     <fieldset disabled={busy}>
       <label className="deposit-switch-row">接受新充值订单<Switch aria-label="接受新充值订单" disabled={busy} checked={enabled} onChange={value => { dirty(); setEnabled(value); }} /></label>
       <label>监听节点地址<AdminPasswordInput ariaLabel="监听节点地址" value={endpoint} onChange={value => { dirty(); setEndpoint(value); }} /></label>
@@ -73,16 +83,32 @@ export function AssetForm({ network, assets, catalog, existing, dirty, busy, set
   const [token, setToken] = useState(existing?.token_address ?? '');
   const [decimals, setDecimals] = useState(String(existing?.decimals ?? (defaultKind === 'native' ? native?.decimals ?? '' : '')));
   const [enabled, setEnabled] = useState(existing?.enabled ?? true);
+  const [presetId, setPresetId] = useState('');
+  const presets = assetPresets.filter(row => row.network === network && !assets.some(asset => asset.asset_symbol === row.symbol));
+  const preset = presets.find(row => row.id === presetId);
   const scale = parseSafeInteger(decimals, 0, 18);
   const platform = catalog.find(row => row.symbol === symbol);
   const error = !platform ? '请先选择已创建的平台币种' : !existing && assets.some(row => row.asset_symbol === symbol) ? '此币种已配置，请在列表中编辑' : scale === null ? '请填写 0 至 18 的链上精度（decimals）' : kind === 'token' && !token.trim() ? '请填写当前网络的真实合约地址或 mint' : '';
   function changeKind(value: string) {
-    dirty(); setKind(value); setToken('');
+    dirty(); setPresetId(''); setKind(value); setToken('');
     setSymbol(value === 'native' ? native?.symbol ?? '' : '');
     setDecimals(value === 'native' ? String(native?.decimals ?? '') : '');
   }
   return <div className="deposit-edit-form">
     {existing ? <Banner type="info" description="币种、链上类型、合约和精度在创建后固定，不能原地修改，以保护历史订单归属。这里可以启用或停用该币种。" /> : <p>一个网络可以添加多个监听币种。例如 Ethereum 可分别配置 ETH、USDT、USDC，并继续添加其他 ERC20 资产。</p>}
+    {!existing && presets.length ? <div className="deposit-preset">
+      <label id="asset-preset-label">主网币种预设</label>
+      <AdminSelect motion={false} ariaLabel="主网币种预设" ariaLabelledBy="asset-preset-label" disabled={busy} value={presetId} optionList={[{ value: '', label: '手动配置币种' }, ...presets.map(row => {
+        const available = catalog.some(asset => asset.symbol === row.symbol);
+        return { value: row.id, label: `${row.label}${available ? '' : '（请先创建平台资产）'}`, disabled: !available };
+      })]} onChange={value => {
+        setPresetId(value);
+        const next = presets.find(row => row.id === value);
+        if (next && catalog.some(asset => asset.symbol === next.symbol)) { dirty(); setKind(next.kind); setSymbol(next.symbol); setToken(next.token); setDecimals(String(next.decimals)); }
+      }} />
+      <p className="muted">只填入当前主网的币种、类型、合约和精度，不自动保存。已配置币种不再列出；新币种仍可手动添加。</p>
+      {preset ? <p>已填入 {preset.label} · 精度 {preset.decimals}。<a href={preset.source} target="_blank" rel="noopener noreferrer">核对官方资产身份</a></p> : null}
+    </div> : null}
     <fieldset disabled={busy}>
       <label id="chain-kind-label">链上资产类型</label>
       {existing ? <p>{kind === 'native' ? '原生币' : '代币合约 / SPL mint'}</p> : <AdminSelect ariaLabel="链上资产类型" ariaLabelledBy="chain-kind-label" value={kind} onChange={changeKind} optionList={[
@@ -90,11 +116,11 @@ export function AssetForm({ network, assets, catalog, existing, dirty, busy, set
         ...(network !== 'btc' ? [{ value: 'token', label: network === 'solana' ? '经典 SPL Token' : network === 'tron' ? 'TRC20 代币' : 'ERC20 代币' }] : [])
       ]} />}
       <label id="chain-symbol-label">平台币种</label>
-      {existing || kind === 'native' ? <p>{symbol} {kind === 'native' ? '· 原生币身份固定' : ''}</p> : <AdminSelect ariaLabel="平台币种" ariaLabelledBy="chain-symbol-label" filter value={symbol} onChange={value => { dirty(); setSymbol(value); }} placeholder="选择要监听的币种" optionList={catalog.filter(row => !assets.some(asset => asset.asset_symbol === row.symbol)).map(row => ({ value: row.symbol, label: `${row.symbol}${row.status !== 'active' || !row.deposit_enabled ? '（平台充值未开启）' : ''}` }))} />}
+      {existing || kind === 'native' ? <p>{symbol} {kind === 'native' ? '· 原生币身份固定' : ''}</p> : <AdminSelect ariaLabel="平台币种" ariaLabelledBy="chain-symbol-label" filter value={symbol} onChange={value => { dirty(); setPresetId(''); setSymbol(value); setToken(''); setDecimals(''); }} placeholder="选择要监听的币种" optionList={catalog.filter(row => !assets.some(asset => asset.asset_symbol === row.symbol)).map(row => ({ value: row.symbol, label: `${row.symbol}${row.status !== 'active' || !row.deposit_enabled ? '（平台充值未开启）' : ''}` }))} />}
       {!existing ? <p className="muted">列表来自平台资产。若没有所需币种，请先在资产管理中添加，再刷新本页。</p> : null}
       {kind === 'native' ? <p>原生币无需填写合约地址，链上精度为 {decimals}。</p> : <>
-        <label>合约地址 / mint{existing ? <Typography.Text copyable>{token}</Typography.Text> : <AdminTextInput ariaLabel="合约地址或 mint" value={token} onChange={value => { dirty(); setToken(value); }} />}</label>
-        <label>链上精度（decimals）{existing ? <span>{decimals}</span> : <AdminTextInput ariaLabel="链上精度" value={decimals} onChange={value => { dirty(); setDecimals(value); }} placeholder="以链上合约为准" />}</label>
+        <label>合约地址 / mint{existing ? <Typography.Text copyable>{token}</Typography.Text> : <AdminTextInput ariaLabel="合约地址或 mint" value={token} onChange={value => { dirty(); setPresetId(''); setToken(value); }} />}</label>
+        <label>链上精度（decimals）{existing ? <span>{decimals}</span> : <AdminTextInput ariaLabel="链上精度" value={decimals} onChange={value => { dirty(); setPresetId(''); setDecimals(value); }} placeholder="以链上合约为准" />}</label>
       </>}
       <label className="deposit-switch-row">开放该币种充值<Switch aria-label="开放该币种充值" disabled={busy} checked={enabled} onChange={value => { dirty(); setEnabled(value); }} /></label>
     </fieldset>

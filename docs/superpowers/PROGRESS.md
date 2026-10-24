@@ -10251,3 +10251,17 @@
 - 修改文件：秒合约诊断任务 prd.md、research/diagnosis.md、本记录。
 - 验证结果：静态核对迁移0157与读取函数；git diff --check通过。无业务代码修改，未执行真实数据库回归，未验证线上恢复。
 - 后续事项：不恢复指定输赢/改价能力，可继续处理真实行情结算路径；未提交、推送、部署。
+
+## 2026-10-24 00:00 - 主网充值预设实现（时间未采集）
+
+- 完成内容：按用户选择增加 Ethereum、Tron/TRC20、Solana 节点与 7 个币种草稿预设；保护已有映射、平台资产范围和保存版本，拦截密钥占位符；补充来源与接入说明。
+- 修改文件：`web/src/admin/deposits/presets.ts`、`presets.test.ts`、`DepositSettingsEditors.tsx`、`DepositSettingsPage.test.tsx`、`RechargeWorkspace.css`、`.trellis/spec/admin/ui-system.md`、`docs/superpowers/timed-chain-deposits.md`及任务记录。
+- 验证结果：定向测试 26/26、typecheck、lint、build 通过；包体 2,754,639 bytes，较前轮增加 5,213 bytes，既有 2,600,000 bytes 门槛仍超限，未放宽门槛。
+- 后续事项：完成全量门禁及隔离真实 API 浏览器验收；未推送或部署。
+
+## 2026-10-24 14:24 - 主网充值预设验收
+
+- 完成内容：Ethereum/Tron/Solana 主网预设验收；修复新预设下拉连续切换的动画竞态；补充主网身份、API 密钥及节点能力说明，清理隔离服务和临时夹具。
+- 修改文件：本轮充值编辑器、预设、测试及 CSS；`web/src/shared/SemiFormControls.tsx`（仅可选 motion 透传）；`.trellis/spec/admin/ui-system.md`、使用说明及任务交付记录。
+- 验证结果：最终 Web 125 文件 1182/1182、typecheck、lint、production-policy、coverage、build通过；Ego 真实 HTTP + 隔离 MySQL 验证 TRC20 保存、节点草稿与占位符、连续切换及桌面/390/320 布局和取消。包体 2,754,677 bytes，较前轮 +5,251 bytes，既有 2,600,000 门槛仍失败，未放宽。diff及任务校验通过。
+- 后续事项：仅保存本地提交，未推送或部署；实际密钥权限、节点持续监听及实链到账未验证，需运营填入真实密钥与地址后验收。

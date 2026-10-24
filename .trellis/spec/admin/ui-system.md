@@ -1439,8 +1439,18 @@ changes and navigation. Refresh is unavailable while an editor/save is active.
 Failed refresh disables new writes without erasing a pinned draft. New asset
 selection uses the minimal platform catalog, excludes already mapped symbols
 and explains platform recharge disabled status. ETH/18 (Ethereum/Base), BTC/8
-and SOL/9 are fixed native presets; Tron offers only TRC20. No token contract or
-decimals is guessed. Existing identity is copyable read-only text with a reason;
+and SOL/9 are fixed native presets; Tron offers only TRC20. Manual token entry
+never guesses contracts or decimals. Explicit, source-verified mainnet presets
+may populate new asset drafts for Ethereum, Tron and Solana; exclude mapped
+symbols and disable choices absent from the platform catalog. Changing the
+platform symbol clears the previous token identity. Node presets only populate
+endpoint/confirmation drafts, preserving admission state and secret semantics.
+Block API_KEY placeholders even when admission is disabled because configured
+nodes still scan history. Presets never save automatically; preserve revision,
+reason and discard guards. The two preset selects opt out of popup motion to
+avoid a leave/reopen race that strands an expanded select with an empty portal;
+other shared selects retain their default. Browser checks must repeatedly switch
+Solana node and asset presets within the same editor. Existing identity is copyable read-only text with a reason;
 only its enabled state is editable. Native identity is not an empty disabled
 contract input. Semi Modal action buttons need explicit Chinese aria-labels;
 Select visible labels use aria-labelledby. `接受新充值订单` controls admission, not

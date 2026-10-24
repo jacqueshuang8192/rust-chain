@@ -5,6 +5,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ApiError, apiRequest } from '../../api/client';
 import { DepositSettingsPage } from './DepositSettingsPage';
+import { assetPresets, nodePresets } from './presets';
 
 vi.mock('../../api/client', async () => ({ ...await vi.importActual('../../api/client'), apiRequest: vi.fn() }));
 vi.mock('../../auth/authStore', () => {
@@ -20,7 +21,7 @@ vi.mock('../access', () => {
   };
 });
 if (!Range.prototype.getBoundingClientRect) Range.prototype.getBoundingClientRect = () => new DOMRect(0, 0, 0, 0);
-const settings = { scanners: [{ network: 'eth', enabled: true, endpoint_configured: true, api_key_configured: true, confirmations: 12, revision: 7, last_scan_at: null, last_error: null }], assets: [], addresses: [], platform_assets: ['ETH', 'USDT', 'USDC', 'DAI'].map(symbol => ({ symbol, status: 'active', deposit_enabled: true, precision_scale: 18 })) };
+const settings = { scanners: [{ network: 'eth', enabled: true, endpoint_configured: true, api_key_configured: true, confirmations: 12, revision: 7, last_scan_at: null, last_error: null }], assets: [], addresses: [], platform_assets: ['ETH', 'USDT', 'USDC', 'DAI', 'SOL'].map(symbol => ({ symbol, status: 'active', deposit_enabled: true, precision_scale: 18 })) };
 const mocked = vi.mocked(apiRequest);
 beforeEach(() => { permissions.addressOnly = false; permissions.readOnly = false; mocked.mockReset(); mocked.mockResolvedValue(settings); });
 afterEach(cleanup);
@@ -150,6 +151,7 @@ it('shows immutable chain identity and only updates the selected asset state at 
   const asset = { id: 1, network: 'eth', asset_symbol: 'USDT', asset_kind: 'token', token_address: '0x1111111111111111111111111111111111111111', decimals: 6, enabled: true, revision: 11 };
   mocked.mockResolvedValue({ ...settings, assets: [asset] }); show();
   await user.click(await screen.findByRole('button', { name: '编辑 USDT 监听' }));
+  expect(screen.queryByRole('combobox', { name: '主网币种预设' })).not.toBeInTheDocument();
   expect(screen.queryByRole('textbox', { name: '合约地址或 mint' })).not.toBeInTheDocument();
   expect(screen.queryByRole('textbox', { name: '链上精度' })).not.toBeInTheDocument();
   expect(screen.getByText(/以保护历史订单归属/)).toBeInTheDocument();
@@ -161,6 +163,73 @@ it('shows immutable chain identity and only updates the selected asset state at 
   expect(await screen.findByText(/数据状态已变化/)).toBeInTheDocument();
   expect(mocked).toHaveBeenCalledWith('/admin/api/v1/wallet/deposit-settings/assets', { method: 'PUT', body: JSON.stringify({ network: 'eth', asset_symbol: 'USDT', asset_kind: 'token', token_address: asset.token_address, decimals: 6, enabled: false, expected_revision: 11, reason: '暂停此币种' }) });
   expect(screen.getByRole('textbox', { name: '操作原因' })).toHaveValue('暂停此币种');
+});
+
+const networkNames: Record<string, string> = { eth: 'Ethereum', tron: 'Tron（TRC20）', solana: 'Solana' };
+it.each(assetPresets)('applies $id only to a draft and sends the selected mainnet identity on confirmation', async (preset) => {
+  const user = userEvent.setup(); show();
+  await screen.findByRole('button', { name: '新增监听币种' });
+  if (preset.network !== 'eth') await choose(user, '配置网络', networkNames[preset.network]);
+  await user.click(screen.getByRole('button', { name: '新增监听币种' }));
+  await choose(user, '主网币种预设', preset.label);
+  if (preset.kind === 'token') {
+    expect(screen.getByRole('textbox', { name: '合约地址或 mint' })).toHaveValue(preset.token);
+    expect(screen.getByRole('textbox', { name: '链上精度' })).toHaveValue(String(preset.decimals));
+  } else {
+    expect(screen.getByText(`原生币无需填写合约地址，链上精度为 ${preset.decimals}。`)).toBeInTheDocument();
+  }
+  expect(mocked.mock.calls.every(([, init]) => !init?.method)).toBe(true);
+  await user.click(screen.getByRole('button', { name: '添加监听币种' }));
+  await user.type(screen.getByRole('textbox', { name: '操作原因' }), '使用已核对主网预设');
+  await user.click(screen.getByRole('button', { name: '确认' }));
+  await waitFor(() => expect(mocked).toHaveBeenCalledWith('/admin/api/v1/wallet/deposit-settings/assets', { method: 'PUT', body: JSON.stringify({ network: preset.network, asset_symbol: preset.symbol, asset_kind: preset.kind, token_address: preset.token, decimals: preset.decimals, enabled: true, expected_revision: 0, reason: '使用已核对主网预设' }) }));
+});
+
+it.each(nodePresets)('fills $id without enabling admission or sending unresolved credentials', async (preset) => {
+  const user = userEvent.setup();
+  mocked.mockResolvedValue({ ...settings, scanners: [{ ...settings.scanners[0], network: preset.network, enabled: false, endpoint_configured: false }] });
+  show();
+  await screen.findByRole('combobox', { name: '配置网络' });
+  if (preset.network !== 'eth') await choose(user, '配置网络', networkNames[preset.network]);
+  await user.click(await screen.findByRole('button', { name: '编辑监听配置' }));
+  await choose(user, '主网节点预设', preset.label);
+  expect(screen.getByLabelText('监听节点地址')).toHaveValue(preset.endpoint);
+  expect(screen.getByRole('textbox', { name: '充值确认数' })).toHaveValue(String(preset.confirmations));
+  expect(screen.getByRole('switch', { name: '接受新充值订单' })).not.toBeChecked();
+  expect(mocked.mock.calls.every(([, init]) => !init?.method)).toBe(true);
+  if (preset.endpoint.includes('{API_KEY}')) {
+    expect(screen.getByRole('button', { name: '保存监听配置' })).toBeDisabled();
+    expect(screen.getByText('请将节点地址中的 API_KEY 占位符替换为自己的真实密钥')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('监听节点地址'), { target: { value: preset.endpoint.replace('{API_KEY}', 'local-fixture-key') } });
+  }
+  await user.click(screen.getByRole('button', { name: '保存监听配置' }));
+  await user.type(screen.getByRole('textbox', { name: '操作原因' }), '保存主网节点草稿');
+  await user.click(screen.getByRole('button', { name: '确认' }));
+  await waitFor(() => expect(mocked).toHaveBeenCalledWith(`/admin/api/v1/wallet/deposit-settings/scanners/${preset.network}`, { method: 'PUT', body: JSON.stringify({ enabled: false, endpoint: preset.endpoint.replace('{API_KEY}', 'local-fixture-key'), api_key: null, confirmations: preset.confirmations, expected_revision: 7, reason: '保存主网节点草稿' }) }));
+});
+
+it('removes preset identity when choosing another symbol and protects cancellation', async () => {
+  const user = userEvent.setup(); show();
+  await user.click(await screen.findByRole('button', { name: '新增监听币种' }));
+  await choose(user, '主网币种预设', 'USDT · Ethereum ERC20');
+  await choose(user, '平台币种', 'DAI');
+  expect(screen.getByLabelText('合约地址或 mint')).toHaveValue('');
+  expect(screen.getByRole('textbox', { name: '链上精度' })).toHaveValue('');
+  expect(screen.getByRole('button', { name: '添加监听币种' })).toBeDisabled();
+  await user.click(screen.getByRole('button', { name: '取消编辑' }));
+  await user.click(screen.getByRole('button', { name: '放弃草稿' }));
+  expect(mocked.mock.calls.every(([, init]) => !init?.method)).toBe(true);
+});
+
+it('disables presets for missing platform assets and excludes existing mappings', async () => {
+  const user = userEvent.setup();
+  mocked.mockResolvedValue({ ...settings, platform_assets: settings.platform_assets.filter(row => row.symbol !== 'USDC'), assets: [{ id: 1, network: 'eth', asset_symbol: 'USDT', asset_kind: 'token', token_address: assetPresets[1].token, decimals: 6, enabled: false, revision: 3 }] });
+  show();
+  await user.click(await screen.findByRole('button', { name: '新增监听币种' }));
+  await user.click(screen.getByRole('combobox', { name: '主网币种预设' }));
+  expect(screen.queryByText('USDT · Ethereum ERC20', { selector: '.semi-select-option-text' })).not.toBeInTheDocument();
+  const missing = await screen.findByText('USDC · Ethereum ERC20（请先创建平台资产）');
+  expect(missing.closest('[role="option"]')).toHaveAttribute('aria-disabled', 'true');
 });
 
 it('preserves the selected network after a successful save and validates native identities per network', async () => {
