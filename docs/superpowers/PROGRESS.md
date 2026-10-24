@@ -10377,3 +10377,10 @@
 - 修改文件：本任务delivery.md所列业务、迁移、测试及规范文件；任务记录和`docs/superpowers/PROGRESS.md`。
 - 验证结果：fetch确认远程与本地基线一致；沿用最终充值21项、HTTP权限1项、Web1197项、架构/OpenAPI和静态检查结果；提交前diff及任务上下文校验通过。既有前端包体超限保留，未放宽。
 - 后续事项：推送后核对远程SHA；发布需先执行0162迁移并同步前后端，GitHub工作流、部署及真实链到账待验证。
+
+## 2026-10-25 01:19（Europe/Istanbul） - 交付范围纠正
+
+- 完成内容：推送复核发现会话记录脚本自动暂存了两个无关任务目录；追加纠正提交移除其Git跟踪，保留本地文件，不重写远程历史。
+- 修改文件：移除远程跟踪的`.trellis/tasks/10-21-agent-coin-logo-security-block/`与`.trellis/tasks/10-22-diagnose-seconds-orders-stuck-pending-settlement/`；`docs/superpowers/PROGRESS.md`。
+- 验证结果：核查功能提交及归档提交范围正确；核查日志提交额外记录后进行精确路径移除，业务代码与验证结果未变。
+- 后续事项：推送纠正提交并核对远程SHA。
