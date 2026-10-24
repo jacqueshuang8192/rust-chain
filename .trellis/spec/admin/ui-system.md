@@ -1502,3 +1502,16 @@ ConfirmAction requires the reason before credit/ignore. Freeze target controls
 and closing during confirmation/submission, prevent duplicate writes, and
 preserve backend atomic revalidation. Cancelled orders are eligible for explicit
 manual attribution only, with the cancellation history retained by the backend.
+
+### Deposit provider pools
+
+Once a network has providers, the scanner SideSheet edits the full pinned-revision
+provider/key snapshot. Names, priorities, enabled flags and request intervals remain
+explicit. Secrets start blank; replacement and clearing differ. URL placeholders
+are allowed only in provider endpoint templates and require credentials. Initial
+single-node setup creates the default channel; future edits use the pool editor.
+Add/remove changes remain drafts until the reason confirmation succeeds. Errors
+and revision conflicts preserve every draft. Runtime provider/key cooldown times
+come from the DB snapshot, not client inference, and never replace network-level
+readiness. Disabled/unknown/all-key-cooling states must not say healthy. Reuse Semi
+controls, responsive fieldsets, masked inputs and the existing navigation guard.

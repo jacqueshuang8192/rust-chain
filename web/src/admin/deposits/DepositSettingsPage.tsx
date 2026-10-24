@@ -12,6 +12,7 @@ import { AdminRequestActionBoundary, useCanAdminRequest } from '../access';
 import { AddressImportForm, AssetForm, DepositEditPanel, networkLabel, ScannerForm } from './DepositSettingsEditors';
 import { base, networkOptions, parseAddresses, parseSettings, type Asset, type Scanner, type Settings, type SharedAddress } from './contracts';
 import { DepositSetupGuide } from './DepositSetupGuide';
+import { ScannerProviderStatus } from './ScannerProviderStatus';
 import { methodBlockers, scanStatus } from './setupStatus';
 import './RechargeWorkspace.css';
 
@@ -58,6 +59,7 @@ function SettingsEditor({ data, reload, canConfigure, unavailable }: { data: Set
       <div className="deposit-scan-status"><Tag color={!unavailable && scan.ready ? 'green' : 'grey'}>{unavailable ? '状态待刷新' : scan.label}</Tag><span>已扫描{network === 'solana' ? ' slot' : '区块高度'}：{scanner.cursor_height ?? '尚未建立游标'}</span><span>最近追上区块：<TimestampText value={scanner.last_scan_at} /></span></div>
       <p className="muted">{scan.detail} 此处读取真实扫描状态，不会执行跳过历史区块或手工入账。</p>
       {scanner.last_error ? <Banner type="warning" description={`监听异常：${scanner.last_error}`} /> : <p className="muted">只有平台资产允许充值、币种与地址已启用、节点最近成功追上区块时，用户才能创建充值订单。</p>}
+      <ScannerProviderStatus scanner={scanner} />
     </Card> : canConfigure ? <Banner type="warning" description="当前网络缺少监听配置，请刷新确认服务端配置完整。" /> : <Banner type="info" description="当前账号可管理收款地址。查看和编辑网络、币种需要充值网络配置权限。" />}
     {canConfigure ? <Card title={<Typography.Title heading={6}>监听币种 · {assets.length} 个</Typography.Title>} headerExtraContent={canEditAsset ? <Button theme="solid" disabled={locked} onClick={() => setEditing({ type: 'asset', network, snapshot: data })}>新增监听币种</Button> : <Tag>只读权限</Tag>}>
       <p>每个币种单独配置链上身份，共用本网络的地址池。Ethereum 可添加 ETH、USDT、USDC 等；后续仍可继续添加。</p>

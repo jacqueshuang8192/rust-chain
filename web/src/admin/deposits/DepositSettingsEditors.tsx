@@ -7,6 +7,7 @@ import { parseSafeInteger } from '../../shared/integer';
 import { createModalProps } from '../resources/actions/shared';
 import { UnsavedChangesGuard } from '../settings';
 import { base, networkOptions, type Asset, type PlatformAsset, type Scanner } from './contracts';
+import { MultiScannerForm } from './MultiScannerForm';
 import { assetPresets, hasCredentialPlaceholder, nativeAssets, nodePresets } from './presets';
 
 export const networkLabel = (network: string) => networkOptions.find(row => row.value === network)?.label ?? network;
@@ -32,7 +33,10 @@ export function DepositEditPanel({ title, close, children }: { title: string; cl
 }
 
 type CommonProps = EditorControls & { saved: () => Promise<void> };
-export function ScannerForm({ scanner, dirty, busy, setBusy, saved }: CommonProps & { scanner: Scanner }) {
+export function ScannerForm(props: CommonProps & { scanner: Scanner }) {
+  return props.scanner.providers.length ? <MultiScannerForm {...props} /> : <InitialScannerForm {...props} />;
+}
+function InitialScannerForm({ scanner, dirty, busy, setBusy, saved }: CommonProps & { scanner: Scanner }) {
   const [enabled, setEnabled] = useState(scanner.enabled);
   const [endpoint, setEndpoint] = useState('');
   const [apiKey, setApiKey] = useState('');

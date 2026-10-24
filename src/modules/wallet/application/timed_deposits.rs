@@ -96,6 +96,7 @@ pub(crate) async fn save_scanner(
     {
         return Err(AppError::Validation("invalid scanner API key".into()));
     }
+    validate_providers(&mut request)?;
     storage::settings::save_scanner(pool, admin_id, &network, key, &request).await
 }
 
@@ -234,4 +235,98 @@ pub async fn scan_once(pool: &Pool<MySql>, key: Option<&str>) -> AppResult<u64> 
 /// 取消身份仅来自用户令牌；存储层原子校验付款证据，不能撤销已检测到的到账。
 pub async fn cancel_order(pool: &Pool<MySql>, user_id: u64, id: u64) -> AppResult<DepositOrder> {
     storage::orders::cancel(pool, user_id, id).await
+}
+
+fn validate_providers(request: &mut SaveScanner) -> AppResult<()> {
+    let Some(providers) = &mut request.providers else {
+        return Ok(());
+    };
+    if request
+        .endpoint
+        .as_ref()
+        .is_some_and(|s| !s.trim().is_empty())
+        || request
+            .api_key
+            .as_ref()
+            .is_some_and(|s| !s.trim().is_empty())
+    {
+        return Err(AppError::Validation(
+            "do not mix legacy credentials with provider configuration".into(),
+        ));
+    }
+    if providers.is_empty() || providers.len() > 10 {
+        return Err(AppError::Validation(
+            "configure between 1 and 10 providers".into(),
+        ));
+    }
+    let mut ids = std::collections::HashSet::new();
+    for provider in providers {
+        provider.name = provider.name.trim().to_owned();
+        if provider.name.is_empty()
+            || provider.name.chars().count() > 80
+            || provider.name.chars().any(char::is_control)
+            || provider.priority > 1000
+            || !(100..=2000).contains(&provider.request_interval_ms)
+            || provider.id.is_some_and(|id| id == 0 || !ids.insert(id))
+        {
+            return Err(AppError::Validation(
+                "invalid provider name, priority, request interval or duplicate ID".into(),
+            ));
+        }
+        if let Some(endpoint) = provider
+            .endpoint
+            .as_deref()
+            .filter(|s| !s.trim().is_empty())
+        {
+            let parsed = url::Url::parse(&endpoint.trim().replace("{API_KEY}", "credential"))
+                .map_err(|_| AppError::Validation("invalid provider endpoint".into()))?;
+            if endpoint.len() > 2000
+                || !matches!(parsed.scheme(), "http" | "https")
+                || parsed.host_str().is_none()
+                || parsed.fragment().is_some()
+                || endpoint.matches("{API_KEY}").count() > 1
+                || endpoint
+                    .split("://")
+                    .nth(1)
+                    .and_then(|s| s.split(['/', '?', '#']).next())
+                    .is_some_and(|authority| authority.contains("{API_KEY}"))
+            {
+                return Err(AppError::Validation(
+                    "provider requires an HTTP URL; key placeholders belong in path or query"
+                        .into(),
+                ));
+            }
+        }
+        if provider.keys.is_empty() || provider.keys.len() > 10 {
+            return Err(AppError::Validation(
+                "configure between 1 and 10 key slots per provider".into(),
+            ));
+        }
+        let mut key_ids = std::collections::HashSet::new();
+        for key in &mut provider.keys {
+            key.name = key.name.trim().to_owned();
+            if key.name.is_empty()
+                || key.name.chars().count() > 80
+                || key.name.chars().any(char::is_control)
+                || key.priority > 1000
+                || !(100..=2000).contains(&key.request_interval_ms)
+                || key.id.is_some_and(|id| id == 0 || !key_ids.insert(id))
+                || key
+                    .api_key
+                    .as_ref()
+                    .is_some_and(|s| s.len() > 1024 || s.chars().any(char::is_control))
+                || (key.clear_api_key && key.api_key.as_ref().is_some_and(|s| !s.trim().is_empty()))
+            {
+                return Err(AppError::Validation(
+                    "invalid provider key configuration".into(),
+                ));
+            }
+        }
+        if provider.enabled && !provider.keys.iter().any(|k| k.enabled) {
+            return Err(AppError::Validation(
+                "enabled provider requires an enabled key slot".into(),
+            ));
+        }
+    }
+    Ok(())
 }

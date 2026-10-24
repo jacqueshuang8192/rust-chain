@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import type { Asset, Scanner } from './contracts';
 import { parseSettings } from './contracts';
 import { methodBlockers, scanStatus } from './setupStatus';
-const scanner: Scanner = { network: 'eth', enabled: true, endpoint_configured: true, api_key_configured: false, confirmations: 12, revision: 1, scan_fresh: true, cursor_height: 100, checked_at: 1, last_scan_at: 1, last_error: null };
+const scanner: Scanner = { network: 'eth', providers: [], enabled: true, endpoint_configured: true, api_key_configured: false, confirmations: 12, revision: 1, scan_fresh: true, cursor_height: 100, checked_at: 1, last_scan_at: 1, last_error: null };
 const asset: Asset = { id: 1, network: 'eth', asset_symbol: 'ETH', asset_kind: 'native', token_address: '', decimals: 18, enabled: true, revision: 1 };
 const catalog = [{ symbol: 'ETH', status: 'active', deposit_enabled: true, precision_scale: 18 }];
 const addresses = [{ pool_id: 1, network: 'eth', address: '0x1', enabled: true }];

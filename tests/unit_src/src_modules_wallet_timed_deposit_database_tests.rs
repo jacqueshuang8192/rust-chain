@@ -349,6 +349,7 @@ async fn timed_deposit_database_reservations_and_accounting() {
         "eth",
         "0123456789abcdef0123456789abcdef",
         SaveScanner {
+            providers: None,
             enabled: false,
             endpoint: None,
             api_key: None,
@@ -683,6 +684,7 @@ async fn timed_deposit_database_reservations_and_accounting() {
         "eth",
         key,
         SaveScanner {
+            providers: None,
             enabled: false,
             endpoint: Some(server.uri()),
             api_key: None,

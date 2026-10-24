@@ -1,5 +1,8 @@
 use super::*;
 
+#[path = "src_modules_wallet_deposit_provider_tests.rs"]
+mod provider_tests;
+
 #[test]
 fn bitcoin_value_never_uses_float() {
     let value: Value = serde_json::from_str("9007199254740993.00000001").unwrap();
@@ -24,6 +27,7 @@ fn transfer_topic_validates_padding_and_confirmation_bounds() {
 
 fn node(server: &wiremock::MockServer, network: &str) -> Node {
     Node {
+        gate: None,
         network: network.into(),
         endpoint: server.uri(),
         api_key: None,

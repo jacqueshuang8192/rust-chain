@@ -21,7 +21,7 @@ vi.mock('../access', () => {
   };
 });
 if (!Range.prototype.getBoundingClientRect) Range.prototype.getBoundingClientRect = () => new DOMRect(0, 0, 0, 0);
-const settings = { scanners: [{ network: 'eth', enabled: true, endpoint_configured: true, api_key_configured: true, confirmations: 12, revision: 7, last_scan_at: null, last_error: null, scan_fresh: false, cursor_height: null, checked_at: 1792800000000 }], assets: [], addresses: [], platform_assets: ['ETH', 'USDT', 'USDC', 'DAI', 'SOL'].map(symbol => ({ symbol, status: 'active', deposit_enabled: true, precision_scale: 18 })) };
+const settings = { scanners: [{ network: 'eth', providers: [], enabled: true, endpoint_configured: true, api_key_configured: true, confirmations: 12, revision: 7, last_scan_at: null, last_error: null, scan_fresh: false, cursor_height: null, checked_at: 1792800000000 }], assets: [], addresses: [], platform_assets: ['ETH', 'USDT', 'USDC', 'DAI', 'SOL'].map(symbol => ({ symbol, status: 'active', deposit_enabled: true, precision_scale: 18 })) };
 const mocked = vi.mocked(apiRequest);
 beforeEach(() => { permissions.addressOnly = false; permissions.readOnly = false; mocked.mockReset(); mocked.mockResolvedValue(settings); });
 afterEach(cleanup);
@@ -317,4 +317,59 @@ it('refreshes saved state while idle and pauses polling during edits and address
     await user.click(screen.getByRole('button', { name: '取消' }));
     expect(screen.getByRole('button', { name: '刷新配置与监听状态' })).toBeEnabled();
   } finally { cleanup(); interval.mockRestore(); cleared.mockRestore(); }
+});
+
+function withProviders() {
+  return { ...settings, scanners: [{ ...settings.scanners[0], providers: [{ id: 10, network: 'eth', name: 'Primary', priority: 0, enabled: true, request_interval_ms: 250, cooldown_until: null, last_error: null, last_success_at: null, keys: [{ id: 20, provider_id: 10, name: 'Key A', priority: 0, enabled: true, api_key_configured: true, request_interval_ms: 250, cooldown_until: null, last_error: null, last_success_at: null }] }] }] };
+}
+it('adds a backup channel and multiple keys without revealing or replacing existing secrets', async () => {
+  const user = userEvent.setup(); mocked.mockResolvedValue(withProviders()); show();
+  await user.click(await screen.findByRole('button', { name: '编辑监听配置' }));
+  expect(screen.getByLabelText('渠道 1 节点地址')).toHaveValue('');
+  expect(screen.getByLabelText('渠道 1 凭据 1 API Key')).toHaveValue('');
+  await user.click(screen.getByRole('button', { name: '添加 API Key · 渠道 1' }));
+  await user.type(screen.getByLabelText('渠道 1 凭据 2 API Key'), 'second-key');
+  await user.click(screen.getByRole('button', { name: '添加备用渠道' }));
+  expect(screen.getByRole('button', { name: '保存监听配置' })).toBeDisabled();
+  await user.type(screen.getByLabelText('渠道 2 节点地址'), 'https://backup.example/rpc');
+  await user.type(screen.getByLabelText('渠道 2 凭据 1 API Key'), 'backup-key');
+  await user.click(screen.getByRole('button', { name: '保存监听配置' }));
+  await user.type(screen.getByRole('textbox', { name: '操作原因' }), '增加主备渠道');
+  mocked.mockRejectedValueOnce(new ApiError(409, 'CONFLICT', 'changed'));
+  await user.click(screen.getByRole('button', { name: '确认' }));
+  await waitFor(() => expect(mocked.mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(true));
+  const [, init] = mocked.mock.calls.find(([, init]) => init?.method === 'PUT')!;
+  const body = JSON.parse(String(init?.body));
+  expect(body.expected_revision).toBe(7); expect(body.providers).toHaveLength(2);
+  expect(body.providers[0].endpoint).toBeNull();
+  expect(body.providers[0].keys[0]).toMatchObject({ id: 20, api_key: null, clear_api_key: false });
+  expect(body.providers[0].keys[1].api_key).toBe('second-key');
+  expect(body.providers[1]).toMatchObject({ id: null, endpoint: 'https://backup.example/rpc', priority: 1, request_interval_ms: 250 });
+  expect(await screen.findByText(/数据状态已变化/)).toBeInTheDocument();
+  expect(screen.getByLabelText('渠道 2 凭据 1 API Key')).toHaveValue('backup-key');
+  expect(screen.getByRole('textbox', { name: '操作原因' })).toHaveValue('增加主备渠道');
+});
+it('validates channel intervals and requires a key for URL credential templates', async () => {
+  const user = userEvent.setup(); mocked.mockResolvedValue(withProviders()); show();
+  await user.click(await screen.findByRole('button', { name: '编辑监听配置' }));
+  const interval = screen.getByLabelText('渠道 1 请求间隔');
+  await user.clear(interval); await user.type(interval, '1e3');
+  expect(screen.getByRole('button', { name: '保存监听配置' })).toBeDisabled();
+  await user.clear(interval); await user.type(interval, '500');
+  await user.click(screen.getByRole('button', { name: '添加备用渠道' }));
+  fireEvent.change(screen.getByLabelText('渠道 2 节点地址'), { target: { value: 'https://backup.example/rpc/{API_KEY}' } });
+  expect(await screen.findByText(/渠道 2 的 URL 模板需要 API Key/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '保存监听配置' })).toBeDisabled();
+  await user.type(screen.getByLabelText('渠道 2 凭据 1 API Key'), 'real-fixture-key');
+  expect(screen.getByRole('button', { name: '保存监听配置' })).toBeEnabled();
+});
+it('shows persisted channel and key cooldown states for read-only users', async () => {
+  permissions.readOnly = true;
+  const data = withProviders();
+  mocked.mockResolvedValue({ ...data, scanners: [{ ...data.scanners[0], providers: [{ ...data.scanners[0].providers[0], cooldown_until: settings.scanners[0].checked_at + 60000, last_error: 'HTTP 503 upstream unavailable', keys: [{ ...data.scanners[0].providers[0].keys[0], cooldown_until: settings.scanners[0].checked_at + 120000, last_error: 'HTTP 429 limited' }] }] }] });
+  show();
+  expect(await screen.findByText('渠道冷却')).toBeInTheDocument();
+  expect(screen.getByText(/HTTP 429 limited/)).toBeInTheDocument();
+  expect(screen.getByText(/HTTP 503 upstream unavailable/)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '编辑监听配置' })).not.toBeInTheDocument();
 });

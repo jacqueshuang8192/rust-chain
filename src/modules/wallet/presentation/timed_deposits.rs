@@ -84,6 +84,8 @@ pub struct DepositPage<T> {
 
 #[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
 pub struct ScannerView {
+    #[sqlx(skip)]
+    pub providers: Vec<ScannerProviderView>,
     pub network: String,
     pub enabled: bool,
     pub endpoint_configured: bool,
@@ -142,6 +144,7 @@ pub struct DepositPlatformAsset {
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SaveScanner {
+    pub providers: Option<Vec<SaveScannerProvider>>,
     pub enabled: bool,
     pub endpoint: Option<String>,
     pub api_key: Option<String>,
@@ -207,4 +210,64 @@ pub struct ReceiptView {
     pub review_reason: Option<String>,
     pub order_id: Option<u64>,
     pub review_note: Option<String>,
+}
+
+/// 渠道与凭据仅公开配置标志和健康快照，禁止回显密文或含密钥 URL。
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
+pub struct ScannerProviderView {
+    pub id: u64,
+    pub network: String,
+    pub name: String,
+    pub priority: u32,
+    pub enabled: bool,
+    pub request_interval_ms: u32,
+    #[serde(with = "option_unix_millis")]
+    #[schema(value_type = Option<i64>)]
+    pub cooldown_until: Option<DateTime<Utc>>,
+    pub last_error: Option<String>,
+    #[serde(with = "option_unix_millis")]
+    #[schema(value_type = Option<i64>)]
+    pub last_success_at: Option<DateTime<Utc>>,
+    #[sqlx(skip)]
+    pub keys: Vec<ScannerKeyView>,
+}
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
+pub struct ScannerKeyView {
+    pub id: u64,
+    pub provider_id: u64,
+    pub name: String,
+    pub priority: u32,
+    pub enabled: bool,
+    pub api_key_configured: bool,
+    pub request_interval_ms: u32,
+    #[serde(with = "option_unix_millis")]
+    #[schema(value_type = Option<i64>)]
+    pub cooldown_until: Option<DateTime<Utc>>,
+    pub last_error: Option<String>,
+    #[serde(with = "option_unix_millis")]
+    #[schema(value_type = Option<i64>)]
+    pub last_success_at: Option<DateTime<Utc>>,
+}
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SaveScannerProvider {
+    pub id: Option<u64>,
+    pub name: String,
+    pub priority: u32,
+    pub enabled: bool,
+    pub endpoint: Option<String>,
+    pub request_interval_ms: u32,
+    pub keys: Vec<SaveScannerKey>,
+}
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SaveScannerKey {
+    pub id: Option<u64>,
+    pub name: String,
+    pub priority: u32,
+    pub enabled: bool,
+    pub api_key: Option<String>,
+    #[serde(default)]
+    pub clear_api_key: bool,
+    pub request_interval_ms: u32,
 }

@@ -14,6 +14,26 @@ async fn timed_deposit_openapi_preserves_decimal_text_and_protected_routes() {
     }
     let schemas = &doc["components"]["schemas"];
     assert_eq!(
+        schemas["ScannerView"]["properties"]["providers"]["type"],
+        "array"
+    );
+    assert!(
+        schemas["SaveScanner"]["properties"]
+            .get("providers")
+            .is_some()
+    );
+    for name in ["ScannerProviderView", "ScannerKeyView"] {
+        assert!(schemas[name]["properties"].get("cooldown_until").is_some());
+        for secret in [
+            "endpoint",
+            "endpoint_encrypted",
+            "api_key",
+            "api_key_encrypted",
+        ] {
+            assert!(schemas[name]["properties"].get(secret).is_none());
+        }
+    }
+    assert_eq!(
         schemas["ScannerView"]["properties"]["scan_fresh"]["type"],
         "boolean"
     );

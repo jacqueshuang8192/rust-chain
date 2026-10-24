@@ -11,7 +11,7 @@ retired in this test environment. No signing, custody or sweeps.
 
 - Migrations `0158_timed_chain_deposits.sql`, `0159_timed_deposit_text_identity.sql`,
   `0160_independent_recharge_addresses.sql` and
-  `0161_timed_deposit_cancellation.sql`. The shared table owns its IDs;
+  `0161_timed_deposit_cancellation.sql` and `0162_deposit_scanner_providers.sql`. The shared table owns its IDs;
   existing order references are preserved without legacy inventory inserts.
 - Tables: `wallet_deposit_scanners`, `wallet_deposit_chain_assets`,
   `wallet_deposit_shared_addresses`, `wallet_deposit_orders`, `wallet_deposit_receipts`.
@@ -25,7 +25,7 @@ retired in this test environment. No signing, custody or sweeps.
 - Lists use `limit` (1..100), `offset`, `status`, `network`, `asset_symbol`,
   exact `order_no`. Receipt order filters refer to its associated candidate/order.
 - Worker: `workers::timed_deposits::run_loop`, 3-second scheduling, persisted
-  60-second leases, revision fencing, 45-second rounds, up to 32 heights/round.
+  60-second leases, revision fencing, 45-second rounds, up to 32 heights/round, reduced according to configured request spacing.
 
 ## 3. Contracts
 
@@ -140,6 +140,54 @@ order admission. RPC errors do not advance the cursor; replayed completed events
 are idempotent. Reorganization recovery requires reconciliation and a reviewed
 checkpoint repair; there is no UI button silently skipping blocks.
 
+### Provider failover and durable rate control
+
+`SaveScanner.providers?: SaveScannerProvider[]` atomically replaces the network's
+provider/key configuration under the existing network revision/lock and audit.
+Each provider has stable optional ID, name, enabled flag, priority 0..1000,
+HTTP endpoint (blank keeps encrypted value), request_interval_ms 100..2000,
+and 1..10 key slots. Each key has stable optional ID, name, enabled, priority,
+request_interval_ms, optional secret and explicit clear_api_key. One network
+supports 1..10 providers. IDs must belong to the edited network/provider and
+must not repeat. An enabled provider needs an enabled slot. A keyless public
+endpoint still has one enabled slot with no secret.
+
+`ScannerView.providers` is required in settings responses. Provider/key snapshots
+expose cooldown_until, last_error and last_success_at, but never endpoint or
+secret values. Both frontend and backend must ship together. Migration 0162
+copies existing ciphertexts into a default provider/key, leaving checkpoints
+and historical orders unchanged. Legacy single-node writes cannot overwrite a
+multi-provider/key pool. The scanner's existing encrypted endpoint column remains
+an admission/settlement presence projection; runtime reads the normalized tables.
+
+Templates may contain one `{API_KEY}` in URL path/query, never authority. Runtime
+URL-encodes the selected key and omits the header; non-template endpoints retain
+TRON-PRO-API-KEY/Bearer behavior. Every new provider attempt verifies chain identity,
+asset decimals and the persisted block hash. Only transport/provider protocol
+failures permit automatic retry: chain-identity, continuity and financial errors
+remain network-level stops rather than being hidden by a different source.
+
+Primary/backup order is provider priority/ID then key priority/ID. A round makes
+at most four attempts within its existing 45-second deadline (35 seconds per
+attempt). 401/429 cool down the selected key; connection, 403, server, malformed
+JSON and application/RPC failures cool down the provider. 429 accepts numeric or
+HTTP-date Retry-After, with 60 seconds minimum and seven days maximum; other
+minimums are 300 seconds for access rejection and 30 seconds for connection/server
+errors. Repeated failures back off exponentially. Success resets only the selected
+key/provider; other cooling keys retain their state. Configuration saves without
+new credentials preserve cooldowns; explicit credential replacement resets the
+corresponding stored failure state.
+
+Before every HTTP request, the gate verifies network revision and live lease,
+locks provider then key, reserves the later of their persisted next-request times,
+and updates both deadlines. Sleep occurs outside the transaction; eligibility is
+checked again before sending. Response completion extends both persisted deadlines
+by the configured interval, preventing scheduling/DB latency from consuming the
+reserved gap before the request actually arrives. Different workers cannot reset request pacing or
+cooldowns on restart. Failed rounds do not advance checkpoints; receipts already
+observed remain idempotent. All candidates cooling/unavailable closes admission;
+there is no unauthenticated fallback or cursor skip.
+
 ### Scanner HTTP diagnostics
 
 `Node::post_operation(path: &'static str, operation: &'static str, body: Value)`
@@ -182,6 +230,11 @@ No HTTP failure advances the cursor or marks the scanner ready.
 | Node HTTP 404 / 405 | Preserve status/operation; base URL and method-check hint |
 | Node HTTP 429 / 5xx / 3xx | Rate/quota / upstream availability / final API URL hint; no redirect |
 | Transport failure | Safe timeout/connect/send category; no raw URL or error |
+| Main key 429, backup key 401, next key healthy | Persist isolated cooldowns; validated backup initializes/continues same checkpoint |
+| All providers cooling/failing | No additional node requests; preserve cursor; network error closes admission |
+| Existing provider/key saved with blank secrets | Retain encrypted values and cooldown state |
+| Cross-network provider ID / cross-provider key ID | Reject and roll back entire configuration/audit |
+| Provider URL template and enabled empty key | Reject; no anonymous fallback |
 
 ## 5. Good / Base / Bad Cases
 
@@ -203,6 +256,11 @@ No HTTP failure advances the cursor or marks the scanner ready.
   direct import atomicity/duplicates, cross-network independence, legacy allowlist
   independence, and disabled-admission scanning/settlement with revision fencing.
 - Cancellation: owner isolation, repeat/replay, unchanged windows, immediate reuse, late/reused ambiguity, observed/review/expired rejection and concurrent scan/cancel; verify ledger unchanged on cancel and one entry after repeated manual credit.
+- Provider DB fixtures: upgrade from 0161 with ciphertext preservation, migrations
+  twice, 429/Retry-After and 401 key failover, pacing, cross-round cooldown,
+  all-unavailable cursor preservation, blank-secret preservation, ownership rollback
+  and secret-free settings/audit. Browser exercises actual API saves and responsive
+  provider/key editors. Independent providers do not guarantee account quota.
 - HTTP fixtures: preserve status/operation for 401/403/404/405/429/5xx/3xx;
   assert TRON-PRO-API-KEY header and successful JSON remain intact, diagnostic
   length fits persistence, secrets/body/Location/parameters stay absent, and

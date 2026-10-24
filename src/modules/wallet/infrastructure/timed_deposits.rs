@@ -1,6 +1,7 @@
 //! 限时订单、监听配置与链上证据持久化，资金变更复用原钱包入账事务。
 
 pub(crate) mod orders;
+pub(crate) mod providers;
 pub(crate) mod scanners;
 pub(crate) mod settings;
 pub(crate) mod settlement;

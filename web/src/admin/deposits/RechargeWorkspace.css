@@ -53,3 +53,13 @@
   .deposit-review-sheet dl > div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .deposit-review-sheet .semi-space { width: 100%; }
 }
+
+.deposit-provider-draft { min-width: 0; padding: 16px; border: 1px solid var(--semi-color-border); border-radius: 8px; display: grid; gap: 12px; }
+.deposit-provider-draft legend { padding: 0 6px; font-weight: 600; }
+.deposit-provider-fields { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+.deposit-key-draft { padding: 12px; background: var(--semi-color-fill-0); border-radius: 6px; display: grid; gap: 10px; min-width: 0; }
+.deposit-provider-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.deposit-provider-status { list-style: none; padding: 0; display: grid; gap: 12px; }
+.deposit-provider-status > li { border-top: 1px solid var(--semi-color-border); padding-top: 12px; overflow-wrap: anywhere; }
+.deposit-key-status { margin: 8px 0; padding-left: 12px; border-left: 2px solid var(--semi-color-border); }
+@media (max-width: 600px) { .deposit-provider-fields { grid-template-columns: 1fr; } .deposit-provider-draft { padding: 10px; } }

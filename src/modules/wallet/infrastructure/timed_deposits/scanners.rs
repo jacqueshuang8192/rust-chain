@@ -2,6 +2,7 @@
 
 mod bitcoin;
 mod evm;
+mod provider_runtime;
 mod solana;
 mod tron;
 
@@ -25,8 +26,6 @@ const TRANSFER_TOPIC: &str = "ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628
 #[derive(sqlx::FromRow)]
 struct ScannerConfig {
     network: String,
-    endpoint_encrypted: Option<String>,
-    api_key_encrypted: Option<String>,
     confirmations: u32,
     revision: u64,
     cursor_json: Option<Json<Cursor>>,
@@ -43,6 +42,7 @@ struct Node {
     endpoint: String,
     api_key: Option<String>,
     client: reqwest::Client,
+    gate: Option<provider_runtime::Gate>,
 }
 struct Context {
     network: String,
@@ -59,7 +59,7 @@ struct Block {
 
 /// 各网络独立认领持久租约并并行读取；单网失败记录脱敏原因，其他网络继续，未处理完绝不推进游标。
 pub(crate) async fn run_once(pool: &Pool<MySql>, key: Option<&str>) -> AppResult<u64> {
-    let configs=sqlx::query_as::<_,ScannerConfig>("SELECT network,endpoint_encrypted,api_key_encrypted,confirmations,revision,cursor_json FROM wallet_deposit_scanners WHERE endpoint_encrypted IS NOT NULL ORDER BY network").fetch_all(pool).await?;
+    let configs=sqlx::query_as::<_,ScannerConfig>("SELECT network,confirmations,revision,cursor_json FROM wallet_deposit_scanners WHERE endpoint_encrypted IS NOT NULL ORDER BY network").fetch_all(pool).await?;
     let results = stream::iter(
         configs
             .into_iter()
@@ -86,9 +86,12 @@ async fn run_network(
     if claim.rows_affected() != 1 {
         return Ok(0);
     }
-    let result = tokio::time::timeout(Duration::from_secs(45), scan(pool, key, &config))
-        .await
-        .unwrap_or_else(|_| Err(failure("scanner round timed out")));
+    let result = tokio::time::timeout(
+        Duration::from_secs(45),
+        provider_runtime::scan_available(pool, key, &config, &token),
+    )
+    .await
+    .unwrap_or_else(|_| Err(failure("scanner round timed out")));
     match result {
         Ok((cursor, count, caught_up)) => {
             sqlx::query("UPDATE wallet_deposit_scanners SET cursor_json=?,last_scan_at=IF(?,CURRENT_TIMESTAMP(6),last_scan_at),last_error=NULL,lease_token=NULL,lease_until=NULL WHERE network=? AND revision=? AND lease_token=?")
@@ -112,23 +115,9 @@ async fn run_network(
 
 async fn scan(
     pool: &Pool<MySql>,
-    key: Option<&str>,
     config: &ScannerConfig,
+    node: &Node,
 ) -> AppResult<(Cursor, u64, bool)> {
-    let key = key.ok_or_else(|| failure("credential encryption key is missing"))?;
-    let endpoint = decrypt_optional_secret(config.endpoint_encrypted.as_deref(), key)?
-        .ok_or_else(|| failure("scanner endpoint is missing"))?;
-    let api_key = decrypt_optional_secret(config.api_key_encrypted.as_deref(), key)?;
-    let node = Node {
-        network: config.network.clone(),
-        endpoint,
-        api_key,
-        client: reqwest::Client::builder()
-            .timeout(Duration::from_secs(20))
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .map_err(|_| failure("scanner HTTP client initialization failed"))?,
-    };
     let assets=sqlx::query_as::<_,(u64,String,String,String,i32)>("SELECT id,asset_symbol,asset_kind,token_address,decimals FROM wallet_deposit_chain_assets c WHERE network=? AND (enabled=TRUE OR EXISTS(SELECT 1 FROM wallet_deposit_orders o WHERE o.chain_asset_id=c.id)) ORDER BY id")
         .bind(&config.network).fetch_all(pool).await?.into_iter().map(|(id,asset_symbol,asset_kind,token_address,decimals)|ChainAsset{id,asset_symbol,asset_kind,token_address,decimals}).collect::<Vec<_>>();
     let historic:u32=sqlx::query_scalar("SELECT required_confirmations FROM wallet_deposit_orders WHERE network=? AND status<>'credited' ORDER BY required_confirmations DESC LIMIT 1").bind(&config.network).fetch_optional(pool).await?.unwrap_or(1);
@@ -189,7 +178,9 @@ async fn scan(
             "confirmed chain reorganization detected; reconcile deposits before recovery",
         ));
     }
-    let end = safe.min(cursor.height.saturating_add(32));
+    let interval = node.gate.as_ref().map_or(250, |gate| gate.interval());
+    let batch = (12_000 / (u64::from(interval) * 4)).clamp(1, 32);
+    let end = safe.min(cursor.height.saturating_add(batch));
     if end <= cursor.height {
         return Ok((cursor, 0, true));
     }
@@ -235,10 +226,29 @@ impl Node {
         operation: &'static str,
         body: Value,
     ) -> AppResult<Value> {
+        if let Some(gate) = &self.gate {
+            gate.acquire().await?;
+        }
+        let result = self.send_operation(path, operation, body).await;
+        if let Some(gate) = &self.gate {
+            gate.completed().await?;
+        }
+        result
+    }
+
+    async fn send_operation(
+        &self,
+        path: &'static str,
+        operation: &'static str,
+        body: Value,
+    ) -> AppResult<Value> {
         let url = if path.is_empty() {
             self.endpoint.clone()
         } else {
-            format!("{}{path}", self.endpoint.trim_end_matches('/'))
+            let mut endpoint = url::Url::parse(&self.endpoint)
+                .map_err(|_| failure("invalid provider endpoint"))?;
+            endpoint.set_path(&format!("{}{path}", endpoint.path().trim_end_matches('/')));
+            endpoint.to_string()
         };
         let mut request = self
             .client
@@ -252,18 +262,40 @@ impl Node {
                 request.bearer_auth(key)
             };
         }
-        let mut response = request.send().await.map_err(|error| {
-            let hint = if error.is_timeout() {
-                "请求超时，请检查节点响应与服务器网络"
-            } else if error.is_connect() {
-                "连接失败，请检查 DNS、TLS 与服务器网络"
-            } else {
-                "请求发送失败，请检查节点地址与凭据格式"
-            };
-            failure(&format!("{} {operation}：{hint}", self.network))
-        })?;
+        let mut response = match request.send().await {
+            Ok(response) => response,
+            Err(error) => {
+                let hint = if error.is_timeout() {
+                    "请求超时，请检查节点响应与服务器网络"
+                } else if error.is_connect() {
+                    "连接失败，请检查 DNS、TLS 与服务器网络"
+                } else {
+                    "请求发送失败，请检查节点地址与凭据格式"
+                };
+                let message = format!("{} {operation}：{hint}", self.network);
+                if let Some(gate) = &self.gate {
+                    gate.failed(&message, true, 30).await?;
+                }
+                return Err(failure(&message));
+            }
+        };
         if !response.status().is_success() {
-            return Err(self.http_failure(operation, response.status()));
+            let error = self.http_failure(operation, response.status());
+            if let Some(gate) = &self.gate {
+                let status = response.status().as_u16();
+                let seconds = if status == 429 {
+                    provider_runtime::retry_after(
+                        response.headers().get(reqwest::header::RETRY_AFTER),
+                    )
+                } else if status == 401 || status == 403 {
+                    300
+                } else {
+                    30
+                };
+                gate.failed(&error.to_string(), !matches!(status, 401 | 429), seconds)
+                    .await?;
+            }
+            return Err(error);
         }
         if response
             .content_length()
@@ -272,19 +304,38 @@ impl Node {
             return Err(failure("chain node response exceeds size limit"));
         }
         let mut bytes = Vec::new();
-        while let Some(chunk) = response
-            .chunk()
-            .await
-            .map_err(|_| failure("chain node response read failed"))?
-        {
+        loop {
+            let chunk = match response.chunk().await {
+                Ok(Some(chunk)) => chunk,
+                Ok(None) => break,
+                Err(_) => {
+                    if let Some(gate) = &self.gate {
+                        gate.failed("节点响应读取失败，等待备用渠道", true, 30)
+                            .await?;
+                    }
+                    return Err(failure("chain node response read failed"));
+                }
+            };
             if bytes.len().saturating_add(chunk.len()) > 64 * 1024 * 1024 {
                 return Err(failure("chain node response exceeds size limit"));
             }
             bytes.extend_from_slice(&chunk);
         }
-        let value: Value = serde_json::from_slice(&bytes)
-            .map_err(|_| failure("chain node returned invalid JSON"))?;
+        let value: Value = match serde_json::from_slice(&bytes) {
+            Ok(value) => value,
+            Err(_) => {
+                if let Some(gate) = &self.gate {
+                    gate.failed("节点返回无效 JSON，请检查节点接口", true, 60)
+                        .await?;
+                }
+                return Err(failure("chain node returned invalid JSON"));
+            }
+        };
         if value.get("Error").is_some() {
+            if let Some(gate) = &self.gate {
+                gate.failed("节点返回应用错误，请检查渠道权限和额度", true, 60)
+                    .await?;
+            }
             return Err(failure("chain node returned an application error"));
         }
         Ok(value)
@@ -304,7 +355,12 @@ impl Node {
             300..=399 => "节点返回重定向，请填写最终 API 地址；监听器不会转发凭据到重定向地址",
             _ => "节点拒绝请求，请检查节点配置和服务商控制台",
         };
-        let credential = if self.api_key.is_some() {
+        let credential = if self.api_key.is_some()
+            || self
+                .gate
+                .as_ref()
+                .is_some_and(|gate| gate.credential_configured)
+        {
             "已配置"
         } else {
             "未配置"
@@ -325,6 +381,14 @@ impl Node {
             )
             .await?;
         if !response["error"].is_null() {
+            if let Some(gate) = &self.gate {
+                gate.failed(
+                    &format!("RPC 方法 {method} 失败，请检查渠道权限和额度"),
+                    true,
+                    60,
+                )
+                .await?;
+            }
             return Err(failure(&format!("chain RPC method {method} failed")));
         }
         response
