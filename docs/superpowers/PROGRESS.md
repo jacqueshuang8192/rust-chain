@@ -10265,3 +10265,10 @@
 - 修改文件：本轮充值编辑器、预设、测试及 CSS；`web/src/shared/SemiFormControls.tsx`（仅可选 motion 透传）；`.trellis/spec/admin/ui-system.md`、使用说明及任务交付记录。
 - 验证结果：最终 Web 125 文件 1182/1182、typecheck、lint、production-policy、coverage、build通过；Ego 真实 HTTP + 隔离 MySQL 验证 TRC20 保存、节点草稿与占位符、连续切换及桌面/390/320 布局和取消。包体 2,754,677 bytes，较前轮 +5,251 bytes，既有 2,600,000 门槛仍失败，未放宽。diff及任务校验通过。
 - 后续事项：仅保存本地提交，未推送或部署；实际密钥权限、节点持续监听及实链到账未验证，需运营填入真实密钥与地址后验收。
+
+## 2026-10-24 14:31 - 主网充值预设推送远程
+
+- 完成内容：按用户要求将主网充值预设及归档记录推送至 origin/main，功能提交 `8e6271a`，交付记录提交 `b8b89cb`。
+- 修改文件：`docs/superpowers/PROGRESS.md`（推送记录）；无新增业务改动。
+- 验证结果：fetch 后远程无新增提交，本地领先 3 个提交；git diff --check 通过，git push origin main 成功。沿用本轮 1182 项测试及构建验证，既有包体超限仍保留。
+- 后续事项：无待推送功能；未部署，真实节点密钥及实链到账仍需环境验收。
