@@ -10300,3 +10300,10 @@
 - 修改文件：`web/src/admin/deposits/`、`web/src/shared/ConfirmAction.tsx`及测试、钱包充值 settings/presentation 与后端测试、`.trellis/spec/admin/ui-system.md`、`.trellis/spec/backend/timed-deposits.md`、`docs/superpowers/timed-chain-deposits.md`及本任务记录。
 - 验证结果：最终 Web 126 文件1190/1190、typecheck、lint、build通过；policy15/15、coverage门槛通过；真实MySQL1/1、架构11/11、OpenAPI20/20、clippy和fmt通过。Ego真实API验证五网切换、服务商密钥草稿、ready/stale/暂停区分、320px编辑取消；1728/390/320无横溢并已查看截图。JS包体2,760,903 bytes，较上轮+6,226 bytes，既有2,600,000门槛仍失败且未放宽；diff与任务校验通过。
 - 后续事项：保存本地提交并归档，未推送或部署；前后端需同版发布，真实节点权限、持续扫描与实链到账尚未验证。
+
+## 2026-10-24 19:41 - 链上充值扫描配置远程交付
+
+- 完成内容：按用户授权将链上充值扫描配置功能提交 `d6f645a`、归档及会话记录纳入本次 origin/main 推送。
+- 修改文件：`docs/superpowers/PROGRESS.md`；无新增业务改动。
+- 验证结果：fetch 确认远程无新提交，本地领先 3 个提交；沿用最终 Web 1190/1190、类型/lint/build、相关后端与浏览器验收结果；既有包体超限保留。推送前执行 diff 检查，推送后核对远程 SHA。
+- 后续事项：GitHub workflow 运行及部署结果待验证；前后端需同版发布，真实节点与实链到账仍需环境验收。
