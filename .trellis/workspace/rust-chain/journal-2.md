@@ -837,3 +837,36 @@ Added draft-only Ethereum, TRC20 and Solana node/asset presets with issuer ident
 ### Next Steps
 
 - None - task complete
+
+
+## Session 84: Docker artifact quota fix
+
+**Date**: 2026-10-24
+**Task**: Docker artifact quota fix
+**Branch**: `main`
+
+### Summary
+
+Replaced artifact digest exchange with unique matrix job outputs and disabled optional build-record artifacts. Python 24, Docker contracts 10, integrity gate, YAML, shellcheck and actionlint passed. Remote run API unavailable (404); no push or remote cleanup.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `240d474` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
