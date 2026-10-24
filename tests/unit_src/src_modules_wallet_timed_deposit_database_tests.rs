@@ -778,3 +778,47 @@ async fn timed_deposit_database_reservations_and_accounting() {
     sqlx::query("UPDATE deposit_network_configs SET status='active',asset_symbols_json=NULL WHERE network='eth'").execute(&pool).await.unwrap();
     pool.close().await;
 }
+
+#[tokio::test]
+async fn timed_deposit_settings_expose_real_scan_snapshot_without_credentials() {
+    let Ok(url) = std::env::var("TIMED_DEPOSIT_TEST_DATABASE_URL") else {
+        eprintln!("SKIPPED: isolated MySQL is required for scanner settings validation");
+        return;
+    };
+    assert!(url.contains("127.0.0.1") && url.contains("timed_deposits_test"));
+    let pool = MySqlPoolOptions::new()
+        .max_connections(2)
+        .connect(&url)
+        .await
+        .unwrap();
+    sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+    sqlx::query("UPDATE wallet_deposit_scanners SET endpoint_encrypted='hidden-node-secret',api_key_encrypted='hidden-api-secret',last_scan_at=NULL,last_error=NULL,cursor_json=NULL WHERE network='base'").execute(&pool).await.unwrap();
+    let first = settings::load(&pool).await.unwrap();
+    let node = first.scanners.iter().find(|s| s.network == "base").unwrap();
+    assert!(node.endpoint_configured && node.api_key_configured);
+    assert!(!node.scan_fresh);
+    assert_eq!(node.cursor_height, None);
+    let json = serde_json::to_string(&first).unwrap();
+    assert!(!json.contains("hidden-node-secret") && !json.contains("hidden-api-secret"));
+    assert!(!json.contains("endpoint_encrypted") && !json.contains("api_key_encrypted"));
+    sqlx::query("UPDATE wallet_deposit_scanners SET last_scan_at=CURRENT_TIMESTAMP(6),cursor_json=JSON_OBJECT('height',30000000,'hash_height',29999999,'hash','fixture-block') WHERE network='base'").execute(&pool).await.unwrap();
+    let data = settings::load(&pool).await.unwrap();
+    let node = data.scanners.iter().find(|s| s.network == "base").unwrap();
+    assert!(node.scan_fresh);
+    assert_eq!(node.cursor_height, Some(30_000_000));
+    assert!(node.checked_at >= node.last_scan_at.unwrap());
+    sqlx::query("UPDATE wallet_deposit_scanners SET last_scan_at=DATE_SUB(CURRENT_TIMESTAMP(6),INTERVAL 121 SECOND),last_error='fixture error' WHERE network='base'").execute(&pool).await.unwrap();
+    let data = settings::load(&pool).await.unwrap();
+    let node = data.scanners.iter().find(|s| s.network == "base").unwrap();
+    assert!(!node.scan_fresh);
+    assert_eq!(node.last_error.as_deref(), Some("fixture error"));
+    assert_eq!(node.cursor_height, Some(30_000_000));
+    let persisted: Option<sqlx::types::Json<serde_json::Value>> =
+        sqlx::query_scalar("SELECT cursor_json FROM wallet_deposit_scanners WHERE network='base'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert_eq!(persisted.unwrap().0["hash"], "fixture-block");
+    sqlx::query("UPDATE wallet_deposit_scanners SET endpoint_encrypted=NULL,api_key_encrypted=NULL,last_scan_at=NULL,last_error=NULL,cursor_json=NULL WHERE network='base'").execute(&pool).await.unwrap();
+    pool.close().await;
+}

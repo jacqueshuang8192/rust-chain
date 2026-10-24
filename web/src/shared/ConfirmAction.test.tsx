@@ -84,3 +84,18 @@ describe('ConfirmAction', () => {
   });
 
 });
+
+it('reports modal lifetime so parents can pause refresh through failures', async () => {
+  const user = userEvent.setup(); const opened = vi.fn(); const action = vi.fn().mockRejectedValueOnce(new Error('retry')).mockResolvedValue(undefined);
+  render(<ConfirmAction actionText="保存设置" title="配置确认" onOpenChange={opened} onConfirm={action} />);
+  await user.click(screen.getByRole('button', { name: '保存设置' }));
+  expect(opened.mock.calls).toEqual([[true]]);
+  await user.type(screen.getByLabelText('操作原因'), 'reviewed');
+  await user.click(screen.getByRole('button', { name: '确认' }));
+  await screen.findByRole('alert'); expect(opened.mock.calls).toEqual([[true]]);
+  await user.click(screen.getByRole('button', { name: '确认' }));
+  await waitFor(() => expect(opened.mock.calls).toEqual([[true], [false]]));
+  await user.click(screen.getByRole('button', { name: '保存设置' }));
+  await user.click(screen.getByRole('button', { name: '取消' }));
+  expect(opened.mock.calls).toEqual([[true], [false], [true], [false]]);
+});

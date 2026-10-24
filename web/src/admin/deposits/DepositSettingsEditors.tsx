@@ -38,6 +38,7 @@ export function ScannerForm({ scanner, dirty, busy, setBusy, saved }: CommonProp
   const [apiKey, setApiKey] = useState('');
   const [confirmations, setConfirmations] = useState(String(scanner.confirmations));
   const [presetId, setPresetId] = useState('');
+  const [providerKey, setProviderKey] = useState('');
   const presets = nodePresets.filter(row => row.network === scanner.network);
   const preset = presets.find(row => row.id === presetId);
   const count = parseSafeInteger(confirmations, 1, 10000);
@@ -46,16 +47,19 @@ export function ScannerForm({ scanner, dirty, busy, setBusy, saved }: CommonProp
     {presets.length ? <div className="deposit-preset">
       <label id="node-preset-label">主网节点预设</label>
       <AdminSelect motion={false} ariaLabel="主网节点预设" ariaLabelledBy="node-preset-label" disabled={busy} value={presetId} optionList={[{ value: '', label: '手动配置 / 保留已有节点' }, ...presets.map(row => ({ value: row.id, label: row.label }))]} onChange={value => {
-        setPresetId(value);
+        setPresetId(value); setProviderKey('');
         const next = presets.find(row => row.id === value);
         if (next) { dirty(); setEndpoint(next.endpoint); setConfirmations(String(next.confirmations)); }
       }} />
       <p className="muted">选择后只填入节点地址和确认深度，可继续编辑；不会自动保存或切换接单状态。已有节点在确认保存后才被替换，密钥框留空仍保留原值。</p>
+      {preset?.endpoint.includes('{API_KEY}') ? <label>服务商 API Key<AdminPasswordInput ariaLabel="服务商 API Key" disabled={busy} value={providerKey} placeholder="填写后自动生成节点地址" onChange={value => {
+        dirty(); setProviderKey(value); setEndpoint(preset.endpoint.replace('{API_KEY}', value.trim() ? encodeURIComponent(value.trim()) : '{API_KEY}'));
+      }} /><span className="muted">只用于当前预设的 URL 鉴权，保存时随节点地址加密；切换预设会清空此输入。</span></label> : null}
       {preset ? <><p>{preset.note}</p><a href={preset.source} target="_blank" rel="noopener noreferrer">查看节点官方说明</a></> : null}
     </div> : null}
     <fieldset disabled={busy}>
       <label className="deposit-switch-row">接受新充值订单<Switch aria-label="接受新充值订单" disabled={busy} checked={enabled} onChange={value => { dirty(); setEnabled(value); }} /></label>
-      <label>监听节点地址<AdminPasswordInput ariaLabel="监听节点地址" value={endpoint} onChange={value => { dirty(); setEndpoint(value); }} /></label>
+      <label>监听节点地址<AdminPasswordInput ariaLabel="监听节点地址" value={endpoint} onChange={value => { dirty(); setPresetId(''); setProviderKey(''); setEndpoint(value); }} /></label>
       <p className="muted">{scanner.endpoint_configured ? '节点地址已配置，留空保留原值。' : '尚未配置节点地址。'} 密钥内容不会回显。</p>
       <label>节点 API 密钥<AdminPasswordInput ariaLabel="节点 API 密钥" value={apiKey} onChange={value => { dirty(); setApiKey(value); }} /></label>
       <p className="muted">{scanner.api_key_configured ? 'API 密钥已配置。' : 'API 密钥未配置。'} 留空保留原值。</p>

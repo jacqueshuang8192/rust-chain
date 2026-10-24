@@ -96,6 +96,16 @@ This minimal catalog is available under `wallet.networks.read` without
 `assets.read`; it contains no management-only asset fields. The full frontend
 contract requires the catalog, while address-only reads stay address-only.
 
+Each settings `ScannerView` also requires `scan_fresh: boolean`,
+`cursor_height: u64 | null` and `checked_at: UTC milliseconds`. Freshness uses
+`last_scan_at > CURRENT_TIMESTAMP(6) - INTERVAL 120 SECOND` in MySQL, matching
+order admission; null scan time is false. Read height from persisted
+`cursor_json.height` (Solana uses slots). The snapshot read never probes nodes,
+advances cursors or reveals credentials. A fresh timestamp alone does not prove
+admission: endpoint, null error, network switch, asset flags and addresses still
+matter. Ship backend and admin together; the strict client rejects missing or
+invalid snapshot fields rather than inventing health from its local clock.
+
 Permissions: `wallet.networks` for settings/mappings, `wallet.address_pool` for
 shared-address reads/writes, `wallet.deposits` for orders/evidence, `.review` for review.
 
@@ -134,6 +144,8 @@ checkpoint repair; there is no UI button silently skipping blocks.
 | Evidence identity changes | Stop and reconcile; retain original evidence |
 | Review lacks matching identity/confirmation | Reject; rollback all financial writes |
 | Cursor missing with historical orders | Pause; require explicit recovery |
+| Settings timestamp is null/stale | `scan_fresh=false`; no healthy UI label |
+| Settings read | Return persisted height and DB check time; no cursor mutation |
 
 ## 5. Good / Base / Bad Cases
 
@@ -143,6 +155,8 @@ checkpoint repair; there is no UI button silently skipping blocks.
   belongs to the original order when its combination has no unresolved history.
 - Bad: automatically credit user B after user A's unpaid 100-token order expires
   and the same combination is reused, without proving who paid.
+- Base: a configured endpoint with no completed scan shows waiting; a fresh
+  successful scanner with admission disabled stays caught up but cannot accept orders.
 
 ## 6. Tests Required
 
@@ -161,6 +175,9 @@ checkpoint repair; there is no UI button silently skipping blocks.
 - Admin: exact preview, immutable revision, secret omission, explicit target/reason,
   failed drafts retained, direct import preview, address-only permissions and
   selected-network retention after save. No mock proves live-chain receipt.
+- Settings snapshot: real MySQL null/fresh/stale times, unsigned height and DB
+  check time; serialized response excludes both secrets and encrypted fields,
+  and a settings read preserves the cursor hash.
 
 ## 7. Wrong vs Correct
 
@@ -172,3 +189,7 @@ Correct: keep decimal text, create an explicit half-open order, match immutable
 chain evidence against history, quarantine reused unpaid combinations, retain
 checkpoints, and read the unsigned confirmation column with descending LIMIT 1
 plus an application default when no rows exist.
+
+Wrong: show a green receiving status because `enabled=true` or a node URL was
+saved. Correct: display snapshot freshness separately from admission and list
+every unsatisfied network/asset/address prerequisite.

@@ -13,6 +13,19 @@ async fn timed_deposit_openapi_preserves_decimal_text_and_protected_routes() {
     }
     let schemas = &doc["components"]["schemas"];
     assert_eq!(
+        schemas["ScannerView"]["properties"]["scan_fresh"]["type"],
+        "boolean"
+    );
+    assert_eq!(
+        schemas["ScannerView"]["properties"]["checked_at"]["type"],
+        "integer"
+    );
+    assert!(
+        schemas["ScannerView"]["properties"]
+            .get("cursor_height")
+            .is_some()
+    );
+    assert_eq!(
         schemas["CreateDepositOrder"]["properties"]["amount"]["type"],
         "string"
     );

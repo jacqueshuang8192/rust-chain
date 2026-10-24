@@ -91,6 +91,12 @@ pub struct ScannerView {
     #[schema(value_type = Option<i64>)]
     pub last_scan_at: Option<DateTime<Utc>>,
     pub last_error: Option<String>,
+    /// 数据库按与用户准入相同的 120 秒窗口判断；仅表示此快照时的追上状态。
+    pub scan_fresh: bool,
+    pub cursor_height: Option<u64>,
+    #[serde(with = "unix_millis")]
+    #[schema(value_type = i64)]
+    pub checked_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]

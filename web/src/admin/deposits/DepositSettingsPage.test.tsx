@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -21,7 +21,7 @@ vi.mock('../access', () => {
   };
 });
 if (!Range.prototype.getBoundingClientRect) Range.prototype.getBoundingClientRect = () => new DOMRect(0, 0, 0, 0);
-const settings = { scanners: [{ network: 'eth', enabled: true, endpoint_configured: true, api_key_configured: true, confirmations: 12, revision: 7, last_scan_at: null, last_error: null }], assets: [], addresses: [], platform_assets: ['ETH', 'USDT', 'USDC', 'DAI', 'SOL'].map(symbol => ({ symbol, status: 'active', deposit_enabled: true, precision_scale: 18 })) };
+const settings = { scanners: [{ network: 'eth', enabled: true, endpoint_configured: true, api_key_configured: true, confirmations: 12, revision: 7, last_scan_at: null, last_error: null, scan_fresh: false, cursor_height: null, checked_at: 1792800000000 }], assets: [], addresses: [], platform_assets: ['ETH', 'USDT', 'USDC', 'DAI', 'SOL'].map(symbol => ({ symbol, status: 'active', deposit_enabled: true, precision_scale: 18 })) };
 const mocked = vi.mocked(apiRequest);
 beforeEach(() => { permissions.addressOnly = false; permissions.readOnly = false; mocked.mockReset(); mocked.mockResolvedValue(settings); });
 afterEach(cleanup);
@@ -246,4 +246,75 @@ it('preserves the selected network after a successful save and validates native 
   await user.click(screen.getByRole('button', { name: '新增监听币种' }));
   expect(screen.getByRole('combobox', { name: '链上资产类型' })).toHaveTextContent('TRC20 代币');
   expect(screen.queryByText('原生币 TRX')).not.toBeInTheDocument();
+});
+
+it('offers permission-aware setup shortcuts and explains unavailable payment methods', async () => {
+  const user = userEvent.setup();
+  const asset = { id: 1, network: 'eth', asset_symbol: 'ETH', asset_kind: 'native', token_address: '', decimals: 18, enabled: true, revision: 1 };
+  mocked.mockResolvedValue({ ...settings, assets: [asset] }); show();
+  expect(await screen.findByText('收款配置指引')).toBeInTheDocument();
+  expect(screen.getByText('可收款支付方式 0 / 1')).toBeInTheDocument();
+  expect(screen.getByText('待处理：缺少启用的收款地址；等待扫描确认')).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: '配置节点' }));
+  expect(screen.getByLabelText('监听节点地址')).toHaveValue('');
+  expect(screen.getByRole('button', { name: '刷新配置与监听状态' })).toBeDisabled();
+});
+
+it('builds a credential URL from the dedicated provider key without putting it in the Bearer field', async () => {
+  const user = userEvent.setup(); show();
+  await user.click(await screen.findByRole('button', { name: '配置节点' }));
+  await choose(user, '主网节点预设', 'Ethereum · Alchemy（需密钥）');
+  await user.type(screen.getByLabelText('服务商 API Key'), 'fixture/a?b');
+  expect(screen.getByLabelText('监听节点地址')).toHaveValue('https://eth-mainnet.g.alchemy.com/v2/fixture%2Fa%3Fb');
+  expect(screen.getByLabelText('节点 API 密钥')).toHaveValue('');
+  expect(mocked.mock.calls.every(([, init]) => !init?.method)).toBe(true);
+  await user.click(screen.getByRole('button', { name: '保存监听配置' }));
+  await user.type(screen.getByRole('textbox', { name: '操作原因' }), '更新节点');
+  await user.click(screen.getByRole('button', { name: '确认' }));
+  await waitFor(() => expect(mocked).toHaveBeenCalledWith('/admin/api/v1/wallet/deposit-settings/scanners/eth', { method: 'PUT', body: JSON.stringify({ enabled: true, endpoint: 'https://eth-mainnet.g.alchemy.com/v2/fixture%2Fa%3Fb', api_key: null, confirmations: 12, expected_revision: 7, reason: '更新节点' }) }));
+});
+
+it('clears provider key when switching presets and cancels without any save', async () => {
+  const user = userEvent.setup();
+  mocked.mockResolvedValue({ ...settings, scanners: [{ ...settings.scanners[0], network: 'solana' }] }); show();
+  await screen.findByRole('combobox', { name: '配置网络' });
+  await choose(user, '配置网络', 'Solana');
+  await user.click(screen.getByRole('button', { name: '配置节点' }));
+  await choose(user, '主网节点预设', 'Solana · Helius（需密钥）');
+  await user.type(screen.getByLabelText('服务商 API Key'), 'first-key');
+  await choose(user, '主网节点预设', 'Solana · 公共主网（测试用）');
+  expect(screen.queryByLabelText('服务商 API Key')).not.toBeInTheDocument();
+  await choose(user, '主网节点预设', 'Solana · Helius（需密钥）');
+  expect(screen.getByLabelText('服务商 API Key')).toHaveValue('');
+  expect(screen.getByRole('button', { name: '保存监听配置' })).toBeDisabled();
+  await user.click(screen.getByRole('button', { name: '取消编辑' }));
+  await user.click(screen.getByRole('button', { name: '放弃草稿' }));
+  expect(mocked.mock.calls.every(([, init]) => !init?.method)).toBe(true);
+});
+
+
+it('refreshes saved state while idle and pauses polling during edits and address confirmation', async () => {
+  const user = userEvent.setup();
+  const interval = vi.spyOn(window, 'setInterval'); const cleared = vi.spyOn(window, 'clearInterval');
+  const latestPoll = () => {
+    const index = interval.mock.calls.map(call => call[1]).lastIndexOf(15000);
+    return { callback: interval.mock.calls[index][0], id: interval.mock.results[index].value };
+  };
+  try {
+    mocked.mockResolvedValue({ ...settings, addresses: [{ pool_id: 3, network: 'eth', address: '0x1111111111111111111111111111111111111111', enabled: true }] }); show();
+    await screen.findByRole('button', { name: '配置节点' });
+    const first = latestPoll(); const calls = mocked.mock.calls.length;
+    await act(async () => { if (typeof first.callback === 'function') first.callback(); });
+    await waitFor(() => expect(mocked.mock.calls.length).toBeGreaterThan(calls));
+    const editingPoll = latestPoll();
+    await user.click(screen.getByRole('button', { name: '配置节点' }));
+    expect(cleared).toHaveBeenCalledWith(editingPoll.id);
+    await user.click(screen.getByRole('button', { name: '取消编辑' }));
+    const addressPoll = latestPoll();
+    await user.click(screen.getByRole('button', { name: '停用地址' }));
+    expect(cleared).toHaveBeenCalledWith(addressPoll.id);
+    expect(screen.getByRole('button', { name: '刷新配置与监听状态' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: '取消' }));
+    expect(screen.getByRole('button', { name: '刷新配置与监听状态' })).toBeEnabled();
+  } finally { cleanup(); interval.mockRestore(); cleared.mockRestore(); }
 });

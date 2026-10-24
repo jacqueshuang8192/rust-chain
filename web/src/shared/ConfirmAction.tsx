@@ -13,12 +13,14 @@ type ConfirmActionProps = {
   description?: string;
   modalWidth?: number | string;
   onConfirm: (reason: string) => Promise<void> | void;
+  /** 通知父页面暂停会改变待确认目标的后台刷新。 */
+  onOpenChange?: (open: boolean) => void;
   /** 允许不填原因直接确认；用于不强制审计说明的操作，例如秒合约控输控赢。 */
   reasonOptional?: boolean;
   title: string;
 };
 
-export function ConfirmAction({ actionAriaLabel, actionText = '执行', confirmText = '确认', dangerous, description, disabled, modalWidth, onConfirm, reasonOptional = false, title }: ConfirmActionProps) {
+export function ConfirmAction({ actionAriaLabel, actionText = '执行', confirmText = '确认', dangerous, description, disabled, modalWidth, onConfirm, onOpenChange, reasonOptional = false, title }: ConfirmActionProps) {
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const [visible, setVisible] = useState(false);
@@ -30,6 +32,7 @@ export function ConfirmAction({ actionAriaLabel, actionText = '执行', confirmT
       return;
     }
     setVisible(false);
+    onOpenChange?.(false);
     setReason('');
     setError('');
   }
@@ -45,6 +48,7 @@ export function ConfirmAction({ actionAriaLabel, actionText = '执行', confirmT
     try {
       await onConfirm(trimmed);
       setVisible(false);
+      onOpenChange?.(false);
       setReason('');
     } catch (cause) {
       // Keep the reason and dialog on a rejected action; do not leak an unhandled Modal promise.
@@ -56,7 +60,7 @@ export function ConfirmAction({ actionAriaLabel, actionText = '执行', confirmT
 
   return (
     <>
-      <Button aria-label={actionAriaLabel} disabled={disabled} onClick={() => setVisible(true)} theme={destructive ? 'light' : 'solid'} type={destructive ? 'danger' : 'primary'}>
+      <Button aria-label={actionAriaLabel} disabled={disabled} onClick={() => { setVisible(true); onOpenChange?.(true); }} theme={destructive ? 'light' : 'solid'} type={destructive ? 'danger' : 'primary'}>
         {actionText}
       </Button>
       <Modal

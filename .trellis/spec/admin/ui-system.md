@@ -1456,6 +1456,29 @@ contract input. Semi Modal action buttons need explicit Chinese aria-labels;
 Select visible labels use aria-labelledby. `接受新充值订单` controls admission, not
 historical scanning; disabling addresses/assets preserves in-flight processing.
 
+The configuration guide orders node access, explicit assets, receiving addresses
+and scan/admission readiness. Each network/asset method lists all blockers:
+disabled mapping, absent/inactive/non-depositable platform asset, paused network,
+no enabled address, or missing/error/waiting/stale scanner. Read `scan_fresh`,
+`cursor_height` and `checked_at` from the strict backend snapshot; never infer
+freshness from browser time or equate the admission switch with scan success.
+Loading/error snapshots show unknown readiness, not stale green status.
+Use `slot` for Solana progress. The setup guide is absent for address-only roles.
+
+Alchemy/Helius presets expose a separate masked provider key input. Trim and
+URL-encode it into the selected template, then save through the existing encrypted
+endpoint API. Do not copy it into the Bearer field. Switching presets clears this
+draft key; manual endpoint edits clear preset selection/key. Placeholder guards,
+explicit save, revision and discard semantics remain mandatory.
+
+Refresh every 15 seconds only for the full settings view while visible and idle.
+Pause during editors, address confirmation dialogs, reads and writes.
+`ConfirmAction.onOpenChange?: (open: boolean) => void` notifies open/cancel/success;
+failed confirmation retains the dialog and paused refresh. Its optional nature
+preserves other call sites. Tests cover pause/resume and failed confirmation.
+Keep the guide at four/two/one columns for desktop/tablet/narrow layouts. Scope
+summary flex rules to its text block; Semi Tag is also a `div` and must not stretch.
+
 Search actual `order_no`; display internal IDs only as labelled action references.
 Review never preselects a candidate as proof of ownership: read an explicit target,
 show actual amount/fee and chain identity, and require a reason. Backend matching

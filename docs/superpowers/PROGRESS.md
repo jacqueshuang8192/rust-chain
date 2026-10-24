@@ -10286,3 +10286,17 @@
 - 修改文件：`docs/superpowers/PROGRESS.md`；无新增业务或 workflow 改动。
 - 验证结果：推送前 fetch 确认远程无新提交、本地领先 3 个提交；沿用本轮 Python 24/24、Rust 10/10、actionlint、shellcheck 与源码完整性验证。
 - 后续事项：推送后核对远程 SHA；新版 workflow 的实际运行与镜像发布结果仍待 GitHub 验证，未清理远程存储或变更计费。
+
+## 2026-10-24 19:06 - 链上充值扫描配置与就绪状态实现
+
+- 完成内容：参考 GMPay Edge 分层配置，增加节点/币种/地址/扫描四步指引与每种支付方式的阻塞原因；返回数据库判断的扫描新鲜度、持久游标高度和检查时间；新增服务商 API Key 草稿生成节点 URL；无编辑时自动刷新，编辑和确认期间暂停。
+- 修改文件：钱包充值 settings/presentation、后台充值页面/编辑器/新增指引与状态模块、ConfirmAction 可选打开状态通知及相应测试。
+- 验证结果：隔离 MySQL 状态/凭据不回传测试通过；Web 全量 1189/1189，补充定向 34/34；架构 11/11、OpenAPI 20/20、clippy、typecheck、lint、policy、coverage、build通过。现有包体门槛仍超限，未放宽。
+- 后续事项：完成真实 API 浏览器桌面与窄屏验收、最终回归和交付文档；未推送或部署。
+
+## 2026-10-24 19:21 - 链上充值扫描配置最终验收
+
+- 完成内容：五网配置指引、支付方式阻塞原因与真实扫描快照验收；修复状态标签拉伸及测试 API 的 TS 兼容性，补充配置说明和接口规范；清理隔离服务、临时启动夹具及会话文件。
+- 修改文件：`web/src/admin/deposits/`、`web/src/shared/ConfirmAction.tsx`及测试、钱包充值 settings/presentation 与后端测试、`.trellis/spec/admin/ui-system.md`、`.trellis/spec/backend/timed-deposits.md`、`docs/superpowers/timed-chain-deposits.md`及本任务记录。
+- 验证结果：最终 Web 126 文件1190/1190、typecheck、lint、build通过；policy15/15、coverage门槛通过；真实MySQL1/1、架构11/11、OpenAPI20/20、clippy和fmt通过。Ego真实API验证五网切换、服务商密钥草稿、ready/stale/暂停区分、320px编辑取消；1728/390/320无横溢并已查看截图。JS包体2,760,903 bytes，较上轮+6,226 bytes，既有2,600,000门槛仍失败且未放宽；diff与任务校验通过。
+- 后续事项：保存本地提交并归档，未推送或部署；前后端需同版发布，真实节点权限、持续扫描与实链到账尚未验证。

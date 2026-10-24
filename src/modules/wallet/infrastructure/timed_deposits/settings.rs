@@ -12,7 +12,7 @@ use sqlx::{MySql, Pool};
 /// 配置页只回显凭据是否存在，不向浏览器或审计输出节点密钥、带密钥路径或密文。
 pub(crate) async fn load(pool: &Pool<MySql>) -> AppResult<DepositSettings> {
     Ok(DepositSettings{
-        scanners:sqlx::query_as("SELECT network,enabled,endpoint_encrypted IS NOT NULL AS endpoint_configured,api_key_encrypted IS NOT NULL AS api_key_configured,confirmations,revision,last_scan_at,last_error FROM wallet_deposit_scanners ORDER BY network").fetch_all(pool).await?,
+        scanners:sqlx::query_as("SELECT network,enabled,endpoint_encrypted IS NOT NULL AS endpoint_configured,api_key_encrypted IS NOT NULL AS api_key_configured,confirmations,revision,last_scan_at,last_error,COALESCE(last_scan_at>DATE_SUB(CURRENT_TIMESTAMP(6),INTERVAL 120 SECOND),FALSE) AS scan_fresh,CAST(JSON_UNQUOTE(JSON_EXTRACT(cursor_json,'$.height')) AS UNSIGNED) AS cursor_height,CURRENT_TIMESTAMP(6) AS checked_at FROM wallet_deposit_scanners ORDER BY network").fetch_all(pool).await?,
         assets:sqlx::query_as("SELECT id,network,asset_symbol,asset_kind,token_address,decimals,enabled,revision FROM wallet_deposit_chain_assets ORDER BY network,asset_symbol").fetch_all(pool).await?,
         addresses:sqlx::query_as("SELECT pool_id,network,address,enabled FROM wallet_deposit_shared_addresses ORDER BY network,pool_id").fetch_all(pool).await?,
         platform_assets:sqlx::query_as("SELECT symbol,status,deposit_enabled,precision_scale FROM assets ORDER BY symbol").fetch_all(pool).await?,
