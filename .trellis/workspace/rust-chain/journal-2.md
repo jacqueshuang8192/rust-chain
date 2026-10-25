@@ -1002,3 +1002,36 @@ Implemented and verified primary/backup providers, multiple encrypted API keys, 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 89: Chain scanner recovery delivery
+
+**Date**: 2026-10-25
+**Task**: Chain scanner recovery delivery
+**Branch**: `main`
+
+### Summary
+
+Implemented and verified audited confirmed-head recovery, optional historical backfill or explicit skip; user authorized origin/main push. Existing Web bundle overage unchanged; release requires migration 0163 and coordinated backend/Admin.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `81979f2` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
