@@ -1035,3 +1035,36 @@ Implemented and verified audited confirmed-head recovery, optional historical ba
 ### Next Steps
 
 - None - task complete
+
+
+## Session 90: Fix scanner recovery large error lint
+
+**Date**: 2026-10-25
+**Task**: Fix scanner recovery large error lint
+**Branch**: `main`
+
+### Summary
+
+Box ScanFailure AppError without changing retry/error semantics. Local 1.92 production Clippy, 15 scanner tests and 11 architecture checks passed; two DB fixtures skipped, CI 1.99 rerun pending. Not pushed.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `d0117b7` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

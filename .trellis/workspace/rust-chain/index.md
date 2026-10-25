@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 89
+- **Total Sessions**: 90
 - **Last Active**: 2026-10-25
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~1037 | Active |
+| `journal-2.md` | ~1070 | Active |
 | `journal-1.md` | ~1985 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 90 | 2026-10-25 | Fix scanner recovery large error lint | `d0117b7` | `main` |
 | 89 | 2026-10-25 | Chain scanner recovery delivery | `81979f2` | `main` |
 | 88 | 2026-10-25 | Chain scanner high availability delivery | `4f12402` | `main` |
 | 87 | 2026-10-25 | Tron listener HTTP diagnostics delivery | `a13c1d7` | `main` |
