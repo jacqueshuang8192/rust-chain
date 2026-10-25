@@ -14,14 +14,15 @@ export const networkLabel = (network: string) => networkOptions.find(row => row.
 type EditorControls = { dirty: () => void; busy: boolean; setBusy: (busy: boolean) => void };
 
 /** 编辑器固定打开时的配置快照；取消、浏览器关闭和站内跳转均保护草稿。 */
-export function DepositEditPanel({ title, close, children }: { title: string; close: () => void; children: (controls: EditorControls) => ReactNode }) {
+export function DepositEditPanel({ title, close, children, className }: { className?: string; title: string; close: () => void; children: (controls: EditorControls) => ReactNode }) {
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [discard, setDiscard] = useState(false);
   const cancel = () => { if (!busy) { if (dirty) setDiscard(true); else close(); } };
+  const modalProps = createModalProps('medium');
   return <>
     <UnsavedChangesGuard enabled={dirty || busy} />
-    <SideSheet {...createModalProps('medium')} title={title} visible motion={false} onCancel={cancel} closable={!busy} closeOnEsc={!busy}
+    <SideSheet {...modalProps} className={[modalProps.className, className].filter(Boolean).join(' ')} title={title} visible motion={false} onCancel={cancel} closable={!busy} closeOnEsc={!busy}
       footer={<Button disabled={busy} onClick={cancel}>取消编辑</Button>}>
       {children({ dirty: () => setDirty(true), busy, setBusy })}
     </SideSheet>

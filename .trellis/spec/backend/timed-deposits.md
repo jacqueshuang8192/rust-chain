@@ -11,7 +11,8 @@ retired in this test environment. No signing, custody or sweeps.
 
 - Migrations `0158_timed_chain_deposits.sql`, `0159_timed_deposit_text_identity.sql`,
   `0160_independent_recharge_addresses.sql` and
-  `0161_timed_deposit_cancellation.sql` and `0162_deposit_scanner_providers.sql`. The shared table owns its IDs;
+  `0161_timed_deposit_cancellation.sql`, `0162_deposit_scanner_providers.sql` and
+  `0163_deposit_scanner_recovery.sql`. The shared table owns its IDs;
   existing order references are preserved without legacy inventory inserts.
 - Tables: `wallet_deposit_scanners`, `wallet_deposit_chain_assets`,
   `wallet_deposit_shared_addresses`, `wallet_deposit_orders`, `wallet_deposit_receipts`.
@@ -138,7 +139,8 @@ Missing historical cursor, discontinuous hashes, stale/inconsistent node data,
 unsupported parsing or confirmed reorganization stops progress and closes new
 order admission. RPC errors do not advance the cursor; replayed completed events
 are idempotent. Reorganization recovery requires reconciliation and a reviewed
-checkpoint repair; there is no UI button silently skipping blocks.
+checkpoint repair. Ordinary restart/configuration saves never skip blocks; the
+explicit audited recovery action below is the only supported head-jump path.
 
 ### Provider failover and durable rate control
 
@@ -186,7 +188,50 @@ by the configured interval, preventing scheduling/DB latency from consuming the
 reserved gap before the request actually arrives. Different workers cannot reset request pacing or
 cooldowns on restart. Failed rounds do not advance checkpoints; receipts already
 observed remain idempotent. All candidates cooling/unavailable closes admission;
-there is no unauthenticated fallback or cursor skip.
+there is no unauthenticated fallback or automatic cursor skip.
+
+### Explicit head recovery and dual progress
+
+`POST /admin/api/v1/wallet/deposit-settings/scanners/:network/recovery` takes
+`{mode:"backfill"|"skip",expected_revision:u64,acknowledge_skip:boolean,reason:string}`
+and returns 202 with JSON `{queued:true}` (the Admin client requires JSON for non-204 responses). Both backend and Admin map this exact action to
+`wallet.networks.write` before the generic `/recovery` operate classifier.
+A reason is mandatory; skip requires acknowledgement. Under the network lock,
+reject missing endpoint/cursor, a stale revision or an already queued request with
+409. Persist the request, actor and reason, increment revision, invalidate lease
+and freshness, and audit `deposit_scanner.recovery_requested`. Never call the node
+or advance the cursor in the HTTP handler.
+
+The worker reads the checkpoint again after claiming the lease. Recovery validates
+network/assets, the old checkpoint and the latest confirmed head (finalized slots
+for Solana); retaining history also validates an existing target. Failure leaves
+all progress/request data intact for retry. Apply only under the network lock with
+matching revision, token and unexpired lease; audit `recovery_applied` atomically
+with old/new progress, actor and reason. Both actions require a subsequent successful
+live scan before admission can resume. Confirmed reorganization and missing cursors
+still require reconciliation; these actions cannot bypass those checks.
+
+Migration 0163 persists `recovery_request_json`, `backfill_cursor_json`,
+`backfill_target_json`, `backfill_last_error`, `backfill_blocked`, `backfill_next_at`.
+Dual progress retains the oldest unfinished cursor and pins the new target hash.
+Repeated recovery extends one continuous range; overlapping evidence is idempotent.
+Skip discards the intervening range AND any existing backfill without deleting
+orders, receipts or ledger entries. Neither mode runs automatically on restart.
+
+Live work has priority. Schedule one bounded historical batch when live success
+is within 30 seconds and error-free, or to recheck a blocked history anchor; wait
+at least 15 seconds between historical rounds. Both use the same network lease
+and durable provider/key pacing. Validate the fixed history target before scanning,
+then the full batch's continuity and final join hash before observing its receipts.
+Transport errors retain historical progress without replacing live status. Chain,
+continuity or accounting errors persist a history block and close admission; live
+success or another dual recovery cannot clear this block. A successful historical
+retry clears it and invalidates live freshness, requiring another live success.
+
+ScannerView adds nullable `recovery_mode`, `backfill_cursor_height`,
+`backfill_target_height`, `backfill_last_error`, and boolean `backfill_blocked`.
+Cast JSON mode extraction explicitly to utf8mb4 text: MySQL otherwise exposes
+binary metadata that SQLx cannot decode as String. Snapshot reads remain passive.
 
 ### Scanner HTTP diagnostics
 
@@ -219,6 +264,11 @@ No HTTP failure advances the cursor or marks the scanner ready.
 | Cancel detected/review/credited/expired order | 409; no financial changes |
 | Receive after cancellation/reuse | review; no automatic credit |
 | Missing token / wrong scope or permission | 401 / 403 |
+| Recovery without network-write / skip acknowledgement | 403 / 400; no queued request or progress change |
+| Recovery queued successfully | 202; cursor unchanged until worker validates |
+| Recovery node failure or obsolete lease/revision | Preserve live and historical checkpoints |
+| Historical transport failure | Separate error; retain history and live status |
+| Historical anchor/continuity failure | No batch settlement; block admission until validated retry |
 | Stale configuration revision | 409; retain editor draft/reason |
 | Duplicate receipt/review | Original result; no additional credit |
 | Evidence identity changes | Stop and reconcile; retain original evidence |
@@ -238,6 +288,8 @@ No HTTP failure advances the cursor or marks the scanner ready.
 
 ## 5. Good / Base / Bad Cases
 
+- Good: dual recovery reaches the new head while retaining the old range; replaying that range credits each receipt only once.
+- Bad: restart clears the old cursor, or live success hides a blocked historical anchor.
 - Good: cancellation wins a race with scanning, so the receipt goes to review; if scanning wins, cancellation fails.
 - Good: twelve concurrent 100-token requests and ten addresses yield ten exact
   reservations and two conflicts; a 200-token request may reuse an address.
@@ -256,6 +308,9 @@ No HTTP failure advances the cursor or marks the scanner ready.
   direct import atomicity/duplicates, cross-network independence, legacy allowlist
   independence, and disabled-admission scanning/settlement with revision fencing.
 - Cancellation: owner isolation, repeat/replay, unchanged windows, immediate reuse, late/reused ambiguity, observed/review/expired rejection and concurrent scan/cancel; verify ledger unchanged on cancel and one entry after repeated manual credit.
+- Recovery DB/HTTP fixtures: dual progress/extension/skip, acknowledgement and revision
+  rejection, transient/fatal history errors, audit, obsolete in-flight result fencing,
+  confirmed target, historical actual settlement and ledger idempotency on replay.
 - Provider DB fixtures: upgrade from 0161 with ciphertext preservation, migrations
   twice, 429/Retry-After and 401 key failover, pacing, cross-round cooldown,
   all-unavailable cursor preservation, blank-secret preservation, ownership rollback
@@ -302,3 +357,7 @@ Wrong: collapse all provider rejections into "non-success HTTP status", or
 append upstream JSON/HTML to make it more useful. Correct: report the numeric
 status and code-defined operation with safe fixed guidance; obtain the actual
 provider account evidence before claiming a specific operational root cause.
+
+Wrong: direct SQL head reset, or classify every `/recovery` action as operate.
+Correct: use the reasoned, revision-pinned network-write request and validate its
+confirmed target in the worker; never erase retained history without explicit skip.

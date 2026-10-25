@@ -330,3 +330,22 @@ fn validate_providers(request: &mut SaveScanner) -> AppResult<()> {
     }
     Ok(())
 }
+
+/// 显式恢复只接受补扫或跳过两种模式；跳过必须确认数据缺口，原因及操作者随请求持久化。
+pub(crate) async fn recover_scanner(
+    pool: &Pool<MySql>,
+    admin_id: u64,
+    network: &str,
+    mut request: RecoverScanner,
+) -> AppResult<()> {
+    let network = super::normalize_deposit_network(network)?;
+    request.reason = reason(request.reason)?;
+    if !matches!(request.mode.as_str(), "backfill" | "skip")
+        || (request.mode == "skip" && !request.acknowledge_skip)
+    {
+        return Err(AppError::Validation(
+            "选择补扫或跳过模式；跳过历史必须明确确认可能遗漏到账".into(),
+        ));
+    }
+    storage::scanners::recovery::request(pool, admin_id, &network, &request).await
+}

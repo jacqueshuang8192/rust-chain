@@ -85,6 +85,7 @@ fn import_addresses() {}
     import_addresses,
     settings,
     scanner,
+    recovery,
     asset,
     address,
     admin_list,
@@ -93,3 +94,8 @@ fn import_addresses() {}
     review
 ))]
 pub(super) struct TimedDepositsApiDoc;
+
+#[utoipa::path(post, path="/admin/api/v1/wallet/deposit-settings/scanners/{network}/recovery", tag="timed-deposits", security(("bearerAuth"=[])),
+    request_body=RecoverScanner, params(("network"=String,Path)),
+    responses((status=202,body=ScannerRecoveryQueued,description="已排队，节点验证成功后恢复进度"),(status=409,description="版本变化、请求已排队或尚无扫描游标")))]
+fn recovery() {}

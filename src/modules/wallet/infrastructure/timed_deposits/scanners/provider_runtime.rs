@@ -32,10 +32,11 @@ pub(super) async fn scan_available(
     key: Option<&str>,
     config: &ScannerConfig,
     token: &str,
-) -> AppResult<(Cursor, u64, bool)> {
+    work: recovery::Work,
+) -> Result<(Cursor, u64, bool), recovery::ScanFailure> {
     let encryption_key = key.ok_or_else(|| failure("credential encryption key is missing"))?;
     let candidates=sqlx::query_as::<_,Candidate>("SELECT p.id AS provider_id,k.id AS key_id,p.endpoint_encrypted,k.api_key_encrypted,p.request_interval_ms AS provider_interval,k.request_interval_ms AS key_interval FROM wallet_deposit_scanner_providers p JOIN wallet_deposit_scanner_keys k ON k.provider_id=p.id WHERE p.network=? AND p.enabled=TRUE AND k.enabled=TRUE AND (p.cooldown_until IS NULL OR p.cooldown_until<=CURRENT_TIMESTAMP(6)) AND (k.cooldown_until IS NULL OR k.cooldown_until<=CURRENT_TIMESTAMP(6)) ORDER BY p.priority,p.id,k.priority,k.id")
-        .bind(&config.network).fetch_all(pool).await?;
+        .bind(&config.network).fetch_all(pool).await.map_err(AppError::from)?;
     let mut last = failure("所有监听渠道暂不可用或正在冷却，请检查渠道状态后等待自动重试");
     let mut excluded = HashSet::new();
     let mut attempts = 0;
@@ -82,7 +83,8 @@ pub(super) async fn scan_available(
                 credential_configured: candidate.api_key_encrypted.is_some(),
             }),
         };
-        let result = tokio::time::timeout(Duration::from_secs(35), scan(pool, config, &node)).await;
+        let result =
+            tokio::time::timeout(Duration::from_secs(35), scan(pool, config, &node, work)).await;
         let result = match result {
             Ok(result) => result,
             Err(_) => {
@@ -108,7 +110,7 @@ pub(super) async fn scan_available(
                     .retryable
                     .load(Ordering::Relaxed)
                 {
-                    return Err(error);
+                    return Err(error.into());
                 }
                 if node
                     .gate
@@ -123,7 +125,10 @@ pub(super) async fn scan_available(
             }
         }
     }
-    Err(last)
+    Err(recovery::ScanFailure {
+        error: last,
+        retryable: true,
+    })
 }
 
 impl Gate {

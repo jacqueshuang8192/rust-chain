@@ -8,9 +8,26 @@ async fn timed_deposit_openapi_preserves_decimal_text_and_protected_routes() {
         ("/api/v1/wallet/deposit-orders", "post"),
         ("/api/v1/wallet/deposit-orders/{id}/cancel", "post"),
         ("/admin/api/v1/wallet/deposit-settings", "get"),
+        (
+            "/admin/api/v1/wallet/deposit-settings/scanners/{network}/recovery",
+            "post",
+        ),
         ("/admin/api/v1/wallet/deposit-receipts/{id}/review", "post"),
     ] {
         assert!(operation_has_bearer_security(&doc, path, method));
+    }
+    for name in [
+        "recovery_mode",
+        "backfill_cursor_height",
+        "backfill_target_height",
+        "backfill_last_error",
+        "backfill_blocked",
+    ] {
+        assert!(
+            doc["components"]["schemas"]["ScannerView"]["properties"]
+                .get(name)
+                .is_some()
+        );
     }
     let schemas = &doc["components"]["schemas"];
     assert_eq!(
@@ -74,5 +91,9 @@ async fn timed_deposit_openapi_preserves_decimal_text_and_protected_routes() {
         schemas["ScannerView"]["properties"]
             .get("api_key")
             .is_none()
+    );
+    assert_eq!(
+        schemas["ScannerRecoveryQueued"]["properties"]["queued"]["type"],
+        "boolean"
     );
 }

@@ -21,7 +21,7 @@ vi.mock('../access', () => {
   };
 });
 if (!Range.prototype.getBoundingClientRect) Range.prototype.getBoundingClientRect = () => new DOMRect(0, 0, 0, 0);
-const settings = { scanners: [{ network: 'eth', providers: [], enabled: true, endpoint_configured: true, api_key_configured: true, confirmations: 12, revision: 7, last_scan_at: null, last_error: null, scan_fresh: false, cursor_height: null, checked_at: 1792800000000 }], assets: [], addresses: [], platform_assets: ['ETH', 'USDT', 'USDC', 'DAI', 'SOL'].map(symbol => ({ symbol, status: 'active', deposit_enabled: true, precision_scale: 18 })) };
+const settings = { scanners: [{ network: 'eth', providers: [], recovery_mode: null, backfill_cursor_height: null, backfill_target_height: null, backfill_last_error: null, backfill_blocked: false, enabled: true, endpoint_configured: true, api_key_configured: true, confirmations: 12, revision: 7, last_scan_at: null, last_error: null, scan_fresh: false, cursor_height: null, checked_at: 1792800000000 }], assets: [], addresses: [], platform_assets: ['ETH', 'USDT', 'USDC', 'DAI', 'SOL'].map(symbol => ({ symbol, status: 'active', deposit_enabled: true, precision_scale: 18 })) };
 const mocked = vi.mocked(apiRequest);
 beforeEach(() => { permissions.addressOnly = false; permissions.readOnly = false; mocked.mockReset(); mocked.mockResolvedValue(settings); });
 afterEach(cleanup);
@@ -372,4 +372,51 @@ it('shows persisted channel and key cooldown states for read-only users', async 
   expect(screen.getByText(/HTTP 429 limited/)).toBeInTheDocument();
   expect(screen.getByText(/HTTP 503 upstream unavailable/)).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: '编辑监听配置' })).not.toBeInTheDocument();
+});
+
+it('submits dual progress with the pinned revision and shows the queued state', async () => {
+  const user = userEvent.setup();
+  const scanner = { ...settings.scanners[0], cursor_height: 80 };
+  mocked.mockResolvedValue({ ...settings, scanners: [scanner] }); show();
+  await user.click(await screen.findByRole('button', { name: '恢复到最新区块' }));
+  expect(screen.getByRole('combobox', { name: '历史区块处理方式' })).toHaveTextContent('双进度');
+  await user.click(screen.getByRole('button', { name: '提交恢复请求' }));
+  await user.type(screen.getByRole('textbox', { name: '操作原因' }), '恢复最新监听并补扫');
+  mocked.mockResolvedValue({ ...settings, scanners: [{ ...scanner, revision: 8, recovery_mode: 'backfill' }] });
+  await user.click(screen.getByRole('button', { name: '确认' }));
+  await waitFor(() => expect(mocked).toHaveBeenCalledWith('/admin/api/v1/wallet/deposit-settings/scanners/eth/recovery', { method: 'POST', body: JSON.stringify({ mode: 'backfill', expected_revision: 7, acknowledge_skip: false, reason: '恢复最新监听并补扫' }) }));
+  expect(await screen.findByText(/恢复请求已排队/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '恢复到最新区块' })).toBeDisabled();
+});
+it('requires skip acknowledgement and retains failed recovery mode, reason and revision', async () => {
+  const user = userEvent.setup();
+  mocked.mockResolvedValue({ ...settings, scanners: [{ ...settings.scanners[0], cursor_height: 100, backfill_cursor_height: 50, backfill_target_height: 100 }] }); show();
+  await user.click(await screen.findByRole('button', { name: '恢复到最新区块' }));
+  await choose(user, '历史区块处理方式', '手动跳过：不再扫描历史区间');
+  expect(screen.getByText(/将放弃从进度 50/)).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '提交恢复请求' })).toBeDisabled();
+  await user.click(screen.getByRole('switch', { name: '确认跳过历史风险' }));
+  await user.click(screen.getByRole('button', { name: '提交恢复请求' }));
+  await user.type(screen.getByRole('textbox', { name: '操作原因' }), '已核对停机区间');
+  mocked.mockRejectedValueOnce(new ApiError(409, 'CONFLICT', 'changed'));
+  await user.click(screen.getByRole('button', { name: '确认' }));
+  expect(await screen.findByText(/数据状态已变化/)).toBeInTheDocument();
+  expect(mocked).toHaveBeenCalledWith('/admin/api/v1/wallet/deposit-settings/scanners/eth/recovery', { method: 'POST', body: JSON.stringify({ mode: 'skip', expected_revision: 7, acknowledge_skip: true, reason: '已核对停机区间' }) });
+  expect(screen.getByRole('textbox', { name: '操作原因' })).toHaveValue('已核对停机区间');
+  await user.click(screen.getByRole('button', { name: '取消' }));
+  await choose(user, '历史区块处理方式', '双进度：跳到最新并补扫历史');
+  await choose(user, '历史区块处理方式', '手动跳过：不再扫描历史区间');
+  expect(screen.getByRole('switch', { name: '确认跳过历史风险' })).not.toBeChecked();
+});
+it('shows separate historical errors to readers without recovery write access', async () => {
+  permissions.readOnly = true;
+  mocked.mockResolvedValue({ ...settings, scanners: [{ ...settings.scanners[0], cursor_height: 110, backfill_cursor_height: 80, backfill_target_height: 100, backfill_last_error: 'anchor mismatch', backfill_blocked: true }] }); show();
+  expect(await screen.findByText('历史补扫 · 异常待核对')).toBeInTheDocument();
+  expect(screen.getByText(/已扫描区块高度：80 \/ 100/)).toBeInTheDocument();
+  expect(screen.getByText(/已阻止新订单准入/)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '恢复到最新区块' })).not.toBeInTheDocument();
+});
+it('does not allow recovery before the scanner has a checkpoint', async () => {
+  show();
+  expect(await screen.findByRole('button', { name: '恢复到最新区块' })).toBeDisabled();
 });

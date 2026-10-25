@@ -464,6 +464,13 @@ fn permission_resource(path: &str) -> Option<&'static str> {
 }
 
 fn operational_action(path: &str) -> Option<&'static str> {
+    if path
+        .strip_prefix("/wallet/deposit-settings/scanners/")
+        .and_then(|tail| tail.strip_suffix("/recovery"))
+        .is_some_and(|network| !network.is_empty() && !network.contains('/'))
+    {
+        return Some("write");
+    }
     if path.contains("/approve")
         || path.contains("/reject")
         || path.contains("/review")

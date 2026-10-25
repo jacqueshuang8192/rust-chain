@@ -1515,3 +1515,25 @@ and revision conflicts preserve every draft. Runtime provider/key cooldown times
 come from the DB snapshot, not client inference, and never replace network-level
 readiness. Disabled/unknown/all-key-cooling states must not say healthy. Reuse Semi
 controls, responsive fieldsets, masked inputs and the existing navigation guard.
+
+### Scanner recovery controls
+
+Network cards offer a network-write-only “恢复到最新区块” SideSheet when a saved
+endpoint/checkpoint exists and no request is pending. Default to dual progress;
+skip requires a separate risk switch acknowledging that both the skipped interval
+and existing backfill will no longer be detected automatically. Both modes use
+ConfirmAction with a mandatory reason, pinned network/revision, draft protection
+and error retention. Switching modes resets the skip acknowledgement.
+
+Show queued mode and separate live/history heights, fixed historical target and
+errors from the strict ScannerView. Explain that history transport retries differ
+from blocked history requiring reconciliation. Solana uses slot labels. Do not
+claim reception is ready solely because recovery succeeded. Refresh is passive
+and pauses while editing; recovery is never triggered by opening or refreshing.
+Tests cover reason/payload, revision conflict retention, skip gating, queued state,
+reader permission and missing checkpoint. Browser checks use real local HTTP at
+1728/390/320 widths with isolated data and a simulated node.
+
+Recovery SideSheet titles must allow shrinking (`flex: 1 1 0; min-width: 0`) and
+wrapping while the close action keeps its width. Verify the actual close-button
+bounds at 320px; document-level overflow alone misses clipped overlay controls.

@@ -2,6 +2,8 @@ use super::*;
 
 #[path = "src_modules_wallet_deposit_provider_tests.rs"]
 mod provider_tests;
+#[path = "src_modules_wallet_scanner_recovery_tests.rs"]
+mod recovery_tests;
 
 #[test]
 fn bitcoin_value_never_uses_float() {

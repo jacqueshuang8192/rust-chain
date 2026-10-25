@@ -20,6 +20,7 @@ type ActionDescriptor = {
 
 const actionDescriptorMatrix: ActionDescriptor[] = [
   { endpoint: '/admin/api/v1/wallet/deposit-settings/scanners/eth', method: 'PUT', permission: 'wallet.networks.write' },
+  { endpoint: '/admin/api/v1/wallet/deposit-settings/scanners/eth/recovery', method: 'POST', permission: 'wallet.networks.write' },
   { endpoint: '/admin/api/v1/wallet/deposit-settings/assets', method: 'PUT', permission: 'wallet.networks.write' },
   { endpoint: '/admin/api/v1/wallet/deposit-settings/addresses/1', method: 'PUT', permission: 'wallet.address_pool.write' },
   { endpoint: '/admin/api/v1/wallet/deposit-receipts/1/review', method: 'POST', permission: 'wallet.deposits.review' },

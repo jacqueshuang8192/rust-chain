@@ -63,3 +63,6 @@
 .deposit-provider-status > li { border-top: 1px solid var(--semi-color-border); padding-top: 12px; overflow-wrap: anywhere; }
 .deposit-key-status { margin: 8px 0; padding-left: 12px; border-left: 2px solid var(--semi-color-border); }
 @media (max-width: 600px) { .deposit-provider-fields { grid-template-columns: 1fr; } .deposit-provider-draft { padding: 10px; } }
+
+.deposit-recovery-panel .semi-sidesheet-title { flex: 1 1 0; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+.deposit-recovery-panel .semi-sidesheet-close { flex-shrink: 0; }

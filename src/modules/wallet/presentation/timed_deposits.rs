@@ -99,6 +99,11 @@ pub struct ScannerView {
     /// 数据库按与用户准入相同的 120 秒窗口判断；仅表示此快照时的追上状态。
     pub scan_fresh: bool,
     pub cursor_height: Option<u64>,
+    pub recovery_mode: Option<String>,
+    pub backfill_cursor_height: Option<u64>,
+    pub backfill_target_height: Option<u64>,
+    pub backfill_last_error: Option<String>,
+    pub backfill_blocked: bool,
     #[serde(with = "unix_millis")]
     #[schema(value_type = i64)]
     pub checked_at: DateTime<Utc>,
@@ -270,4 +275,18 @@ pub struct SaveScannerKey {
     #[serde(default)]
     pub clear_api_key: bool,
     pub request_interval_ms: u32,
+}
+
+#[derive(Debug, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RecoverScanner {
+    pub mode: String,
+    pub expected_revision: u64,
+    pub acknowledge_skip: bool,
+    pub reason: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct ScannerRecoveryQueued {
+    pub queued: bool,
 }

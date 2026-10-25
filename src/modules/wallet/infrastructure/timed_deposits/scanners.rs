@@ -3,6 +3,7 @@
 mod bitcoin;
 mod evm;
 mod provider_runtime;
+pub(crate) mod recovery;
 mod solana;
 mod tron;
 
@@ -23,12 +24,20 @@ use std::{collections::HashSet, time::Duration};
 
 const TRANSFER_TOPIC: &str = "ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 
+const CONFIG_SELECT: &str = "SELECT network,confirmations,revision,cursor_json,recovery_request_json,backfill_cursor_json,backfill_target_json,COALESCE(backfill_next_at<=CURRENT_TIMESTAMP(6),TRUE) AS backfill_due,COALESCE(last_scan_at>DATE_SUB(CURRENT_TIMESTAMP(6),INTERVAL 30 SECOND) AND last_error IS NULL,FALSE) AS live_recent,COALESCE(backfill_blocked,FALSE) AS backfill_blocked FROM wallet_deposit_scanners";
+
 #[derive(sqlx::FromRow)]
 struct ScannerConfig {
     network: String,
     confirmations: u32,
     revision: u64,
     cursor_json: Option<Json<Cursor>>,
+    recovery_request_json: Option<Json<recovery::Request>>,
+    backfill_cursor_json: Option<Json<Cursor>>,
+    backfill_target_json: Option<Json<Cursor>>,
+    backfill_due: bool,
+    live_recent: bool,
+    backfill_blocked: bool,
 }
 #[derive(Clone, Serialize, Deserialize)]
 struct Cursor {
@@ -59,7 +68,11 @@ struct Block {
 
 /// 各网络独立认领持久租约并并行读取；单网失败记录脱敏原因，其他网络继续，未处理完绝不推进游标。
 pub(crate) async fn run_once(pool: &Pool<MySql>, key: Option<&str>) -> AppResult<u64> {
-    let configs=sqlx::query_as::<_,ScannerConfig>("SELECT network,confirmations,revision,cursor_json FROM wallet_deposit_scanners WHERE endpoint_encrypted IS NOT NULL ORDER BY network").fetch_all(pool).await?;
+    let configs = sqlx::query_as::<_, ScannerConfig>(&format!(
+        "{CONFIG_SELECT} WHERE endpoint_encrypted IS NOT NULL ORDER BY network"
+    ))
+    .fetch_all(pool)
+    .await?;
     let results = stream::iter(
         configs
             .into_iter()
@@ -80,43 +93,14 @@ async fn run_network(
     key: Option<&str>,
     config: ScannerConfig,
 ) -> AppResult<u64> {
-    let token = uuid::Uuid::now_v7().to_string();
-    let claim=sqlx::query("UPDATE wallet_deposit_scanners SET lease_token=?,lease_until=DATE_ADD(CURRENT_TIMESTAMP(6),INTERVAL 60 SECOND) WHERE network=? AND revision=? AND (lease_until IS NULL OR lease_until<CURRENT_TIMESTAMP(6))")
-        .bind(&token).bind(&config.network).bind(config.revision).execute(pool).await?;
-    if claim.rows_affected() != 1 {
-        return Ok(0);
-    }
-    let result = tokio::time::timeout(
-        Duration::from_secs(45),
-        provider_runtime::scan_available(pool, key, &config, &token),
-    )
-    .await
-    .unwrap_or_else(|_| Err(failure("scanner round timed out")));
-    match result {
-        Ok((cursor, count, caught_up)) => {
-            sqlx::query("UPDATE wallet_deposit_scanners SET cursor_json=?,last_scan_at=IF(?,CURRENT_TIMESTAMP(6),last_scan_at),last_error=NULL,lease_token=NULL,lease_until=NULL WHERE network=? AND revision=? AND lease_token=?")
-                .bind(Json(cursor)).bind(caught_up).bind(&config.network).bind(config.revision).bind(&token).execute(pool).await?;
-            Ok(count)
-        }
-        Err(error) => {
-            let message = match &error {
-                AppError::Internal(s) | AppError::Validation(s) | AppError::Conflict(s) => {
-                    s.as_str()
-                }
-                _ => "deposit scanner persistence failed",
-            };
-            sqlx::query("UPDATE wallet_deposit_scanners SET last_error=?,lease_token=NULL,lease_until=NULL WHERE network=? AND revision=? AND lease_token=?")
-                .bind(message.chars().take(255).collect::<String>()).bind(&config.network).bind(config.revision).bind(&token).execute(pool).await?;
-            tracing::warn!(network=%config.network,error=%message,"限时充值监听失败，保留游标等待重试");
-            Ok(0)
-        }
-    }
+    recovery::run_network(pool, key, config).await
 }
 
 async fn scan(
     pool: &Pool<MySql>,
     config: &ScannerConfig,
     node: &Node,
+    work: recovery::Work,
 ) -> AppResult<(Cursor, u64, bool)> {
     let assets=sqlx::query_as::<_,(u64,String,String,String,i32)>("SELECT id,asset_symbol,asset_kind,token_address,decimals FROM wallet_deposit_chain_assets c WHERE network=? AND (enabled=TRUE OR EXISTS(SELECT 1 FROM wallet_deposit_orders o WHERE o.chain_asset_id=c.id)) ORDER BY id")
         .bind(&config.network).fetch_all(pool).await?.into_iter().map(|(id,asset_symbol,asset_kind,token_address,decimals)|ChainAsset{id,asset_symbol,asset_kind,token_address,decimals}).collect::<Vec<_>>();
@@ -133,7 +117,28 @@ async fn scan(
             .into_iter()
             .collect(),
     };
-    let cursor = if let Some(Json(cursor)) = &config.cursor_json {
+    if work == recovery::Work::Recover {
+        return recovery::confirmed_head(node, config, &context, safe)
+            .await
+            .map(|cursor| (cursor, 0, true));
+    }
+    let selected_cursor = if work == recovery::Work::Backfill {
+        &config.backfill_cursor_json
+    } else {
+        &config.cursor_json
+    };
+    let safe = if work == recovery::Work::Backfill {
+        let target = &config
+            .backfill_target_json
+            .as_ref()
+            .ok_or_else(|| failure("historical scan target missing"))?
+            .0;
+        recovery::verify_anchor(node, target, &context, safe).await?;
+        target.height
+    } else {
+        safe
+    };
+    let cursor = if let Some(Json(cursor)) = selected_cursor {
         cursor.clone()
     } else {
         if orders::earliest_order_time(pool, &config.network)
@@ -194,23 +199,36 @@ async fn scan(
     .try_collect::<Vec<_>>()
     .await?;
     blocks.sort_by_key(|b| b.height);
+    // 先验证完整批次和补扫接合点，再处理任何到账，避免后面的区块异常在本批部分入账后才暴露。
     let mut next = cursor;
-    let mut count = 0;
-    for block in blocks {
+    for block in &blocks {
         if block.parent_hash != next.hash {
             return Err(failure("deposit scan block continuity failed"));
-        }
-        for receipt in block.receipts {
-            settlement::observe_scanned(pool, &receipt, config.revision).await?;
-            count += 1;
         }
         next = Cursor {
             height: block.height,
             hash_height: block.height,
-            hash: block.hash,
+            hash: block.hash.clone(),
         };
     }
     next.height = end;
+    if work == recovery::Work::Backfill && end == safe {
+        let target = &config
+            .backfill_target_json
+            .as_ref()
+            .ok_or_else(|| failure("historical scan target missing"))?
+            .0;
+        if next.hash != target.hash || next.hash_height != target.hash_height {
+            return Err(failure("historical scan did not join recovery anchor"));
+        }
+    }
+    let mut count = 0;
+    for block in blocks {
+        for receipt in block.receipts {
+            settlement::observe_scanned(pool, &receipt, config.revision).await?;
+            count += 1;
+        }
+    }
     Ok((next, count, end == safe))
 }
 

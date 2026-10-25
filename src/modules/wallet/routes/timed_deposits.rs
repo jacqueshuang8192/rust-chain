@@ -36,6 +36,10 @@ pub(super) fn admin_routes() -> Router<AppState> {
             "/wallet/deposit-settings/scanners/:network",
             put(save_scanner),
         )
+        .route(
+            "/wallet/deposit-settings/scanners/:network/recovery",
+            post(recover_scanner),
+        )
         .route("/wallet/deposit-settings/assets", put(save_asset))
         .route(
             "/wallet/deposit-settings/addresses",
@@ -189,5 +193,24 @@ async fn cancel(
 ) -> AppResult<Json<DepositOrder>> {
     Ok(Json(
         app::cancel_order(&mysql_pool(&state)?, user_id_from_subject(&c.sub)?, id).await?,
+    ))
+}
+
+async fn recover_scanner(
+    AdminAuth(c): AdminAuth,
+    State(state): State<AppState>,
+    Path(network): Path<String>,
+    Json(r): Json<RecoverScanner>,
+) -> AppResult<(StatusCode, Json<ScannerRecoveryQueued>)> {
+    app::recover_scanner(
+        &mysql_pool(&state)?,
+        admin_id_from_subject(&c.sub)?,
+        &network,
+        r,
+    )
+    .await?;
+    Ok((
+        StatusCode::ACCEPTED,
+        Json(ScannerRecoveryQueued { queued: true }),
     ))
 }

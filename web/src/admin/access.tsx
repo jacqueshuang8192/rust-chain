@@ -243,6 +243,7 @@ export function adminActionForRequest(endpoint: string, method: AdminHttpMethod)
   const path = endpoint.replace(/^\/admin\/api\/v1/, '').split('?')[0];
   if (path.startsWith('/auth/') || path === '/auth' || path === '/access/me') return null;
   if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return 'read';
+  if (method === 'POST' && /^\/wallet\/deposit-settings\/scanners\/[^/]+\/recovery$/.test(path)) return 'write';
   if (method === 'PATCH' && /^\/agents\/[1-9]\d*\/recharge-policy$/.test(path)) return 'authorize';
   if (method === 'POST' && isCommissionReversal(path)) return 'settle';
   if (method === 'POST') {

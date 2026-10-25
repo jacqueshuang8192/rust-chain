@@ -287,4 +287,84 @@ async fn timed_deposit_routes_enforce_exact_amount_ownership_and_admin_permissio
             "retired path {path}"
         );
     }
+    // Recovery is a network-write operation; rejected requests cannot queue or change checkpoints.
+    let recovery_path = "/admin/api/v1/wallet/deposit-settings/scanners/eth/recovery";
+    sqlx::query("UPDATE wallet_deposit_scanners SET cursor_json=JSON_OBJECT('height',80,'hash_height',80,'hash','b80') WHERE network='eth'").execute(&pool).await.unwrap();
+    let revision: u64 =
+        sqlx::query_scalar("SELECT revision FROM wallet_deposit_scanners WHERE network='eth'")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    let recovery = json!({"mode":"skip","expected_revision":revision,"acknowledge_skip":true,"reason":"audited fixture skip"});
+    for (token, expected) in [
+        (None, StatusCode::UNAUTHORIZED),
+        (Some(user_token.as_str()), StatusCode::FORBIDDEN),
+        (Some(admin_token.as_str()), StatusCode::FORBIDDEN),
+    ] {
+        assert_eq!(
+            call(&app, token, "POST", recovery_path, recovery.clone())
+                .await
+                .status(),
+            expected
+        );
+    }
+    sqlx::query(
+        "UPDATE admin_roles SET permissions=JSON_ARRAY('wallet.networks.write') WHERE id=?",
+    )
+    .bind(role)
+    .execute(&pool)
+    .await
+    .unwrap();
+    for (field, value, status) in [
+        ("mode", json!("automatic"), StatusCode::BAD_REQUEST),
+        ("acknowledge_skip", json!(false), StatusCode::BAD_REQUEST),
+        ("reason", json!(""), StatusCode::BAD_REQUEST),
+        (
+            "expected_revision",
+            json!(revision + 10),
+            StatusCode::CONFLICT,
+        ),
+        (
+            "expected_revision",
+            json!("invalid"),
+            StatusCode::UNPROCESSABLE_ENTITY,
+        ),
+    ] {
+        let mut invalid = recovery.clone();
+        invalid[field] = value;
+        assert_eq!(
+            call(&app, Some(&admin_token), "POST", recovery_path, invalid)
+                .await
+                .status(),
+            status
+        );
+    }
+    let pending: bool = sqlx::query_scalar(
+        "SELECT recovery_request_json IS NOT NULL FROM wallet_deposit_scanners WHERE network='eth'",
+    )
+    .fetch_one(&pool)
+    .await
+    .unwrap();
+    assert!(!pending);
+    let response = call(
+        &app,
+        Some(&admin_token),
+        "POST",
+        recovery_path,
+        recovery.clone(),
+    )
+    .await;
+    assert_eq!(response.status(), StatusCode::ACCEPTED);
+    assert_eq!(body_json(response).await.unwrap(), json!({"queued":true}));
+    assert_eq!(
+        call(&app, Some(&admin_token), "POST", recovery_path, recovery)
+            .await
+            .status(),
+        StatusCode::CONFLICT
+    );
+    let height: u64 = sqlx::query_scalar("SELECT CAST(JSON_UNQUOTE(JSON_EXTRACT(cursor_json,'$.height')) AS UNSIGNED) FROM wallet_deposit_scanners WHERE network='eth'").fetch_one(&pool).await.unwrap();
+    assert_eq!(
+        height, 80,
+        "only the validated worker may apply the recovery"
+    );
 }
