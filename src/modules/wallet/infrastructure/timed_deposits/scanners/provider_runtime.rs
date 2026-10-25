@@ -126,7 +126,7 @@ pub(super) async fn scan_available(
         }
     }
     Err(recovery::ScanFailure {
-        error: last,
+        error: Box::new(last),
         retryable: true,
     })
 }

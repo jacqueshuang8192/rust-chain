@@ -303,3 +303,22 @@ async fn timed_deposit_recovery_dual_skip_failure_revision_and_accounting() {
     .unwrap();
     assert_eq!(audits, 4);
 }
+
+#[test]
+fn scanner_failure_remains_compact_and_preserves_error_classification() {
+    use super::super::recovery::ScanFailure;
+    assert!(std::mem::size_of::<ScanFailure>() < 128);
+    let fatal = ScanFailure::from(AppError::Conflict("checkpoint changed".into()));
+    assert!(!fatal.retryable);
+    assert!(
+        matches!(fatal.error.as_ref(), AppError::Conflict(message) if message == "checkpoint changed")
+    );
+    let retry = ScanFailure {
+        error: Box::new(failure("scanner round timed out")),
+        retryable: true,
+    };
+    assert!(retry.retryable);
+    assert!(
+        matches!(retry.error.as_ref(), AppError::Internal(message) if message == "scanner round timed out")
+    );
+}

@@ -233,6 +233,12 @@ ScannerView adds nullable `recovery_mode`, `backfill_cursor_height`,
 Cast JSON mode extraction explicitly to utf8mb4 text: MySQL otherwise exposes
 binary metadata that SQLx cannot decode as String. Snapshot reads remain passive.
 
+`ScanFailure` stores `Box<AppError>` plus its retryable flag. Do not inline
+AppError in this wrapper: its layout plus metadata can reach Clippy's 128-byte
+large-error threshold on CI even when local compilation passes. Preserve original
+error variants/messages and retry classification; do not silence `result_large_err`.
+The scanner regression test checks the wrapper size and both classifications.
+
 ### Scanner HTTP diagnostics
 
 `Node::post_operation(path: &'static str, operation: &'static str, body: Value)`

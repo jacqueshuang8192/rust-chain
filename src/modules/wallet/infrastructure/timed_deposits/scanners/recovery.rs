@@ -16,13 +16,14 @@ pub(super) enum Work {
 }
 
 pub(super) struct ScanFailure {
-    pub error: AppError,
+    // 错误载荷间接存储，避免 AppError 与重试标记合并后触发大 Result 错误检查。
+    pub error: Box<AppError>,
     pub retryable: bool,
 }
 impl From<AppError> for ScanFailure {
     fn from(error: AppError) -> Self {
         Self {
-            error,
+            error: Box::new(error),
             retryable: false,
         }
     }
@@ -165,7 +166,7 @@ pub(super) async fn run_network(
     .await
     .unwrap_or_else(|_| {
         Err(ScanFailure {
-            error: failure("scanner round timed out"),
+            error: Box::new(failure("scanner round timed out")),
             retryable: true,
         })
     });
@@ -175,7 +176,7 @@ pub(super) async fn run_network(
             Ok(count)
         }
         Err(error) => {
-            let message = match &error.error {
+            let message = match error.error.as_ref() {
                 AppError::Internal(s) | AppError::Validation(s) | AppError::Conflict(s) => {
                     s.as_str()
                 }

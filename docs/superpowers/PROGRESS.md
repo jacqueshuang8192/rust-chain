@@ -10405,3 +10405,10 @@
 - 修改文件：本任务delivery.md所列实现、迁移、测试、规范与任务记录；docs/superpowers/PROGRESS.md。
 - 验证结果：沿用本轮22项充值、HTTP权限/响应、架构11项、OpenAPI20项、Web1201项及最终定向42项和浏览器验收结果；提交前复核diff与任务上下文。既有前端包体超限保留，未放宽门槛。
 - 后续事项：推送后核对远程SHA；发布需0163迁移并同步后端/管理后台，GitHub工作流、部署与实链到账待验证。
+
+## 2026-10-25 12:05（Europe/Istanbul） - 修复扫描恢复错误类型过大导致Clippy失败
+
+- 完成内容：ScanFailure改为Box<AppError>保存错误载荷，同步普通转换、超时和渠道耗尽构造及错误匹配；保留错误信息、重试分类和扫描资金语义，未禁用lint。新增类型大小及错误分类回归断言。
+- 修改文件：scanners/recovery.rs、scanners/provider_runtime.rs、tests/unit_src/src_modules_wallet_scanner_recovery_tests.rs、.trellis/spec/backend/timed-deposits.md及任务记录。
+- 验证结果：本地Rust/Clippy1.92执行cargo clippy --lib --bins -- -D warnings -D clippy::result_large_err通过；扫描器测试17项报告成功，其中15项实际执行、2项因未配置隔离数据库明确跳过；架构11/11、fmt、diff和任务校验通过。未在日志对应的Rust1.99/CI环境复验，未重跑数据库资金集成测试。
+- 后续事项：本地提交修复，尚未推送；推送后重跑远程workflow，无新增迁移。
