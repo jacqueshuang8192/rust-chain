@@ -1101,3 +1101,36 @@ Unified mobile deposit form with searchable logo pickers, session-scoped pair re
 ### Next Steps
 
 - None - task complete
+
+
+## Session 92: Deposit history header action
+
+**Date**: 2026-10-25
+**Task**: Deposit history header action
+**Branch**: `main`
+
+### Summary
+
+Moved mobile deposit history entry into header, removed duplicate body action, preserved busy guard and localization. Release gate passed with 919 tests; 320px light Chinese and dark English browser checks passed. Not pushed.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `cd21f7d` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
