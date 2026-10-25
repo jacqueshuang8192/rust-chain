@@ -10,7 +10,6 @@ import { fetchDepositAssets } from '../api/wallet'
 import { depositAssetIcon, depositNetworkIcon } from '../core/depositIcons'
 import type { DepositAsset } from '../core/types'
 const props = withDefaults(defineProps<{ identity: string; asset?: string; network?: string; orderId?: string }>(), { orderId: '', asset: '', network: '' })
-const emit = defineEmits<{ history: [] }>()
 const { t, locale } = useI18n()
 const options = ref<DepositOption[]>([])
 const assetMetadata = ref<Pick<DepositAsset, 'symbol' | 'name' | 'logoUrl'>[]>([])
@@ -20,6 +19,7 @@ const order = ref<DepositOrder | null>(null)
 const history = ref<DepositOrder[]>([])
 const error = ref('')
 const busy = ref(false)
+defineExpose({ busy })
 const loading = ref(false)
 const qr = ref('')
 const now = ref(Date.now())
@@ -191,7 +191,7 @@ onUnmounted(() => { destroyed = true; generation += 1; qrGeneration += 1; contro
 </script>
 <template>
   <section class="timed-deposit" :aria-label="t('timedDeposit.title')">
-    <div class="deposit-toolbar"><span v-if="!order">{{ t('timedDeposit.window') }}</span><button type="button" class="deposit-link" :disabled="busy" @click="emit('history')">{{ t('timedDeposit.history') }} →</button></div>
+    <p v-if="!order" class="deposit-window">{{ t('timedDeposit.window') }}</p>
     <p v-if="error" role="alert" class="deposit-error">{{ error }} <button type="button" :disabled="busy || loading" @click="order ? refresh() : load()">{{ t('timedDeposit.refresh') }}</button></p>
     <p v-if="loading" role="status">{{ t('timedDeposit.loading') }}</p>
     <form v-if="!props.orderId && !order" class="deposit-form" @submit.prevent="submit">
@@ -237,8 +237,8 @@ onUnmounted(() => { destroyed = true; generation += 1; qrGeneration += 1; contro
 .timed-deposit { --deposit-ink: var(--text, currentColor); --deposit-muted: var(--muted-strong, #667085); --deposit-surface: var(--surface-2, #f3f5f7); display: grid; gap: 24px; color: var(--deposit-ink); min-width: 0; }
 .timed-deposit p { margin: 0; line-height: 1.6; font-size: 14px; }
 .timed-deposit h2, .timed-deposit h3 { margin: 0; }
-.deposit-toolbar, .deposit-status, .deposit-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
-.deposit-toolbar > span, .deposit-notice, .deposit-form-heading p { color: var(--deposit-muted); font-size: 13px; }
+.deposit-status, .deposit-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.deposit-window, .deposit-notice, .deposit-form-heading p { color: var(--deposit-muted); font-size: 13px; }
 .deposit-form, .deposit-order { display: grid; gap: 22px; min-width: 0; }
 .deposit-form-heading h2 { font-size: 26px; line-height: 1.2; margin-bottom: 10px; }
 .timed-deposit label { display: grid; gap: 10px; font-size: 14px; }
@@ -251,7 +251,6 @@ onUnmounted(() => { destroyed = true; generation += 1; qrGeneration += 1; contro
 .timed-deposit button { min-height: 44px; padding: 10px 16px; border-radius: 0; background: var(--deposit-surface); border: 0; color: inherit; cursor: pointer; font: inherit; font-size: 14px; transition: opacity 120ms, transform 120ms; }
 .timed-deposit button:active:not(:disabled) { transform: translateY(1px); }
 .timed-deposit button.deposit-primary { min-height: 52px; border-radius: 999px; background: #087b52; color: white; font-weight: 600; }
-.timed-deposit button.deposit-link { background: transparent; padding-inline: 0; }
 .timed-deposit button:disabled { opacity: .5; cursor: not-allowed; }
 .deposit-selections { display: grid; gap: 10px; }
 .deposit-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

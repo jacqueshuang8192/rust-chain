@@ -1,5 +1,6 @@
 // Local browser fixture: real component and API adapter, no external API traffic.
-import { createApp, h } from 'vue'
+import { createApp, h, ref } from 'vue'
+import { History } from 'lucide-vue-next'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import PageHeader from '../../src/components/PageHeader.vue'
 import TimedDepositPanel from '../../src/components/TimedDepositPanel.vue'
@@ -32,8 +33,9 @@ client.defaults.adapter = async (config) => {
   else throw new Error('Unexpected local fixture request: ' + path)
   return { data, status: 200, statusText: 'OK', headers: {}, config }
 }
-const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/', component: {} }, { path: '/assets', name: 'assets', component: {} }] })
+const router = createRouter({ history: createMemoryHistory(), routes: [{ path: '/', component: {} }, { path: '/assets', name: 'assets', component: {} }, { path: '/assets/deposit/orders', name: 'deposit-orders', component: {} }] })
+const depositPanel = ref(null)
 createApp({ render: () => h('main', { class: 'page pencil-page wallet-pencil-page', style: 'max-width:448px;margin:auto' }, [
-  h(PageHeader, { title: i18n.global.t('timedDeposit.title'), back: true, pencil: true, fallback: { name: 'assets' } }),
-  h('div', { style: 'padding:6px 20px 20px' }, [h(TimedDepositPanel, { identity: 'fixture-user', asset: 'ETH', network: 'eth' })]),
+  h(PageHeader, { title: i18n.global.t('timedDeposit.title'), back: true, pencil: true, fallback: { name: 'assets' } }, { actions: () => h('button', { class: 'icon-button', type: 'button', 'aria-label': i18n.global.t('timedDeposit.history'), disabled: depositPanel.value?.busy, onClick: () => router.push({ name: 'deposit-orders' }) }, [h(History, { size: 22 })]) }),
+  h('div', { style: 'padding:6px 20px 20px' }, [h(TimedDepositPanel, { ref: depositPanel, identity: 'fixture-user', asset: 'ETH', network: 'eth' })]),
 ]) }).use(i18n).use(router).mount('#app')

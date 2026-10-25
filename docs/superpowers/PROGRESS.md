@@ -10433,3 +10433,10 @@
 - 修改文件：mobile充值组件/视图/路由/无障碍标题/双语资源；core/depositIcons.ts、public/deposit-icons及许可来源；相关回归测试、浏览器夹具、mobile规范和任务交付文档。
 - 验证结果：release:gate全通过，919/919测试、PWA/Tauri网页构建及产物/包体/源码/测试质量检查通过；最终btc图标映射复核后16项定向测试、类型及两端构建/预算再次通过。PWA约1513KiB JS、657.2KiB CSS，未调高预算。Ego使用真实组件和本地API夹具验证320/390/448明暗主题、英文、Logo加载、选择/搜索/关闭/键盘焦点、取消/新建/过期状态；无横向溢出。未进行实链付款或原生设备构建。
 - 后续事项：本地提交及归档；尚未推送、部署。测试浏览器空间已关闭，临时Vite服务清理。
+
+## 2026-10-25 13:59（Europe/Istanbul） - 手机充值记录入口移入Header
+
+- 完成内容：充值订单记录入口移到Header右侧，移除正文重复入口；保留提交中禁用状态，提供中英文无障碍名称。
+- 修改文件：mobile/src/views/DepositDetailView.vue、mobile/src/components/TimedDepositPanel.vue、mobile/tests/fixtures/timed-deposit-browser.js、.trellis/spec/mobile/navigation-and-localization.md及任务记录。
+- 验证结果：npm run release:gate --prefix mobile通过，919/919测试、类型检查、PWA/Tauri网页构建与产物/预算检查通过；浏览器320窄屏浅色中文及深色英文检查通过，按钮44×44且图标居中，无重复入口及水平溢出。使用本地API夹具，未验证真实历史页面跳转或实链付款。
+- 后续事项：本地提交归档；尚未推送。

@@ -168,6 +168,12 @@ lastTradePath: ComputedRef<string>
   detail and order history retain their own fallbacks. All form route aliases use
   the localized on-chain deposit accessibility title.
 
+- Deposit order history is the authenticated form/detail Header's right-side
+  `History` icon action, using the shared 44px `icon-button`, localized label and
+  named `deposit-orders` push. Hide it on history itself. `TimedDepositPanel`
+  exposes its reactive `busy` value to keep this action disabled during writes;
+  it does not render or emit a second history action in the content area.
+
 - Deposit pickers use body-Teleported, labelled dialogs with `useModalDialog`,
   search-first focus, contained Tab navigation, Escape/backdrop/Close dismissal,
   body scroll locking and trigger-focus restoration. Keep the more specific
