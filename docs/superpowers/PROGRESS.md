@@ -10412,3 +10412,10 @@
 - 修改文件：scanners/recovery.rs、scanners/provider_runtime.rs、tests/unit_src/src_modules_wallet_scanner_recovery_tests.rs、.trellis/spec/backend/timed-deposits.md及任务记录。
 - 验证结果：本地Rust/Clippy1.92执行cargo clippy --lib --bins -- -D warnings -D clippy::result_large_err通过；扫描器测试17项报告成功，其中15项实际执行、2项因未配置隔离数据库明确跳过；架构11/11、fmt、diff和任务校验通过。未在日志对应的Rust1.99/CI环境复验，未重跑数据库资金集成测试。
 - 后续事项：本地提交修复，尚未推送；推送后重跑远程workflow，无新增迁移。
+
+## 2026-10-25 12:14（Europe/Istanbul） - 扫描器Clippy修复远程交付
+
+- 完成内容：按用户授权，将修复提交d0117b7及归档提交facb775纳入origin/main推送。
+- 修改文件：docs/superpowers/PROGRESS.md；本次未修改业务代码。
+- 验证结果：fetch确认远程无新增提交，本地领先2个提交；沿用本轮Clippy、15项扫描器及11项架构检查通过结果，2项数据库测试跳过。
+- 后续事项：推送后核对远程SHA；CI Rust1.99工作流结果待验证。
