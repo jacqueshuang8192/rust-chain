@@ -1,5 +1,7 @@
 export default {
   timedDeposit: {
+    searchOptions: "Search assets or networks",
+    noMatches: "No matching options",
     window: "30-minute payment window",
     draftHint: "Enter the token quantity you will transfer.",
     remaining: "Time left",

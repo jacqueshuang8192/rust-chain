@@ -5,8 +5,6 @@ import { compileStyle } from 'vue/compiler-sfc'
 
 const read = (path: string): string => readFileSync(new URL(path, import.meta.url), 'utf8')
 const sources = {
-  depositAsset: read('../src/views/DepositAssetView.vue'),
-  depositNetwork: read('../src/views/DepositNetworkView.vue'),
   depositDetail: read('../src/views/DepositDetailView.vue'),
   withdrawAsset: read('../src/views/WithdrawAssetView.vue'),
   withdraw: read('../src/views/WithdrawView.vue'),
@@ -24,8 +22,6 @@ const recordsEmptySource = read('../src/components/TransactionRecordEmptyState.v
 
 test('钱包流程声明当前选中浅色与深色 Pencil 画板', () => {
   const expected: Record<keyof typeof sources, string> = {
-    depositAsset: 'fNXT7 n5jiPN',
-    depositNetwork: 'y4ifR qKfsZ',
     depositDetail: 'w5htG TCN5A',
     withdrawAsset: 'NGBmq h0WWYC',
     withdraw: 'Qa9dW o8Wsh',
@@ -104,27 +100,18 @@ test('钱包未登录态保留 Header 与 Body，并使用 fullPath 登录重定
   assert.doesNotMatch(loginRequiredSource, /router\.replace\(\{ name: 'login'/)
 })
 
-test('充币与提币选择页锁定 44px 搜索、36px 币标和 60px 真实资产行', () => {
-  for (const source of [sources.depositAsset, sources.withdrawAsset]) {
+test('提币选择页锁定 44px 搜索、36px 币标和 60px 真实资产行', () => {
+  for (const source of [sources.withdrawAsset]) {
     assert.match(source, /<AssetMark[\s\S]*?:size="36"/)
     assert.match(source, /\.asset-search \{[\s\S]*?height: 44px[\s\S]*?padding: 0 14px/)
     assert.match(source, /\.asset-picker button \{[\s\S]*?grid-template-columns: 36px minmax\(0, 1fr\) 16px[\s\S]*?height: 60px[\s\S]*?min-height: 60px/)
     assert.doesNotMatch(source, /asset-heading/)
   }
 
-  assert.match(sources.depositAsset, /Promise\.all\(\[fetchDepositAssets\(\), fetchTimedDepositOptions\(\)\]\)/)
-  assert.match(sources.depositAsset, /item\.name\?\.toUpperCase\(\)\.includes\(keyword\)/)
-  assert.match(sources.depositAsset, /asset\.name \|\| t\('deposit\.supported'\)/)
   assert.match(sources.withdrawAsset, /assets\.value = await fetchWithdrawalAssets\(\)/)
 })
 
-test('充币网络保留选中摘要与网络行，付款页仅在可付款状态展示真实二维码', () => {
-  assert.match(sources.depositNetwork, /selectedAsset\.value = assets\.find/)
-  assert.match(sources.depositNetwork, /await fetchTimedDepositOptions\(\)/)
-  assert.doesNotMatch(sources.depositNetwork, /estimatedMinutes/)
-  assert.match(sources.depositNetwork, /\.network-summary \{[\s\S]*?min-height: 48px/)
-  assert.match(sources.depositNetwork, /\.network-list button \{[\s\S]*?height: 56px[\s\S]*?min-height: 56px/)
-  assert.doesNotMatch(sources.depositNetwork, /network-note|<Info/)
+test('统一充币付款页仅在可付款状态展示真实二维码', () => {
 
   const panel = read('../src/components/TimedDepositPanel.vue')
   assert.match(sources.depositDetail, /<TimedDepositPanel/)
@@ -201,10 +188,8 @@ test('交易记录使用正式通栏布局，提币记录和快捷充值继续�
   assert.doesNotMatch(walletApiSource, /networkMinutes|estimatedMinutes|\|\| 'USD'|\|\| 'USDT'/)
 })
 
-test('钱包返回合同使用业务父级，动态充币详情回到当前资产网络选择', () => {
-  assert.match(sources.depositAsset, /:fallback="\{ name: 'assets' \}"/)
-  assert.match(sources.depositNetwork, /:fallback="\{ name: 'deposit-asset' \}"/)
-  assert.match(sources.depositDetail, /name: 'deposit-network', params: \{ asset \}/)
+test('钱包返回合同使用业务父级，统一充币表单回到资产', () => {
+  assert.match(sources.depositDetail, /name: 'assets'/)
   assert.match(sources.withdrawAsset, /:fallback="\{ name: 'assets' \}"/)
   assert.match(sources.withdraw, /:fallback="\{ name: 'withdraw-asset' \}"/)
   assert.match(sources.ledger, /:back-fallback="\{ name: 'assets' \}"/)
@@ -224,4 +209,19 @@ test('生产钱包页面没有复制 Pencil 演示资产、金额、网络或支
       .replace(/^[ \t]*\/\/[^\n]*/gm, '')
     assert.doesNotMatch(copySource, /[\u3400-\u9fff]/)
   }
+})
+
+
+test('deposit entry and legacy selection URLs use one shared form with bottom sheet selectors', () => {
+  const router = read('../src/router/index.ts')
+  for (const name of ['deposit-asset', 'deposit-network', 'deposit-detail']) {
+    assert.ok(router.includes(`name: '${name}', component: DepositDetailView`))
+  }
+  const panel = read('../src/components/TimedDepositPanel.vue')
+  assert.equal((panel.match(/<DepositSelectionSheet /g) || []).length, 2)
+  assert.doesNotMatch(panel, /<select/)
+  const sheet = read('../src/components/DepositSelectionSheet.vue')
+  assert.match(sheet, /\.pencil-page\.deposit-picker-overlay \{[^}]*display: flex/)
+  assert.match(sheet, /useModalDialog\(open, dialog\)/)
+  assert.match(sheet, /role="dialog" aria-modal="true"/)
 })

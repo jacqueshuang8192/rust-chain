@@ -65,6 +65,7 @@ const visibleTabs = computed<TransactionRecordTab[]>(() => {
 
     <nav class="records-tabs" :class="{ 'records-tabs--ledger-window': activeTab === 'ledger' || activeTab.includes('strategy') }" :aria-label="t('ledger.recordTabsLabel')">
       <RouterLink
+        replace
         v-for="tab in visibleTabs"
         :key="tab"
         class="records-tab"

@@ -492,3 +492,8 @@ test('交易记录新增固定文案保持中英文对称', () => {
     assert.equal(typeof en.associated[key as keyof typeof en.associated], 'string')
   }
 })
+
+
+test('record tabs replace their route instead of adding intermediate history', () => {
+  assert.match(layout, /<RouterLink\s+replace\s/)
+})

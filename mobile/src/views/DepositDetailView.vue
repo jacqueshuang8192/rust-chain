@@ -13,7 +13,7 @@ const { t } = useI18n()
 </script>
 <template>
   <main class="page page--plain pencil-page wallet-pencil-page deposit-detail-pencil" data-pencil-source="w5htG TCN5A">
-    <PageHeader :back="true" :eyebrow="t('assets.deposit')" :fallback="id ? { name: 'deposit-orders' } : history ? { name: 'deposit-asset' } : { name: 'deposit-network', params: { asset } }" :pencil="true" :subtitle="t('deposit.networkWarning')" :title="t(id ? 'timedDeposit.order' : history ? 'timedDeposit.history' : 'timedDeposit.title')" />
+    <PageHeader :back="true" :eyebrow="t('assets.deposit')" :fallback="id ? { name: 'deposit-orders' } : history ? { name: 'deposit-asset' } : { name: 'assets' }" :pencil="true" :subtitle="t('deposit.networkWarning')" :title="t(id ? 'timedDeposit.order' : history ? 'timedDeposit.history' : 'timedDeposit.title')" />
     <div class="page-content deposit-detail">
       <LoginRequiredState class="wallet-login-prompt" v-if="!session.isAuthenticated" :description="t('deposit.detailLoginDescription')" />
       <DepositOrderHistory v-else-if="history" :identity="session.identityScope" @select="router.push({ name: 'deposit-order', params: { id: $event } })" @create="router.push({ name: 'deposit-asset' })" />

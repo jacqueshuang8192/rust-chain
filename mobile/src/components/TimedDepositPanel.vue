@@ -5,10 +5,15 @@ import { toDataURL } from 'qrcode'
 import { cancelTimedDepositOrder, createTimedDepositOrder, fetchTimedDepositOptions, fetchTimedDepositOrder, fetchTimedDepositOrders } from '../api/timedDeposits'
 import { validateDepositDraft, type DepositOption, type DepositOrder } from '../core/timedDeposit'
 import { useModalDialog } from '../core/modalDialog'
+import DepositSelectionSheet from './DepositSelectionSheet.vue'
+import { fetchDepositAssets } from '../api/wallet'
+import { depositAssetIcon, depositNetworkIcon } from '../core/depositIcons'
+import type { DepositAsset } from '../core/types'
 const props = withDefaults(defineProps<{ identity: string; asset?: string; network?: string; orderId?: string }>(), { orderId: '', asset: '', network: '' })
 const emit = defineEmits<{ history: [] }>()
 const { t, locale } = useI18n()
 const options = ref<DepositOption[]>([])
+const assetMetadata = ref<Pick<DepositAsset, 'symbol' | 'name' | 'logoUrl'>[]>([])
 const selection = ref('')
 const amount = ref('')
 const order = ref<DepositOrder | null>(null)
@@ -33,6 +38,11 @@ let destroyed = false
 let qrGeneration = 0
 const optionKey = (value: DepositOption) => `${value.asset_symbol}:${value.network}`
 const option = computed(() => options.value.find(value => optionKey(value) === selection.value))
+const assetChoices = computed(() => [...new Set(options.value.map(item => item.asset_symbol))].map(symbol => {
+  const asset = assetMetadata.value.find(item => item.symbol === symbol)
+  return { value: symbol, label: symbol, description: asset?.name, symbol, logoUrl: asset?.logoUrl, fallbackLogoUrl: depositAssetIcon(symbol) }
+}))
+const networkChoices = computed(() => options.value.filter(item => item.asset_symbol === option.value?.asset_symbol).map(item => ({ value: optionKey(item), label: item.display_name, symbol: item.display_name, logoUrl: depositNetworkIcon(item.network), description: `${t('timedDeposit.minimum')} ${item.min_deposit_amount} ${item.asset_symbol}` })))
 const pair = computed(() => ({ asset: option.value?.asset_symbol || props.asset, network: option.value?.network || props.network }))
 const remaining = computed(() => Math.max(0, Math.ceil(((order.value?.expires_at || 0) - now.value - clockOffset.value) / 1000)))
 const payable = computed(() => order.value?.status === 'pending' && remaining.value > 0)
@@ -54,9 +64,19 @@ async function readHistory(version: number, signal: AbortSignal, restore: boolea
   history.value = page.items
   if (restore) { const pending = page.items.find(item => item.status === 'pending' || item.status === 'review'); if (pending) setOrder(pending) }
 }
+function initialOption(available: DepositOption[]) {
+  if (props.asset || props.network) return available.find(item => (!props.asset || item.asset_symbol === props.asset.toUpperCase()) && (!props.network || item.network === props.network))
+  try {
+    const saved = sessionStorage.getItem(`timed-deposit-selection:${props.identity}`)
+    return available.find(item => optionKey(item) === saved) || available[0]
+  } catch { return available[0] }
+}
+function rememberSelection() {
+  try { sessionStorage.setItem(`timed-deposit-selection:${props.identity}`, selection.value) } catch { /* Selection remains usable without browser storage. */ }
+}
 async function load() {
   const { version, signal } = begin()
-  confirmingCancel.value = false; cancelError.value = ''; order.value = null; history.value = []; options.value = []; selection.value = ''; amount.value = ''; error.value = ''; busy.value = false
+  confirmingCancel.value = false; cancelError.value = ''; order.value = null; history.value = []; options.value = []; assetMetadata.value = []; selection.value = ''; amount.value = ''; error.value = ''; busy.value = false
   if (!props.identity) { loading.value = false; return }
   loading.value = true
   try {
@@ -67,21 +87,38 @@ async function load() {
       if (current(version)) setOrder(restored)
       return
     }
-    const available = await fetchTimedDepositOptions(signal)
+    const [available, metadata] = await Promise.all([fetchTimedDepositOptions(signal), fetchDepositAssets().catch(() => [])])
     if (!current(version)) return
-    options.value = available.filter(item => (!props.asset || item.asset_symbol === props.asset.toUpperCase()) && (!props.network || item.network === props.network))
-    selection.value = options.value[0] ? optionKey(options.value[0]) : ''
-    await readHistory(version, signal, true)
+    assetMetadata.value = metadata
+    options.value = available
+    const initial = initialOption(available)
+    selection.value = initial ? optionKey(initial) : ''
+    if (initial) await readHistory(version, signal, true)
   } catch (cause) { if (current(version)) error.value = message(cause) }
   finally { if (current(version)) loading.value = false }
 }
+function chooseAsset(symbol: string) {
+  if (busy.value || order.value || symbol === option.value?.asset_symbol) return
+  const chosen = options.value.find(item => item.asset_symbol === symbol && item.network === option.value?.network) || options.value.find(item => item.asset_symbol === symbol)
+  if (chosen) { selection.value = optionKey(chosen); void changeSelection() }
+}
+function chooseNetwork(key: string) {
+  if (busy.value || order.value || key === selection.value || !networkChoices.value.some(item => item.value === key)) return
+  selection.value = key; void changeSelection()
+}
+function newDeposit() {
+  if (busy.value || loading.value || payable.value || order.value?.status === 'review') return
+  begin(); order.value = null; amount.value = ''; error.value = ''
+}
 async function changeSelection() {
+  rememberSelection()
   const { version, signal } = begin(); order.value = null; amount.value = ''; error.value = ''; history.value = []; loading.value = true
   try { await readHistory(version, signal, true) } catch (cause) { if (current(version)) error.value = message(cause) }
   finally { if (current(version)) loading.value = false }
 }
 async function submit() {
-  if (busy.value || !option.value || !validDraft.value || !props.identity || payable.value) return
+  if (loading.value || busy.value || !option.value || !validDraft.value || !props.identity || order.value) return
+  rememberSelection()
   const chosen = option.value; const exact = validDraft.value; const { version, signal } = begin()
   busy.value = true; error.value = ''
   const storageKey = `timed-deposit:${props.identity}:${optionKey(chosen)}:${exact}`
@@ -154,19 +191,20 @@ onUnmounted(() => { destroyed = true; generation += 1; qrGeneration += 1; contro
 </script>
 <template>
   <section class="timed-deposit" :aria-label="t('timedDeposit.title')">
-    <div class="deposit-toolbar"><span>{{ t('timedDeposit.window') }}</span><button type="button" class="deposit-link" :disabled="busy" @click="emit('history')">{{ t('timedDeposit.history') }} →</button></div>
+    <div class="deposit-toolbar"><span v-if="!order">{{ t('timedDeposit.window') }}</span><button type="button" class="deposit-link" :disabled="busy" @click="emit('history')">{{ t('timedDeposit.history') }} →</button></div>
     <p v-if="error" role="alert" class="deposit-error">{{ error }} <button type="button" :disabled="busy || loading" @click="order ? refresh() : load()">{{ t('timedDeposit.refresh') }}</button></p>
     <p v-if="loading" role="status">{{ t('timedDeposit.loading') }}</p>
-    <form v-if="!props.orderId && !payable && order?.status !== 'review'" class="deposit-form" @submit.prevent="submit">
+    <form v-if="!props.orderId && !order" class="deposit-form" @submit.prevent="submit">
+      <div class="deposit-selections">
+        <DepositSelectionSheet :label="t('deposit.selectAsset')" :value="option?.asset_symbol || ''" :selected="option?.asset_symbol || ''" :choices="assetChoices" :disabled="busy || !options.length" @select="chooseAsset" />
+        <DepositSelectionSheet :label="t('deposit.selectNetwork')" :value="option?.display_name || ''" :selected="selection" :choices="networkChoices" :disabled="busy || !option" @select="chooseNetwork" />
+      </div>
       <div class="deposit-form-heading"><h2>{{ t('timedDeposit.amount') }}</h2><p>{{ t('timedDeposit.draftHint') }}</p></div>
-      <label>{{ t('timedDeposit.assetNetwork') }}
-        <select v-model="selection" :disabled="loading || busy || options.length === 0" @change="changeSelection"><option v-for="item in options" :key="optionKey(item)" :value="optionKey(item)">{{ item.asset_symbol }} · {{ item.display_name }}</option></select>
-      </label>
       <p v-if="!loading && !options.length">{{ t('timedDeposit.unavailable') }}</p>
-      <label>{{ t('timedDeposit.amount') }}<div class="deposit-amount-field"><input v-model="amount" inputmode="decimal" type="text" maxlength="64" :disabled="busy || !option" :placeholder="t('timedDeposit.amountPlaceholder')" /><span>{{ option?.asset_symbol || '—' }}</span></div></label>
+      <label class="deposit-amount-label"><span class="deposit-visually-hidden">{{ t('timedDeposit.amount') }}</span><span class="deposit-amount-field"><input v-model="amount" inputmode="decimal" type="text" maxlength="64" :disabled="busy || loading || !option" :aria-invalid="Boolean(amount && !validDraft)" :placeholder="t('timedDeposit.amountPlaceholder')" /><span>{{ option?.asset_symbol || '—' }}</span></span></label>
       <div v-if="option" class="deposit-terms"><p>{{ t('timedDeposit.minimum') }}<strong>{{ option.min_deposit_amount }} {{ option.asset_symbol }}</strong></p><p>{{ t('timedDeposit.fee') }}<strong>{{ option.deposit_fee }} {{ option.asset_symbol }}</strong></p></div>
       <p v-if="amount && !validDraft" role="status" class="deposit-error">{{ t('timedDeposit.invalid') }}</p>
-      <button class="deposit-primary" type="submit" :disabled="busy || loading || !validDraft">{{ busy ? t('timedDeposit.creating') : t('timedDeposit.create') }}</button>
+      <button class="deposit-primary deposit-create" type="submit" :disabled="busy || loading || !validDraft">{{ busy ? t('timedDeposit.creating') : t('timedDeposit.create') }}</button>
       <p class="deposit-notice">{{ t('timedDeposit.instructions') }}</p>
     </form>
     <section v-if="order" class="deposit-order" :aria-label="t('timedDeposit.order')">
@@ -177,9 +215,10 @@ onUnmounted(() => { destroyed = true; generation += 1; qrGeneration += 1; contro
         <div class="deposit-destination"><h3>{{ t('timedDeposit.address') }}</h3><p>{{ order.address }}</p><button class="deposit-primary" type="button" @click="copy">{{ copied ? t('timedDeposit.copied') : t('timedDeposit.copy') }}</button><p class="deposit-notice">{{ t('timedDeposit.networkOnly', { network: order.network, asset: order.asset_symbol }) }}</p></div>
       </div>
       <p v-if="!payable && order.status !== 'credited'" class="deposit-notice">{{ t('timedDeposit.stopped') }}</p>
-      <dl class="deposit-details"><div v-for="field in details" :key="field[0]"><dt>{{ t(`timedDeposit.${field[0]}`) }}</dt><dd>{{ field[1] }}</dd></div></dl>
-      <button v-if="payable" type="button" :disabled="busy" @click="askCancel">{{ t('timedDeposit.cancel') }}</button>
+      <details class="deposit-order-details"><summary>{{ t('timedDeposit.details') }}</summary><dl class="deposit-details"><div v-for="field in details" :key="field[0]"><dt>{{ t(`timedDeposit.${field[0]}`) }}</dt><dd>{{ field[1] }}</dd></div></dl></details>
+      <button v-if="payable" class="deposit-cancel-action" type="button" :disabled="busy" @click="askCancel">{{ t('timedDeposit.cancel') }}</button>
       <footer class="deposit-footer"><p>{{ t('timedDeposit.confirmations', { count: order.required_confirmations }) }}</p><button type="button" :disabled="busy || loading" @click="refresh">{{ t('timedDeposit.refresh') }}</button></footer>
+      <button v-if="!props.orderId && !payable && order.status !== 'review'" type="button" class="deposit-primary" :disabled="busy || loading" @click="newDeposit">{{ t('timedDeposit.newDeposit') }}</button>
     </section>
     <Teleport to="body">
       <div v-if="confirmingCancel" class="pencil-page deposit-cancel-overlay" @click.self="closeCancel">
@@ -203,17 +242,26 @@ onUnmounted(() => { destroyed = true; generation += 1; qrGeneration += 1; contro
 .deposit-form, .deposit-order { display: grid; gap: 22px; min-width: 0; }
 .deposit-form-heading h2 { font-size: 26px; line-height: 1.2; margin-bottom: 10px; }
 .timed-deposit label { display: grid; gap: 10px; font-size: 14px; }
-.timed-deposit input, .timed-deposit select { width: 100%; min-width: 0; min-height: 52px; padding: 12px 14px; border: 0; border-radius: 6px; background: var(--deposit-surface); color: inherit; font: inherit; }
-.deposit-amount-field { display: flex; align-items: center; background: var(--deposit-surface); border-radius: 6px; padding-right: 16px; gap: 8px; }
-.deposit-amount-field input { font-size: 24px; font-variant-numeric: tabular-nums; }
+.timed-deposit input { width: 100%; min-width: 0; min-height: 52px; padding: 12px 14px; border: 0; border-radius: 0; background: var(--deposit-surface); color: inherit; font: inherit; }
+.deposit-amount-field { display: flex; align-items: center; background: var(--deposit-surface); border-radius: 0; padding-right: 16px; gap: 8px; }
+.deposit-amount-field input { font-size: 28px; font-variant-numeric: tabular-nums; }
 .deposit-amount-field span { font-weight: 600; }
-.deposit-amount-field:focus-within, .timed-deposit select:focus-visible, .timed-deposit button:focus-visible { outline: 2px solid var(--focus, #10b981); outline-offset: 3px; }
+.deposit-amount-field:focus-within, .timed-deposit button:focus-visible { outline: 2px solid var(--focus, #10b981); outline-offset: 3px; }
 .deposit-amount-field input:focus { outline: none; }
-.timed-deposit button { min-height: 44px; padding: 10px 16px; border-radius: 6px; background: var(--deposit-surface); border: 0; color: inherit; cursor: pointer; font: inherit; font-size: 14px; transition: opacity 120ms, transform 120ms; }
+.timed-deposit button { min-height: 44px; padding: 10px 16px; border-radius: 0; background: var(--deposit-surface); border: 0; color: inherit; cursor: pointer; font: inherit; font-size: 14px; transition: opacity 120ms, transform 120ms; }
 .timed-deposit button:active:not(:disabled) { transform: translateY(1px); }
-.timed-deposit button.deposit-primary { min-height: 50px; background: #087b52; color: white; font-weight: 600; }
+.timed-deposit button.deposit-primary { min-height: 52px; border-radius: 999px; background: #087b52; color: white; font-weight: 600; }
 .timed-deposit button.deposit-link { background: transparent; padding-inline: 0; }
 .timed-deposit button:disabled { opacity: .5; cursor: not-allowed; }
+.deposit-selections { display: grid; gap: 10px; }
+.deposit-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.deposit-amount-field { min-height: 76px; }
+.deposit-amount-field input { min-height: 76px; }
+.deposit-order-details summary { min-height: 48px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; font-size: 14px; }
+.deposit-order-details summary::after { content: "+"; font-size: 24px; }
+.deposit-order-details[open] summary::after { content: "−"; }
+.deposit-order-details summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.timed-deposit button.deposit-cancel-action { background: transparent; color: var(--muted-strong); }
 .deposit-terms { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 .deposit-terms p { display: grid; gap: 6px; color: var(--deposit-muted); font-size: 13px; }
 .deposit-terms strong { color: var(--deposit-ink); font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }
@@ -222,8 +270,8 @@ onUnmounted(() => { destroyed = true; generation += 1; qrGeneration += 1; contro
 .deposit-state { background: var(--deposit-surface); padding: 7px 10px; border-radius: 4px; }
 .deposit-payment-heading h2 { font-size: 32px; line-height: 1.2; overflow-wrap: anywhere; margin: 8px 0; font-variant-numeric: tabular-nums; }
 .deposit-payment-heading h2 span { font-size: 18px; font-weight: 500; white-space: nowrap; }
-.deposit-payment { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; padding: 20px 16px; background: var(--deposit-surface); }
-.deposit-qr { justify-self: center; display: grid; place-items: center; background: white; color: #14231d; padding: 10px; width: 240px; max-width: 100%; aspect-ratio: 1; box-sizing: border-box; }
+.deposit-payment { border-radius: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px; padding: 20px 16px; background: var(--deposit-surface); }
+.deposit-qr { justify-self: center; display: grid; place-items: center; background: white; color: #14231d; padding: 10px; width: 220px; max-width: 100%; aspect-ratio: 1; box-sizing: border-box; }
 .deposit-qr img { max-width: 100%; height: auto; }
 .deposit-destination { display: grid; gap: 14px; min-width: 0; }
 .deposit-destination h3 { font-size: 16px; }
@@ -234,6 +282,7 @@ onUnmounted(() => { destroyed = true; generation += 1; qrGeneration += 1; contro
 .timed-deposit dd { margin: 0; overflow-wrap: anywhere; text-align: right; }
 .deposit-error { color: var(--negative, #c43b3b); }
 .deposit-footer button { width: 100%; }
+@media (max-width: 340px) { .deposit-qr { width: 200px; } }
 @media (prefers-reduced-motion: reduce) { .timed-deposit button { transition: none; } .timed-deposit button:active:not(:disabled) { transform: none; } }
 </style>
 
@@ -243,7 +292,7 @@ onUnmounted(() => { destroyed = true; generation += 1; qrGeneration += 1; contro
 .deposit-cancel-dialog h2 { margin: 0; font-size: 22px; }
 .deposit-cancel-dialog p { margin: 0; font-size: 15px; line-height: 1.7; overflow-wrap: anywhere; }
 .deposit-cancel-dialog [role='alert'] { color: var(--negative); }
-.deposit-cancel-dialog button { min-height: 48px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--text); font: inherit; }
+.deposit-cancel-dialog button { min-height: 48px; border: 1px solid var(--line); border-radius: 0; background: var(--surface); color: var(--text); font: inherit; }
 .deposit-cancel-dialog button:last-child { background: #087b52; color: white; border: 0; }
 .deposit-cancel-dialog button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .deposit-cancel-dialog button:disabled { opacity: .5; }

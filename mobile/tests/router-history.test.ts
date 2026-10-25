@@ -24,6 +24,8 @@ const routes = [
   { path: '/products', name: 'products', component: {} },
   { path: '/seconds', name: 'seconds', component: {} },
   { path: '/assets', name: 'assets', component: {} },
+  { path: '/orders', name: 'orders', component: {} },
+  { path: '/assets/ledger', name: 'wallet-ledger', component: {} },
   { path: '/login', name: 'login', component: {} },
   { path: '/register', name: 'register', component: {} },
   { path: '/forgot-password', name: 'forgot-password', component: {} },
@@ -376,4 +378,28 @@ test('2FA 重置和挑战失效回登录时保留清洗后的 redirect', async (
       redirect.startsWith('//') ? '/' : redirect,
     )
   }
+})
+
+
+test('record tab replacements preserve the source page across orders and ledger', async () => {
+  const { router, restore } = createBrowserHistoryRouter()
+  try {
+    await router.push('/assets')
+    await router.push('/orders?tab=current&symbol=ETH_USDT')
+    await router.replace('/orders?tab=history&symbol=ETH_USDT')
+    await router.replace('/assets/ledger?symbol=ETH_USDT')
+    await router.replace('/orders?tab=strategy-history&symbol=ETH_USDT')
+    await goBackOrAndWait(router, '/assets', false)
+    assert.equal(router.currentRoute.value.fullPath, '/assets')
+  } finally { restore() }
+})
+
+test('direct-open record tabs keep the safe fallback after replacement', async () => {
+  const { router, restore } = createBrowserHistoryRouter()
+  try {
+    await router.replace('/orders?tab=current')
+    await router.replace('/assets/ledger')
+    await goBackOrAndWait(router, '/assets', false)
+    assert.equal(router.currentRoute.value.fullPath, '/assets')
+  } finally { restore() }
 })

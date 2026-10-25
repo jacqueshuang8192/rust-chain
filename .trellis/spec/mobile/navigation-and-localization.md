@@ -155,6 +155,26 @@ lastTradePath: ComputedRef<string>
 
 ### Router history
 
+- Transaction record tabs in `TransactionRecordsLayout` use `RouterLink replace`,
+  including transitions between `orders` and `wallet-ledger`. Tab state is a view
+  of one record workspace, not a navigation step. Keep the source page in history
+  and preserve symbol queries. `goBackOr` retains direct-open route fallbacks.
+  Verify both source-page return after several tabs and direct-open fallback with
+  the web-history harness in `router-history.test.ts`.
+
+- Chain deposit entry and legacy asset/network URLs render `DepositDetailView`.
+  Selection happens in the form through `DepositSelectionSheet`, not separate
+  asset/network pages. Direct-open form Back falls back to Assets; owned order
+  detail and order history retain their own fallbacks. All form route aliases use
+  the localized on-chain deposit accessibility title.
+
+- Deposit pickers use body-Teleported, labelled dialogs with `useModalDialog`,
+  search-first focus, contained Tab navigation, Escape/backdrop/Close dismissal,
+  body scroll locking and trigger-focus restoration. Keep the more specific
+  `.pencil-page.deposit-picker-overlay` selector: the global `.pencil-page` rule
+  otherwise overrides flex layout and overlay paint when styles load later.
+  Only the option list scrolls; honor safe areas and reduced motion.
+
 - Root navigation has exactly five ordered visual destinations and uses router
   `replace`: `home`, `markets`, persisted `trade`, `assets`, and `profile`.
 - The central Trade control opens the body-Teleported root trade chooser rather

@@ -2594,6 +2594,28 @@ quote/contract errors, unknown/late frames, and listed-only new-coin opportuniti
 
 ## Timed On-chain Deposits
 
+Mobile uses one asset/network/amount form. Only `/wallet/deposit-options` decides
+availability; `/wallet/deposit-assets` optionally supplies names and logo URLs.
+Metadata failure cannot disable a valid payment option. Both sheets and their
+selected triggers use `AssetMark`: configured asset logo first, bundled common
+asset image second, existing initial fallback last. Network images use canonical
+keys `eth`, `base`, `tron`, `btc`, `solana`; Base must not use an ETH coin image.
+Vendored files and license/source records live in `public/deposit-icons/`, with
+base-aware paths from `core/depositIcons.ts`. Unknown assets/networks never borrow
+an unrelated logo. Cover configured precedence, unavailable metadata, canonical
+network IDs, image existence and nested PWA bases in tests.
+
+Keep the last selection in `sessionStorage` under
+`timed-deposit-selection:${identity}`. Persist only its asset/network key, never
+amounts, addresses or payment status. Explicit legacy route params take priority;
+obsolete saved pairs fall back to an available option. Changing pair clears the
+amount and invalidates previous reads, while dismissing a picker leaves the
+draft untouched. Rapid selection changes remain possible while history loads;
+generation checks reject earlier pair results. Creating remains disabled during
+that read. Pending/review orders hide selectors. Terminal orders expose an
+explicit New deposit action, which invalidates old polling before clearing the
+order so an in-flight response cannot resurrect it.
+
 Use [the backend timed deposit contract](../backend/timed-deposits.md) for both
 Mobile and PC. Select readiness from `/wallet/deposit-options`, accept exact coin
 quantity text, and create an order only on explicit submit. Stable uncertain

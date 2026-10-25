@@ -1,5 +1,7 @@
 export default {
   timedDeposit: {
+    searchOptions: "搜索币种或网络",
+    noMatches: "未找到匹配项",
     window: "30 分钟付款窗口",
     draftHint: "输入实际转入的币种数量。",
     remaining: "剩余时间",

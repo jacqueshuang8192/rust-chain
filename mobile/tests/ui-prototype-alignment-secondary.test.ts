@@ -6,9 +6,7 @@ import zhCN from '../src/i18n/messages/zh-CN.ts'
 
 const viewNames = [
   'AccountBindingsView',
-  'DepositAssetView',
   'DepositDetailView',
-  'DepositNetworkView',
   'EarnView',
   'ForgotPasswordView',
   'KycView',
@@ -162,7 +160,6 @@ test('重点业务页保留各自的信息层级和完整状态表面', () => {
 test('组合输入把焦点、错误和禁用反馈放在完整字段容器', () => {
   for (const name of [
     'AccountBindingsView',
-    'DepositAssetView',
     'EarnView',
     'ForgotPasswordView',
     'KycView',

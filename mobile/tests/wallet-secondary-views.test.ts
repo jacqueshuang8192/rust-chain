@@ -5,8 +5,6 @@ import en from '../src/i18n/messages/en.ts'
 import zhCN from '../src/i18n/messages/zh-CN.ts'
 
 const viewFiles = {
-  depositAsset: '../src/views/DepositAssetView.vue',
-  depositNetwork: '../src/views/DepositNetworkView.vue',
   depositDetail: '../src/views/DepositDetailView.vue',
   withdrawAsset: '../src/views/WithdrawAssetView.vue',
   withdraw: '../src/views/WithdrawView.vue',
@@ -20,13 +18,9 @@ const sources = Object.fromEntries(
 ) as Record<keyof typeof viewFiles, string>
 
 test('充值流程读取真实资产与可用网络，并由限时订单面板创建地址', () => {
-  assert.match(sources.depositAsset, /Promise\.all\(\[fetchDepositAssets\(\), fetchTimedDepositOptions\(\)\]\)/)
-  assert.match(sources.depositAsset, /name: 'deposit-network', params: \{ asset: asset\.symbol \}/)
-  assert.match(sources.depositNetwork, /await fetchTimedDepositOptions\(\)/)
-  assert.match(sources.depositNetwork, /name: 'deposit-detail', params: \{ asset: props\.asset, network: network\.network \}/)
   assert.match(sources.depositDetail, /<TimedDepositPanel[^>]+:asset="asset"[^>]+:network="network"/)
   assert.doesNotMatch(sources.depositDetail, /createDepositAddress/)
-  assert.match(sources.depositDetail, /name: 'deposit-network', params: \{ asset \}/)
+  assert.match(sources.depositDetail, /name: 'assets'/)
 })
 
 test('提币流程保留真实资产路由、余额网络加载、校验和提交载荷', () => {
@@ -77,7 +71,7 @@ test('钱包二级页使用 HIPPO 变量、明暗主题焦点、状态和窄屏�
     assert.doesNotMatch(copySource, /[\u3400-\u9fff]/)
   }
 
-  for (const source of [sources.depositAsset, sources.withdrawAsset, sources.withdraw, sources.quickRecharge]) {
+  for (const source of [sources.withdrawAsset, sources.withdraw, sources.quickRecharge]) {
     assert.match(source, /:focus-within/)
   }
 
