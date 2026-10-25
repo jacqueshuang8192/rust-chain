@@ -1068,3 +1068,36 @@ Box ScanFailure AppError without changing retry/error semantics. Local 1.92 prod
 ### Next Steps
 
 - None - task complete
+
+
+## Session 91: Mobile deposit flow and record navigation
+
+**Date**: 2026-10-25
+**Task**: Mobile deposit flow and record navigation
+**Branch**: `main`
+
+### Summary
+
+Unified mobile deposit form with searchable logo pickers, session-scoped pair restoration, terminal-order reset and stale-poll protection. Record tabs replace history. Release gate 919 tests, both web builds and budgets passed; final 16 focused tests and builds passed. Browser local-adapter checks covered phone widths/themes, logos and cancellation/expiry. Not pushed.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `776745e` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
