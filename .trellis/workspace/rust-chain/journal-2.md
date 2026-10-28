@@ -1167,3 +1167,36 @@ Moved mobile deposit history entry into header, removed duplicate body action, p
 ### Next Steps
 
 - None - task complete
+
+
+## Session 94: Trade history entry immersion
+
+**Date**: 2026-10-28
+**Task**: Trade history entry immersion
+**Branch**: `main`
+
+### Summary
+
+Made the spot history entry transparent with muted styling, 44x44 touch geometry and subtle hover/press feedback. Mobile release gate passed with 923 tests; browser matrix and keyboard navigation passed. Task archived; no push or deployment.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9aea413` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
