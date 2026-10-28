@@ -1200,3 +1200,36 @@ Made the spot history entry transparent with muted styling, 44x44 touch geometry
 ### Next Steps
 
 - None - task complete
+
+
+## Session 95: Base native deposits through standard RPC
+
+**Date**: 2026-10-28
+**Task**: Base native deposits through standard RPC
+**Branch**: `main`
+
+### Summary
+
+Replaced Base native trace scanning with bounded standard transaction batches and verified receipts. Preserved legacy root-event replay identity, durable cooldowns and Ethereum/ERC20 behavior. Added 41 fixtures; all 64 timed-deposit tests executed successfully after correcting the isolated provider DB name. Architecture 11, Clippy, all-target check, fmt and Web 1212 tests/typecheck/lint/policy/coverage/build passed. Existing Web JS budget remains over limit. Live 25-call RPC sample passed; 100-call batch throttled. No push, deployment or production recovery claim; Base internal ETH excluded. Isolated MySQL cleaned up; unrelated agent-management work retained.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0bc71a9` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
