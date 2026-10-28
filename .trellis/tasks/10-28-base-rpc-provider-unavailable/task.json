@@ -1,0 +1,31 @@
+{
+  "id": "base-rpc-provider-unavailable",
+  "name": "base-rpc-provider-unavailable",
+  "title": "诊断Base充值监听RPC渠道不可用",
+  "description": "Diagnosed a Base RPC plan restriction for debug_traceBlockByHash; no business code changes.",
+  "status": "review",
+  "dev_type": "diagnostic",
+  "scope": "wallet",
+  "package": null,
+  "priority": "P2",
+  "creator": "rust-chain",
+  "assignee": "rust-chain",
+  "createdAt": "2026-10-28",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    ".trellis/tasks/10-28-base-rpc-provider-unavailable/prd.md",
+    ".trellis/tasks/10-28-base-rpc-provider-unavailable/research/diagnosis.md",
+    ".trellis/tasks/10-28-base-rpc-provider-unavailable/research/rpc-probe.json",
+    "docs/superpowers/PROGRESS.md"
+  ],
+  "notes": "Six read-only RPC probes; user confirmed the same method error in production. Provider entitlement/configuration change and actual production recovery remain outstanding.",
+  "meta": {}
+}

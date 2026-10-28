@@ -1,0 +1,97 @@
+[
+  {
+    "at": "2026-10-28T12:15:15.266821+00:00",
+    "method": "eth_getBlockByNumber",
+    "argument_mode": "hashes",
+    "http_status": 200,
+    "result_type": "dict",
+    "transaction_count": 225
+  },
+  {
+    "at": "2026-10-28T12:15:17.906708+00:00",
+    "method": "eth_getBlockByNumber",
+    "argument_mode": "full",
+    "http_status": 200,
+    "rpc_error": {
+      "code": -32601,
+      "message": "Method not available on this plan with fullTransactions=true: eth_getBlockByNumber. Request the block without full transaction bodies, or upgrade your subscription at [URL REDACTED]"
+    }
+  },
+  {
+    "at": "2026-10-28T12:15:20.453060+00:00",
+    "method": "eth_getBlockByHash",
+    "argument_mode": "full",
+    "http_status": 200,
+    "rpc_error": {
+      "code": -32601,
+      "message": "Method not available on this plan with fullTransactions=true: eth_getBlockByHash. Request the block without full transaction bodies, or upgrade your subscription at [URL REDACTED]"
+    }
+  },
+  {
+    "at": "2026-10-28T12:15:22.945423+00:00",
+    "method": "eth_getTransactionByHash",
+    "argument_mode": "single",
+    "http_status": 200,
+    "result_type": "dict"
+  },
+  {
+    "at": "2026-10-28T12:15:25.420095+00:00",
+    "method": "eth_getTransactionReceipt",
+    "argument_mode": "single",
+    "http_status": 200,
+    "result_type": "dict",
+    "receipt_status": "0x1"
+  },
+  {
+    "at": "2026-10-28T12:16:56.580667+00:00",
+    "method": "eth_getBlockByNumber",
+    "http_status": 200
+  },
+  {
+    "at": "2026-10-28T12:16:59.595912+00:00",
+    "method": "eth_getBlockReceipts",
+    "http_status": 200,
+    "rpc_error": {
+      "code": -32601,
+      "message": "Method not available on this plan: eth_getBlockReceipts. Upgrade your subscription at [URL REDACTED] for full method access."
+    }
+  },
+  {
+    "at": "2026-10-28T12:18:57.463482+00:00",
+    "method": "eth_getTransactionByHash batch",
+    "requested": 3,
+    "http_status": 200,
+    "response_type": "list",
+    "response_count": 3,
+    "all_match": true,
+    "errors": []
+  },
+  {
+    "at": "2026-10-28T12:25:49.928431+00:00",
+    "operation": "read_block_hashes",
+    "http_status": 200
+  },
+  {
+    "at": "2026-10-28T12:25:52.583291+00:00",
+    "operation": "query_transactions_batch_25",
+    "http_status": 200,
+    "count": 25,
+    "error_codes": [],
+    "all_have_result": true,
+    "all_identities_match": true
+  },
+  {
+    "at": "2026-10-28T12:25:55.231475+00:00",
+    "operation": "read_sample_positive_transfer_receipt",
+    "http_status": 200,
+    "status": "0x1",
+    "all_identity_fields_match": true
+  },
+  {
+    "at": "2026-10-28T12:25:57.705772+00:00",
+    "operation": "query_transactions_batch_100",
+    "http_status": 429,
+    "rpc_error_code": -32005,
+    "observation": "Plan throughput limit returned for the 100-call batch"
+  }
+]

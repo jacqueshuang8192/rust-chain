@@ -23,10 +23,16 @@
 | 网络 | 本批资产 | 所需节点能力 |
 |---|---|---|
 | Ethereum | ETH、明确配置的 ERC20 | 主网 chainId 1；完整区块、按 blockHash 的日志、decimals；原生 ETH 还要求 `debug_traceBlockByHash` 的 `callTracer` |
-| Base | ETH、明确配置的 ERC20 | 主网 chainId 8453；同上，原生内部转账依赖 callTracer |
+| Base | 直接转入的 ETH、明确配置的 ERC20 | 主网 chainId 8453；区块交易哈希、批量 `eth_getTransactionByHash`、`eth_getTransactionReceipt` 成功回执；ERC20 使用按 blockHash 的日志与 decimals。不需要 debug/trace 或完整交易区块接口，合约内部 ETH 转账不会自动到账 |
 | Tron | 明确配置的 TRC20 | 主网 FullNode，`getnowblock`、`getblockbynum`、`gettransactioninfobyblocknum`、合约精度常量调用；原生 TRX 暂不开放 |
 | Bitcoin | BTC | 已同步的主网 Bitcoin Core JSON-RPC，`getblockchaininfo`、`getblockhash`、`getblock` verbosity 2；使用可访问的历史区块，逐 vout 匹配，coinbase 不作为充值 |
 | Solana | SOL、经典 SPL Token | mainnet-beta 的完整 finalized `jsonParsed` 区块、inner instructions、mint 元数据、slot/区块时间；Token2022 暂不开放 |
+
+Base 原生 ETH 使用普通 RPC：以 `eth_getBlockByNumber(height, false)` 读取交易哈希，每组最多 25 笔批量查询交易，仅为正金额且直接转入受监听地址的交易查询回执，核对成功状态、区块哈希/高度、交易哈希/位置及双方地址后生成到账证据。批量响应按 ID 还原顺序，漏项、重复或错误结果使整块失败。失败交易、零金额、自转账、合约创建和合约内部转账不生成原生充值证据。ERC20 处理方式不变；Ethereum 仍支持调用树和内部 ETH 转账。
+
+含原生资产的 Base 每轮最多处理 4 个区块，所有请求仍经过渠道/Key 持久节流。批量查询仍消耗每笔方法调用的服务商额度，不能视为增加了账户吞吐；套餐限流时继续冷却重试。需在部署后观察是否持续追上区块，不能仅凭单次接口成功宣布充值恢复。
+
+部署此改动不需要数据库迁移，也不会重置扫描位置或清除渠道冷却。已有直接转账沿用原调用树根事件的去重编号，补扫不会重新创建同一笔证据；已经保存的内部转账证据不删除，但尚未观测到的内部 ETH 付款不在新的 Base 自动扫描范围。运营需明确告知用户仅使用直接转账充值 Base ETH。发布后等待原冷却结束，检查完整扫描成功并追上区块；有历史积压时保留补扫，不要用跳块替代恢复。
 
 节点凭据可放在节点 URL 的受控鉴权路径中；API 密钥字段在 Tron 使用 `TRON-PRO-API-KEY`，其他网络使用 Bearer。Bitcoin Core 的用户密码鉴权可使用节点 URL 的 Basic Auth 信息，务必使用受信网络或 TLS 代理。所有地址只需要收款地址，系统不接收私钥。
 

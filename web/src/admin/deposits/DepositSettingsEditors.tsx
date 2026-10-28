@@ -70,7 +70,7 @@ function InitialScannerForm({ scanner, dirty, busy, setBusy, saved }: CommonProp
       <p className="muted">{scanner.api_key_configured ? 'API 密钥已配置。' : 'API 密钥未配置。'} 留空保留原值。</p>
       <label>确认数 / Solana finalized slot 深度<AdminTextInput ariaLabel="充值确认数" value={confirmations} onChange={value => { dirty(); setConfirmations(value); }} /></label>
     </fieldset>
-    <p>停止接单后仍监听已有订单。Ethereum / Base 原生 ETH 需要节点支持 callTracer；Bitcoin 使用 Core RPC；Tron 监听 TRC20；Solana 监听 finalized 区块与经典 SPL Token。</p>
+    <p>停止接单后仍监听已有订单。Ethereum 原生 ETH 需要节点支持 callTracer；Base 原生 ETH 通过区块与回执识别直接转账，不支持合约内部转账；Bitcoin 使用 Core RPC；Tron 监听 TRC20；Solana 监听 finalized 区块与经典 SPL Token。</p>
     {error ? <Banner type="warning" description={error} /> : null}
     <ConfirmAction actionText="保存监听配置" title={`更新 ${networkLabel(scanner.network)} 监听配置`} disabled={busy || Boolean(error)}
       description="保存后等待监听重新追上区块，再恢复接单。原监听进度保留。" onConfirm={async reason => {

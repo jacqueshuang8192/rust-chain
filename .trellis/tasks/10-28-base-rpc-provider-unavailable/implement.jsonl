@@ -1,0 +1,3 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend guidelines and validation scope"}
+{"file": ".trellis/spec/backend/timed-deposits.md", "reason": "Native trace requirements, durable cooldown, credential redaction"}
+{"file": ".trellis/tasks/10-28-base-rpc-provider-unavailable/research/diagnosis.md", "reason": "Verified RPC observations, production symptom and operational limits"}

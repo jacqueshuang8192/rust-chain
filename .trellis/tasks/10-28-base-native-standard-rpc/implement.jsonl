@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/backend/timed-deposits.md", "reason": "Adapter, identity, accounting and cooldown contract"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Backend docs, tests and architecture checks"}
+{"file": ".trellis/spec/admin/ui-system.md", "reason": "Operator configuration UI conventions"}
+{"file": ".trellis/tasks/10-28-base-rpc-provider-unavailable/research/diagnosis.md", "reason": "Verified current plan restriction; user authorized direct-only follow-up"}
+{"file": ".trellis/tasks/10-28-base-native-standard-rpc/research/implementation.md", "reason": "Chosen ordinary RPC strategy, actual plan limits and replay invariants"}

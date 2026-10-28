@@ -10482,3 +10482,24 @@
 - 修改文件：docs/superpowers/PROGRESS.md；本地Git远程配置（不入库）。
 - 验证结果：origin与github8192的git ls-remote均返回a765097a4c748b911f8ff084a05adfb096fba8bc；两次推送成功。默认github.com身份无写权限，改用已验证的jacqueshuang8192身份后成功。沿用已通过的功能/浏览器/Mobile门禁结果，无业务代码变更；代理管理与既有未提交进度保持本地。
 - 后续事项：同步本条交付记录并复核两个远程最终SHA；未执行部署，竞猜开关发布需0164迁移。
+
+## 2026-10-28 13:42（Europe/Istanbul） - Base充值监听RPC套餐权限诊断
+
+- 完成内容：实测用户提供的Nodies节点，确认Base链ID、区块读取和样例ERC20精度/日志正常；debug_traceBlockByHash返回JSON-RPC -32601，明确提示当前套餐未开放。用户确认后台渠道错误为相同方法。核对原生ETH调用树要求、历史订单资产保留及持久冷却路径，给出开通方法权限或更换兼容节点的处理方式。
+- 修改文件：.trellis/tasks/10-28-base-rpc-provider-unavailable/内PRD、上下文、任务状态与research/diagnosis.md、research/rpc-probe.json；docs/superpowers/PROGRESS.md。无业务代码变更，无凭据入库。
+- 验证结果：6次低频只读RPC探测完成，5次基础读取正常、1次trace请求确认套餐拒绝；脱敏结果/密钥格式排除检查、task.py validate、git diff --check通过，src/migrations无改动。仅诊断文档，未重跑Rust/Web测试；未访问生产数据库或执行实链付款。
+- 后续事项：用户需开通debug_traceBlockByHash/callTracer或更换支持相同能力及历史区间的Base节点，冷却到期后复核完整扫描与准入恢复。尚未修改生产配置、提交推送或部署；具体冷却时间与生产恢复结果未验证。
+
+## 2026-10-28 15:36（Europe/Istanbul） - Base原生充值普通RPC路径实现
+
+- 完成内容：Base改为读取区块交易哈希、每组最多25笔批量查询普通交易、核对成功回执；不调用trace或完整交易区块接口。保留原根事件编号、区块身份/状态校验、历史游标与冷却，Base原生每轮最多4块；同步后台直接转账范围说明和运营文档。
+- 修改文件：scanners.rs、scanners/evm.rs、扫描器测试入口及新增Base回归、后台充值setupStatus/编辑说明、backend/timed-deposits规范、运营手册和10-28-base-native-standard-rpc任务记录。
+- 验证结果：扫描器首轮58项报告成功，其中56项实际执行、2项因隔离数据库未配置跳过；新增41项覆盖批量乱序/漏项/重号、回执失败、去重兼容等。后台定向3文件40/40通过。实测25笔批量和成功回执可用；完整交易块/整块回执受套餐限制，100笔批量触发429，因此采用25笔上限。
+- 后续事项：隔离MySQL已启动，继续资金/冷却/恢复实库回归、Rust静态检查及最终Web门禁；尚未提交、推送或部署。仅识别Base外层直接ETH转账，实际持续追块能力待部署观察。
+
+## 2026-10-28 15:44（Europe/Istanbul） - Base普通RPC充值最终验证
+
+- 完成内容：完成Base专用普通RPC扫描、每组25笔与每轮4块上限、回执严格校验和旧根事件去重兼容；保留Ethereum内部转账和ERC20原逻辑。同步后台说明、运营手册、规范与脱敏诊断记录，准备精确本地提交。
+- 修改文件：本任务task.json.relatedFiles及10-28-base-rpc-provider-unavailable诊断记录；仅暂存本次Base任务进度段，已有代理管理代码/规范/进度保留工作区。
+- 验证结果：充值相关64项全部实际执行通过（初轮63通过，渠道测试因测试库命名防护拒绝；改用专用timed_deposits_test_ha后单项复验通过）；新增41项Base/批量回归。架构11/11、生产Clippy、all-target check、fmt、diff及任务校验通过；Web全量1212/1212、类型/lint/policy15/coverage23/build通过。Web包体既有超限仍为2785289/2600000（本次文案+192字节），未放宽预算。隔离MySQL已关闭并清理。
+- 后续事项：本地提交归档；未推送或部署，无迁移。Base合约内部ETH转账不自动识别；部署后等待原冷却结束并验证持续追块及新单准入，当前套餐大批量429和持续吞吐仍需运营观察。未验证生产到账或浏览器视觉，仅修改后台说明文字。

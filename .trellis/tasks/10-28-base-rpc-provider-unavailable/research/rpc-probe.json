@@ -1,0 +1,64 @@
+[
+  {
+    "at": "2026-10-28T10:38:05.054117+00:00",
+    "method": "eth_chainId",
+    "http_status": 200,
+    "result": "0x2105",
+    "elapsed_ms": 766
+  },
+  {
+    "at": "2026-10-28T10:38:07.825818+00:00",
+    "method": "eth_getBlockByNumber",
+    "http_status": 200,
+    "result": {
+      "number": "0x32bb9d6",
+      "timestamp": "0x6ae1d08f",
+      "hash": "0x001b8ed699caa7c83ac319551b11eae12a0707198f45e27492e6220d0e074707",
+      "transactions": 309
+    },
+    "elapsed_ms": 602
+  },
+  {
+    "at": "2026-10-28T10:38:10.432935+00:00",
+    "method": "eth_getBlockByNumber",
+    "http_status": 200,
+    "result": {
+      "number": "0x32bb9c2",
+      "timestamp": "0x6ae1d067",
+      "hash": "0x2bee8f620412f23a505c049aed11af9b95562b6c7fee2e299d2ba1c5442559ba",
+      "transactions": 317
+    },
+    "elapsed_ms": 598
+  },
+  {
+    "at": "2026-10-28T10:38:48.727986+00:00",
+    "method": "eth_call",
+    "test_block": "0x32bb9c2",
+    "http_status": 200,
+    "response_bytes": 102,
+    "result": "0x0000000000000000000000000000000000000000000000000000000000000012",
+    "elapsed_ms": 505
+  },
+  {
+    "at": "2026-10-28T10:38:51.234931+00:00",
+    "method": "eth_getLogs",
+    "test_block": "0x32bb9c2",
+    "http_status": 200,
+    "response_bytes": 15940,
+    "result_count": 25,
+    "all_logs_match_block": true,
+    "elapsed_ms": 592
+  },
+  {
+    "at": "2026-10-28T10:38:53.829800+00:00",
+    "method": "debug_traceBlockByHash",
+    "test_block": "0x32bb9c2",
+    "http_status": 200,
+    "response_bytes": 199,
+    "rpc_error": {
+      "code": -32601,
+      "message": "Method not available on this plan: debug_traceBlockByHash. Upgrade your subscription at [URL REDACTED] for full method access."
+    },
+    "elapsed_ms": 595
+  }
+]

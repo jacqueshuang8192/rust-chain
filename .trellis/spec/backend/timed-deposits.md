@@ -129,7 +129,8 @@ Supported adapter boundaries:
 
 | Network | Assets | Node requirements |
 |---|---|---|
-| Ethereum/Base | ETH, configured ERC20 | Mainnet chainId 1/8453; blockHash logs; decimals; callTracer for native external/internal successful calls |
+| Ethereum | ETH, configured ERC20 | Mainnet chainId 1; blockHash logs; decimals; callTracer for native external/internal successful calls |
+| Base | Direct ETH transfers, configured ERC20 | Mainnet chainId 8453; blockHash logs; decimals; block transaction hashes, batched transaction lookups and individual receipts; no trace or fullTransactions=true requirement |
 | Tron | Configured TRC20 | Mainnet FullNode, complete block transaction receipts and executed Transfer logs; native TRX rejected |
 | Bitcoin | BTC | Synchronized mainnet Bitcoin Core, getblock verbosity 2; each vout independent; exclude coinbase |
 | Solana | SOL, classic SPL | Mainnet-beta, finalized full jsonParsed blocks and inner instructions; verify mint program/decimals; Token2022 excluded |
@@ -141,6 +142,34 @@ order admission. RPC errors do not advance the cursor; replayed completed events
 are idempotent. Reorganization recovery requires reconciliation and a reviewed
 checkpoint repair. Ordinary restart/configuration saves never skip blocks; the
 explicit audited recovery action below is the only supported head-jump path.
+
+Base native scanning requests `eth_getBlockByNumber(height, false)`, then batches
+`eth_getTransactionByHash(hash)` in groups of at most 25 when a native asset is
+included (including mappings retained for historical orders). Each HTTP batch
+uses the existing durable gate; restore response order by numeric JSON-RPC IDs,
+reject missing/duplicate/out-of-range IDs or any failed subcall, and require each
+returned transaction hash to equal the requested block hash-list entry. Every
+transaction must have a unique hash, matching block hash/height, its exact array
+index, valid sender, explicit recipient (null only for creation), and a hex value.
+Only positive, non-self transfers to watched recipients request
+`eth_getTransactionReceipt(txHash)`. Require matching transaction/block identity,
+index, sender and recipient; status 1 credits the outer transfer, status 0 skips
+it, and missing/unknown status or incomplete/mismatched evidence fails the block.
+No debug/trace call, contract-creation attribution or internal native transfer
+inference is allowed on Base. ERC20 logs and Ethereum callTracer remain unchanged.
+
+Native Base receipt `event_index` stays `0x80000000` for each transaction, matching
+the previous callTracer root event; the uniqueness key also includes network and
+transaction hash. Do not substitute transactionIndex or a new index namespace:
+replaying an old direct payment must reach the existing receipt/credit. Existing
+internal receipts remain stored; new or unobserved historical internal payments
+are outside direct-only support. Operator help must disclose this boundary.
+This change has no HTTP DTO, database or migration change and never clears
+durable cooldowns or checkpoints automatically.
+Base rounds with native assets cap the existing adaptive batch at four blocks
+because transaction lookup batches add requests. Provider per-method usage still
+applies to every subcall; batching is not a quota multiplier. HTTP 429 continues
+to cool the selected key, and sustained catch-up depends on actual plan capacity.
 
 ### Provider failover and durable rate control
 
@@ -289,6 +318,9 @@ No HTTP failure advances the cursor or marks the scanner ready.
 | Main key 429, backup key 401, next key healthy | Persist isolated cooldowns; validated backup initializes/continues same checkpoint |
 | All providers cooling/failing | No additional node requests; preserve cursor; network error closes admission |
 | Existing provider/key saved with blank secrets | Retain encrypted values and cooldown state |
+| Base native direct transfer with matching successful receipt | Produce one native root event at `0x80000000`; no trace calls |
+| Base reverted/zero/self/creation/internal-only ETH transfer | No native deposit evidence |
+| Base receipt absent, mismatched, malformed or unknown status | Fail entire block; do not advance progress or partially settle that batch |
 | Cross-network provider ID / cross-provider key ID | Reject and roll back entire configuration/audit |
 | Provider URL template and enabled empty key | Reject; no anonymous fallback |
 
@@ -367,3 +399,14 @@ provider account evidence before claiming a specific operational root cause.
 Wrong: direct SQL head reset, or classify every `/recovery` action as operate.
 Correct: use the reasoned, revision-pinned network-write request and validate its
 confirmed target in the worker; never erase retained history without explicit skip.
+
+Wrong: replace Base traces with transaction values without checking receipt
+success, or assign transactionIndex as the native event index. Correct: verify
+successful receipt identity and retain the old trace-root event index. Required
+fixtures cover mixed ERC20/native blocks, 18-decimal amounts, reverted and excluded
+transfers, malformed/duplicate transactions, all receipt identity mismatches,
+missing receipts after an earlier valid transfer, anchor/token-only request
+shapes, and equality with the retained Ethereum trace-root evidence. Keep the
+Ethereum internal-transfer regression; Base direct-only support must not narrow it.
+Batch fixtures must include shuffled replies, multiple 25-call chunks, empty
+requests, missing results, individual errors and invalid response IDs/versions.

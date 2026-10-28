@@ -185,6 +185,13 @@ async fn scan(
     }
     let interval = node.gate.as_ref().map_or(250, |gate| gate.interval());
     let batch = (12_000 / (u64::from(interval) * 4)).clamp(1, 32);
+    // Base 原生扫描需分片查询每笔交易，限制区块数为持久节流和整轮超时留出余量。
+    let batch =
+        if context.network == "base" && context.assets.iter().any(|a| a.asset_kind == "native") {
+            batch.min(4)
+        } else {
+            batch
+        };
     let end = safe.min(cursor.height.saturating_add(batch));
     if end <= cursor.height {
         return Ok((cursor, 0, true));
@@ -398,6 +405,60 @@ impl Node {
                 json!({"jsonrpc":"2.0","id":1,"method":method,"params":params}),
             )
             .await?;
+        self.rpc_result(method, &response).await
+    }
+
+    /// 批量请求按最多二十五个只读调用分片，每个 HTTP 请求仍经过持久节流；响应按 ID 重排，拒绝漏项和重号。
+    /// 任一子调用失败则不返回部分结果，保留渠道冷却与故障切换语义，诊断不包含参数或上游原文。
+    async fn rpc_batch(&self, method: &'static str, params: Vec<Value>) -> AppResult<Vec<Value>> {
+        let mut results = Vec::with_capacity(params.len());
+        for chunk in params.chunks(25) {
+            let requests: Vec<_> = chunk.iter().enumerate().map(|(index, params)| {
+                json!({"jsonrpc":"2.0","id":index + 1,"method":method,"params":params})
+            }).collect();
+            let response = self.post_operation("", method, json!(requests)).await?;
+            let ordered = (|| -> AppResult<Vec<&Value>> {
+                let replies = array(&response)?;
+                if replies.len() != chunk.len() {
+                    return Err(failure("chain RPC batch response count mismatch"));
+                }
+                let mut ordered = vec![None; chunk.len()];
+                for reply in replies {
+                    let index = integer(&reply["id"])?
+                        .checked_sub(1)
+                        .and_then(|id| usize::try_from(id).ok())
+                        .filter(|id| *id < chunk.len())
+                        .ok_or_else(|| failure("chain RPC batch response ID is invalid"))?;
+                    if reply["jsonrpc"] != "2.0" || ordered[index].replace(reply).is_some() {
+                        return Err(failure("chain RPC batch response identity mismatch"));
+                    }
+                }
+                ordered
+                    .into_iter()
+                    .map(|reply| {
+                        reply.ok_or_else(|| failure("chain RPC batch response is incomplete"))
+                    })
+                    .collect()
+            })();
+            let ordered = match ordered {
+                Ok(ordered) => ordered,
+                Err(error) => {
+                    if let Some(gate) = &self.gate {
+                        gate.failed("RPC 批量响应不完整或标识无效，请检查渠道接口", true, 60)
+                            .await?;
+                    }
+                    return Err(error);
+                }
+            };
+            for reply in ordered {
+                results.push(self.rpc_result(method, reply).await?);
+            }
+        }
+        Ok(results)
+    }
+
+    /// 普通与批量 RPC 共用错误分类，任一方法错误按原规则冷却渠道；缺失结果不能当成空数据继续扫描。
+    async fn rpc_result(&self, method: &'static str, response: &Value) -> AppResult<Value> {
         if !response["error"].is_null() {
             if let Some(gate) = &self.gate {
                 gate.failed(

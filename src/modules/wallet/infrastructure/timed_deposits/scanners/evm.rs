@@ -1,4 +1,4 @@
-//! Ethereum/Base 的 ERC20 日志和原生币调用树；区块哈希绑定所有读取，失败调用不产生到账。
+//! EVM 代币日志、Ethereum 调用树与 Base 原生直接转账；区块身份绑定读取，失败交易不产生到账。
 
 use super::*;
 
@@ -28,9 +28,11 @@ pub(super) async fn head(node: &Node, assets: &[ChainAsset]) -> AppResult<u64> {
     hex_integer(&latest["number"])
 }
 
-/// 同一块的原生调用树与代币日志使用互不重叠事件索引；节点缺少 trace 能力时禁止开放原生币充值。
+/// 原生币与代币日志使用不重叠的事件索引；Base 批量读取区块内交易并核对成功回执，Ethereum 保留调用树。
 pub(super) async fn block(node: &Node, height: u64, context: &Context) -> AppResult<Block> {
-    let data = node
+    let native = context.assets.iter().find(|a| a.asset_kind == "native");
+    let direct_native = node.network == "base" && native.is_some();
+    let mut data = node
         .rpc(
             "eth_getBlockByNumber",
             json!([format!("0x{height:x}"), false]),
@@ -103,7 +105,27 @@ pub(super) async fn block(node: &Node, height: u64, context: &Context) -> AppRes
             }
         }
     }
-    if let Some(asset) = context.assets.iter().find(|a| a.asset_kind == "native") {
+    if let Some(asset) = native.filter(|_| direct_native) {
+        let hashes = array(&data["transactions"])?;
+        let params = hashes
+            .iter()
+            .map(|hash| text(hash).map(|hash| json!([hash])))
+            .collect::<AppResult<Vec<_>>>()?;
+        let transactions = node.rpc_batch("eth_getTransactionByHash", params).await?;
+        for (hash, transaction) in hashes.iter().zip(&transactions) {
+            if text(hash)? != text(&transaction["hash"])? {
+                return Err(failure(
+                    "EVM transaction hash does not match requested block",
+                ));
+            }
+        }
+        data["transactions"] = json!(transactions);
+        block
+            .receipts
+            .extend(direct_native_receipts(node, &data, &block, context, asset, time).await?);
+        return Ok(block);
+    }
+    if let Some(asset) = native {
         let traces=node.rpc("debug_traceBlockByHash",json!([block.hash,{"tracer":"callTracer","timeout":"15s","tracerConfig":{"onlyTopCall":false}}])).await?;
         let transactions = array(&data["transactions"])?;
         if array(&traces)?.len() != transactions.len() {
@@ -162,6 +184,78 @@ pub(super) async fn block(node: &Node, height: u64, context: &Context) -> AppRes
         }
     }
     Ok(block)
+}
+
+/// Base 只核对正金额且收款地址受监听的外层交易；回执必须成功并与区块、交易、位置和双方地址完全一致。
+/// 保留旧调用树根事件的索引以复用历史去重键；内部转账和合约创建不推测到账，任何缺失证据使整块失败。
+async fn direct_native_receipts(
+    node: &Node,
+    data: &Value,
+    block: &Block,
+    context: &Context,
+    asset: &ChainAsset,
+    time: DateTime<Utc>,
+) -> AppResult<Vec<ChainReceipt>> {
+    let mut receipts = Vec::new();
+    let mut hashes = HashSet::new();
+    let address = |value: &Value| {
+        canonical_address(&context.network, text(value)?)
+            .map_err(|_| failure("invalid EVM transaction address"))
+    };
+    for (index, transaction) in array(&data["transactions"])?.iter().enumerate() {
+        let hash = text(&transaction["hash"])?;
+        if !hashes.insert(hash)
+            || text(&transaction["blockHash"])? != block.hash
+            || hex_integer(&transaction["blockNumber"])? != block.height
+            || hex_integer(&transaction["transactionIndex"])? != index as u64
+        {
+            return Err(failure("EVM transaction block identity mismatch"));
+        }
+        let from = address(&transaction["from"])?;
+        let to = transaction
+            .get("to")
+            .ok_or_else(|| failure("EVM transaction recipient is missing"))?;
+        let raw = text(&transaction["value"])?
+            .strip_prefix("0x")
+            .filter(|raw| {
+                !raw.is_empty() && raw.len() <= 64 && raw.bytes().all(|b| b.is_ascii_hexdigit())
+            })
+            .ok_or_else(|| failure("invalid EVM native value"))?;
+        let amount =
+            raw_amount(raw, 16, asset.decimals).map_err(|_| failure("invalid EVM native value"))?;
+        if to.is_null() {
+            continue;
+        }
+        let to = address(to)?;
+        if amount <= 0 || from == to || !context.addresses.contains(&to) {
+            continue;
+        }
+        let evidence = node.rpc("eth_getTransactionReceipt", json!([hash])).await?;
+        if text(&evidence["transactionHash"])? != hash
+            || text(&evidence["blockHash"])? != block.hash
+            || hex_integer(&evidence["blockNumber"])? != block.height
+            || hex_integer(&evidence["transactionIndex"])? != index as u64
+            || address(&evidence["from"])? != from
+            || address(&evidence["to"])? != to
+        {
+            return Err(failure("EVM transaction receipt identity mismatch"));
+        }
+        match hex_integer(&evidence["status"])? {
+            0 => continue,
+            1 => receipts.push(receipt(
+                context,
+                block,
+                time,
+                hash,
+                0x8000_0000,
+                asset,
+                to,
+                amount,
+            )?),
+            _ => return Err(failure("invalid EVM transaction receipt status")),
+        }
+    }
+    Ok(receipts)
 }
 
 /// Transfer 收款 topic 必须为左补零的 32 字节地址；不能截断任意输入形成其他收款人。
