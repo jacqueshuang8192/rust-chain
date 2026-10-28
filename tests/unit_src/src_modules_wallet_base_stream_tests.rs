@@ -460,3 +460,212 @@ async fn base_stream_migration_preserves_all_checkpoints_and_fences_workers() {
     );
     pool.close().await;
 }
+
+#[tokio::test]
+async fn base_trace_upgrade_retires_only_obsolete_cooldowns_and_resumes_both_streams() {
+    let Some(pool) = pool(
+        "DEPOSIT_TRACE_UPGRADE_DATABASE_URL",
+        "timed_deposits_test_trace_upgrade",
+    )
+    .await
+    else {
+        return;
+    };
+    let mut old = sqlx::migrate!("./migrations");
+    old.migrations =
+        std::borrow::Cow::Owned(old.iter().filter(|m| m.version < 166).cloned().collect());
+    old.run(&pool).await.unwrap();
+    let server = MockServer::start().await;
+    let time = Utc::now().timestamp() - 1;
+    Mock::given(matchers::method("POST"))
+        .respond_with(move |request: &wiremock::Request| {
+            let body: Value = serde_json::from_slice(&request.body).unwrap();
+            let answer = |v: &Value| {
+                let result = match v["method"].as_str().unwrap() {
+                    "eth_chainId" => json!("0x2105"),
+                    "eth_call" => json!("0x6"),
+                    "eth_getBlockByNumber" => {
+                        let height = if v["params"][0] == "latest" { 101 } else {
+                            u64::from_str_radix(v["params"][0].as_str().unwrap().trim_start_matches("0x"), 16).unwrap()
+                        };
+                        json!({"number":format!("0x{height:x}"),"hash":format!("b{height}"),"parentHash":format!("b{}",height-1),"timestamp":format!("0x{time:x}"),"transactions":if height==101 {json!(["native-payment"])} else {json!([])}})
+                    }
+                    "eth_getTransactionByHash" => json!({"hash":"native-payment","blockHash":"b101","blockNumber":"0x65","transactionIndex":"0x0","from":FROM,"to":ADDRESS,"value":"0xde0b6b3a7640000"}),
+                    "eth_getLogs" => json!([]),
+                    method => panic!("unexpected method after Base upgrade: {method}"),
+                };
+                json!({"jsonrpc":"2.0","id":v["id"],"result":result})
+            };
+            ResponseTemplate::new(200).set_body_json(if let Some(batch) = body.as_array() {
+                Value::Array(batch.iter().map(answer).collect())
+            } else { answer(&body) })
+        }).mount(&server).await;
+    let endpoint = crate::infra::secrets::encrypt_secret_field(KEY, Some(&server.uri()), None)
+        .unwrap()
+        .unwrap();
+    sqlx::query("UPDATE wallet_deposit_scanners SET enabled=TRUE,confirmations=1,endpoint_encrypted=?,revision=77,cursor_json=?,last_error='chain RPC method debug_traceBlockByHash failed' WHERE network='base'")
+        .bind(&endpoint).bind(Json(json!({"height":100,"hash_height":100,"hash":"b100"}))).execute(&pool).await.unwrap();
+    for (symbol, kind, token, decimals) in
+        [("ETH", "native", "", 18), ("BUGUSDC", "token", TOKEN, 6)]
+    {
+        sqlx::query("INSERT INTO assets(symbol,name,precision_scale) VALUES (?,?,?) ON DUPLICATE KEY UPDATE precision_scale=VALUES(precision_scale)")
+            .bind(symbol).bind(symbol).bind(decimals).execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO wallet_deposit_chain_assets(network,asset_id,asset_symbol,asset_kind,token_address,identity_key,decimals,enabled) SELECT 'base',id,symbol,?,?,SHA2(?,256),?,TRUE FROM assets WHERE symbol=?")
+            .bind(kind).bind(token).bind(symbol).bind(decimals).bind(symbol).execute(&pool).await.unwrap();
+    }
+    const TRACE_ERROR: &str = "RPC 方法 debug_traceBlockByHash 失败，请检查渠道权限和额度";
+    let mut provider_ids = Vec::new();
+    for (network, enabled, error) in [
+        ("base", true, TRACE_ERROR),
+        ("base", false, TRACE_ERROR),
+        ("base", true, "节点返回 HTTP 429"),
+        (
+            "base",
+            true,
+            "RPC 方法 eth_getLogs 失败，请检查渠道权限和额度",
+        ),
+        ("eth", true, TRACE_ERROR),
+        ("base", true, "节点连接失败"),
+    ] {
+        provider_ids.push(sqlx::query("INSERT INTO wallet_deposit_scanner_providers(network,name,enabled,endpoint_encrypted,request_interval_ms,cooldown_until,last_error,failure_count,last_success_at,next_request_at) VALUES (?,'Upgrade fixture',?,?,100,DATE_ADD(CURRENT_TIMESTAMP(6),INTERVAL 64 MINUTE),?,8,'2026-01-01 00:00:00','2026-01-01 00:00:01')")
+            .bind(network).bind(enabled).bind(&endpoint).bind(error).execute(&pool).await.unwrap().last_insert_id());
+    }
+    for (name, error) in [
+        ("available", None),
+        ("limited", Some("HTTP 429")),
+        ("unauthorized", Some("HTTP 401")),
+    ] {
+        sqlx::query("INSERT INTO wallet_deposit_scanner_keys(provider_id,name,request_interval_ms,last_error,cooldown_until,failure_count,next_request_at) VALUES (?,?,100,?,IF(? IS NULL,NULL,DATE_ADD(CURRENT_TIMESTAMP(6),INTERVAL 1 DAY)),3,'2026-01-01 00:00:01')")
+            .bind(provider_ids[0]).bind(name).bind(error).bind(error).execute(&pool).await.unwrap();
+    }
+    sqlx::query("UPDATE wallet_deposit_scanner_streams SET cursor_json=?,last_error='chain RPC method debug_traceBlockByHash failed' WHERE network='base'")
+        .bind(Json(json!({"height":100,"hash_height":100,"hash":"b100"}))).execute(&pool).await.unwrap();
+
+    // 新代码仍被旧共享冷却挡在发送前：两路均没有请求，也不能推进游标。
+    run_once(&pool, Some(KEY)).await.unwrap();
+    assert!(server.received_requests().await.unwrap().is_empty());
+    let before = snapshot(&pool).await;
+    assert_eq!(before.providers[0].last_error.as_deref(), Some(TRACE_ERROR));
+    for stream in &before.streams {
+        assert_eq!(stream.cursor_height, Some(100));
+        assert!(!stream.scan_fresh);
+        assert!(stream.last_error.as_deref().unwrap().contains("冷却"));
+    }
+
+    // 修复不能改写历史恢复、租约、准入或密钥冷却；保存完整状态做前后比较。
+    sqlx::query("UPDATE wallet_deposit_scanner_streams SET backfill_cursor_json=?,backfill_target_json=?,recovery_request_json=?,backfill_last_error='anchor mismatch',backfill_blocked=TRUE,lease_token='fixture-lease',lease_until=DATE_ADD(CURRENT_TIMESTAMP(6),INTERVAL 60 SECOND) WHERE stream='token'")
+        .bind(Json(json!({"height":50,"hash_height":50,"hash":"b50"}))).bind(Json(json!({"height":100,"hash_height":100,"hash":"b100"}))).bind(Json(json!({"mode":"backfill","admin_id":1,"reason":"pending fixture"}))).execute(&pool).await.unwrap();
+    let progress_sql = "SELECT JSON_OBJECT('network',network,'stream',stream,'cursor',cursor_json,'history',backfill_cursor_json,'target',backfill_target_json,'request',recovery_request_json,'error',last_error,'history_error',backfill_last_error,'blocked',backfill_blocked,'next',backfill_next_at,'fresh',last_scan_at,'lease',lease_token,'lease_until',lease_until) FROM wallet_deposit_scanner_streams ORDER BY stream";
+    let key_sql = "SELECT JSON_OBJECT('id',id,'provider',provider_id,'enabled',enabled,'secret',api_key_encrypted,'cooldown',cooldown_until,'error',last_error,'success',last_success_at,'count',failure_count,'next',next_request_at) FROM wallet_deposit_scanner_keys ORDER BY id";
+    let progress_before = sqlx::query_scalar::<_, Json<Value>>(progress_sql)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+    let keys_before = sqlx::query_scalar::<_, Json<Value>>(key_sql)
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+    let unaffected_sql = "SELECT JSON_OBJECT('id',id,'network',network,'enabled',enabled,'endpoint',endpoint_encrypted,'cooldown',cooldown_until,'error',last_error,'success',last_success_at,'count',failure_count,'next',next_request_at) FROM wallet_deposit_scanner_providers WHERE id NOT IN (?,?) ORDER BY id";
+    let unaffected_before = sqlx::query_scalar::<_, Json<Value>>(unaffected_sql)
+        .bind(provider_ids[0])
+        .bind(provider_ids[1])
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+    sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+    sqlx::migrate!("./migrations").run(&pool).await.unwrap();
+    let repaired = snapshot(&pool).await;
+    assert!(
+        repaired.providers[0].cooldown_until.is_none(),
+        "upgrade must retire the obsolete Base trace cooldown"
+    );
+    for provider in &repaired.providers[..2] {
+        assert!(provider.last_error.is_none());
+        assert!(
+            provider.last_success_at.is_none(),
+            "repair is not a successful scan"
+        );
+    }
+    assert!(!repaired.providers[1].enabled);
+    assert_eq!(repaired.revision, before.revision);
+    assert_eq!(
+        sqlx::query_scalar::<_, Json<Value>>(unaffected_sql)
+            .bind(provider_ids[0])
+            .bind(provider_ids[1])
+            .fetch_all(&pool)
+            .await
+            .unwrap(),
+        unaffected_before
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, Json<Value>>(progress_sql)
+            .fetch_all(&pool)
+            .await
+            .unwrap(),
+        progress_before
+    );
+    assert_eq!(
+        sqlx::query_scalar::<_, Json<Value>>(key_sql)
+            .fetch_all(&pool)
+            .await
+            .unwrap(),
+        keys_before
+    );
+    for (old, new) in before.providers[2..].iter().zip(&repaired.providers[2..]) {
+        assert_eq!(old.cooldown_until, new.cooldown_until);
+        assert_eq!(old.last_error, new.last_error);
+        assert_eq!(old.last_success_at, new.last_success_at);
+    }
+    let counts: Vec<u32> = sqlx::query_scalar(
+        "SELECT failure_count FROM wallet_deposit_scanner_providers ORDER BY id",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert_eq!(counts, vec![0, 0, 8, 8, 8, 8]);
+    let pacing: Vec<Option<DateTime<Utc>>> = sqlx::query_scalar(
+        "SELECT next_request_at FROM wallet_deposit_scanner_providers ORDER BY id",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    assert!(pacing.iter().all(|t| t.unwrap().timestamp() == 1767225601));
+
+    // 仅撤销本测试额外种入的历史/租约夹具，真实扫描从保留的100继续到101。
+    sqlx::query("UPDATE wallet_deposit_scanner_streams SET backfill_cursor_json=NULL,backfill_target_json=NULL,recovery_request_json=NULL,backfill_last_error=NULL,backfill_blocked=FALSE,lease_token=NULL,lease_until=NULL WHERE network='base'").execute(&pool).await.unwrap();
+    run_once(&pool, Some(KEY)).await.unwrap();
+    let resumed = snapshot(&pool).await;
+    for stream in &resumed.streams {
+        assert_eq!(stream.cursor_height, Some(101));
+        assert!(stream.last_error.is_none() && stream.scan_fresh);
+    }
+    assert!(resumed.providers[0].last_error.is_none());
+    assert!(resumed.providers[0].last_success_at.is_some());
+    assert!(
+        resumed.providers[0].keys[1..]
+            .iter()
+            .all(|k| k.cooldown_until.is_some())
+    );
+    let methods: Vec<String> = server
+        .received_requests()
+        .await
+        .unwrap()
+        .iter()
+        .flat_map(|request| {
+            let body: Value = serde_json::from_slice(&request.body).unwrap();
+            let calls = body.as_array().cloned().unwrap_or_else(|| vec![body]);
+            calls
+                .into_iter()
+                .map(|v| v["method"].as_str().unwrap().to_owned())
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    assert!(methods.iter().any(|m| m == "eth_getLogs"));
+    assert!(methods.iter().any(|m| m == "eth_getTransactionByHash"));
+    assert!(
+        methods
+            .iter()
+            .all(|m| !m.starts_with("debug_") && !m.starts_with("trace_"))
+    );
+    pool.close().await;
+}

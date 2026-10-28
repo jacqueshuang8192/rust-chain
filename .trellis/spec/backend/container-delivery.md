@@ -20,6 +20,10 @@
 - Internal listener: `/usr/local/bin/exchange-api` on `127.0.0.1:8081`.
 - Migration process: `/usr/local/bin/exchange-migrate`, applying embedded SQLx migrations and,
   only when `BOOTSTRAP_MODE=create_admin`, bootstrapping the first administrator before exiting.
+- Root `build.rs` watches `migrations/` with `cargo:rerun-if-changed=migrations`.
+  Docker's `builder` stage copies it before compiling. SQLx embeds existing files,
+  but adding a new file must also invalidate incremental Cargo artifacts; otherwise
+  a migration-only release can silently retain the previous migration list.
 - Health endpoint: `GET /health` returns HTTP 200 with `{"status":"ok"}`.
 - Published image: `ghcr.io/jacqueshuang-fresnostate/rust-chain:<tag>`.
 - Build workflow: native GitHub Actions matrix plus digest-based manifest finalization.

@@ -35,6 +35,7 @@ RUN CARGO_NET_RETRY=5 CARGO_HTTP_TIMEOUT=120 \
 
 FROM rust-dependencies AS builder
 
+COPY build.rs ./
 COPY migrations ./migrations
 COPY src ./src
 

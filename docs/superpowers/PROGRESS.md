@@ -10524,3 +10524,10 @@
 - 修改文件：docs/superpowers/PROGRESS.md（本次交付记录）。
 - 验证结果：两个远程fetch成功，推送前均为0落后/6领先且满足祖先关系；普通push均成功，git ls-remote均返回bd109412cc24ede62fb9e6d1f12fed6c6f792ade。本轮仅Git交付，沿用前轮数据库、Rust、Web及浏览器验证，未重跑业务测试或核实远程CI；既有Web包体超限保留。
 - 后续事项：同步本条交付记录并复核最终SHA；尚未部署。发布须先停旧充值扫描worker、执行0165迁移、同步后端与后台后启动worker，禁止新旧worker混跑；实链到账与真实套餐持续吞吐待上线验证。
+
+## 2026-10-28 19:44（Europe/Istanbul） - Base旧trace渠道冷却复现与定向修复
+
+- 完成内容：用户确认错误来自Base后台渠道状态；实库复现0165保留旧trace共享冷却，导致两路零请求且旧错误仍展示。新增0166仅清除确切旧Base trace渠道故障，保留Key真实限流、其他渠道故障及全部进度；补充build.rs及Docker复制，确保新增迁移触发重新嵌入。
+- 修改文件：migrations/0166_retire_base_trace_cooldown.sql、build.rs、Dockerfile、tests/unit_src/src_modules_wallet_base_stream_tests.rs、后端相关规范及充值操作手册、本任务记录。
+- 验证结果：修复前回归在旧冷却断言失败；修复后隔离MySQL三项Base迁移/分流/升级测试全部通过，SQLx重复运行成功；41项Base普通RPC回归通过。首次精确测试名未匹配到用例，未计入验证；发现新增迁移未触发旧增量测试产物重编译，补构建监听后通过。最终架构11/11、容器合同10/10、Clippy/all-target check/fmt及diff检查通过。
+- 后续事项：修复已验证，待提交交付。生产数据库和实际进程未访问，仍需停止旧worker、使用新构建迁移器执行0166后启动新版；不以清除错误替代成功追块。

@@ -164,12 +164,67 @@ transaction hash. Do not substitute transactionIndex or a new index namespace:
 replaying an old direct payment must reach the existing receipt/credit. Existing
 internal receipts remain stored; new or unobserved historical internal payments
 are outside direct-only support. Operator help must disclose this boundary.
-This change has no HTTP DTO, database or migration change and never clears
-durable cooldowns or checkpoints automatically.
+The RPC-path change has no HTTP DTO or schema change. Ordinary restarts never
+clear durable cooldowns or checkpoints. The one-time upgrade repair in 0166
+retires only the obsolete Base trace provider failure described below.
 Base rounds with native assets cap the existing adaptive batch at four blocks
 because transaction lookup batches add requests. Provider per-method usage still
 applies to every subcall; batching is not a quota multiplier. HTTP 429 continues
 to cool the selected key, and sustained catch-up depends on actual plan capacity.
+
+### Retiring obsolete Base trace cooldowns
+
+#### 1. Scope / Trigger
+
+After upgrading from trace-based Base scanning, Admin may still show the stored
+trace error and both streams may be excluded by its durable shared cooldown.
+A channel status message alone is not evidence of a new RPC invocation.
+
+#### 2. Signatures
+
+`0166_retire_base_trace_cooldown.sql` updates `wallet_deposit_scanner_providers`
+only where `network='base'` and `last_error` equals
+`RPC 方法 debug_traceBlockByHash 失败，请检查渠道权限和额度`.
+
+#### 3. Contracts
+
+Reset only those rows' `last_error`, `cooldown_until`, `failure_count` and stale
+`last_success_at`. Preserve enabled flags, endpoints, pacing, every key/scoped
+failure, network revision, leases, live/history cursors, queued recovery and
+financial records. Clearing a failure does not establish scanner freshness.
+Stop old workers before migrating; a fresh complete scan must validate progress.
+Never edit 0165 or treat a current trace error from a running Base process as a
+reason to repeatedly clear the DB: verify its deployed build and network first.
+
+#### 4. Validation & Error Matrix
+
+| State | Repair |
+|---|---|
+| Exact old Base trace provider error, active or disabled channel | Retire failure; preserve enabled flag |
+| Base quota/auth/connection/other-method failure | Preserve |
+| Ethereum trace failure | Preserve |
+| Historical integrity block or queued recovery | Preserve |
+| No matching legacy row | No-op |
+
+#### 5. Good / Base / Bad Cases
+
+Good: an eligible repaired channel resumes both streams from height 100 to 101.
+Base: a fresh database has nothing to retire. Bad: clear every cooldown or fake a
+successful scan to make the Admin green.
+
+#### 6. Tests Required
+
+Use isolated MySQL plus mock RPC: prove zero requests while the inherited provider
+cools, run the migrator twice, compare checkpoint/recovery/key/unrelated-provider
+snapshots, then resume both asset paths without trace. Include disabled channels,
+Ethereum and real HTTP quota/auth errors. New migration files must trigger Cargo
+rebuilds through root `build.rs`; Docker's builder must copy that file.
+
+#### 7. Wrong vs Correct
+
+Wrong: remove trace calls but assume persisted failure state disappears on restart.
+Correct: narrow immutable upgrade repair, then ordinary verified scanning; retain
+every genuine outage and historical checkpoint.
 
 ### Provider failover and durable rate control
 
