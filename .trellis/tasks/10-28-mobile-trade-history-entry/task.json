@@ -1,0 +1,31 @@
+{
+  "id": "mobile-trade-history-entry",
+  "name": "mobile-trade-history-entry",
+  "title": "Trade历史订单入口融入交易工作区",
+  "description": "",
+  "status": "in_progress",
+  "dev_type": "frontend",
+  "scope": "mobile",
+  "package": null,
+  "priority": "P2",
+  "creator": "rust-chain",
+  "assignee": "rust-chain",
+  "createdAt": "2026-10-28",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "mobile/src/views/TradeView.vue",
+    "mobile/tests/pencil-trading-product-selected-parity.test.ts",
+    ".trellis/spec/mobile/index.md",
+    "docs/superpowers/PROGRESS.md"
+  ],
+  "notes": "All acceptance criteria passed; see research/delivery.md. Local commit and archive only.",
+  "meta": {}
+}

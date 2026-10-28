@@ -10461,3 +10461,10 @@
 - 修改文件：本任务归档、Trellis会话与本进度记录。
 - 验证结果：沿用前条最终功能/数据库/浏览器验证结果；精确暂存26个本任务文件，git diff --cached --check通过，未纳入无关代码或进度。
 - 后续事项：未推送部署；发布先执行0164迁移。既有包体/文档门禁限制见交付记录；继续用户新提出的Trade历史订单按钮优化。
+
+## 2026-10-28 08:43（Europe/Istanbul） - Trade历史订单按钮沉浸优化
+
+- 完成内容：现货Trade历史订单入口去掉常驻方块底色，以低强调透明图标融入持仓标签栏；保留44×44触控区域，悬停/按下反馈、键盘焦点、低动态和中英文名称。
+- 修改文件：mobile/src/views/TradeView.vue、mobile/tests/pencil-trading-product-selected-parity.test.ts、.trellis/spec/mobile/index.md及本任务记录。
+- 验证结果：定向37/37；完整Mobile release:gate通过（923/923测试、类型、PWA/Tauri网页构建及产物/包体/源码/测试质量门禁）。Ego本地夹具验证320/390/448×明暗×中英文12组，按钮44×44、图标中心差0、无水平溢出；点击/Enter到历史委托、返回、焦点和低动态按压通过。原模板摘要仅放行本次新增class，未放宽预算。
+- 后续事项：本地提交归档；未推送部署，未做实盘交易或原生设备构建。本任务详见research/delivery.md。

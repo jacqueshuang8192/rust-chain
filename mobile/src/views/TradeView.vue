@@ -1789,7 +1789,7 @@ onBeforeUnmount(() => {
           >
             {{ t('orders.positions') }}
           </span>
-          <button type="button" :aria-label="t('trade.orderHistory')" @click="openOrders('history')">
+          <button class="spot-history-entry" type="button" :aria-label="t('trade.orderHistory')" @click="openOrders('history')">
             <History :size="19" aria-hidden="true" />
           </button>
         </nav>
@@ -3381,17 +3381,31 @@ onBeforeUnmount(() => {
   width: 100%;
 }
 
-.spot-account-tabs button:last-child {
+.spot-account-tabs button:hover { color: var(--text); }
+.spot-account-tabs button:active { background: var(--surface-2); }
+
+.spot-account-tabs .spot-history-entry {
   justify-content: center;
   justify-self: end;
+  height: 44px;
   width: 44px;
-  border-radius: 10px;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+@media (hover: hover) {
+  .spot-account-tabs .spot-history-entry:hover {
+    background: color-mix(in srgb, var(--surface-2) 60%, transparent);
+    color: var(--text);
+  }
+}
+
+.spot-account-tabs .spot-history-entry:active {
   background: var(--surface-2);
   color: var(--text);
 }
-
-.spot-account-tabs button:hover { color: var(--text); }
-.spot-account-tabs button:active { background: var(--surface-2); }
 
 .spot-holdings-panel {
   min-height: 232px;

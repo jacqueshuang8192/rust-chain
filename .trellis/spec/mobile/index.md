@@ -53,6 +53,13 @@ not rely on inherited `text-align` or the browser's default button layout.
 For shared control changes, verify the SVG and button bounding-box centers
 match on both axes and preserve a minimum 44x44 touch target.
 
+The spot Trade account rail's `.spot-history-entry` is a quiet inline control:
+keep its resting background transparent with no border or shadow, center the
+history SVG in a 44x44 target, and use theme tokens for hover/pressed feedback.
+Preserve the existing focus-visible ring, reduced-motion override, localized
+accessible name, and `openOrders('history')` navigation. Scope this treatment
+to the spot entry; verify 320/390/448px in both themes without page overflow.
+
 ## Shared Header Icon-Control Contract
 
 Production header icon controls use one CSS-owned 44x44 circular instrument

@@ -112,6 +112,12 @@ test('现货 yzOPc/bo8k5 模板仅定向调整订单类型入口与持仓归属�
   )
   normalizedAccountWorkspace = replaceExactlyOnce(
     normalizedAccountWorkspace,
+    '<button class="spot-history-entry" type="button"',
+    '<button type="button"',
+    'history entry presentation class',
+  )
+  normalizedAccountWorkspace = replaceExactlyOnce(
+    normalizedAccountWorkspace,
     currentHoldingsEntry,
     `          <button type="button" @click="openOrders('positions')">
             {{ t('trade.positionsAndAssets') }} <ChevronDown :size="12" aria-hidden="true" />
