@@ -22,5 +22,7 @@
 
 ## 清理与范围
 
-- 临时Rust HTTP服务、Web/Mobile Vite、浏览器任务空间、测试令牌及前端/Rust临时夹具已清理；隔离数据库随后关闭。
+- 临时Rust HTTP服务、Web/Mobile Vite、浏览器任务空间、测试令牌及前端/Rust临时夹具已清理；隔离数据库已关闭。
 - 本任务文件范围见task.json.relatedFiles。已有代理管理界面、其规范和进度记录、两个诊断任务与.vite保持原样，不纳入本功能提交。
+
+本地功能提交：`8c493a7`。

@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 92
-- **Last Active**: 2026-10-25
+- **Total Sessions**: 93
+- **Last Active**: 2026-10-28
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~1136 | Active |
+| `journal-2.md` | ~1169 | Active |
 | `journal-1.md` | ~1985 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 93 | 2026-10-28 | 竞猜手机端入口显示开关 | `8c493a7` | `main` |
 | 92 | 2026-10-25 | Deposit history header action | `cd21f7d` | `main` |
 | 91 | 2026-10-25 | Mobile deposit flow and record navigation | `776745e` | `main` |
 | 90 | 2026-10-25 | Fix scanner recovery large error lint | `d0117b7` | `main` |

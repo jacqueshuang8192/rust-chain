@@ -3,7 +3,7 @@
   "name": "prediction-mobile-entry-visibility",
   "title": "竞猜配置增加手机端入口显示开关",
   "description": "后台竞猜配置增加手机端入口显示开关，公共配置透传并控制产品中心入口。",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": "fullstack",
   "scope": "prediction",
   "package": null,
@@ -11,11 +11,11 @@
   "creator": "rust-chain",
   "assignee": "rust-chain",
   "createdAt": "2026-10-28",
-  "completedAt": null,
+  "completedAt": "2026-10-28",
   "branch": null,
   "base_branch": "main",
   "worktree_path": null,
-  "commit": null,
+  "commit": "8c493a7",
   "pr_url": null,
   "subtasks": [],
   "children": [],
@@ -43,6 +43,6 @@
     ".trellis/spec/mobile/backend-integration.md",
     "docs/superpowers/PROGRESS.md"
   ],
-  "notes": "已实现并完成本地功能、真实MySQL/HTTP及浏览器验证；既有Web包体和wallet中文文档门禁失败已记录。待按流程本地提交归档；未推送部署。",
+  "notes": "本地完成、验证并提交；未推送或部署。既有Web包体和wallet文档门禁限制见research/delivery.md。",
   "meta": {}
 }

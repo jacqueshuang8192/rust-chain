@@ -1134,3 +1134,36 @@ Moved mobile deposit history entry into header, removed duplicate body action, p
 ### Next Steps
 
 - None - task complete
+
+
+## Session 93: 竞猜手机端入口显示开关
+
+**Date**: 2026-10-28
+**Task**: 竞猜手机端入口显示开关
+**Branch**: `main`
+
+### Summary
+
+完成独立显示开关、旧请求兼容、审计及手机端入口动态显示；真实MySQL/HTTP、浏览器及Mobile/Web回归通过，既有包体与无关文档门禁失败已记录。未推送部署，发布需0164迁移。
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8c493a7` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
