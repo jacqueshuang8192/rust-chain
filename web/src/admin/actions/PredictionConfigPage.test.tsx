@@ -41,6 +41,7 @@ const originalResizeObserver = globalThis.ResizeObserver;
 const originalMatchMedia = window.matchMedia;
 
 const settingsResponse = {
+  mobile_entry_enabled: true,
   sync_enabled: true,
   sync_interval_seconds: 120,
   sync_tags: ['crypto', 'politics'],
@@ -181,6 +182,38 @@ describe('PredictionConfigPage', () => {
     expect(apiRequestMock.mock.calls.some(([path]) => path === '/admin/api/v1/prediction/sync/logs?limit=20')).toBe(false);
   });
 
+  it('persists the mobile entry switch independently of synchronization and restores it on reload', async () => {
+    const user = userEvent.setup();
+    let saved = { ...settingsResponse };
+    apiRequestMock.mockImplementation((path, init) => {
+      if (path === '/admin/api/v1/prediction/settings') {
+        if (init?.method === 'PATCH') {
+          saved = { ...saved, ...JSON.parse(String(init.body)), revision: saved.revision + 1 };
+        }
+        return Promise.resolve(saved);
+      }
+      return Promise.resolve(assetConfigsResponse);
+    });
+    const page = renderPredictionPage(<PredictionSettingsPage />);
+    expect(await screen.findByRole('switch', { name: '手机端显示竞猜入口' })).toBeChecked();
+    await user.click(screen.getByRole('switch', { name: '手机端显示竞猜入口' }));
+    await user.click(screen.getByRole('button', { name: '保存全局策略' }));
+    await user.type(await screen.findByLabelText('操作原因'), '隐藏手机端入口');
+    await user.click(screen.getByRole('button', { name: '确认' }));
+    await waitFor(() => expect(saved.mobile_entry_enabled).toBe(false));
+    expect(saved.sync_enabled).toBe(true);
+    await waitFor(() => expect(screen.queryByLabelText('操作原因')).not.toBeInTheDocument());
+    page.unmount();
+    renderPredictionPage(<PredictionSettingsPage />);
+    expect(await screen.findByRole('switch', { name: '手机端显示竞猜入口' })).not.toBeChecked();
+    await user.click(screen.getByRole('switch', { name: '手机端显示竞猜入口' }));
+    await user.click(screen.getByRole('button', { name: '保存全局策略' }));
+    await user.type(await screen.findByLabelText('操作原因'), '恢复手机端入口');
+    await user.click(screen.getByRole('button', { name: '确认' }));
+    await waitFor(() => expect(saved.mobile_entry_enabled).toBe(true));
+    expect(saved.revision).toBe(9);
+  });
+
   it('opens the canonical asset editor when the tab query is present', async () => {
     renderPredictionPage(<PredictionSettingsPage />, '/admin/prediction/settings?tab=assets');
 
@@ -234,6 +267,7 @@ describe('PredictionConfigPage', () => {
     });
     const settingsRequest = apiRequestMock.mock.calls.find(([path, init]) => path === '/admin/api/v1/prediction/settings' && init?.method === 'PATCH')?.[1];
     expect(JSON.parse(String(settingsRequest?.body))).toEqual({
+      mobile_entry_enabled: true,
       sync_enabled: true,
       sync_interval_seconds: 300,
       sync_tags: ['sports', 'crypto'],
@@ -281,6 +315,7 @@ describe('PredictionConfigPage', () => {
     apiRequestMock.mockRejectedValueOnce(new ApiError(409, 'CONFLICT', 'stale revision'));
     await user.clear(screen.getByLabelText('同步间隔秒数'));
     await user.type(screen.getByLabelText('同步间隔秒数'), '600');
+    await user.click(screen.getByRole('switch', { name: '手机端显示竞猜入口' }));
     await user.click(screen.getByRole('button', { name: '保存全局策略' }));
     await user.type(await screen.findByLabelText('操作原因'), '并发冲突验证');
     await user.click(await screen.findByRole('button', { name: '确认' }));
@@ -289,10 +324,12 @@ describe('PredictionConfigPage', () => {
       expect(toastError).toHaveBeenCalledWith('全局策略已被其他管理员更新；当前草稿已保留，请重新加载最新配置后再修改。');
     });
     expect(screen.getByLabelText('同步间隔秒数')).toHaveValue(600);
+    expect(screen.getByRole('switch', { name: '手机端显示竞猜入口' })).not.toBeChecked();
     expect(apiRequestMock.mock.calls.filter(([path, init]) => path === '/admin/api/v1/prediction/settings' && !init?.method)).toHaveLength(1);
 
     await user.click(screen.getByRole('button', { name: '放弃草稿并重新加载' }));
     await waitFor(() => expect(screen.getByLabelText('同步间隔秒数')).toHaveValue(120));
+    expect(screen.getByRole('switch', { name: '手机端显示竞猜入口' })).toBeChecked();
     expect(apiRequestMock.mock.calls.filter(([path, init]) => path === '/admin/api/v1/prediction/settings' && !init?.method)).toHaveLength(2);
 
     await user.click(screen.getByRole('tab', { name: '下注资产' }));

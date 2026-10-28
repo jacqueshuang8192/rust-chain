@@ -2651,3 +2651,14 @@ read, never imply cancellation or refund; server conflict may mean detection
 preceded the cancellation. Preserve visible feedback and stop displaying QR on
 confirmed cancellation. DTO cancelled_at is required nullable milliseconds.
 The PC layout is unchanged; its status whitelist and translations accept cancelled.
+
+## Prediction Product-Center Entry
+
+`ProductHubView` reads `mobile_entry_enabled` through `fetchPredictionSettings`
+on mount and foreground return. Hide while the initial read is pending or a
+read fails; an explicit false hides only the discovery row, including its
+layout space. Keep news/help, existing prediction routes and orders intact.
+Preserve the asset-array contract of `fetchPredictionConfig`; both readers
+share a single full-config reference cache. See
+`../backend/prediction-markets.md#mobile-entry-visibility` for migration,
+legacy compatibility, audit, and executable regression contracts.

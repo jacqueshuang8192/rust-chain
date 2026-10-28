@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
@@ -9,11 +10,41 @@ import {
   Newspaper,
 } from 'lucide-vue-next'
 import PageHeader from '@/components/PageHeader.vue'
+import { fetchPredictionSettings } from '@/api/prediction'
 
 const router = useRouter()
 const { t } = useI18n()
+const predictionEntryVisible = ref(false)
+let disposed = false
+let loadingVisibility = false
+
+async function refreshPredictionVisibility(): Promise<void> {
+  if (disposed || loadingVisibility || document.visibilityState === 'hidden') return
+  loadingVisibility = true
+  try {
+    const config = await fetchPredictionSettings({ force: true })
+    if (!disposed) predictionEntryVisible.value = config.mobileEntryEnabled
+  } catch {
+    if (!disposed) predictionEntryVisible.value = false
+  } finally {
+    loadingVisibility = false
+  }
+}
+
+onMounted(() => {
+  void refreshPredictionVisibility()
+  window.addEventListener('focus', refreshPredictionVisibility)
+  document.addEventListener('visibilitychange', refreshPredictionVisibility)
+})
+
+onBeforeUnmount(() => {
+  disposed = true
+  window.removeEventListener('focus', refreshPredictionVisibility)
+  document.removeEventListener('visibilitychange', refreshPredictionVisibility)
+})
 
 function openPrediction(): void {
+  if (!predictionEntryVisible.value) return
   void router.push({ name: 'prediction' })
 }
 
@@ -40,9 +71,10 @@ function openProductHelp(): void {
       </template>
     </PageHeader>
 
-    <div class="page-content product-hub__body" data-product-count="2">
+    <div class="page-content product-hub__body" :data-product-count="predictionEntryVisible ? 2 : 1">
       <section class="product-hub__list" :aria-label="t('products.specializedServices')">
         <button
+          v-if="predictionEntryVisible"
           class="product-card product-card--secondary product-hub__row"
           data-product="prediction"
           data-product-tier="secondary"
@@ -95,7 +127,7 @@ function openProductHelp(): void {
 .product-hub__body {
   display: grid;
   gap: 18px;
-  grid-template-rows: 128px 48px;
+  grid-template-rows: auto 48px;
   min-width: 0;
   padding: 8px 20px calc(20px + env(safe-area-inset-bottom));
 }
@@ -103,8 +135,7 @@ function openProductHelp(): void {
 .product-hub__list {
   display: grid;
   gap: 0;
-  grid-template-rows: repeat(2, 64px);
-  height: 128px;
+  grid-auto-rows: 64px;
   min-width: 0;
 }
 

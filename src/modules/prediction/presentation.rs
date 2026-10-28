@@ -64,6 +64,7 @@ pub(crate) struct AdminOrdersQuery {
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct SavePredictionSettingsRequest {
+    pub(crate) mobile_entry_enabled: Option<bool>,
     pub(crate) sync_enabled: bool,
     pub(crate) sync_interval_seconds: u32,
     pub(crate) sync_tags: Vec<String>,
@@ -132,6 +133,7 @@ pub(crate) struct SettlePredictionMarketRequest {
 
 #[derive(Debug, Serialize)]
 pub(crate) struct PredictionSettingsResponse {
+    pub(crate) mobile_entry_enabled: bool,
     pub(crate) sync_enabled: bool,
     pub(crate) sync_interval_seconds: u32,
     pub(crate) sync_tags: Vec<String>,
@@ -162,6 +164,7 @@ pub(crate) struct PredictionStakeAssetResponse {
 
 #[derive(Debug, Serialize)]
 pub(crate) struct PredictionUserConfigResponse {
+    pub(crate) mobile_entry_enabled: bool,
     pub(crate) allowed_assets: Vec<PredictionStakeAssetResponse>,
     pub(crate) default_fee_rate: BigDecimal,
     pub(crate) quote_ttl_seconds: u32,
@@ -352,6 +355,7 @@ impl From<PredictionSettingsRow> for PredictionSettingsResponse {
     /// 其余字段包括费率、结算模式、退款策略、报价有效期和最近一次同步的状态与计数均原样透传。
     fn from(row: PredictionSettingsRow) -> Self {
         Self {
+            mobile_entry_enabled: row.mobile_entry_enabled,
             sync_enabled: row.sync_enabled,
             sync_interval_seconds: row.sync_interval_seconds,
             sync_tags: service::json_string_array(&row.sync_tags_json),

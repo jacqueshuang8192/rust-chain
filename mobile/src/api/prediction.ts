@@ -17,6 +17,11 @@ export interface PredictionAsset {
   maxPayoutAmount: DecimalText
 }
 
+export interface PredictionConfig {
+  mobileEntryEnabled: boolean
+  allowedAssets: PredictionAsset[]
+}
+
 export interface PredictionMarket {
   id: number
   title: string
@@ -58,14 +63,28 @@ export interface PredictionOrder {
 }
 
 export async function fetchPredictionConfig(options: ReferenceRequestOptions = {}): Promise<PredictionAsset[]> {
+  return (await fetchPredictionSettings(options)).allowedAssets
+}
+
+export async function fetchPredictionSettings(options: ReferenceRequestOptions = {}): Promise<PredictionConfig> {
   const url = requestUrl('/prediction/config')
   return referenceRequestRegistry.request(createReferenceRequestKey(url), 2 * 60_000, async () => {
-    const response = await client.get<{ allowed_assets?: Array<Record<string, unknown>> }>(url)
-    return (response.data.allowed_assets || []).map((asset) => ({
-      assetId: requiredId(asset.asset_id),
-      assetSymbol: String(asset.asset_symbol || '').toUpperCase(),
-      maxPayoutAmount: predictionDecimal(asset.max_payout_amount, 'max_payout_amount'),
-    }))
+    const response = await client.get<{
+      mobile_entry_enabled?: boolean
+      allowed_assets?: Array<Record<string, unknown>>
+    }>(url)
+    const enabled = response.data.mobile_entry_enabled
+    if (enabled !== undefined && typeof enabled !== 'boolean') {
+      throw new Error('Prediction config response contains an invalid mobile entry flag')
+    }
+    return {
+      mobileEntryEnabled: enabled ?? true,
+      allowedAssets: (response.data.allowed_assets || []).map((asset) => ({
+        assetId: requiredId(asset.asset_id),
+        assetSymbol: String(asset.asset_symbol || '').toUpperCase(),
+        maxPayoutAmount: predictionDecimal(asset.max_payout_amount, 'max_payout_amount'),
+      })),
+    }
   }, options)
 }
 

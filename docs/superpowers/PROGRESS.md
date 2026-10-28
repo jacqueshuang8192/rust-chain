@@ -10440,3 +10440,17 @@
 - 修改文件：mobile/src/views/DepositDetailView.vue、mobile/src/components/TimedDepositPanel.vue、mobile/tests/fixtures/timed-deposit-browser.js、.trellis/spec/mobile/navigation-and-localization.md及任务记录。
 - 验证结果：npm run release:gate --prefix mobile通过，919/919测试、类型检查、PWA/Tauri网页构建与产物/预算检查通过；浏览器320窄屏浅色中文及深色英文检查通过，按钮44×44且图标居中，无重复入口及水平溢出。使用本地API夹具，未验证真实历史页面跳转或实链付款。
 - 后续事项：本地提交归档；尚未推送。
+
+## 2026-10-28 08:23（Europe/Istanbul） - 竞猜手机端入口开关实现
+
+- 完成内容：后台全局策略新增手机端显示开关；0164迁移默认开启，公共配置透传真实值；旧后台省略字段保留当前值，保存继续使用revision和审计。手机端产品中心按配置收起入口，进入/回到前台强制刷新，失败隐藏、卸载隔离迟到响应。
+- 修改文件：prediction后端四层与0164迁移、后台竞猜types/model/表单/审计字段标签、Mobile配置API/产品中心及相关回归、prediction-markets和mobile/backend-integration规范、本任务PRD。
+- 验证结果：隔离MySQL真实竞猜回归7/7通过；后台竞猜定向6/6、Mobile定向21/21及完整release:gate通过；首次cargo check --all-targets通过。全量后台和最终Rust静态检查、真实浏览器验收继续执行。
+- 后续事项：完成浏览器开关往返与窄屏验证、最终质量检查和交付记录；尚未提交、推送或部署。
+
+## 2026-10-28 08:28（Europe/Istanbul） - 竞猜手机端入口开关最终验收
+
+- 完成内容：完成后台显示开关与手机端动态入口、默认开启和旧客户端兼容；真实API验证关闭/恢复/重载/返回前台刷新，隐藏行无空白。同步配置合同与交付记录。
+- 修改文件：本任务task.json.relatedFiles所列后端/迁移/后台/Mobile及测试、规范与任务记录。
+- 验证结果：隔离MySQL竞猜7/7，最终新增1/1；预测单测11/11、架构11/11、最终all-target check/生产Clippy/fmt通过。Web全量1212/1212、最终定向33/33、类型/lint/policy15/coverage23/build通过；Mobile release:gate全过（923项）。Ego真实API验证开关往返与前台刷新，1728/390/320后台和320/390/448手机布局无水平溢出。既有Web包体2785097/2600000超限、未修改wallet provider_runtime两个中文doc缺口保留，详见交付记录。
+- 后续事项：整理本地提交归档；未推送部署，发布需先0164迁移并同步后端/后台/Mobile。临时浏览器、API、Vite、测试令牌与夹具已清理。

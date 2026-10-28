@@ -414,6 +414,7 @@ export const ADMIN_FIELD_LABELS: Record<string, string> = {
   submitted_at: "提交时间",
   symbols: "订阅交易对",
   sync_enabled: "同步开关",
+  mobile_entry_enabled: "手机端显示竞猜入口",
   sync_interval_seconds: "同步间隔秒数",
   sync_tags: "同步标签",
   target: "目标",

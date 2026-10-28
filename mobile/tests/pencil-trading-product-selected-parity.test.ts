@@ -380,7 +380,7 @@ test('秒合约确认层 Teleport 到 body 并将固定操作区与可滚动明�
   assert.doesNotMatch(compiled.code, /\.seconds-page[^,{]*\.seconds-mask/)
 })
 
-test('产品中心仅渲染两条 64px 产品行与一条 48px 产品说明入口', () => {
+test('产品中心按配置渲染 64px 产品行与一条 48px 产品说明入口', () => {
   const css = styleOf(productHubSource)
   assert.match(productHubSource, /data-pencil-source="Z0B0N6 zMsKE"/)
   assert.match(productHubSource, /class="page page--plain pencil-page product-hub"/)
@@ -454,11 +454,11 @@ test('产品中心正常态几何、字体与无分割线合同精确匹配 Z0B0
   assert.equal(cssValue(rootRule, 'display'), 'block')
   assert.equal(cssValue(rootRule, 'gap'), '0')
   assert.equal(cssValue(bodyRule, 'gap'), '18px')
-  assert.equal(cssValue(bodyRule, 'grid-template-rows'), '128px 48px')
+  assert.equal(cssValue(bodyRule, 'grid-template-rows'), 'auto 48px')
   assert.equal(cssValue(bodyRule, 'min-width'), '0')
   assert.equal(cssValue(bodyRule, 'padding'), '8px 20px calc(20px + env(safe-area-inset-bottom))')
-  assert.equal(cssValue(listRule, 'grid-template-rows'), 'repeat(2, 64px)')
-  assert.equal(cssValue(listRule, 'height'), '128px')
+  assert.equal(cssValue(listRule, 'grid-auto-rows'), '64px')
+  assert.doesNotMatch(listRule, /(?:^|;)\s*height\s*:/)
   assert.equal(cssValue(listRule, 'min-width'), '0')
 
   assert.equal(cssValue(rowRule, 'background'), 'transparent')

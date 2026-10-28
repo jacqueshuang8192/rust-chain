@@ -229,12 +229,14 @@ pub(crate) async fn update_admin_settings_if_revision_in_tx(
 ) -> AppResult<bool> {
     let result = sqlx::query(
         r#"UPDATE prediction_settings
-           SET sync_enabled = ?, sync_interval_seconds = ?, sync_tags_json = ?,
+           SET mobile_entry_enabled = COALESCE(?, mobile_entry_enabled),
+               sync_enabled = ?, sync_interval_seconds = ?, sync_tags_json = ?,
                allowed_asset_ids_json = ?, default_fee_rate = ?,
                default_settlement_mode = ?, default_invalid_refund_policy = ?,
                quote_ttl_seconds = ?, revision = revision + 1
            WHERE id = 1 AND revision = ?"#,
     )
+    .bind(update.mobile_entry_enabled)
     .bind(update.sync_enabled)
     .bind(update.sync_interval_seconds)
     .bind(SqlxJson(json!(&update.sync_tags)))
@@ -1030,7 +1032,7 @@ pub(crate) fn prediction_order_query_builder() -> QueryBuilder<'static, MySql> {
 /// 结算等需要与写入同处一致快照的路径必须改用事务内的加锁版本。
 pub(crate) async fn load_settings(pool: &Pool<MySql>) -> AppResult<PredictionSettingsRow> {
     sqlx::query_as::<_, PredictionSettingsRow>(
-        r#"SELECT sync_enabled, sync_interval_seconds, sync_tags_json, allowed_asset_ids_json,
+        r#"SELECT mobile_entry_enabled, sync_enabled, sync_interval_seconds, sync_tags_json, allowed_asset_ids_json,
                   default_fee_rate, default_settlement_mode, default_invalid_refund_policy,
                   quote_ttl_seconds, revision, last_sync_status, last_sync_error,
                   last_sync_started_at, last_sync_finished_at, last_successful_sync_at,
@@ -1052,7 +1054,7 @@ pub(crate) async fn load_settings_in_tx(
     tx: &mut Transaction<'_, MySql>,
 ) -> AppResult<PredictionSettingsRow> {
     sqlx::query_as::<_, PredictionSettingsRow>(
-        r#"SELECT sync_enabled, sync_interval_seconds, sync_tags_json, allowed_asset_ids_json,
+        r#"SELECT mobile_entry_enabled, sync_enabled, sync_interval_seconds, sync_tags_json, allowed_asset_ids_json,
                   default_fee_rate, default_settlement_mode, default_invalid_refund_policy,
                   quote_ttl_seconds, revision, last_sync_status, last_sync_error,
                   last_sync_started_at, last_sync_finished_at, last_successful_sync_at,

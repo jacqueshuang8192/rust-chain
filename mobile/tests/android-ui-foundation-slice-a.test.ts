@@ -89,7 +89,7 @@ test('资产、我的与产品中心保持真实数据摘要和对应工作台',
   assert.match(profileSource, /class="profile-identity-pencil"/)
   assert.match(profileSource, /v-if="!session\.isAuthenticated" class="profile-auth-actions"/)
   assert.match(productHubSource, /data-product-workspace="live"/)
-  assert.match(productHubSource, /data-product-count="2"/)
+  assert.match(productHubSource, /:data-product-count="predictionEntryVisible \? 2 : 1"/)
   assert.equal((productHubSource.match(/class="product-card product-card--secondary product-hub__row"/g) || []).length, 2)
   assert.match(productHubSource, /function openPrediction\(\): void[\s\S]*?name: 'prediction'/)
   assert.match(productHubSource, /function openNews\(\): void[\s\S]*?name: 'news'/)

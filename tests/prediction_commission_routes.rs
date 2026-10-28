@@ -25,6 +25,9 @@ mod support;
 #[path = "prediction/journal.rs"]
 mod journal;
 
+#[path = "prediction/mobile_entry.rs"]
+mod mobile_entry;
+
 static PREDICTION_CONFIG_GOVERNANCE_LOCK: tokio::sync::Mutex<()> =
     tokio::sync::Mutex::const_new(());
 
@@ -608,6 +611,7 @@ async fn create_prediction_admin(pool: &MySqlPool) -> (u64, u64) {
 
 #[derive(Debug, Clone, sqlx::FromRow)]
 struct PredictionSettingsGovernanceSnapshot {
+    mobile_entry_enabled: bool,
     sync_enabled: bool,
     sync_interval_seconds: u32,
     sync_tags_json: SqlxJson<Value>,
@@ -712,12 +716,13 @@ async fn restore_prediction_settings(
 ) -> Result<(), sqlx::Error> {
     sqlx::query(
         r#"UPDATE prediction_settings
-           SET sync_enabled = ?, sync_interval_seconds = ?, sync_tags_json = ?,
+           SET mobile_entry_enabled = ?, sync_enabled = ?, sync_interval_seconds = ?, sync_tags_json = ?,
                allowed_asset_ids_json = ?, default_fee_rate = ?,
                default_settlement_mode = ?, default_invalid_refund_policy = ?,
                quote_ttl_seconds = ?, revision = ?
            WHERE id = 1"#,
     )
+    .bind(snapshot.mobile_entry_enabled)
     .bind(snapshot.sync_enabled)
     .bind(snapshot.sync_interval_seconds)
     .bind(snapshot.sync_tags_json.clone())
@@ -740,7 +745,7 @@ async fn prediction_configuration_writes_are_revision_guarded_and_audited_atomic
         return Ok(());
     };
     let original_settings = sqlx::query_as::<_, PredictionSettingsGovernanceSnapshot>(
-        r#"SELECT sync_enabled, sync_interval_seconds, sync_tags_json,
+        r#"SELECT mobile_entry_enabled, sync_enabled, sync_interval_seconds, sync_tags_json,
                   allowed_asset_ids_json, default_fee_rate, default_settlement_mode,
                   default_invalid_refund_policy, quote_ttl_seconds, revision
            FROM prediction_settings WHERE id = 1"#,

@@ -38,6 +38,7 @@ export const syncStatusMeta: Record<
 
 export function settingsToValues(settings: PredictionSettings): PredictionSettingsValues {
   return {
+    mobileEntryEnabled: settings.mobile_entry_enabled ?? true,
     syncEnabled: settings.sync_enabled,
     syncIntervalSeconds: String(settings.sync_interval_seconds),
     syncTags: settings.sync_tags.join('\n'),
@@ -86,6 +87,7 @@ export function settingsPayload(
   reason: string
 ) {
   return {
+    mobile_entry_enabled: values.mobileEntryEnabled,
     sync_enabled: values.syncEnabled,
     sync_interval_seconds: positiveInteger(values.syncIntervalSeconds, '同步间隔'),
     sync_tags: parseTags(values.syncTags),

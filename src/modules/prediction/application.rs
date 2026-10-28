@@ -88,7 +88,7 @@ pub(crate) async fn get_admin_settings(
 /// 报价有效期必须落在 1 到 120 秒之间：为零会让报价一生成即失效，过长则让用户能长时间锁定旧赔率。
 /// 资产范围逐个校验存在且启用，任一非法即整体拒绝，不保存部分有效的列表。
 /// 标签与资产列表在写入前分别去空去重，因此重复填写不会污染配置。
-/// 写入是整体覆盖而非增量合并，调用方必须提交完整配置，遗漏字段会被入参值覆盖。
+/// 既有字段整体覆盖；手机端入口开关允许旧客户端省略，此时保留已有值，避免意外重新展示。
 /// 客户端版本落后时返回 Conflict/409，既不覆盖新值也不追加一条误导性的审计记录。
 pub(crate) async fn save_admin_settings(
     AdminAuth(claims): AdminAuth,
@@ -117,6 +117,7 @@ pub(crate) async fn save_admin_settings(
     let sync_tags = service::normalize_string_list(request.sync_tags);
     let allowed_asset_ids = service::unique_u64_list(request.allowed_asset_ids);
     let update = repository::PredictionSettingsUpdate {
+        mobile_entry_enabled: request.mobile_entry_enabled,
         sync_enabled: request.sync_enabled,
         sync_interval_seconds: request.sync_interval_seconds,
         sync_tags,
@@ -185,7 +186,8 @@ pub(crate) async fn list_admin_asset_configs(
     }))
 }
 
-/// 返回用户下注前需要的公共配置：可用资产清单、默认费率与报价有效期。
+/// 返回公共配置：手机端入口显示开关、可用资产清单、默认费率与报价有效期。
+/// 入口开关仅控制手机端展示，不参与下注准入、同步和已有订单结算。
 /// 可用资产需同时满足两个条件才会出现：落在后台设置的允许范围内，
 /// 且在资产配置表中已启用、其资产本身也处于启用状态，两侧取交集。
 /// 允许范围为空时明确返回空清单而不是放行全部资产，
@@ -200,6 +202,7 @@ pub(crate) async fn get_user_config(
     let allowed_ids = service::json_u64_array(&settings.allowed_asset_ids_json);
     if allowed_ids.is_empty() {
         return Ok(Json(presentation::PredictionUserConfigResponse {
+            mobile_entry_enabled: settings.mobile_entry_enabled,
             allowed_assets: Vec::new(),
             default_fee_rate: settings.default_fee_rate,
             quote_ttl_seconds: settings.quote_ttl_seconds,
@@ -213,6 +216,7 @@ pub(crate) async fn get_user_config(
         .map(presentation::PredictionStakeAssetResponse::from)
         .collect();
     Ok(Json(presentation::PredictionUserConfigResponse {
+        mobile_entry_enabled: settings.mobile_entry_enabled,
         allowed_assets,
         default_fee_rate: settings.default_fee_rate,
         quote_ttl_seconds: settings.quote_ttl_seconds,
@@ -321,6 +325,7 @@ async fn save_admin_asset_config_use_case(
 /// 生成预测全局设置的审计白名单快照，只包含可编辑配置与 revision，不记录同步错误原文或任何凭据字段。
 fn prediction_settings_audit_json(row: &repository::PredictionSettingsRow) -> Value {
     json!({
+        "mobile_entry_enabled": row.mobile_entry_enabled,
         "sync_enabled": row.sync_enabled,
         "sync_interval_seconds": row.sync_interval_seconds,
         "sync_tags": service::json_string_array(&row.sync_tags_json),

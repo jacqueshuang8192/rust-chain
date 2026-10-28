@@ -154,3 +154,67 @@ create_order_from_quote(&mut tx, user.id, quote, &request.idempotency_key).await
 ```tsx
 orderNoColumn('PM')
 ```
+
+## Mobile Entry Visibility
+
+### 1. Scope / Trigger
+
+Admin prediction settings and the Mobile product-center discovery entry. This
+display setting does not disable trading, direct routes, synchronization,
+existing orders, settlement, or the PC client.
+
+### 2. Signatures
+
+- Migration `0164_prediction_mobile_entry.sql` adds
+  `prediction_settings.mobile_entry_enabled BOOLEAN NOT NULL DEFAULT TRUE`
+  with nullable-add, backfill, and NOT NULL finalization.
+- Admin settings GET/PATCH and public `GET /api/v1/prediction/config` expose
+  `mobile_entry_enabled`. The public field is present even with zero assets.
+- Mobile `fetchPredictionSettings(options)` returns
+  `{ mobileEntryEnabled, allowedAssets }`; `fetchPredictionConfig(options)`
+  preserves its existing asset-array return contract.
+
+### 3. Contracts
+
+- Admin exposes `手机端显示竞猜入口` in global settings, saved with the existing
+  reason/revision transaction. Audit before/after includes this field.
+- An omitted/null PATCH field preserves the current stored value via
+  `COALESCE`; explicit false must never fall back to true.
+- Public config remains unauthenticated. A missing field from an older server
+  maps to true; a present non-boolean value rejects the response.
+- Both Mobile readers share one two-minute in-memory reference cache and DTO
+  shape. Product-center entry visibility forces a fresh read on mount and
+  foreground/focus return, coalesces concurrent requests, and ignores late
+  results after unmount. Initial loading and failed reads hide the entry.
+- Hidden rows collapse; news/help remain available. No permanent browser cache
+  or additional trading guard is introduced.
+
+### 4. Validation & Error Matrix
+
+| Condition | Result |
+| --- | --- |
+| New migration applied | Existing entry stays enabled |
+| Explicit false saved | Admin reload and public GET return false |
+| Old PATCH omits flag | Previously saved state survives |
+| Stale revision | 409; no state or audit write; UI draft retained |
+| Mobile config read fails | Hide entry; retry on next foreground/mount |
+
+### 5. Good / Base / Bad Cases
+
+Base: enable, save, reload, and navigate. Good: disable with synchronization
+unchanged, then re-enable. Bad: an old settings write silently reopens a hidden
+entry or a stale client treats a hidden entry as a trading authorization rule.
+
+### 6. Tests Required
+
+`prediction_commission_routes::mobile_entry` covers real MySQL/HTTP writes,
+public empty/nonempty responses, legacy omission, conflicts, and audits.
+`PredictionConfigPage.test.tsx` covers toggle persistence and draft retention.
+`mobile/tests/prediction-entry.test.ts` executes the actual adapter/template for
+visibility, cache compatibility, foreground races, failures, and cleanup.
+
+### 7. Wrong vs Correct
+
+Wrong: `flag || true`, two DTO shapes under one cache key, fixed 128px list height.
+Correct: validate boolean then `flag ?? true`, share the full config cache,
+and size the list using auto rows.

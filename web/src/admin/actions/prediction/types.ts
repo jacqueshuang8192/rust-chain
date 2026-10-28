@@ -1,4 +1,5 @@
 export type PredictionSettings = {
+  mobile_entry_enabled: boolean;
   sync_enabled: boolean;
   sync_interval_seconds: number;
   sync_tags: string[];
@@ -18,6 +19,7 @@ export type PredictionSettings = {
 };
 
 export type PredictionSettingsValues = {
+  mobileEntryEnabled: boolean;
   syncEnabled: boolean;
   syncIntervalSeconds: string;
   syncTags: string;

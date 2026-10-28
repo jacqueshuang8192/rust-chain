@@ -9,6 +9,7 @@ use serde_json::Value;
 
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub(crate) struct PredictionSettingsRow {
+    pub(crate) mobile_entry_enabled: bool,
     pub(crate) sync_enabled: bool,
     pub(crate) sync_interval_seconds: u32,
     pub(crate) sync_tags_json: Value,
@@ -77,6 +78,8 @@ pub(crate) struct PredictionAssetConfigRow {
 /// 应用层须先完成枚举、金额、资产与原因校验，再把该命令交给基础设施层在既有事务内执行。
 #[derive(Debug)]
 pub(crate) struct PredictionSettingsUpdate {
+    /// 旧客户端省略时保留数据库当前值，避免无意重新展示入口。
+    pub(crate) mobile_entry_enabled: Option<bool>,
     pub(crate) sync_enabled: bool,
     pub(crate) sync_interval_seconds: u32,
     pub(crate) sync_tags: Vec<String>,

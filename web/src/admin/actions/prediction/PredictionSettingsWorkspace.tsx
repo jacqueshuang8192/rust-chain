@@ -203,6 +203,20 @@ export function PredictionSettingsWorkspace() {
 
           {activeTab === 'settings' && workspace.settingsValues ? (
             <Space align="start" spacing={18} vertical style={{ width: '100%' }}>
+              <section className="admin-action-panel" style={{ width: '100%' }}>
+                <Title heading={4}>手机端显示</Title>
+                <Space align="center" spacing={12} wrap>
+                  <Switch
+                    aria-label="手机端显示竞猜入口"
+                    checked={workspace.settingsValues.mobileEntryEnabled}
+                    onChange={(mobileEntryEnabled) => workspace.updateSettingsValues({ mobileEntryEnabled })}
+                  />
+                  <Text>手机端显示竞猜入口</Text>
+                </Space>
+                <Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
+                  关闭并保存后，手机端产品中心将隐藏竞猜入口；已有订单与结算不受影响。
+                </Text>
+              </section>
               <div className="admin-action-workbench-grid">
                 <section className="admin-action-panel">
                   <Title heading={4}>同步来源</Title>
