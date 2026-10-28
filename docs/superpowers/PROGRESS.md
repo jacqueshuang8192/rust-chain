@@ -10531,3 +10531,10 @@
 - 修改文件：migrations/0166_retire_base_trace_cooldown.sql、build.rs、Dockerfile、tests/unit_src/src_modules_wallet_base_stream_tests.rs、后端相关规范及充值操作手册、本任务记录。
 - 验证结果：修复前回归在旧冷却断言失败；修复后隔离MySQL三项Base迁移/分流/升级测试全部通过，SQLx重复运行成功；41项Base普通RPC回归通过。首次精确测试名未匹配到用例，未计入验证；发现新增迁移未触发旧增量测试产物重编译，补构建监听后通过。最终架构11/11、容器合同10/10、Clippy/all-target check/fmt及diff检查通过。
 - 后续事项：修复已验证，待提交交付。生产数据库和实际进程未访问，仍需停止旧worker、使用新构建迁移器执行0166后启动新版；不以清除错误替代成功追块。
+
+## 2026-10-28 19:44（Europe/Istanbul） - 代理列表已发布版本单列Grid修正
+
+- 完成内容：截图对应已发布页保留双列Grid但只渲染一个面板，浏览器复现列表仅占34.48%；给已发布模板加页面作用域并局部改为单列及100%外层宽度。保留既有本地代理管理重构，仅交付本次最小修正。
+- 修改文件：web/src/styles.css、AgentManagementPage.tsx（仅页面class暂存）、.trellis/spec/admin/ui-system.md（仅本次追加规范）、10-28-agent-list-single-panel-grid任务记录。
+- 验证结果：Ego使用HEAD原组件加精确补丁和本地模拟API；2942/1920/1728/1280/390/320下列表面板与Grid等宽、页面等于父内容宽度且无页面横向溢出；320创建/列表切换、表内横滚350px及1280空态通过。截图已查看。独立导出的HEAD加补丁版本typecheck/lint通过；全量1204/1205，既有时区用例在UTC下复验11/11通过；policy15/15、coverage23项、build通过。包体2781813/2600000仍超限，未放宽预算。
+- 后续事项：完成精确提交并核实双远程；尚未部署。浏览器临时组件、会话、TaskSpace与Vite已清理。

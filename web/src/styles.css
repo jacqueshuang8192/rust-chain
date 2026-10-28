@@ -790,6 +790,14 @@ body {
   align-items: start;
 }
 
+.exchange-page.agent-management-page {
+  width: 100%;
+}
+
+.agent-management-page .admin-action-workbench-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .admin-action-form {
   width: 100%;
   min-width: 0;

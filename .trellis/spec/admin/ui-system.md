@@ -1537,3 +1537,19 @@ reader permission and missing checkpoint. Browser checks use real local HTTP at
 Recovery SideSheet titles must allow shrinking (`flex: 1 1 0; min-width: 0`) and
 wrapping while the close action keeps its width. Verify the actual close-button
 bounds at 320px; document-level overflow alone misses clipped overlay controls.
+
+## Published Agent List Grid Width
+
+- The tab-based agent page renders only one of list/create at a time. Scope its
+  `.admin-action-workbench-grid` to `grid-template-columns: minmax(0, 1fr)` under
+  `.agent-management-page`; never reserve the generic workbench's empty second track.
+- Set `.exchange-page.agent-management-page` to `width: 100%` in the stylesheet
+  actually imported by the published page. Other workbench grids keep their layout.
+- Compare the inner panel width with its grid, not only the outer Card/page width.
+  Preserve table-contained horizontal scrolling and normal page padding.
+- When uncommitted page redesigns coexist with a production bug, verify the exact
+  HEAD-based patch destined for release. A successful check of unrelated local JSX
+  does not prove that the deployed tab-based page is fixed.
+- Browser regression: populated and empty list, list/create switching and inner
+  scroll at 2942/1920/1728/1280/390/320; wait for responsive sidebar state before
+  measuring. Stage only the page scope class and scoped CSS for this repair.

@@ -1,0 +1,30 @@
+{
+  "id": "agent-list-single-panel-grid",
+  "name": "agent-list-single-panel-grid",
+  "title": "Fix agent list single-panel grid width",
+  "description": "",
+  "status": "in_progress",
+  "dev_type": "admin",
+  "scope": "admin",
+  "package": null,
+  "priority": "P2",
+  "creator": "rust-chain",
+  "assignee": "rust-chain",
+  "createdAt": "2026-10-28",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "web/src/styles.css",
+    "web/src/admin/actions/AgentManagementPage.tsx",
+    ".trellis/spec/admin/ui-system.md"
+  ],
+  "notes": "",
+  "meta": {}
+}

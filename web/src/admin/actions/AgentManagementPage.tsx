@@ -409,7 +409,7 @@ export function AgentManagementPage() {
   );
 
   return (
-    <main className="exchange-page admin-action-page">
+    <main className="exchange-page admin-action-page agent-management-page">
       <PageHeader
         actions={
           <Button icon={<IconRefresh aria-hidden="true" />} loading={loading} onClick={reload} theme="borderless">
