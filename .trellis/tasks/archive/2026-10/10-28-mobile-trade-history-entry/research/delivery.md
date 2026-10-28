@@ -43,3 +43,8 @@ labels and the orders route handler remain intact.
 No live backend or financial order was exercised: this is a presentation-only
 change, validated with a local API fixture. No native device build was needed.
 No push or deployment. Existing agent-management work remains separate.
+
+## Delivery state
+
+Implementation commit: `9aea413`. Task browser and fixture authentication were
+cleaned up; the Vite server on port 5188 was stopped. No push or deployment.

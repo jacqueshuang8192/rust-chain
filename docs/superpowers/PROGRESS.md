@@ -10468,3 +10468,10 @@
 - 修改文件：mobile/src/views/TradeView.vue、mobile/tests/pencil-trading-product-selected-parity.test.ts、.trellis/spec/mobile/index.md及本任务记录。
 - 验证结果：定向37/37；完整Mobile release:gate通过（923/923测试、类型、PWA/Tauri网页构建及产物/包体/源码/测试质量门禁）。Ego本地夹具验证320/390/448×明暗×中英文12组，按钮44×44、图标中心差0、无水平溢出；点击/Enter到历史委托、返回、焦点和低动态按压通过。原模板摘要仅放行本次新增class，未放宽预算。
 - 后续事项：本地提交归档；未推送部署，未做实盘交易或原生设备构建。本任务详见research/delivery.md。
+
+## 2026-10-28 08:44（Europe/Istanbul） - Trade历史入口本地提交归档
+
+- 完成内容：本地提交9aea413保存现货历史入口样式、既有回归适配及规范；任务归档并记录会话。
+- 修改文件：本任务归档、Trellis会话及本进度记录。
+- 验证结果：沿用完整Mobile门禁及真实组件浏览器结果；精确暂存本任务9个文件，提交前diff检查通过。临时浏览器、假认证及5188端口Vite服务已清理。
+- 后续事项：无；未推送部署。
