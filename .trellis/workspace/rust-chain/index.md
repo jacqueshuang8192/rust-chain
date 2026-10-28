@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 95
+- **Total Sessions**: 96
 - **Last Active**: 2026-10-28
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~1235 | Active |
+| `journal-2.md` | ~1268 | Active |
 | `journal-1.md` | ~1985 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 96 | 2026-10-28 | Base native and ERC20 scan isolation | `e0a1a76` | `main` |
 | 95 | 2026-10-28 | Base native deposits through standard RPC | `0bc71a9` | `main` |
 | 94 | 2026-10-28 | Trade history entry immersion | `9aea413` | `main` |
 | 93 | 2026-10-28 | 竞猜手机端入口显示开关 | `8c493a7` | `main` |

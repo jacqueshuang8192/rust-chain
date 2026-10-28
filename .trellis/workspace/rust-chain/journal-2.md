@@ -1233,3 +1233,36 @@ Replaced Base native trace scanning with bounded standard transaction batches an
 ### Next Steps
 
 - None - task complete
+
+
+## Session 96: Base native and ERC20 scan isolation
+
+**Date**: 2026-10-28
+**Task**: Base native and ERC20 scan isolation
+**Branch**: `main`
+
+### Summary
+
+Independent Base scan scheduling, cursor/history/lease/readiness and scoped recovery; shared quotas retained. Real MySQL financial and migration tests, Web 1215, architecture/OpenAPI/static gates and browser verified. Existing Web bundle budget still exceeded; migration 0165 required. No push or deployment.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e0a1a76` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
