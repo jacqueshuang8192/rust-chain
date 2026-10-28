@@ -1266,3 +1266,37 @@ Independent Base scan scheduling, cursor/history/lease/readiness and scoped reco
 ### Next Steps
 
 - None - task complete
+
+
+## Session 97: Base upgrade cooldown and published agent grid fixes
+
+**Date**: 2026-10-28
+**Task**: Base upgrade cooldown and published agent grid fixes
+**Branch**: `main`
+
+### Summary
+
+Retired only obsolete Base trace provider failures with migration 0166 and tracked migration-directory rebuilds; real MySQL upgrade/stream and Rust checks passed. Corrected published tab-based agent grid with a minimal scoped patch; exact-release browser and Web verification completed, timezone-dependent test passed under UTC, existing JS budget overrun retained. Unrelated agent redesign remains uncommitted.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `931ebe6` | (see git log) |
+| `0ffbd2a4` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

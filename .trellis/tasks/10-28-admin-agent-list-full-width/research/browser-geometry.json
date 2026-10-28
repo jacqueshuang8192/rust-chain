@@ -1,0 +1,92 @@
+[
+  {
+    "viewport": 2560,
+    "sider": 72,
+    "parentWidth": 2473,
+    "pageWidth": 2473,
+    "pagePadding": 64,
+    "cardWidth": 2409,
+    "stageWidth": 2407,
+    "tableWidth": 2407,
+    "scroll": [
+      2407,
+      2407
+    ],
+    "overflow": 0
+  },
+  {
+    "viewport": 1920,
+    "sider": 72,
+    "parentWidth": 1833,
+    "pageWidth": 1833,
+    "pagePadding": 64,
+    "cardWidth": 1769,
+    "stageWidth": 1767,
+    "tableWidth": 1767,
+    "scroll": [
+      1767,
+      1767
+    ],
+    "overflow": 0
+  },
+  {
+    "viewport": 1728,
+    "sider": 72,
+    "parentWidth": 1641,
+    "pageWidth": 1641,
+    "pagePadding": 64,
+    "cardWidth": 1577,
+    "stageWidth": 1575,
+    "tableWidth": 1575,
+    "scroll": [
+      1575,
+      1575
+    ],
+    "overflow": 0
+  },
+  {
+    "viewport": 1280,
+    "sider": 72,
+    "parentWidth": 1193,
+    "pageWidth": 1193,
+    "pagePadding": 48,
+    "cardWidth": 1145,
+    "stageWidth": 1143,
+    "tableWidth": 1143,
+    "scroll": [
+      1143,
+      1143
+    ],
+    "overflow": 0
+  },
+  {
+    "viewport": 390,
+    "sider": 64,
+    "parentWidth": 326,
+    "pageWidth": 326,
+    "pagePadding": 32,
+    "cardWidth": 294,
+    "stageWidth": 292,
+    "tableWidth": 1020,
+    "scroll": [
+      292,
+      1020
+    ],
+    "overflow": 0
+  },
+  {
+    "viewport": 320,
+    "sider": 64,
+    "parentWidth": 256,
+    "pageWidth": 256,
+    "pagePadding": 32,
+    "cardWidth": 224,
+    "stageWidth": 222,
+    "tableWidth": 1020,
+    "scroll": [
+      222,
+      1020
+    ],
+    "overflow": 0
+  }
+]

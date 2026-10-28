@@ -1,0 +1,30 @@
+{
+  "id": "admin-agent-list-full-width",
+  "name": "admin-agent-list-full-width",
+  "title": "代理管理列表占满内容区宽度",
+  "description": "",
+  "status": "review",
+  "dev_type": "frontend",
+  "scope": "admin",
+  "package": null,
+  "priority": "P2",
+  "creator": "rust-chain",
+  "assignee": "rust-chain",
+  "createdAt": "2026-10-28",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [],
+  "parent": null,
+  "relatedFiles": [
+    "web/src/admin/actions/AgentManagementPage.css",
+    ".trellis/spec/admin/ui-system.md",
+    "docs/superpowers/PROGRESS.md"
+  ],
+  "notes": "Width correction and validation complete. Kept local alongside pre-existing uncommitted agent-management work; no commit/push. Existing JS budget failure documented in research/delivery.md.",
+  "meta": {}
+}

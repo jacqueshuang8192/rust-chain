@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 96
+- **Total Sessions**: 97
 - **Last Active**: 2026-10-28
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~1268 | Active |
+| `journal-2.md` | ~1302 | Active |
 | `journal-1.md` | ~1985 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 97 | 2026-10-28 | Base upgrade cooldown and published agent grid fixes | `931ebe6`, `0ffbd2a4` | `main` |
 | 96 | 2026-10-28 | Base native and ERC20 scan isolation | `e0a1a76` | `main` |
 | 95 | 2026-10-28 | Base native deposits through standard RPC | `0bc71a9` | `main` |
 | 94 | 2026-10-28 | Trade history entry immersion | `9aea413` | `main` |
