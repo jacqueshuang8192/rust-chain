@@ -10538,3 +10538,10 @@
 - 修改文件：web/src/styles.css、AgentManagementPage.tsx（仅页面class暂存）、.trellis/spec/admin/ui-system.md（仅本次追加规范）、10-28-agent-list-single-panel-grid任务记录。
 - 验证结果：Ego使用HEAD原组件加精确补丁和本地模拟API；2942/1920/1728/1280/390/320下列表面板与Grid等宽、页面等于父内容宽度且无页面横向溢出；320创建/列表切换、表内横滚350px及1280空态通过。截图已查看。独立导出的HEAD加补丁版本typecheck/lint通过；全量1204/1205，既有时区用例在UTC下复验11/11通过；policy15/15、coverage23项、build通过。包体2781813/2600000仍超限，未放宽预算。
 - 后续事项：完成精确提交并核实双远程；尚未部署。浏览器临时组件、会话、TaskSpace与Vite已清理。
+
+## 2026-10-28 19:57（Europe/Istanbul） - Base升级故障与代理列表Grid修复双远程交付
+
+- 完成内容：Base定向清理迁移和构建监听提交931ebe69；已发布代理列表单列Grid修正提交0ffbd2a4；两项任务已归档并推送origin/github8192的main。会话记录脚本误纳入四个既有未提交任务目录，本次清理提交取消跟踪并校验保留本地原文件；已发布历史仍包含此前文档提交，未改写远程历史。
+- 修改文件：docs/superpowers/PROGRESS.md；仅取消跟踪四个此前未提交的旧任务目录，不删除工作区文件。
+- 验证结果：两个远程fetch确认可快进；push成功，git ls-remote均返回84e0cbfe9d72f8973dde26f512ca0f4001a23b54。Rust实库3项、原生41项、架构11项、容器10项及静态检查通过；精确Web发布版本的验证与既有时区/包体限制见前条和任务delivery.md。浏览器/本地模拟会话/Vite/隔离MySQL及临时目录已清理。
+- 后续事项：同步本条交付及文档清理提交后复核最终SHA；未执行生产部署或远程CI验收。Base发布需停止旧worker、重新构建迁移器并执行0166后启动新版；代理页面需更新后台构建产物。
