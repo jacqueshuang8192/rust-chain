@@ -38,11 +38,19 @@ pub(crate) async fn request(
 ) -> AppResult<()> {
     let mut tx = pool.begin().await?;
     super::super::lock_network(&mut tx, network).await?;
-    let (revision, configured, cursor, pending, backfill): (u64, bool, Option<Json<Value>>, bool, Option<Json<Value>>) = sqlx::query_as("SELECT revision,endpoint_encrypted IS NOT NULL,cursor_json,recovery_request_json IS NOT NULL,backfill_cursor_json FROM wallet_deposit_scanners WHERE network=?")
+    let (revision, configured): (u64, bool) = sqlx::query_as("SELECT revision,endpoint_encrypted IS NOT NULL FROM wallet_deposit_scanners WHERE network=?")
         .bind(network).fetch_one(&mut *tx).await?;
-    if revision != request.expected_revision || pending || cursor.is_none() || !configured {
+    let scopes: Vec<&str> = if network == "base" {
+        request
+            .stream
+            .as_deref()
+            .map_or_else(|| vec!["native", "token"], |s| vec![s])
+    } else {
+        vec![""]
+    };
+    if revision != request.expected_revision || !configured {
         return Err(AppError::Conflict(
-            "监听配置已变化、恢复请求已排队或尚未建立游标，请刷新后重试".into(),
+            "监听配置已变化或尚未配置节点，请刷新后重试".into(),
         ));
     }
     let pending = Request {
@@ -50,11 +58,29 @@ pub(crate) async fn request(
         admin_id,
         reason: request.reason.clone(),
     };
-    sqlx::query("UPDATE wallet_deposit_scanners SET recovery_request_json=?,revision=revision+1,last_scan_at=NULL,lease_token=NULL,lease_until=NULL WHERE network=?")
-        .bind(Json(&pending)).bind(network).execute(&mut *tx).await?;
-    super::super::audit(&mut tx, admin_id, "deposit_scanner.recovery_requested", 0,
-        Some(json!({"network":network,"cursor":cursor,"backfill_cursor":backfill,"revision":revision})),
-        json!({"network":network,"mode":request.mode,"revision":revision+1,"acknowledge_skip":request.acknowledge_skip}), &request.reason).await?;
+    for stream in scopes {
+        let source = progress::source(stream);
+        let scope = progress::scope(stream);
+        let (cursor, queued, backfill): (Option<Json<Value>>, bool, Option<Json<Value>>) = sqlx::query_as(&format!("SELECT p.cursor_json,p.recovery_request_json IS NOT NULL,p.backfill_cursor_json FROM {source} WHERE {scope}"))
+            .bind(network).fetch_one(&mut *tx).await?;
+        if queued || cursor.is_none() {
+            return Err(AppError::Conflict(
+                "恢复请求已排队或尚未建立游标，请刷新后重试".into(),
+            ));
+        }
+        sqlx::query(&format!("UPDATE {source} SET p.recovery_request_json=?,p.last_scan_at=NULL,p.lease_token=NULL,p.lease_until=NULL WHERE {scope}"))
+            .bind(Json(&pending)).bind(network).execute(&mut *tx).await?;
+        super::super::audit(&mut tx, admin_id, "deposit_scanner.recovery_requested", 0,
+            Some(json!({"network":network,"stream":stream,"cursor":cursor,"backfill_cursor":backfill,"revision":revision})),
+            json!({"network":network,"stream":stream,"mode":request.mode,"revision":revision+1,"acknowledge_skip":request.acknowledge_skip}), &request.reason).await?;
+    }
+    // 全网版本阻止排队前的资金提交；只清除所选分流的健康状态，兄弟分流仍可接单。
+    sqlx::query("UPDATE wallet_deposit_scanners SET revision=revision+1,lease_token=NULL,lease_until=NULL WHERE network=?")
+        .bind(network).execute(&mut *tx).await?;
+    if network == "base" {
+        sqlx::query("UPDATE wallet_deposit_scanner_streams SET lease_token=NULL,lease_until=NULL WHERE network=?")
+            .bind(network).execute(&mut *tx).await?;
+    }
     tx.commit().await?;
     Ok(())
 }
@@ -138,17 +164,26 @@ pub(super) async fn run_network(
     key: Option<&str>,
     config: ScannerConfig,
 ) -> AppResult<u64> {
+    let source = progress::source(&config.stream);
+    let scope = progress::scope(&config.stream);
+    let revision = progress::revision(&config.stream);
     let token = uuid::Uuid::now_v7().to_string();
-    let claim = sqlx::query("UPDATE wallet_deposit_scanners SET lease_token=?,lease_until=DATE_ADD(CURRENT_TIMESTAMP(6),INTERVAL 60 SECOND) WHERE network=? AND revision=? AND (lease_until IS NULL OR lease_until<CURRENT_TIMESTAMP(6))")
-        .bind(&token).bind(&config.network).bind(config.revision).execute(pool).await?;
+    let mut claim_tx = pool.begin().await?;
+    super::super::lock_network(&mut claim_tx, &config.network).await?;
+    let claim = sqlx::query(&format!("UPDATE {source} SET p.lease_token=?,p.lease_until=DATE_ADD(CURRENT_TIMESTAMP(6),INTERVAL 60 SECOND) WHERE {scope} AND {revision}=? AND (p.lease_until IS NULL OR p.lease_until<CURRENT_TIMESTAMP(6))"))
+        .bind(&token).bind(&config.network).bind(config.revision).execute(&mut *claim_tx).await?;
+    claim_tx.commit().await?;
     if claim.rows_affected() != 1 {
         return Ok(0);
     }
     // 认领后重读游标，避免另一个worker在列表读取与认领之间推进时使用旧快照回退进度。
-    let config = sqlx::query_as::<_, ScannerConfig>(&format!("{CONFIG_SELECT} WHERE network=?"))
-        .bind(&config.network)
-        .fetch_one(pool)
-        .await?;
+    let config = sqlx::query_as::<_, ScannerConfig>(&format!(
+        "{} WHERE {scope}",
+        progress::select(&config.stream)
+    ))
+    .bind(&config.network)
+    .fetch_one(pool)
+    .await?;
     let work = if config.recovery_request_json.is_some() {
         Work::Recover
     } else if config.backfill_cursor_json.is_some()
@@ -182,14 +217,17 @@ pub(super) async fn run_network(
                 }
                 _ => "deposit scanner persistence failed",
             };
+            let mut error_tx = pool.begin().await?;
+            super::super::lock_network(&mut error_tx, &config.network).await?;
             if work == Work::Backfill {
-                sqlx::query("UPDATE wallet_deposit_scanners SET backfill_last_error=?,backfill_blocked=IF(?,backfill_blocked,TRUE),last_error=IF(?,last_error,?),backfill_next_at=DATE_ADD(CURRENT_TIMESTAMP(6),INTERVAL 15 SECOND),lease_token=NULL,lease_until=NULL WHERE network=? AND revision=? AND lease_token=?")
-                    .bind(message.chars().take(255).collect::<String>()).bind(error.retryable).bind(error.retryable).bind(message.chars().take(255).collect::<String>()).bind(&config.network).bind(config.revision).bind(&token).execute(pool).await?;
+                sqlx::query(&format!("UPDATE {source} SET p.backfill_last_error=?,p.backfill_blocked=IF(?,p.backfill_blocked,TRUE),p.last_error=IF(?,p.last_error,?),p.backfill_next_at=DATE_ADD(CURRENT_TIMESTAMP(6),INTERVAL 15 SECOND),p.lease_token=NULL,p.lease_until=NULL WHERE {scope} AND {revision}=? AND p.lease_token=?"))
+                    .bind(message.chars().take(255).collect::<String>()).bind(error.retryable).bind(error.retryable).bind(message.chars().take(255).collect::<String>()).bind(&config.network).bind(config.revision).bind(&token).execute(&mut *error_tx).await?;
             } else {
-                sqlx::query("UPDATE wallet_deposit_scanners SET last_error=?,lease_token=NULL,lease_until=NULL WHERE network=? AND revision=? AND lease_token=?")
-                    .bind(message.chars().take(255).collect::<String>()).bind(&config.network).bind(config.revision).bind(&token).execute(pool).await?;
+                sqlx::query(&format!("UPDATE {source} SET p.last_error=?,p.lease_token=NULL,p.lease_until=NULL WHERE {scope} AND {revision}=? AND p.lease_token=?"))
+                    .bind(message.chars().take(255).collect::<String>()).bind(&config.network).bind(config.revision).bind(&token).execute(&mut *error_tx).await?;
             }
-            tracing::warn!(network=%config.network,error=%message,"链上充值扫描失败，保留实时与历史进度等待重试");
+            error_tx.commit().await?;
+            tracing::warn!(network=%config.network,stream=%config.stream,error=%message,"链上充值扫描失败，保留实时与历史进度等待重试");
             Ok(0)
         }
     }
@@ -203,9 +241,17 @@ async fn complete(
     cursor: Cursor,
     caught_up: bool,
 ) -> AppResult<()> {
+    let source = progress::source(&config.stream);
+    let scope = progress::scope(&config.stream);
+    let revision = progress::revision(&config.stream);
+    let revision_update = if config.stream.is_empty() {
+        ",p.revision=p.revision+1"
+    } else {
+        ""
+    };
     let mut tx = pool.begin().await?;
     super::super::lock_network(&mut tx, &config.network).await?;
-    let valid: bool = sqlx::query_scalar("SELECT revision=? AND COALESCE(lease_token=?,FALSE) AND COALESCE(lease_until>CURRENT_TIMESTAMP(6),FALSE) FROM wallet_deposit_scanners WHERE network=?")
+    let valid: bool = sqlx::query_scalar(&format!("SELECT {revision}=? AND COALESCE(p.lease_token=?,FALSE) AND COALESCE(p.lease_until>CURRENT_TIMESTAMP(6),FALSE) FROM {source} WHERE {scope}"))
         .bind(config.revision).bind(token).bind(&config.network).fetch_one(&mut *tx).await?;
     if !valid {
         return Ok(());
@@ -228,18 +274,18 @@ async fn complete(
                 None
             };
             let blocked = backfill.is_some() && config.backfill_blocked;
-            sqlx::query("UPDATE wallet_deposit_scanners SET cursor_json=?,backfill_cursor_json=?,backfill_target_json=?,backfill_last_error=IF(?,backfill_last_error,NULL),backfill_blocked=?,backfill_next_at=CURRENT_TIMESTAMP(6),recovery_request_json=NULL,revision=revision+1,last_scan_at=NULL,last_error=IF(?,last_error,NULL),lease_token=NULL,lease_until=NULL WHERE network=?")
+            sqlx::query(&format!("UPDATE {source} SET p.cursor_json=?,p.backfill_cursor_json=?,p.backfill_target_json=?,p.backfill_last_error=IF(?,p.backfill_last_error,NULL),p.backfill_blocked=?,p.backfill_next_at=CURRENT_TIMESTAMP(6),p.recovery_request_json=NULL{revision_update},p.last_scan_at=NULL,p.last_error=IF(?,p.last_error,NULL),p.lease_token=NULL,p.lease_until=NULL WHERE {scope}"))
                 .bind(Json(&cursor)).bind(backfill).bind(backfill.map(|_| Json(&cursor))).bind(blocked).bind(blocked).bind(blocked).bind(&config.network).execute(&mut *tx).await?;
             super::super::audit(&mut tx, request.admin_id, "deposit_scanner.recovery_applied", 0,
-                Some(json!({"network":config.network,"cursor":old,"backfill_cursor":config.backfill_cursor_json,"backfill_target":config.backfill_target_json})),
-                json!({"network":config.network,"mode":request.mode,"cursor":cursor,"backfill_cursor":backfill,"revision":config.revision+1}), &request.reason).await?;
+                Some(json!({"network":config.network,"stream":config.stream,"cursor":old,"backfill_cursor":config.backfill_cursor_json,"backfill_target":config.backfill_target_json})),
+                json!({"network":config.network,"stream":config.stream,"mode":request.mode,"cursor":cursor,"backfill_cursor":backfill,"revision":config.revision+u64::from(config.stream.is_empty())}), &request.reason).await?;
         }
         Work::Backfill => {
-            sqlx::query("UPDATE wallet_deposit_scanners SET backfill_cursor_json=?,backfill_target_json=IF(?,NULL,backfill_target_json),backfill_last_error=NULL,last_scan_at=IF(backfill_blocked,NULL,last_scan_at),last_error=IF(backfill_blocked,NULL,last_error),backfill_blocked=FALSE,backfill_next_at=DATE_ADD(CURRENT_TIMESTAMP(6),INTERVAL 15 SECOND),lease_token=NULL,lease_until=NULL WHERE network=?")
+            sqlx::query(&format!("UPDATE {source} SET p.backfill_cursor_json=?,p.backfill_target_json=IF(?,NULL,p.backfill_target_json),p.backfill_last_error=NULL,p.last_scan_at=IF(p.backfill_blocked,NULL,p.last_scan_at),p.last_error=IF(p.backfill_blocked,NULL,p.last_error),p.backfill_blocked=FALSE,p.backfill_next_at=DATE_ADD(CURRENT_TIMESTAMP(6),INTERVAL 15 SECOND),p.lease_token=NULL,p.lease_until=NULL WHERE {scope}"))
                 .bind(if caught_up { None } else { Some(Json(cursor)) }).bind(caught_up).bind(&config.network).execute(&mut *tx).await?;
         }
         Work::Live => {
-            sqlx::query("UPDATE wallet_deposit_scanners SET cursor_json=?,last_scan_at=IF(?,CURRENT_TIMESTAMP(6),last_scan_at),last_error=IF(COALESCE(backfill_blocked,FALSE),COALESCE(backfill_last_error,'历史补扫异常，需核对'),NULL),lease_token=NULL,lease_until=NULL WHERE network=?")
+            sqlx::query(&format!("UPDATE {source} SET p.cursor_json=?,p.last_scan_at=IF(?,CURRENT_TIMESTAMP(6),p.last_scan_at),p.last_error=IF(COALESCE(p.backfill_blocked,FALSE),COALESCE(p.backfill_last_error,'历史补扫异常，需核对'),NULL),p.lease_token=NULL,p.lease_until=NULL WHERE {scope}"))
                 .bind(Json(cursor)).bind(caught_up).bind(&config.network).execute(&mut *tx).await?;
         }
     }

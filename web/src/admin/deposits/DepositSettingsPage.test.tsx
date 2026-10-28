@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -187,7 +187,7 @@ it.each(assetPresets)('applies $id only to a draft and sends the selected mainne
 
 it.each(nodePresets)('fills $id without enabling admission or sending unresolved credentials', async (preset) => {
   const user = userEvent.setup();
-  mocked.mockResolvedValue({ ...settings, scanners: [{ ...settings.scanners[0], network: preset.network, enabled: false, endpoint_configured: false }] });
+  mocked.mockResolvedValue({ ...settings, scanners: [{ ...settings.scanners[0], network: preset.network, streams: preset.network === 'base' ? ['native', 'token'].map(stream => ({ ...settings.scanners[0], stream })) : [], enabled: false, endpoint_configured: false }] });
   show();
   await screen.findByRole('combobox', { name: '配置网络' });
   if (preset.network !== 'eth') await choose(user, '配置网络', networkNames[preset.network]);
@@ -419,4 +419,26 @@ it('shows separate historical errors to readers without recovery write access', 
 it('does not allow recovery before the scanner has a checkpoint', async () => {
   show();
   expect(await screen.findByRole('button', { name: '恢复到最新区块' })).toBeDisabled();
+});
+
+it('shows isolated Base progress and recovers only the chosen token stream', async () => {
+  const user = userEvent.setup();
+  const common = { ...settings.scanners[0], network: 'base', cursor_height: 100, last_scan_at: 1792800000000 };
+  const token = { ...common, stream: 'token', cursor_height: 120, scan_fresh: true };
+  const native = { ...common, stream: 'native', last_error: 'RPC native method unavailable', scan_fresh: false };
+  mocked.mockResolvedValue({ ...settings, scanners: [{ ...common, streams: [native, token], last_error: native.last_error }] });
+  show();
+  await screen.findByRole('combobox', { name: '配置网络' });
+  await choose(user, '配置网络', 'Base');
+  const nativeRegion = await screen.findByRole('region', { name: 'ETH 原生币监听状态' });
+  const tokenRegion = screen.getByRole('region', { name: 'ERC20 代币（包括 USDC）监听状态' });
+  expect(within(nativeRegion).getByText('扫描异常')).toBeInTheDocument();
+  expect(within(tokenRegion).getByText('已追上区块')).toBeInTheDocument();
+  expect(within(tokenRegion).getByText('已扫描区块高度：120')).toBeInTheDocument();
+  await user.click(within(tokenRegion).getByRole('button', { name: '恢复 ERC20 到最新区块' }));
+  expect(await screen.findByText(/恢复范围：ERC20/)).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: '提交恢复请求' }));
+  await user.type(screen.getByRole('textbox', { name: '操作原因' }), '恢复代币分流');
+  await user.click(screen.getByRole('button', { name: '确认' }));
+  await waitFor(() => expect(mocked).toHaveBeenCalledWith('/admin/api/v1/wallet/deposit-settings/scanners/base/recovery', { method: 'POST', body: JSON.stringify({ stream: 'token', mode: 'backfill', expected_revision: 7, acknowledge_skip: false, reason: '恢复代币分流' }) }));
 });

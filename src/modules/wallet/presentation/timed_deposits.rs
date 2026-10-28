@@ -85,6 +85,8 @@ pub struct DepositPage<T> {
 #[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
 pub struct ScannerView {
     #[sqlx(skip)]
+    pub streams: Vec<ScannerStreamView>,
+    #[sqlx(skip)]
     pub providers: Vec<ScannerProviderView>,
     pub network: String,
     pub enabled: bool,
@@ -107,6 +109,23 @@ pub struct ScannerView {
     #[serde(with = "unix_millis")]
     #[schema(value_type = i64)]
     pub checked_at: DateTime<Utc>,
+}
+
+/// Base 分流状态独立计算；实时与补扫字段只属于当前资产类别。
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
+pub struct ScannerStreamView {
+    pub stream: String,
+    #[serde(with = "option_unix_millis")]
+    #[schema(value_type = Option<i64>)]
+    pub last_scan_at: Option<DateTime<Utc>>,
+    pub last_error: Option<String>,
+    pub scan_fresh: bool,
+    pub cursor_height: Option<u64>,
+    pub recovery_mode: Option<String>,
+    pub backfill_cursor_height: Option<u64>,
+    pub backfill_target_height: Option<u64>,
+    pub backfill_last_error: Option<String>,
+    pub backfill_blocked: bool,
 }
 
 #[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
@@ -280,6 +299,7 @@ pub struct SaveScannerKey {
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RecoverScanner {
+    pub stream: Option<String>,
     pub mode: String,
     pub expected_revision: u64,
     pub acknowledge_skip: bool,

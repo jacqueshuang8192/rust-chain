@@ -58,6 +58,12 @@ pub(super) async fn save(
             sqlx::query("INSERT INTO wallet_deposit_scanner_providers (network,name,priority,enabled,endpoint_encrypted,request_interval_ms) VALUES (?,?,?,?,?,?)")
                 .bind(network).bind(&draft.name).bind(draft.priority).bind(draft.enabled).bind(&endpoint).bind(draft.request_interval_ms).execute(&mut **tx).await?.last_insert_id()
         };
+        if endpoint_changed {
+            sqlx::query("DELETE FROM wallet_deposit_scanner_stream_failures WHERE provider_id=?")
+                .bind(id)
+                .execute(&mut **tx)
+                .await?;
+        }
         retained.push(id);
         save_keys(
             tx,
@@ -123,6 +129,12 @@ async fn save_keys(
             sqlx::query("INSERT INTO wallet_deposit_scanner_keys (provider_id,name,priority,enabled,api_key_encrypted,request_interval_ms) VALUES (?,?,?,?,?,?)")
                 .bind(provider).bind(&draft.name).bind(draft.priority).bind(draft.enabled).bind(&secret).bind(draft.request_interval_ms).execute(&mut **tx).await?.last_insert_id()
         };
+        if changed {
+            sqlx::query("DELETE FROM wallet_deposit_scanner_stream_failures WHERE provider_id=?")
+                .bind(provider)
+                .execute(&mut **tx)
+                .await?;
+        }
         retained.push(id);
     }
     for (id, _) in old {
@@ -185,6 +197,10 @@ pub(super) async fn save_legacy(
         sqlx::query("INSERT INTO wallet_deposit_scanner_keys (provider_id,name,api_key_encrypted) VALUES (?,'默认凭据',?)").bind(id).bind(api_key).execute(&mut **tx).await?;
     }
     if secrets_changed {
+        sqlx::query("DELETE FROM wallet_deposit_scanner_stream_failures WHERE provider_id=?")
+            .bind(id)
+            .execute(&mut **tx)
+            .await?;
         sqlx::query("UPDATE wallet_deposit_scanner_providers SET endpoint_encrypted=?,cooldown_until=NULL,last_error=NULL,last_success_at=NULL,failure_count=0 WHERE id=?").bind(endpoint).bind(id).execute(&mut **tx).await?;
         sqlx::query("UPDATE wallet_deposit_scanner_keys SET api_key_encrypted=?,cooldown_until=NULL,last_error=NULL,last_success_at=NULL,failure_count=0 WHERE provider_id=?").bind(api_key).bind(id).execute(&mut **tx).await?;
     }

@@ -22,6 +22,7 @@ async fn recover(pool: &Pool<MySql>, admin: u64, mode: &str) {
         admin,
         "tron",
         RecoverScanner {
+            stream: None,
             mode: mode.into(),
             expected_revision: s.revision,
             acknowledge_skip: mode == "skip",
@@ -150,6 +151,7 @@ async fn timed_deposit_recovery_dual_skip_failure_revision_and_accounting() {
             admin,
             "tron",
             RecoverScanner {
+                stream: None,
                 mode: "skip".into(),
                 acknowledge_skip: false,
                 expected_revision: before.revision,
@@ -166,6 +168,7 @@ async fn timed_deposit_recovery_dual_skip_failure_revision_and_accounting() {
             admin,
             "tron",
             RecoverScanner {
+                stream: None,
                 mode: "skip".into(),
                 acknowledge_skip: true,
                 expected_revision: before.revision,

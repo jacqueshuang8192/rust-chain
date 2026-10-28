@@ -13,6 +13,7 @@ struct Candidate {
 }
 
 pub(super) struct Gate {
+    stream: String,
     pool: Pool<MySql>,
     network: String,
     revision: u64,
@@ -35,8 +36,8 @@ pub(super) async fn scan_available(
     work: recovery::Work,
 ) -> Result<(Cursor, u64, bool), recovery::ScanFailure> {
     let encryption_key = key.ok_or_else(|| failure("credential encryption key is missing"))?;
-    let candidates=sqlx::query_as::<_,Candidate>("SELECT p.id AS provider_id,k.id AS key_id,p.endpoint_encrypted,k.api_key_encrypted,p.request_interval_ms AS provider_interval,k.request_interval_ms AS key_interval FROM wallet_deposit_scanner_providers p JOIN wallet_deposit_scanner_keys k ON k.provider_id=p.id WHERE p.network=? AND p.enabled=TRUE AND k.enabled=TRUE AND (p.cooldown_until IS NULL OR p.cooldown_until<=CURRENT_TIMESTAMP(6)) AND (k.cooldown_until IS NULL OR k.cooldown_until<=CURRENT_TIMESTAMP(6)) ORDER BY p.priority,p.id,k.priority,k.id")
-        .bind(&config.network).fetch_all(pool).await.map_err(AppError::from)?;
+    let candidates=sqlx::query_as::<_,Candidate>("SELECT p.id AS provider_id,k.id AS key_id,p.endpoint_encrypted,k.api_key_encrypted,p.request_interval_ms AS provider_interval,k.request_interval_ms AS key_interval FROM wallet_deposit_scanner_providers p JOIN wallet_deposit_scanner_keys k ON k.provider_id=p.id WHERE p.network=? AND p.enabled=TRUE AND k.enabled=TRUE AND (p.cooldown_until IS NULL OR p.cooldown_until<=CURRENT_TIMESTAMP(6)) AND (k.cooldown_until IS NULL OR k.cooldown_until<=CURRENT_TIMESTAMP(6)) AND NOT EXISTS(SELECT 1 FROM wallet_deposit_scanner_stream_failures f WHERE f.provider_id=p.id AND f.stream=? AND f.cooldown_until>CURRENT_TIMESTAMP(6)) ORDER BY p.priority,p.id,k.priority,k.id")
+        .bind(&config.network).bind(&config.stream).fetch_all(pool).await.map_err(AppError::from)?;
     let mut last = failure("所有监听渠道暂不可用或正在冷却，请检查渠道状态后等待自动重试");
     let mut excluded = HashSet::new();
     let mut attempts = 0;
@@ -70,6 +71,7 @@ pub(super) async fn scan_available(
                 .build()
                 .map_err(|_| failure("scanner HTTP client initialization failed"))?,
             gate: Some(Gate {
+                stream: config.stream.clone(),
                 pool: pool.clone(),
                 network: config.network.clone(),
                 revision: config.revision,
@@ -91,7 +93,7 @@ pub(super) async fn scan_available(
                 node.gate
                     .as_ref()
                     .unwrap()
-                    .failed("渠道扫描超时，保留进度后切换备用", true, 30)
+                    .failed_scoped("渠道扫描超时，保留进度后切换备用", 30)
                     .await?;
                 Err(failure("provider scan timed out"))
             }
@@ -132,11 +134,21 @@ pub(super) async fn scan_available(
 }
 
 impl Gate {
+    /// 资金提交只读取当前工作租约标识，不暴露节点或凭据。
+    pub(super) fn lease_token(&self) -> &str {
+        &self.token
+    }
+
+    /// 渠道与凭据共用较慢的请求间隔，分流不能叠加服务商额度。
     pub(super) fn interval(&self) -> u32 {
         self.provider_interval.max(self.key_interval)
     }
     async fn lock<'a>(&self, tx: &mut sqlx::Transaction<'a, MySql>) -> AppResult<()> {
-        let valid: bool=sqlx::query_scalar("SELECT revision=? AND lease_token=? AND lease_until>CURRENT_TIMESTAMP(6) FROM wallet_deposit_scanners WHERE network=? FOR UPDATE")
+        super::super::lock_network(tx, &self.network).await?;
+        let source = progress::source(&self.stream);
+        let scope = progress::scope(&self.stream);
+        let revision = progress::revision(&self.stream);
+        let valid: bool=sqlx::query_scalar(&format!("SELECT {revision}=? AND COALESCE(p.lease_token=?,FALSE) AND COALESCE(p.lease_until>CURRENT_TIMESTAMP(6),FALSE) FROM {source} WHERE {scope} FOR UPDATE"))
             .bind(self.revision).bind(&self.token).bind(&self.network).fetch_one(&mut **tx).await?;
         if !valid {
             return Err(failure("scanner lease or configuration changed"));
@@ -172,9 +184,13 @@ impl Gate {
         if let Ok(wait) = (start - now).to_std() {
             tokio::time::sleep(wait).await;
         }
-        let eligible:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM wallet_deposit_scanners s JOIN wallet_deposit_scanner_providers p ON p.network=s.network JOIN wallet_deposit_scanner_keys k ON k.provider_id=p.id WHERE s.network=? AND s.revision=? AND s.lease_token=? AND s.lease_until>CURRENT_TIMESTAMP(6) AND p.id=? AND k.id=? AND p.enabled=TRUE AND k.enabled=TRUE AND (p.cooldown_until IS NULL OR p.cooldown_until<=CURRENT_TIMESTAMP(6)) AND (k.cooldown_until IS NULL OR k.cooldown_until<=CURRENT_TIMESTAMP(6)))")
-            .bind(&self.network).bind(self.revision).bind(&self.token).bind(self.provider_id).bind(self.key_id).fetch_one(&self.pool).await?;
+        let source = progress::source(&self.stream);
+        let scope = progress::scope(&self.stream);
+        let revision = progress::revision(&self.stream);
+        let eligible:bool=sqlx::query_scalar(&format!("SELECT EXISTS(SELECT 1 FROM {source} JOIN wallet_deposit_scanner_providers pr ON pr.network=p.network JOIN wallet_deposit_scanner_keys k ON k.provider_id=pr.id WHERE {scope} AND {revision}=? AND p.lease_token=? AND p.lease_until>CURRENT_TIMESTAMP(6) AND pr.id=? AND k.id=? AND pr.enabled=TRUE AND k.enabled=TRUE AND (pr.cooldown_until IS NULL OR pr.cooldown_until<=CURRENT_TIMESTAMP(6)) AND (k.cooldown_until IS NULL OR k.cooldown_until<=CURRENT_TIMESTAMP(6)) AND NOT EXISTS(SELECT 1 FROM wallet_deposit_scanner_stream_failures f WHERE f.provider_id=pr.id AND f.stream=? AND f.cooldown_until>CURRENT_TIMESTAMP(6)))"))
+            .bind(&self.network).bind(self.revision).bind(&self.token).bind(self.provider_id).bind(self.key_id).bind(&self.stream).fetch_one(&self.pool).await?;
         if !eligible {
+            self.retryable.store(true, Ordering::Relaxed);
             return Err(failure("scanner channel changed or entered cooldown"));
         }
         Ok(())
@@ -223,17 +239,47 @@ impl Gate {
         Ok(())
     }
 
+    /// RPC 能力与整轮超时只冷却当前 Base 分流；真实 HTTP 配额和连接失败仍使用共享冷却。
+    pub(super) async fn failed_scoped(&self, message: &str, minimum_seconds: u64) -> AppResult<()> {
+        if self.stream.is_empty() {
+            return self.failed(message, true, minimum_seconds).await;
+        }
+        let mut tx = self.pool.begin().await?;
+        self.lock(&mut tx).await?;
+        sqlx::query("INSERT IGNORE INTO wallet_deposit_scanner_stream_failures(provider_id,stream) VALUES (?,?)")
+            .bind(self.provider_id).bind(&self.stream).execute(&mut *tx).await?;
+        let count: u32 = sqlx::query_scalar("SELECT failure_count FROM wallet_deposit_scanner_stream_failures WHERE provider_id=? AND stream=? FOR UPDATE")
+            .bind(self.provider_id).bind(&self.stream).fetch_one(&mut *tx).await?;
+        let seconds = minimum_seconds
+            .max(30u64.saturating_mul(1u64 << count.min(7)))
+            .min(7 * 86400);
+        sqlx::query("UPDATE wallet_deposit_scanner_stream_failures SET cooldown_until=DATE_ADD(CURRENT_TIMESTAMP(6),INTERVAL ? SECOND),last_error=?,failure_count=LEAST(failure_count+1,100) WHERE provider_id=? AND stream=?")
+            .bind(seconds).bind(message.chars().take(255).collect::<String>()).bind(self.provider_id).bind(&self.stream).execute(&mut *tx).await?;
+        tx.commit().await?;
+        self.retryable.store(true, Ordering::Relaxed);
+        self.channel_failed.store(true, Ordering::Relaxed);
+        Ok(())
+    }
+
     /// 完整扫描尝试成功才清除连续失败计数；普通健康探测不能掩盖后续区块接口的持续失败。
     async fn succeeded(&self) -> AppResult<()> {
         let mut tx = self.pool.begin().await?;
         self.lock(&mut tx).await?;
-        sqlx::query("UPDATE wallet_deposit_scanner_providers SET last_success_at=CURRENT_TIMESTAMP(6),last_error=NULL,cooldown_until=NULL,failure_count=0 WHERE id=?").bind(self.provider_id).execute(&mut *tx).await?;
-        sqlx::query("UPDATE wallet_deposit_scanner_keys SET last_success_at=CURRENT_TIMESTAMP(6),last_error=NULL,cooldown_until=NULL,failure_count=0 WHERE id=?").bind(self.key_id).execute(&mut *tx).await?;
+        sqlx::query("UPDATE wallet_deposit_scanner_providers SET last_success_at=CURRENT_TIMESTAMP(6),last_error=NULL,cooldown_until=NULL,failure_count=0 WHERE id=? AND (cooldown_until IS NULL OR cooldown_until<=CURRENT_TIMESTAMP(6))").bind(self.provider_id).execute(&mut *tx).await?;
+        sqlx::query("UPDATE wallet_deposit_scanner_keys SET last_success_at=CURRENT_TIMESTAMP(6),last_error=NULL,cooldown_until=NULL,failure_count=0 WHERE id=? AND (cooldown_until IS NULL OR cooldown_until<=CURRENT_TIMESTAMP(6))").bind(self.key_id).execute(&mut *tx).await?;
+        sqlx::query(
+            "DELETE FROM wallet_deposit_scanner_stream_failures WHERE provider_id=? AND stream=?",
+        )
+        .bind(self.provider_id)
+        .bind(&self.stream)
+        .execute(&mut *tx)
+        .await?;
         tx.commit().await?;
         Ok(())
     }
 }
 
+/// 限流等待接受秒数或 HTTP 日期，始终限制在一分钟到七天之间。
 pub(super) fn retry_after(value: Option<&reqwest::header::HeaderValue>) -> u64 {
     let Some(text) = value.and_then(|v| v.to_str().ok()) else {
         return 60;

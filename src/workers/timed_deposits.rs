@@ -3,6 +3,15 @@ use crate::{error::AppResult, modules::wallet::application::timed_deposits, stat
 
 /// 每轮重读配置并消费持久游标；节点密钥只传递到加密适配器，错误保留在网络状态中供运营核查。
 pub async fn run_loop(state: AppState) -> AppResult<()> {
+    tokio::try_join!(
+        run_group(&state, None),
+        run_group(&state, Some("native")),
+        run_group(&state, Some("token"))
+    )?;
+    Ok(())
+}
+
+async fn run_group(state: &AppState, stream: Option<&str>) -> AppResult<()> {
     let Some(pool) = state.mysql.as_ref() else {
         return Ok(());
     };
@@ -10,11 +19,14 @@ pub async fn run_loop(state: AppState) -> AppResult<()> {
     interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
     loop {
         interval.tick().await;
-        if let Err(error) =
-            timed_deposits::scan_once(pool, state.settings.exposed_credential_encryption_key())
-                .await
+        if let Err(error) = timed_deposits::scan_group_once(
+            pool,
+            state.settings.exposed_credential_encryption_key(),
+            stream,
+        )
+        .await
         {
-            tracing::error!(%error,"限时充值扫描轮次失败，将按持久游标重试");
+            tracing::error!(%error,stream,"限时充值扫描轮次失败，将按持久游标重试");
         }
     }
 }

@@ -27,3 +27,21 @@ it('requires new scan metadata and rejects malformed heights instead of reportin
   expect(() => parseSettings({ ...data, scanners: [{ ...scanner, scan_fresh: undefined }] })).toThrow();
   expect(() => parseSettings({ ...data, scanners: [{ ...scanner, cursor_height: 1.2 }] })).toThrow();
 });
+
+it('Base token admission ignores native errors and fails closed for missing token health', () => {
+  const base: Scanner = { ...scanner, network: 'base', last_error: 'native failed', streams: [{ ...scanner, stream: 'native', last_error: 'native failed' }, { ...scanner, stream: 'token' }] };
+  const token = { ...asset, network: 'base', asset_kind: 'token' };
+  const shared = [{ ...addresses[0], network: 'base' }];
+  expect(methodBlockers(token, base, shared, catalog)).toEqual([]);
+  expect(methodBlockers({ ...token, asset_kind: 'native' }, base, shared, catalog)).toContain('扫描异常');
+  expect(methodBlockers(token, { ...base, streams: [] }, shared, catalog)).not.toEqual([]);
+  expect(scanStatus(base).label).toBe('部分币种可收款');
+});
+it('requires exactly two valid Base stream snapshots', () => {
+  const base = { ...scanner, network: 'base', streams: [{ ...scanner, stream: 'native' }, { ...scanner, stream: 'token' }] };
+  const parse = (value: unknown) => parseSettings({ scanners: [value], assets: [], addresses: [], platform_assets: [] });
+  expect(parse(base).scanners[0].streams).toHaveLength(2);
+  expect(() => parse({ ...base, streams: undefined })).toThrow();
+  expect(() => parse({ ...base, streams: [base.streams[0], base.streams[0]] })).toThrow();
+  expect(() => parse({ ...base, streams: [{ ...base.streams[0], cursor_height: 0.5 }, base.streams[1]] })).toThrow();
+});

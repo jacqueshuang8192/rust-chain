@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/backend/timed-deposits.md", "reason": "Financial scanner and stream isolation contract"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Architecture and focused checks"}
+{"file": ".trellis/spec/admin/resource-response-contract.md", "reason": "Strict backend-derived status and response validation"}
+{"file": ".trellis/tasks/10-28-base-deposit-scan-isolation/research/implementation.md", "reason": "Decisions and verified failure modes"}

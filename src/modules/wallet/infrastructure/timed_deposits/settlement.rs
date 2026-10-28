@@ -42,7 +42,23 @@ pub(crate) async fn observe_scanned(
     receipt: &ChainReceipt,
     revision: u64,
 ) -> AppResult<u64> {
-    process_receipt(pool, receipt, Some(revision)).await
+    process_receipt(pool, receipt, Some((revision, None))).await
+}
+
+/// Base 分流在资金事务内复核本路租约；过期或被替换的工作不得入账，即使网络版本未改变。
+pub(crate) async fn observe_stream(
+    pool: &Pool<MySql>,
+    receipt: &ChainReceipt,
+    revision: u64,
+    stream: &str,
+    token: &str,
+) -> AppResult<u64> {
+    if receipt.network != "base" || receipt.asset_kind != stream {
+        return Err(AppError::Conflict(
+            "deposit stream evidence mismatch".into(),
+        ));
+    }
+    process_receipt(pool, receipt, Some((revision, Some((stream, token))))).await
 }
 
 /// 隔离数据库测试直接注入确定的链证据；生产构建只保留要求配置版本的扫描入口。
@@ -54,16 +70,25 @@ pub(crate) async fn observe(pool: &Pool<MySql>, receipt: &ChainReceipt) -> AppRe
 async fn process_receipt(
     pool: &Pool<MySql>,
     receipt: &ChainReceipt,
-    expected_revision: Option<u64>,
+    expected_revision: Option<(u64, Option<(&str, &str)>)>,
 ) -> AppResult<u64> {
     let mut tx = pool.begin().await?;
     lock_network(&mut tx, &receipt.network).await?;
-    if let Some(expected) = expected_revision {
+    if let Some((expected, lease)) = expected_revision {
         let (configured, revision): (bool, u64) =
             sqlx::query_as("SELECT endpoint_encrypted IS NOT NULL,revision FROM wallet_deposit_scanners WHERE network=?")
                 .bind(&receipt.network)
                 .fetch_one(&mut *tx)
                 .await?;
+        if let Some((stream, token)) = lease {
+            let valid: bool = sqlx::query_scalar("SELECT COALESCE(lease_token=?,FALSE) AND COALESCE(lease_until>CURRENT_TIMESTAMP(6),FALSE) FROM wallet_deposit_scanner_streams WHERE network=? AND stream=?")
+                .bind(token).bind(&receipt.network).bind(stream).fetch_one(&mut *tx).await?;
+            if !valid {
+                return Err(AppError::Conflict(
+                    "deposit stream lease changed during scan".into(),
+                ));
+            }
+        }
         if !configured || revision != expected {
             return Err(AppError::Conflict(
                 "deposit scanner configuration changed during scan".into(),

@@ -31,6 +31,27 @@ async fn timed_deposit_openapi_preserves_decimal_text_and_protected_routes() {
     }
     let schemas = &doc["components"]["schemas"];
     assert_eq!(
+        schemas["ScannerView"]["properties"]["streams"]["type"],
+        "array"
+    );
+    assert!(
+        schemas["ScannerStreamView"]["properties"]
+            .get("cursor_height")
+            .is_some()
+    );
+    assert!(
+        schemas["RecoverScanner"]["properties"]
+            .get("stream")
+            .is_some()
+    );
+    assert!(
+        !schemas["RecoverScanner"]["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|v| v == "stream")
+    );
+    assert_eq!(
         schemas["ScannerView"]["properties"]["providers"]["type"],
         "array"
     );

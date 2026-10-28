@@ -32,7 +32,7 @@ struct Rule {
 
 /// 仅展示配置齐全且监听近期成功的资产网络；链资产映射和平台币种开关都必须满足。
 pub(crate) async fn options(pool: &Pool<MySql>) -> AppResult<Vec<DepositOption>> {
-    Ok(sqlx::query_as("SELECT c.asset_symbol,c.network,CASE c.network WHEN 'eth' THEN 'Ethereum' WHEN 'base' THEN 'Base' WHEN 'btc' THEN 'Bitcoin' WHEN 'tron' THEN 'Tron' ELSE 'Solana' END AS display_name,LEAST(a.precision_scale,c.decimals) AS precision_scale,a.min_deposit_amount,a.deposit_fee,s.confirmations AS required_confirmations FROM wallet_deposit_chain_assets c JOIN assets a ON a.id=c.asset_id JOIN wallet_deposit_scanners s ON s.network=c.network WHERE c.enabled=TRUE AND s.enabled=TRUE AND s.endpoint_encrypted IS NOT NULL AND s.last_error IS NULL AND s.last_scan_at>DATE_SUB(CURRENT_TIMESTAMP(6),INTERVAL 120 SECOND) AND a.status='active' AND a.deposit_enabled=TRUE AND EXISTS(SELECT 1 FROM wallet_deposit_shared_addresses p WHERE p.network=c.network AND p.enabled=TRUE) ORDER BY a.symbol,c.network")
+    Ok(sqlx::query_as("SELECT c.asset_symbol,c.network,CASE c.network WHEN 'eth' THEN 'Ethereum' WHEN 'base' THEN 'Base' WHEN 'btc' THEN 'Bitcoin' WHEN 'tron' THEN 'Tron' ELSE 'Solana' END AS display_name,LEAST(a.precision_scale,c.decimals) AS precision_scale,a.min_deposit_amount,a.deposit_fee,s.confirmations AS required_confirmations FROM wallet_deposit_chain_assets c JOIN assets a ON a.id=c.asset_id JOIN wallet_deposit_scanners s ON s.network=c.network LEFT JOIN wallet_deposit_scanner_streams sp ON sp.network=c.network AND sp.stream=c.asset_kind WHERE c.enabled=TRUE AND s.enabled=TRUE AND s.endpoint_encrypted IS NOT NULL AND ((c.network='base' AND sp.last_error IS NULL AND sp.last_scan_at>DATE_SUB(CURRENT_TIMESTAMP(6),INTERVAL 120 SECOND)) OR (c.network<>'base' AND s.last_error IS NULL AND s.last_scan_at>DATE_SUB(CURRENT_TIMESTAMP(6),INTERVAL 120 SECOND))) AND a.status='active' AND a.deposit_enabled=TRUE AND EXISTS(SELECT 1 FROM wallet_deposit_shared_addresses p WHERE p.network=c.network AND p.enabled=TRUE) ORDER BY a.symbol,c.network")
     .fetch_all(pool).await?)
 }
 
@@ -61,7 +61,7 @@ pub(crate) async fn create(
         tx.commit().await?;
         return get(pool, Some(user_id), id).await;
     }
-    let rule=sqlx::query_as::<_,Rule>("SELECT c.id,c.asset_id,c.asset_symbol,c.asset_kind,c.token_address,c.identity_key,c.decimals,a.precision_scale,a.min_deposit_amount,a.deposit_fee,s.confirmations FROM wallet_deposit_chain_assets c JOIN assets a ON a.id=c.asset_id JOIN wallet_deposit_scanners s ON s.network=c.network WHERE c.network=? AND c.asset_symbol=? AND c.enabled=TRUE AND a.status='active' AND a.deposit_enabled=TRUE AND s.enabled=TRUE AND s.endpoint_encrypted IS NOT NULL AND s.last_error IS NULL AND s.last_scan_at>DATE_SUB(CURRENT_TIMESTAMP(6),INTERVAL 120 SECOND) FOR SHARE").bind(&request.network).bind(&request.asset_symbol).fetch_optional(&mut *tx).await?.ok_or_else(||AppError::Validation("deposit network is not configured or scanner is unavailable".into()))?;
+    let rule=sqlx::query_as::<_,Rule>("SELECT c.id,c.asset_id,c.asset_symbol,c.asset_kind,c.token_address,c.identity_key,c.decimals,a.precision_scale,a.min_deposit_amount,a.deposit_fee,s.confirmations FROM wallet_deposit_chain_assets c JOIN assets a ON a.id=c.asset_id JOIN wallet_deposit_scanners s ON s.network=c.network LEFT JOIN wallet_deposit_scanner_streams sp ON sp.network=c.network AND sp.stream=c.asset_kind WHERE c.network=? AND c.asset_symbol=? AND c.enabled=TRUE AND a.status='active' AND a.deposit_enabled=TRUE AND s.enabled=TRUE AND s.endpoint_encrypted IS NOT NULL AND ((c.network='base' AND sp.last_error IS NULL AND sp.last_scan_at>DATE_SUB(CURRENT_TIMESTAMP(6),INTERVAL 120 SECOND)) OR (c.network<>'base' AND s.last_error IS NULL AND s.last_scan_at>DATE_SUB(CURRENT_TIMESTAMP(6),INTERVAL 120 SECOND))) FOR SHARE").bind(&request.network).bind(&request.asset_symbol).fetch_optional(&mut *tx).await?.ok_or_else(||AppError::Validation("deposit network is not configured or scanner is unavailable".into()))?;
     let precision = rule.precision_scale.min(rule.decimals);
     if request.amount <= 0
         || !amount_fits_asset_precision(&request.amount, precision)
@@ -160,10 +160,13 @@ pub(crate) async fn watched_addresses(pool: &Pool<MySql>, network: &str) -> AppR
 pub(crate) async fn earliest_order_time(
     pool: &Pool<MySql>,
     network: &str,
+    stream: &str,
 ) -> AppResult<Option<DateTime<Utc>>> {
     Ok(
-        sqlx::query_scalar("SELECT MIN(created_at) FROM wallet_deposit_orders WHERE network=?")
+        sqlx::query_scalar("SELECT MIN(created_at) FROM wallet_deposit_orders WHERE network=? AND (?='' OR asset_kind=?)")
             .bind(network)
+            .bind(stream)
+            .bind(stream)
             .fetch_one(pool)
             .await?,
     )

@@ -159,6 +159,7 @@ fn field_label(name: &str) -> &str {
         "waiting_balance" => "余额不足数",
         "due_at" => "到期时间",
         "network" => "网络",
+        "stream" => "监听分流",
         "closed" => "关盘数",
         "withdrawal_scanned" => "提现扫描数",
         "withdrawal_broadcasted" => "提现广播数",

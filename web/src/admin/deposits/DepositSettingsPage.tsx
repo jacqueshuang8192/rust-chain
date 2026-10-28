@@ -7,17 +7,17 @@ import { PageHeader } from '../../layouts/PageHeader';
 import { adminErrorMessage } from '../../shared/adminErrorMessage';
 import { ConfirmAction } from '../../shared/ConfirmAction';
 import { AdminSelect } from '../../shared/SemiFormControls';
-import { TimestampText } from '../../shared/TimestampText';
 import { AdminRequestActionBoundary, useCanAdminRequest } from '../access';
 import { AddressImportForm, AssetForm, DepositEditPanel, networkLabel, ScannerForm } from './DepositSettingsEditors';
-import { base, networkOptions, parseAddresses, parseSettings, type Asset, type Scanner, type Settings, type SharedAddress } from './contracts';
+import { base, networkOptions, parseAddresses, parseSettings, type Asset, type Scanner, type ScannerStream, type Settings, type SharedAddress } from './contracts';
 import { DepositSetupGuide } from './DepositSetupGuide';
+import { ScannerProgressStatus } from './ScannerProgressStatus';
 import { ScannerRecoveryForm } from './ScannerRecoveryForm';
 import { ScannerProviderStatus } from './ScannerProviderStatus';
-import { methodBlockers, scanStatus } from './setupStatus';
+import { methodBlockers } from './setupStatus';
 import './RechargeWorkspace.css';
 
-type Editing = { type: 'recovery'; scanner: Scanner } | { type: 'scanner'; scanner: Scanner } | { type: 'asset'; network: string; existing?: Asset; snapshot: Settings } | { type: 'addresses'; network: string };
+type Editing = { type: 'recovery'; scanner: Scanner; stream?: ScannerStream['stream'] } | { type: 'scanner'; scanner: Scanner } | { type: 'asset'; network: string; existing?: Asset; snapshot: Settings } | { type: 'addresses'; network: string };
 export function DepositSettingsPage() {
   const session = useSyncExternalStore(authStore.subscribe, () => authStore.getSession('admin'));
   const canConfigure = useCanAdminRequest(`${base}/deposit-settings`, 'GET');
@@ -46,7 +46,6 @@ function SettingsEditor({ data, reload, canConfigure, unavailable }: { data: Set
     const timer = window.setInterval(() => { if (document.visibilityState === 'visible') void reload(); }, 15000);
     return () => window.clearInterval(timer);
   }, [editing, addressDialog, locked, canConfigure, reload]);
-  const scan = scanStatus(scanner);
   return <div className="deposit-settings-grid">
     <div className="deposit-network-toolbar"><div><label id="deposit-network-label">配置网络</label><AdminSelect ariaLabel="配置网络" ariaLabelledBy="deposit-network-label" value={network} onChange={setNetwork} optionList={networkOptions} /></div>
       <Button disabled={addressBusy || addressDialog || Boolean(editing)} onClick={() => { void reload(); }}>刷新配置与监听状态</Button>
@@ -57,13 +56,7 @@ function SettingsEditor({ data, reload, canConfigure, unavailable }: { data: Set
       editAddresses={canImport ? () => setEditing({ type: 'addresses', network }) : undefined} /> : null}
     {scanner ? <Card title={<Typography.Title heading={6}>{networkLabel(network)} · 网络与监听</Typography.Title>} headerExtraContent={canEditScanner ? <Button disabled={locked} onClick={() => setEditing({ type: 'scanner', scanner: { ...scanner } })}>编辑监听配置</Button> : <Tag>只读权限</Tag>}>
       <div className="deposit-overview"><span>接单开关：{scanner.enabled ? '已开启' : '已暂停'}</span><span>节点：{scanner.endpoint_configured ? '已配置' : '待配置'}</span><span>确认深度：{scanner.confirmations}</span><span>启用币种：{assets.filter(row => row.enabled).length} 个</span><span>启用地址：{addresses.filter(row => row.enabled).length} 个</span></div>
-      <div className="deposit-scan-status"><Tag color={!unavailable && scan.ready ? 'green' : 'grey'}>{unavailable ? '状态待刷新' : scan.label}</Tag><span>已扫描{network === 'solana' ? ' slot' : '区块高度'}：{scanner.cursor_height ?? '尚未建立游标'}</span><span>最近追上区块：<TimestampText value={scanner.last_scan_at} /></span></div>
-      <p className="muted">{scan.detail} 刷新只读取状态；恢复进度需单独选择处理历史区块的方式。</p>
-      {scanner.recovery_mode ? <Banner type="info" description={`恢复请求已排队：${scanner.recovery_mode === 'backfill' ? '跳到最新并补扫历史' : '跳到最新并跳过历史'}。节点校验成功后生效；失败会保留原进度并重试。`} /> : null}
-      {scanner.backfill_target_height !== null ? <div className="deposit-history-progress"><Typography.Text strong>历史补扫{scanner.backfill_blocked ? ' · 异常待核对' : ''}</Typography.Text><p>已扫描{network === 'solana' ? ' slot' : '区块高度'}：{scanner.backfill_cursor_height} / {scanner.backfill_target_height}</p><p className="muted">实时监听优先，历史范围单独补扫，不需要等待补扫完成才接收新充值。</p></div> : <p className="muted">当前没有待补扫的历史区间。</p>}
-      {scanner.backfill_last_error ? <Banner type="warning" description={`历史补扫异常：${scanner.backfill_last_error}${scanner.backfill_blocked ? '；为避免错误入账，已阻止新订单准入。' : '；保留历史进度等待重试。'}`} /> : null}
-      <AdminRequestActionBoundary endpoint={`${base}/deposit-settings/scanners/${network}/recovery`} method="POST"><Button disabled={locked || Boolean(editing) || scanner.cursor_height === null || !scanner.endpoint_configured || Boolean(scanner.recovery_mode)} onClick={() => setEditing({ type: 'recovery', scanner: { ...scanner } })}>恢复到最新区块</Button></AdminRequestActionBoundary>
-      {scanner.last_error ? <Banner type="warning" description={`监听异常：${scanner.last_error}`} /> : <p className="muted">只有平台资产允许充值、币种与地址已启用、节点最近成功追上区块时，用户才能创建充值订单。</p>}
+      {(network === 'base' ? (scanner.streams ?? []).map(stream => ({ scanner: { ...scanner, ...stream, streams: [] }, stream: stream.stream })) : [{ scanner, stream: undefined }]).map(item => <ScannerProgressStatus key={item.stream ?? network} scanner={item.scanner} stream={item.stream} unavailable={unavailable} locked={locked || Boolean(editing)} recover={() => setEditing({ type: 'recovery', scanner: item.scanner, stream: item.stream })} />)}
       <ScannerProviderStatus scanner={scanner} />
     </Card> : canConfigure ? <Banner type="warning" description="当前网络缺少监听配置，请刷新确认服务端配置完整。" /> : <Banner type="info" description="当前账号可管理收款地址。查看和编辑网络、币种需要充值网络配置权限。" />}
     {canConfigure ? <Card title={<Typography.Title heading={6}>监听币种 · {assets.length} 个</Typography.Title>} headerExtraContent={canEditAsset ? <Button theme="solid" disabled={locked} onClick={() => setEditing({ type: 'asset', network, snapshot: data })}>新增监听币种</Button> : <Tag>只读权限</Tag>}>
@@ -82,7 +75,7 @@ function SettingsEditor({ data, reload, canConfigure, unavailable }: { data: Set
       {!addresses.length ? <p className="muted">尚无收款地址，点击“添加收款地址”批量导入。</p> : <ul className="deposit-config-list">{addresses.map(row => <AddressRow key={row.pool_id} row={row} disabled={locked} setBusy={setAddressBusy} onOpenChange={setAddressDialog} reload={reload} />)}</ul>}
     </Card>
     {editing ? <DepositEditPanel className={editing.type === 'recovery' ? 'deposit-recovery-panel' : undefined} title={editing.type === 'recovery' ? `${networkLabel(editing.scanner.network)} · 恢复扫描进度` : editing.type === 'scanner' ? `${networkLabel(editing.scanner.network)} · 编辑监听配置` : editing.type === 'asset' ? `${networkLabel(editing.network)} · ${editing.existing ? '编辑监听币种' : '新增监听币种'}` : `${networkLabel(editing.network)} · 添加收款地址`} close={() => setEditing(null)}>
-      {controls => editing.type === 'recovery' ? <ScannerRecoveryForm scanner={editing.scanner} {...controls} saved={saved} /> : editing.type === 'scanner' ? <ScannerForm scanner={editing.scanner} {...controls} saved={saved} /> : editing.type === 'asset' ? <AssetForm network={editing.network} existing={editing.existing} assets={editing.snapshot.assets.filter(row => row.network === editing.network)} catalog={editing.snapshot.platform_assets} {...controls} saved={saved} /> : <AddressImportForm network={editing.network} {...controls} saved={saved} />}
+      {controls => editing.type === 'recovery' ? <ScannerRecoveryForm scanner={editing.scanner} stream={editing.stream} {...controls} saved={saved} /> : editing.type === 'scanner' ? <ScannerForm scanner={editing.scanner} {...controls} saved={saved} /> : editing.type === 'asset' ? <AssetForm network={editing.network} existing={editing.existing} assets={editing.snapshot.assets.filter(row => row.network === editing.network)} catalog={editing.snapshot.platform_assets} {...controls} saved={saved} /> : <AddressImportForm network={editing.network} {...controls} saved={saved} />}
     </DepositEditPanel> : null}
   </div>;
 }

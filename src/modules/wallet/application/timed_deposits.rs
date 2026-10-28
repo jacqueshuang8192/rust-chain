@@ -232,6 +232,18 @@ pub async fn scan_once(pool: &Pool<MySql>, key: Option<&str>) -> AppResult<u64> 
     storage::scanners::run_once(pool, key).await
 }
 
+/// Base 原生与代币使用独立轮询；其他网络保留原调度，分流不能改变节点限速及资金校验。
+pub(crate) async fn scan_group_once(
+    pool: &Pool<MySql>,
+    key: Option<&str>,
+    stream: Option<&str>,
+) -> AppResult<u64> {
+    if stream.is_none() {
+        storage::orders::expire(pool).await?;
+    }
+    storage::scanners::run_group(pool, key, stream).await
+}
+
 /// 取消身份仅来自用户令牌；存储层原子校验付款证据，不能撤销已检测到的到账。
 pub async fn cancel_order(pool: &Pool<MySql>, user_id: u64, id: u64) -> AppResult<DepositOrder> {
     storage::orders::cancel(pool, user_id, id).await
@@ -340,7 +352,11 @@ pub(crate) async fn recover_scanner(
 ) -> AppResult<()> {
     let network = super::normalize_deposit_network(network)?;
     request.reason = reason(request.reason)?;
-    if !matches!(request.mode.as_str(), "backfill" | "skip")
+    if request
+        .stream
+        .as_ref()
+        .is_some_and(|stream| network != "base" || !matches!(stream.as_str(), "native" | "token"))
+        || !matches!(request.mode.as_str(), "backfill" | "skip")
         || (request.mode == "skip" && !request.acknowledge_skip)
     {
         return Err(AppError::Validation(

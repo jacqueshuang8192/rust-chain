@@ -12,7 +12,7 @@ retired in this test environment. No signing, custody or sweeps.
 - Migrations `0158_timed_chain_deposits.sql`, `0159_timed_deposit_text_identity.sql`,
   `0160_independent_recharge_addresses.sql` and
   `0161_timed_deposit_cancellation.sql`, `0162_deposit_scanner_providers.sql` and
-  `0163_deposit_scanner_recovery.sql`. The shared table owns its IDs;
+  `0163_deposit_scanner_recovery.sql` and `0165_base_deposit_scan_streams.sql`. The shared table owns its IDs;
   existing order references are preserved without legacy inventory inserts.
 - Tables: `wallet_deposit_scanners`, `wallet_deposit_chain_assets`,
   `wallet_deposit_shared_addresses`, `wallet_deposit_orders`, `wallet_deposit_receipts`.
@@ -267,6 +267,99 @@ AppError in this wrapper: its layout plus metadata can reach Clippy's 128-byte
 large-error threshold on CI even when local compilation passes. Preserve original
 error variants/messages and retry classification; do not silence `result_large_err`.
 The scanner regression test checks the wrapper size and both classifications.
+
+### Base native / ERC20 progress isolation
+
+#### 1. Scope / Trigger
+
+Base native transaction lookups can fail while ERC20 logs are available. Neither
+asset class may block the other class's cursor, evidence settlement or admission.
+Other networks retain the single-network scanner contract above.
+
+#### 2. Signatures
+
+Migration `0165_base_deposit_scan_streams.sql` adds
+`wallet_deposit_scanner_streams(network,stream)` for `base/native` and
+`base/token`, plus `wallet_deposit_scanner_stream_failures(provider_id,stream)`.
+`ScannerView.streams` contains two `ScannerStreamView` entries for Base and an
+empty array for other networks. Each has live/backfill/recovery health fields.
+Recovery accepts optional `stream: "native" | "token"`; omitted/null on Base
+queues both streams atomically, while other networks reject a non-null stream.
+
+#### 3. Contracts
+
+- Migration copies the exact live cursor, pending request, historical range and
+  history error/block into both streams. It clears freshness/leases and increments
+  network revision, never moving a height. Old Base progress remains historical
+  rollout evidence and is never consumed by the new runtime or admission.
+- The worker runs separate three-second loops for Base native, Base token and
+  the existing non-Base group. A long native attempt cannot delay the next token
+  round. Order expiry maintenance stays in the non-Base loop.
+- Each stream owns its 60-second lease, 45-second round, 35-second attempts,
+  realtime/backfill schedule and error state. Queries for assets, historical
+  confirmation depth and missing-checkpoint protection filter by asset_kind.
+  Disabled identities with historical orders remain monitored.
+- Claim/error/complete/gate operations take the network lock before stream and
+  provider/key rows. Configuration revision remains network-wide. Base receipt
+  settlement checks both network revision and the current stream's unexpired
+  token inside the financial transaction; receipt IDs and event indexes do not
+  gain a stream component.
+- Provider/key pacing and HTTP 401/429 or transport/server cooldowns remain
+  shared. RPC application failures, invalid batch responses and complete-attempt
+  timeouts use a persisted provider/stream cooldown; sibling success cannot clear
+  it. Sibling success also cannot clear an active shared quota cooldown.
+  Credential/endpoint replacement resets scoped failures; blank saves preserve them.
+- Options and new-order validation read the corresponding Base stream's null
+  error and 120-second freshness. Network switches, asset flags, addresses and
+  all other admission requirements still apply. Base aggregate snapshot is
+  conservative; it must never be used to reject a healthy token payment method.
+- Recovery increments the network revision when queued and fences all old work,
+  but clears only the selected stream's freshness. Applying Base recovery does
+  not increment the network revision again or invalidate sibling progress.
+  Both requested/applied audit entries identify the stream. The Admin freezes
+  stream, revision and checkpoint in the recovery drawer and strictly requires
+  both distinct Base snapshots in settings responses.
+- Stop old workers before migration, then deploy backend and Admin together.
+  Do not run old and new workers simultaneously. A rollback requires reviewing
+  both streams and reconstructing an audited checkpoint; the frozen legacy Base
+  row is not a valid automatic rollback checkpoint after independent progress.
+
+#### 4. Validation & Error Matrix
+
+| Condition | Required result |
+|---|---|
+| Native transaction RPC rejected | Native checkpoint retained; ERC20 continues, credits and admits |
+| ERC20 log RPC rejected | Token checkpoint retained; native continues independently |
+| Shared HTTP 429 | Selected key cooled for both streams; no quota bypass |
+| Configuration changed / expired stream lease | No stale Base receipt or progress commit |
+| Token-only backfill/skip | Native history unchanged; token changes audited |
+| Missing/duplicate Base stream snapshot | Admin fails closed rather than using aggregate health |
+
+#### 5. Good / Base / Bad Cases
+
+Good: native remains at 100 while tokens reach 101 and credit one USDC receipt.
+Base: Tron continues using its original lease, recovery and provider behavior.
+Bad: two cursors with one error/readiness gate, or a serial outer loop that waits
+for native completion before scheduling the next token scan.
+
+#### 6. Tests Required
+
+Real isolated MySQL with mock RPC: both failure directions; options and create;
+real wallet credit; history replay without duplicate ledger entries; scoped and
+legacy recovery; shared quota; stale configuration and expired-lease rejection;
+repeated token rounds while native lease is held. Migration preserves pending
+history and fences old workers; SQLx rerun is clean. Admin tests cover separate
+status, missing/duplicate snapshots and selected recovery payload; OpenAPI keeps
+stream optional and includes the required response array. Browser check both
+statuses, token recovery and narrow layouts. Real-chain throughput remains an
+explicit deployment check, not implied by fixture success.
+
+#### 7. Wrong vs Correct
+
+Wrong: `base.ready = network.last_error == null` for every asset, or clear a
+provider's current HTTP 429 when a sibling finishes a successful request.
+Correct: admit USDC using `base/token` state; keep active shared quota cooldowns
+and clear only the successful stream's scoped failure after a full valid scan.
 
 ### Scanner HTTP diagnostics
 

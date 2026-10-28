@@ -2,6 +2,7 @@
 
 mod bitcoin;
 mod evm;
+pub(crate) mod progress;
 mod provider_runtime;
 pub(crate) mod recovery;
 mod solana;
@@ -24,10 +25,9 @@ use std::{collections::HashSet, time::Duration};
 
 const TRANSFER_TOPIC: &str = "ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 
-const CONFIG_SELECT: &str = "SELECT network,confirmations,revision,cursor_json,recovery_request_json,backfill_cursor_json,backfill_target_json,COALESCE(backfill_next_at<=CURRENT_TIMESTAMP(6),TRUE) AS backfill_due,COALESCE(last_scan_at>DATE_SUB(CURRENT_TIMESTAMP(6),INTERVAL 30 SECOND) AND last_error IS NULL,FALSE) AS live_recent,COALESCE(backfill_blocked,FALSE) AS backfill_blocked FROM wallet_deposit_scanners";
-
 #[derive(sqlx::FromRow)]
 struct ScannerConfig {
+    stream: String,
     network: String,
     confirmations: u32,
     revision: u64,
@@ -68,11 +68,39 @@ struct Block {
 
 /// 各网络独立认领持久租约并并行读取；单网失败记录脱敏原因，其他网络继续，未处理完绝不推进游标。
 pub(crate) async fn run_once(pool: &Pool<MySql>, key: Option<&str>) -> AppResult<u64> {
-    let configs = sqlx::query_as::<_, ScannerConfig>(&format!(
-        "{CONFIG_SELECT} WHERE endpoint_encrypted IS NOT NULL ORDER BY network"
-    ))
-    .fetch_all(pool)
-    .await?;
+    let (others, native, token) = tokio::join!(
+        run_group(pool, key, None),
+        run_group(pool, key, Some("native")),
+        run_group(pool, key, Some("token"))
+    );
+    Ok(others? + native? + token?)
+}
+
+/// 常驻任务分别调度 Base 两路和其余网络；慢分流不占用快分流的下一轮时间。
+pub(crate) async fn run_group(
+    pool: &Pool<MySql>,
+    key: Option<&str>,
+    selected: Option<&str>,
+) -> AppResult<u64> {
+    let query = if let Some(selected) = selected {
+        let condition = match selected {
+            "native" => "p.stream='native'",
+            "token" => "p.stream='token'",
+            _ => return Err(failure("invalid deposit scan stream")),
+        };
+        format!(
+            "{} WHERE s.endpoint_encrypted IS NOT NULL AND {condition}",
+            progress::select(selected)
+        )
+    } else {
+        format!(
+            "{} WHERE p.network <> 'base' AND p.endpoint_encrypted IS NOT NULL ORDER BY p.network",
+            progress::select("")
+        )
+    };
+    let configs = sqlx::query_as::<_, ScannerConfig>(&query)
+        .fetch_all(pool)
+        .await?;
     let results = stream::iter(
         configs
             .into_iter()
@@ -102,9 +130,9 @@ async fn scan(
     node: &Node,
     work: recovery::Work,
 ) -> AppResult<(Cursor, u64, bool)> {
-    let assets=sqlx::query_as::<_,(u64,String,String,String,i32)>("SELECT id,asset_symbol,asset_kind,token_address,decimals FROM wallet_deposit_chain_assets c WHERE network=? AND (enabled=TRUE OR EXISTS(SELECT 1 FROM wallet_deposit_orders o WHERE o.chain_asset_id=c.id)) ORDER BY id")
-        .bind(&config.network).fetch_all(pool).await?.into_iter().map(|(id,asset_symbol,asset_kind,token_address,decimals)|ChainAsset{id,asset_symbol,asset_kind,token_address,decimals}).collect::<Vec<_>>();
-    let historic:u32=sqlx::query_scalar("SELECT required_confirmations FROM wallet_deposit_orders WHERE network=? AND status<>'credited' ORDER BY required_confirmations DESC LIMIT 1").bind(&config.network).fetch_optional(pool).await?.unwrap_or(1);
+    let assets=sqlx::query_as::<_,(u64,String,String,String,i32)>("SELECT id,asset_symbol,asset_kind,token_address,decimals FROM wallet_deposit_chain_assets c WHERE network=? AND (?='' OR asset_kind=?) AND (enabled=TRUE OR EXISTS(SELECT 1 FROM wallet_deposit_orders o WHERE o.chain_asset_id=c.id)) ORDER BY id")
+        .bind(&config.network).bind(&config.stream).bind(&config.stream).fetch_all(pool).await?.into_iter().map(|(id,asset_symbol,asset_kind,token_address,decimals)|ChainAsset{id,asset_symbol,asset_kind,token_address,decimals}).collect::<Vec<_>>();
+    let historic:u32=sqlx::query_scalar("SELECT required_confirmations FROM wallet_deposit_orders WHERE network=? AND (?='' OR asset_kind=?) AND status<>'credited' ORDER BY required_confirmations DESC LIMIT 1").bind(&config.network).bind(&config.stream).bind(&config.stream).fetch_optional(pool).await?.unwrap_or(1);
     let confirmations = config.confirmations.max(historic);
     let tip = node.head(&assets).await?;
     let safe = tip.saturating_sub(u64::from(confirmations) - 1);
@@ -141,7 +169,7 @@ async fn scan(
     let cursor = if let Some(Json(cursor)) = selected_cursor {
         cursor.clone()
     } else {
-        if orders::earliest_order_time(pool, &config.network)
+        if orders::earliest_order_time(pool, &config.network, &config.stream)
             .await?
             .is_some()
         {
@@ -232,7 +260,22 @@ async fn scan(
     let mut count = 0;
     for block in blocks {
         for receipt in block.receipts {
-            settlement::observe_scanned(pool, &receipt, config.revision).await?;
+            if config.stream.is_empty() {
+                settlement::observe_scanned(pool, &receipt, config.revision).await?;
+            } else {
+                let gate = node
+                    .gate
+                    .as_ref()
+                    .ok_or_else(|| failure("deposit stream lease is missing"))?;
+                settlement::observe_stream(
+                    pool,
+                    &receipt,
+                    config.revision,
+                    &config.stream,
+                    gate.lease_token(),
+                )
+                .await?;
+            }
             count += 1;
         }
     }
@@ -444,7 +487,7 @@ impl Node {
                 Ok(ordered) => ordered,
                 Err(error) => {
                     if let Some(gate) = &self.gate {
-                        gate.failed("RPC 批量响应不完整或标识无效，请检查渠道接口", true, 60)
+                        gate.failed_scoped("RPC 批量响应不完整或标识无效，请检查渠道接口", 60)
                             .await?;
                     }
                     return Err(error);
@@ -461,12 +504,8 @@ impl Node {
     async fn rpc_result(&self, method: &'static str, response: &Value) -> AppResult<Value> {
         if !response["error"].is_null() {
             if let Some(gate) = &self.gate {
-                gate.failed(
-                    &format!("RPC 方法 {method} 失败，请检查渠道权限和额度"),
-                    true,
-                    60,
-                )
-                .await?;
+                gate.failed_scoped(&format!("RPC 方法 {method} 失败，请检查渠道权限和额度"), 60)
+                    .await?;
             }
             return Err(failure(&format!("chain RPC method {method} failed")));
         }

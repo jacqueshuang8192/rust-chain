@@ -18,6 +18,7 @@ pub(crate) async fn load(pool: &Pool<MySql>) -> AppResult<DepositSettings> {
         platform_assets:sqlx::query_as("SELECT symbol,status,deposit_enabled,precision_scale FROM assets ORDER BY symbol").fetch_all(pool).await?,
     };
     super::providers::load(pool, &mut result.scanners).await?;
+    super::scanners::progress::load_views(pool, &mut result.scanners).await?;
     Ok(result)
 }
 
@@ -61,6 +62,7 @@ pub(crate) async fn save_scanner(
     sqlx::query("UPDATE wallet_deposit_scanners SET enabled=?,endpoint_encrypted=?,api_key_encrypted=?,confirmations=?,revision=revision+1,last_scan_at=NULL,last_error=NULL,lease_token=NULL,lease_until=NULL WHERE network=?")
         .bind(request.enabled).bind(endpoint).bind(api_key).bind(request.confirmations).bind(network).execute(&mut *tx).await?;
     audit(&mut tx,admin_id,"deposit_scanner.update",0,Some(json!({"network":network,"enabled":enabled,"confirmations":confirmations,"revision":revision})),json!({"network":network,"enabled":request.enabled,"confirmations":request.confirmations,"revision":revision+1,"providers":request.providers.as_ref().map(|providers|providers.iter().map(|provider|json!({"id":provider.id,"name":provider.name,"enabled":provider.enabled,"priority":provider.priority,"request_interval_ms":provider.request_interval_ms,"endpoint_updated":provider.endpoint.as_ref().is_some_and(|value|!value.trim().is_empty()),"keys":provider.keys.iter().map(|key|json!({"id":key.id,"name":key.name,"enabled":key.enabled,"priority":key.priority,"request_interval_ms":key.request_interval_ms,"credential_updated":key.clear_api_key||key.api_key.as_ref().is_some_and(|value|!value.trim().is_empty())})).collect::<Vec<_>>()})).collect::<Vec<_>>())}),&request.reason).await?;
+    super::scanners::progress::invalidate(&mut tx, network).await?;
     tx.commit().await?;
     Ok(())
 }
@@ -116,6 +118,7 @@ pub(crate) async fn save_asset(
             .bind(&request.network).bind(asset_id).bind(&request.asset_symbol).bind(&request.asset_kind).bind(&request.token_address).bind(identity).bind(request.decimals).bind(request.enabled).execute(&mut *tx).await?.last_insert_id()
     };
     sqlx::query("UPDATE wallet_deposit_scanners SET last_scan_at=NULL,revision=revision+1,lease_token=NULL,lease_until=NULL WHERE network=?").bind(&request.network).execute(&mut *tx).await?;
+    super::scanners::progress::invalidate(&mut tx, &request.network).await?;
     audit(&mut tx,admin_id,"deposit_chain_asset.save",id,before.as_ref().map(|v|json!(v)),json!({"network":request.network,"asset_symbol":request.asset_symbol,"asset_kind":request.asset_kind,"token_address":request.token_address,"decimals":request.decimals,"enabled":request.enabled}),&request.reason).await?;
     tx.commit().await?;
     Ok(())
@@ -150,6 +153,7 @@ pub(crate) async fn import_addresses(
         // 新增地址先使旧扫描失效，重新加载监听集合并追上区块后才开放新订单。
         sqlx::query("UPDATE wallet_deposit_scanners SET last_scan_at=NULL,revision=revision+1,lease_token=NULL,lease_until=NULL WHERE network=?")
             .bind(&request.network).execute(&mut *tx).await?;
+        super::scanners::progress::invalidate(&mut tx, &request.network).await?;
     }
     audit(&mut tx,admin_id,"deposit_shared_address.import",0,None,
         json!({"network":request.network,"created":created,"requested_count":request.addresses.len()}),&request.reason).await?;
