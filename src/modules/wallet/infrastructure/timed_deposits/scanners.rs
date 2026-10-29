@@ -48,6 +48,7 @@ struct Cursor {
 }
 
 struct Node {
+    base_full_blocks: bool,
     network: String,
     endpoint: String,
     api_key: Option<String>,
@@ -215,12 +216,14 @@ async fn scan(
     let interval = node.gate.as_ref().map_or(250, |gate| gate.interval());
     let batch = (12_000 / (u64::from(interval) * 4)).clamp(1, 32);
     // Base 原生扫描需分片查询每笔交易，限制区块数为持久节流和整轮超时留出余量。
-    let batch =
-        if context.network == "base" && context.assets.iter().any(|a| a.asset_kind == "native") {
-            batch.min((node.rpc_batch_limit() * 4).div_ceil(MAX_RPC_BATCH_CALLS) as u64)
-        } else {
-            batch
-        };
+    let batch = if context.network == "base"
+        && !node.base_full_blocks
+        && context.assets.iter().any(|a| a.asset_kind == "native")
+    {
+        batch.min((node.rpc_batch_limit() * 4).div_ceil(MAX_RPC_BATCH_CALLS) as u64)
+    } else {
+        batch
+    };
     let end = safe.min(cursor.height.saturating_add(batch));
     if end <= cursor.height {
         return Ok((cursor, 0, true));

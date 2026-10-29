@@ -6,7 +6,7 @@ import { AdminPasswordInput, AdminSelect, AdminTextArea, AdminTextInput } from '
 import { parseSafeInteger } from '../../shared/integer';
 import { createModalProps } from '../resources/actions/shared';
 import { UnsavedChangesGuard } from '../settings';
-import { base, networkOptions, type Asset, type PlatformAsset, type Scanner } from './contracts';
+import { base, networkOptions, type Asset, type PlatformAsset, type RpcPreset, type Scanner } from './contracts';
 import { MultiScannerForm } from './MultiScannerForm';
 import { assetPresets, hasCredentialPlaceholder, nativeAssets, nodePresets } from './presets';
 
@@ -26,7 +26,7 @@ export function DepositEditPanel({ title, close, children, className }: { classN
       footer={<Button disabled={busy} onClick={cancel}>取消编辑</Button>}>
       {children({ dirty: () => setDirty(true), busy, setBusy })}
     </SideSheet>
-    <Modal visible={discard} title="放弃未保存的配置？" motion={false} maskClosable={false} okText="放弃草稿" cancelText="继续编辑" okButtonProps={{ 'aria-label': '放弃草稿' }} cancelButtonProps={{ 'aria-label': '继续编辑' }}
+    <Modal width="min(448px, calc(100vw - 32px))" visible={discard} title="放弃未保存的配置？" motion={false} maskClosable={false} okText="放弃草稿" cancelText="继续编辑" okButtonProps={{ 'aria-label': '放弃草稿' }} cancelButtonProps={{ 'aria-label': '继续编辑' }}
       onOk={close} onCancel={() => setDiscard(false)}>
       当前编辑内容尚未保存。放弃后可重新打开配置，或选择其他网络。
     </Modal>
@@ -34,8 +34,8 @@ export function DepositEditPanel({ title, close, children, className }: { classN
 }
 
 type CommonProps = EditorControls & { saved: () => Promise<void> };
-export function ScannerForm(props: CommonProps & { scanner: Scanner }) {
-  return props.scanner.providers.length ? <MultiScannerForm {...props} /> : <InitialScannerForm {...props} />;
+export function ScannerForm(props: CommonProps & { scanner: Scanner; presets?: RpcPreset[] }) {
+  return props.scanner.providers.length || props.presets?.some(preset => preset.network === props.scanner.network) ? <MultiScannerForm {...props} /> : <InitialScannerForm {...props} />;
 }
 function InitialScannerForm({ scanner, dirty, busy, setBusy, saved }: CommonProps & { scanner: Scanner }) {
   const [enabled, setEnabled] = useState(scanner.enabled);

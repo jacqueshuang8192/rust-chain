@@ -66,3 +66,11 @@
 
 .deposit-recovery-panel .semi-sidesheet-title { flex: 1 1 0; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
 .deposit-recovery-panel .semi-sidesheet-close { flex-shrink: 0; }
+
+.deposit-edit-form .deposit-provider-draft { padding: 16px; border: 1px solid var(--semi-color-border); }
+.deposit-public-endpoint { font-family: var(--semi-font-family-code); overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  .deposit-edit-form .deposit-provider-draft { padding: 10px; }
+  .deposit-edit-form .deposit-preset { padding: 12px; }
+  .deposit-edit-form .semi-button { max-width: 100%; height: auto; min-height: 32px; white-space: normal; }
+}

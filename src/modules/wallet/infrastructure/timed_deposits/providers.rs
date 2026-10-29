@@ -2,13 +2,13 @@
 use crate::{
     error::{AppError, AppResult},
     infra::secrets::{decrypt_optional_secret, encrypt_secret_field},
-    modules::wallet::presentation::timed_deposits::*,
+    modules::wallet::{domain::rpc_presets, presentation::timed_deposits::*},
 };
 use sqlx::{MySql, Pool, Transaction};
 
 /// 以固定批量查询装配所有网络渠道快照；不读取或返回任何凭据原文。
 pub(super) async fn load(pool: &Pool<MySql>, scanners: &mut [ScannerView]) -> AppResult<()> {
-    let mut providers = sqlx::query_as::<_, ScannerProviderView>("SELECT id,network,name,priority,enabled,request_interval_ms,cooldown_until,last_error,last_success_at FROM wallet_deposit_scanner_providers ORDER BY priority,id").fetch_all(pool).await?;
+    let mut providers = sqlx::query_as::<_, ScannerProviderView>("SELECT id,network,preset_id,name,priority,enabled,request_interval_ms,cooldown_until,last_error,last_success_at FROM wallet_deposit_scanner_providers ORDER BY priority,id").fetch_all(pool).await?;
     let keys = sqlx::query_as::<_, ScannerKeyView>("SELECT id,provider_id,name,priority,enabled,api_key_encrypted IS NOT NULL AS api_key_configured,request_interval_ms,cooldown_until,last_error,last_success_at FROM wallet_deposit_scanner_keys ORDER BY priority,id").fetch_all(pool).await?;
     for key in keys {
         if let Some(provider) = providers.iter_mut().find(|p| p.id == key.provider_id) {
@@ -30,7 +30,7 @@ pub(super) async fn save(
     encryption_key: &str,
     drafts: &[SaveScannerProvider],
 ) -> AppResult<(Option<String>, Option<String>)> {
-    let old: Vec<(u64, String)> = sqlx::query_as("SELECT id,endpoint_encrypted FROM wallet_deposit_scanner_providers WHERE network=? FOR UPDATE")
+    let old: Vec<(u64, String, Option<String>)> = sqlx::query_as("SELECT id,endpoint_encrypted,preset_id FROM wallet_deposit_scanner_providers WHERE network=? FOR UPDATE")
         .bind(network).fetch_all(&mut **tx).await?;
     let mut retained = Vec::new();
     for draft in drafts {
@@ -40,23 +40,55 @@ pub(super) async fn save(
                 "provider does not belong to this network".into(),
             ));
         }
-        let endpoint = encrypt_secret_field(
-            encryption_key,
-            draft.endpoint.as_deref(),
-            previous.map(|r| r.1.clone()),
-        )?
-        .ok_or_else(|| AppError::Validation("new provider requires an endpoint".into()))?;
+        let supplied_endpoint = draft
+            .endpoint
+            .as_deref()
+            .filter(|value| !value.trim().is_empty());
+        let preset_id = match draft.preset_id.as_deref() {
+            Some("") => None,
+            Some(id) => Some(id),
+            None if supplied_endpoint.is_some() => None,
+            None => previous.and_then(|row| row.2.as_deref()),
+        };
+        let preset = preset_id
+            .map(|id| {
+                rpc_presets::find(network, id).ok_or_else(|| {
+                    AppError::Validation("unknown RPC preset for this network".into())
+                })
+            })
+            .transpose()?;
+        if preset.is_some()
+            && (supplied_endpoint.is_some()
+                || draft.keys.len() != 1
+                || draft.keys.iter().any(|key| {
+                    key.api_key
+                        .as_ref()
+                        .is_some_and(|value| !value.trim().is_empty())
+                }))
+        {
+            return Err(AppError::Validation(
+                "public RPC presets use their fixed endpoint and one anonymous key slot".into(),
+            ));
+        }
+        // 相同预设的空白保存保留原密文，不能借此清除冷却或重置已学习的批次。
+        let replacement = preset
+            .filter(|preset| previous.is_none_or(|row| row.2.as_deref() != Some(preset.id)))
+            .map(|preset| preset.endpoint)
+            .or(supplied_endpoint);
+        let endpoint =
+            encrypt_secret_field(encryption_key, replacement, previous.map(|r| r.1.clone()))?
+                .ok_or_else(|| AppError::Validation("new provider requires an endpoint".into()))?;
         let endpoint_plain =
             decrypt_optional_secret(Some(&endpoint), encryption_key)?.unwrap_or_default();
         let endpoint_changed = previous.is_some_and(|r| r.1 != endpoint);
-        let id = if let Some((id, _)) = previous {
-            sqlx::query("UPDATE wallet_deposit_scanner_providers SET name=?,priority=?,enabled=?,endpoint_encrypted=?,request_interval_ms=?,cooldown_until=IF(?,NULL,cooldown_until),last_error=IF(?,NULL,last_error),last_success_at=IF(?,NULL,last_success_at),failure_count=IF(?,0,failure_count) WHERE id=?")
-                .bind(&draft.name).bind(draft.priority).bind(draft.enabled).bind(&endpoint).bind(draft.request_interval_ms)
+        let id = if let Some((id, _, _)) = previous {
+            sqlx::query("UPDATE wallet_deposit_scanner_providers SET name=?,priority=?,enabled=?,endpoint_encrypted=?,preset_id=?,request_interval_ms=?,cooldown_until=IF(?,NULL,cooldown_until),last_error=IF(?,NULL,last_error),last_success_at=IF(?,NULL,last_success_at),failure_count=IF(?,0,failure_count) WHERE id=?")
+                .bind(&draft.name).bind(draft.priority).bind(draft.enabled).bind(&endpoint).bind(preset_id).bind(draft.request_interval_ms)
                 .bind(endpoint_changed).bind(endpoint_changed).bind(endpoint_changed).bind(endpoint_changed).bind(id).execute(&mut **tx).await?;
             *id
         } else {
-            sqlx::query("INSERT INTO wallet_deposit_scanner_providers (network,name,priority,enabled,endpoint_encrypted,request_interval_ms) VALUES (?,?,?,?,?,?)")
-                .bind(network).bind(&draft.name).bind(draft.priority).bind(draft.enabled).bind(&endpoint).bind(draft.request_interval_ms).execute(&mut **tx).await?.last_insert_id()
+            sqlx::query("INSERT INTO wallet_deposit_scanner_providers (network,name,priority,enabled,endpoint_encrypted,preset_id,request_interval_ms) VALUES (?,?,?,?,?,?,?)")
+                .bind(network).bind(&draft.name).bind(draft.priority).bind(draft.enabled).bind(&endpoint).bind(preset_id).bind(draft.request_interval_ms).execute(&mut **tx).await?.last_insert_id()
         };
         if endpoint_changed {
             sqlx::query(
@@ -77,10 +109,11 @@ pub(super) async fn save(
             encryption_key,
             &draft.keys,
             endpoint_plain.contains("{API_KEY}"),
+            preset.is_some(),
         )
         .await?;
     }
-    for (id, _) in old {
+    for (id, _, _) in old {
         if !retained.contains(&id) {
             sqlx::query("DELETE FROM wallet_deposit_scanner_providers WHERE id=?")
                 .bind(id)
@@ -102,6 +135,7 @@ async fn save_keys(
     encryption_key: &str,
     drafts: &[SaveScannerKey],
     requires_key: bool,
+    anonymous: bool,
 ) -> AppResult<()> {
     let old: Vec<(u64,Option<String>)> = sqlx::query_as("SELECT id,api_key_encrypted FROM wallet_deposit_scanner_keys WHERE provider_id=? FOR UPDATE").bind(provider).fetch_all(&mut **tx).await?;
     let mut retained = Vec::new();
@@ -112,7 +146,8 @@ async fn save_keys(
                 "key does not belong to this provider".into(),
             ));
         }
-        let secret = if draft.clear_api_key {
+        // 切换到公共节点必须清除旧渠道密钥，绝不把留空保留的秘密发送给公共服务。
+        let secret = if anonymous || draft.clear_api_key {
             None
         } else {
             encrypt_secret_field(
@@ -207,7 +242,7 @@ pub(super) async fn save_legacy(
             .bind(id)
             .execute(&mut **tx)
             .await?;
-        sqlx::query("UPDATE wallet_deposit_scanner_providers SET endpoint_encrypted=?,cooldown_until=NULL,last_error=NULL,last_success_at=NULL,failure_count=0 WHERE id=?").bind(endpoint).bind(id).execute(&mut **tx).await?;
+        sqlx::query("UPDATE wallet_deposit_scanner_providers SET endpoint_encrypted=?,preset_id=NULL,cooldown_until=NULL,last_error=NULL,last_success_at=NULL,failure_count=0 WHERE id=?").bind(endpoint).bind(id).execute(&mut **tx).await?;
         sqlx::query("UPDATE wallet_deposit_scanner_keys SET api_key_encrypted=?,cooldown_until=NULL,last_error=NULL,last_success_at=NULL,failure_count=0,rpc_batch_limit=25 WHERE provider_id=?").bind(api_key).bind(id).execute(&mut **tx).await?;
     }
     Ok(())

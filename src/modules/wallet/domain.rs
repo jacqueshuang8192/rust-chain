@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::cmp::Ordering;
 
+pub mod rpc_presets;
 pub mod timed_deposits;
 pub mod withdrawal_policy;
 

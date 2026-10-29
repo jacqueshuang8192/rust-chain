@@ -1,0 +1,90 @@
+[
+  {
+    "network": "eth",
+    "endpoint": "https://eth.drpc.org",
+    "checks": [
+      {
+        "method": "eth_chainId",
+        "http": 200,
+        "bytes": 39,
+        "elapsed_ms": 613,
+        "shape": "str"
+      },
+      {
+        "method": "eth_getBlockByNumber",
+        "http": 200,
+        "bytes": 699941,
+        "elapsed_ms": 817,
+        "shape": "object"
+      },
+      {
+        "method": "eth_call",
+        "http": 200,
+        "bytes": 102,
+        "elapsed_ms": 849,
+        "shape": "str"
+      },
+      {
+        "method": "eth_getLogs",
+        "http": 200,
+        "bytes": 83983,
+        "elapsed_ms": 908,
+        "shape": "array",
+        "count": 132
+      },
+      {
+        "method": "eth_getTransactionReceipt",
+        "http": 200,
+        "bytes": 3184,
+        "elapsed_ms": 774,
+        "shape": "object"
+      },
+      {
+        "method": "debug_traceBlockByHash",
+        "http": 200,
+        "bytes": 1883349,
+        "elapsed_ms": 2532,
+        "shape": "array",
+        "count": 565
+      }
+    ],
+    "chain_id": "0x1",
+    "block": {
+      "number": "0x1914311",
+      "hash": "0x5073b1d69d05f86057a66bfe45aca34512afd648ac8e272538b68c9cdd156db7",
+      "timestamp": "0x6ae2ff33"
+    },
+    "full_transactions": true,
+    "transaction_count": 565,
+    "usdc_decimals": 6,
+    "transfer_logs": 132,
+    "receipt_identity_matches": true,
+    "trace_count": 565,
+    "trace_results_complete": true,
+    "completed": true
+  },
+  {
+    "network": "eth",
+    "endpoint": "https://eth.llamarpc.com",
+    "checks": [
+      {
+        "method": "eth_chainId",
+        "http": 525,
+        "error": "error code: 525\n"
+      }
+    ],
+    "completed": false
+  },
+  {
+    "network": "eth",
+    "endpoint": "https://ethereum.public.blockpi.network/v1/rpc",
+    "checks": [
+      {
+        "method": "eth_chainId",
+        "http": 404,
+        "error": "404 not found"
+      }
+    ],
+    "completed": false
+  }
+]

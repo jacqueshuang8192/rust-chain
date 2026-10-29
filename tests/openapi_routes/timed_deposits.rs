@@ -31,6 +31,32 @@ async fn timed_deposit_openapi_preserves_decimal_text_and_protected_routes() {
     }
     let schemas = &doc["components"]["schemas"];
     assert_eq!(
+        schemas["DepositSettings"]["properties"]["rpc_presets"]["type"],
+        "array"
+    );
+    for field in [
+        "id",
+        "network",
+        "name",
+        "endpoint",
+        "source",
+        "note",
+        "recommended",
+        "request_interval_ms",
+    ] {
+        assert!(schemas["RpcPresetView"]["properties"].get(field).is_some());
+    }
+    for schema in ["ScannerProviderView", "SaveScannerProvider"] {
+        assert!(schemas[schema]["properties"].get("preset_id").is_some());
+    }
+    assert!(
+        !schemas["SaveScannerProvider"]["required"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|field| field == "preset_id")
+    );
+    assert_eq!(
         schemas["ScannerView"]["properties"]["streams"]["type"],
         "array"
     );

@@ -2,7 +2,7 @@ import type { Asset, PlatformAsset, Scanner, SharedAddress } from './contracts';
 
 export const scanGuides: Record<string, { title: string; detail: string }> = {
   eth: { title: 'Ethereum 主网 · HTTP RPC', detail: '扫描原生 ETH 与已配置 ERC20；ETH 包含内部转账，需要 callTracer。仅支持主网 chainId 1。' },
-  base: { title: 'Base 主网 · HTTP RPC', detail: '原生 ETH 使用区块内的交易与成功回执，仅识别直接转账；合约内部 ETH 转账不会自动到账。节点需支持批量交易查询；ERC20 继续读取转账日志，主网 chainId 8453。ETH 与 ERC20 独立保存进度和接单状态，共用节点额度。' },
+  base: { title: 'Base 主网 · HTTP RPC', detail: '原生 ETH 使用区块内的交易与成功回执，仅识别直接转账；合约内部 ETH 转账不会自动到账。内置免费渠道读取完整交易块，自定义渠道需支持批量交易查询；ERC20 继续读取转账日志，主网 chainId 8453。ETH 与 ERC20 独立保存进度和接单状态，共用节点额度。' },
   tron: { title: 'Tron 主网 · FullNode', detail: '扫描 TRC20 转账日志及完整交易回执。TronGrid 密钥填写在节点 API 密钥框；暂不支持原生 TRX。' },
   btc: { title: 'Bitcoin 主网 · Core RPC', detail: '扫描已同步节点的完整区块与 BTC 输出。需允许读取历史区块；暂不支持其他 Bitcoin 资产。' },
   solana: { title: 'Solana 主网 · HTTP RPC', detail: '扫描 finalized 完整区块、SOL 和经典 SPL Token，校验 mint 精度。暂不支持 Token2022；持续监听建议专用节点。' }

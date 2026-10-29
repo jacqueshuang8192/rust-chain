@@ -40,7 +40,7 @@ pub(super) async fn head(node: &Node, assets: &[ChainAsset]) -> AppResult<u64> {
 
 /// 区块包含完整交易及内部指令；缺少成功交易的执行元数据时停止该块，不把扫描时间当成链时间。
 pub(super) async fn block(node: &Node, height: u64, context: &Context) -> AppResult<Block> {
-    let data=node.rpc("getBlock",json!([height,{"commitment":"finalized","encoding":"jsonParsed","transactionDetails":"full","rewards":false,"maxSupportedTransactionVersion":0}])).await?;
+    let data=node.rpc("getBlock",json!([height,{"commitment":"finalized","encoding":"jsonParsed","transactionDetails":"full","rewards":false,"maxSupportedTransactionVersion":1}])).await?;
     let mut block = Block {
         height,
         hash: text(&data["blockhash"])?.into(),
@@ -52,6 +52,13 @@ pub(super) async fn block(node: &Node, height: u64, context: &Context) -> AppRes
         return Ok(block);
     }
     for transaction in array(&data["transactions"])? {
+        // V1 仍使用节点解析后的账户与指令；未来未知版本不能静默当成已支持的付款证据。
+        if let Some(version) = transaction.get("version")
+            && version != "legacy"
+            && !matches!(version.as_u64(), Some(0 | 1))
+        {
+            return Err(failure("unsupported Solana transaction version"));
+        }
         let meta = &transaction["meta"];
         if !meta.is_object() || meta.get("err").is_none() {
             return Err(failure(

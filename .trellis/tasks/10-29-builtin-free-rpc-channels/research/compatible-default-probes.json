@@ -1,0 +1,140 @@
+[
+  {
+    "network": "base",
+    "endpoint": "https://base.drpc.org",
+    "checks": [
+      {
+        "method": "eth_chainId",
+        "http": 200,
+        "bytes": 42,
+        "elapsed_ms": 724,
+        "shape": "str"
+      },
+      {
+        "method": "eth_getBlockByNumber",
+        "http": 200,
+        "bytes": 408542,
+        "elapsed_ms": 1433,
+        "shape": "object"
+      },
+      {
+        "method": "eth_call",
+        "http": 200,
+        "bytes": 102,
+        "elapsed_ms": 883,
+        "shape": "str"
+      },
+      {
+        "method": "eth_getLogs",
+        "http": 200,
+        "bytes": 66782,
+        "elapsed_ms": 565,
+        "shape": "array",
+        "count": 105
+      },
+      {
+        "method": "eth_getTransactionReceipt",
+        "http": 200,
+        "bytes": 1276,
+        "elapsed_ms": 468,
+        "shape": "object"
+      }
+    ],
+    "chain_id": "0x2105",
+    "block": {
+      "number": "0x32c523c",
+      "hash": "0xfc8f50e71bd7d6963fae3b21df12ee2a000f102030d22566ad467a399e2f1895",
+      "timestamp": "0x6ae3015b"
+    },
+    "full_transactions": true,
+    "transaction_count": 258,
+    "usdc_decimals": 6,
+    "transfer_logs": 105,
+    "receipt_identity_matches": true,
+    "completed": true
+  },
+  {
+    "network": "solana",
+    "endpoint": "https://solana-rpc.publicnode.com",
+    "checks": [
+      {
+        "method": "getGenesisHash",
+        "http": 200,
+        "bytes": 81,
+        "elapsed_ms": 949,
+        "shape": "str"
+      },
+      {
+        "method": "getSlot",
+        "http": 200,
+        "bytes": 44,
+        "elapsed_ms": 948,
+        "shape": "int"
+      },
+      {
+        "method": "getBlockTime",
+        "http": 200,
+        "bytes": 45,
+        "elapsed_ms": 794,
+        "shape": "int"
+      },
+      {
+        "method": "getBlock",
+        "http": 200,
+        "bytes": 1933785,
+        "elapsed_ms": 1444,
+        "shape": "object"
+      },
+      {
+        "method": "getAccountInfo",
+        "http": 200,
+        "bytes": 503,
+        "elapsed_ms": 572,
+        "shape": "object"
+      }
+    ],
+    "genesis": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+    "slot": 462810879,
+    "block_time": 1793261915,
+    "transaction_count": 219,
+    "usdc_mint_owner": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
+    "usdc_decimals": 6,
+    "completed": true
+  },
+  {
+    "network": "solana",
+    "endpoint": "https://api.mainnet-beta.solana.com",
+    "checks": [
+      {
+        "method": "getGenesisHash",
+        "http": 200,
+        "bytes": 81,
+        "elapsed_ms": 466,
+        "shape": "str"
+      },
+      {
+        "method": "getSlot",
+        "http": 200,
+        "bytes": 44,
+        "elapsed_ms": 500,
+        "shape": "int"
+      },
+      {
+        "method": "getBlockTime",
+        "http": 200,
+        "bytes": 45,
+        "elapsed_ms": 961,
+        "shape": "int"
+      },
+      {
+        "method": "getBlock",
+        "http": 429,
+        "error": " {\"jsonrpc\":\"2.0\",\"error\":{\"code\": 429,\"message\":\"Too many requests for a specific RPC call\"}, \"id\": 1 } \r\n"
+      }
+    ],
+    "genesis": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+    "slot": 462810919,
+    "block_time": 1793261924,
+    "completed": false
+  }
+]

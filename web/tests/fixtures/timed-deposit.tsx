@@ -9,6 +9,8 @@ import { AdminAccessProvider } from '../../src/admin/access';
 import { authStore } from '../../src/auth/authStore';
 import { DepositSettingsPage } from '../../src/admin/deposits/DepositSettingsPage';
 import { DepositReviewPage } from '../../src/admin/deposits/DepositReviewPage';
+import { networkOptions, parseSettings } from '../../src/admin/deposits/contracts';
+import { rpcPresetFixture } from './rpcPresets';
 
 const now=Date.now();
 const address='0x1111111111111111111111111111111111111111';
@@ -20,10 +22,31 @@ const settings={
  addresses:[{pool_id:1,network:'eth',address,enabled:true},{pool_id:2,network:'base',address,enabled:true}],
  platform_assets:[{symbol:'ETH',status:'active',deposit_enabled:true,precision_scale:18},{symbol:'USDC',status:'active',deposit_enabled:true,precision_scale:6}]
 };
+// Opt-in RPC fixture keeps the existing review/recovery scenarios intact.
+const params = new URLSearchParams(location.search);
+const rpcMode = params.has('rpc');
+const rpcSettings = parseSettings({ ...settings, rpc_presets: rpcPresetFixture, scanners: networkOptions.map(({ value }) => ({
+  ...scanner, network: value, enabled: false, endpoint_configured: params.has('custom') && value === 'base', api_key_configured: params.has('custom') && value === 'base',
+  scan_fresh: false, last_scan_at: null, cursor_height: null,
+  streams: value === 'base' ? ['native', 'token'].map(stream => ({ ...progress, stream, scan_fresh: false, last_scan_at: null, cursor_height: null })) : [],
+  providers: params.has('custom') && value === 'base' ? [{ id: 10, network: value, preset_id: null, name: '已有自定义渠道', priority: 0, enabled: true, request_interval_ms: 500, cooldown_until: null, last_error: 'HTTP 429 请求限流', last_success_at: null,
+    keys: [{ id: 20, provider_id: 10, name: '已有凭据', priority: 0, enabled: true, api_key_configured: true, request_interval_ms: 500, cooldown_until: null, last_error: null, last_success_at: null }] }] : []
+})) });
 const order={id:1,order_no:'CD-local-payment-review',user_id:5,asset_symbol:'ETH',network:'eth',asset_kind:'native',token_address:'',address,amount:'100',fee_amount:'0.01',paid_amount:null as string|null,status:'review',created_at:now-20000,expires_at:now+1780000,required_confirmations:12,tx_hash:null};
 const receipt={id:1,network:'eth',tx_hash:'0xlocal-payment-evidence',event_index:2147483648,asset_kind:'native',token_address:'',address,amount:'100',block_height:200,block_hash:'0xlocal-block',block_time:now-10000,confirmations:12,status:'review',review_reason:'expired_unpaid_combination_reused',order_id:1,review_note:null as string|null};
 window.fetch=async(input,init)=>{
  const path=new URL(String(input),location.origin).pathname;
+ if(rpcMode && path.includes('/deposit-settings/scanners/') && init?.method === 'PUT') {
+  const body = JSON.parse(String(init.body));
+  const target = rpcSettings.scanners.find(row => path.endsWith('/'+row.network));
+  if(!target || params.has('conflict') || body.expected_revision !== target.revision) return Response.json({code:'CONFLICT',message:'configuration conflict'},{status:409});
+  Object.assign(target, {enabled:body.enabled, confirmations:body.confirmations, revision:target.revision+1, endpoint_configured:true, api_key_configured:false,
+    providers:body.providers.map((provider: Record<string, unknown>, index: number) => ({...provider,id:provider.id??index+100,network:target.network,cooldown_until:null,last_error:null,last_success_at:null,
+      keys:(provider.keys as Array<Record<string, unknown>>).map((key,k) => ({...key,id:key.id??index*10+k+100,provider_id:provider.id??index+100,api_key_configured:provider.preset_id?false:key.id===20,cooldown_until:null,last_error:null,last_success_at:null}))}))});
+  document.documentElement.dataset.savedPresetIds = target.providers.map(provider=>provider.preset_id??'custom').join(',');
+  return new Response(null,{status:204});
+ }
+ if(rpcMode && path.endsWith('/deposit-settings')) return Response.json(rpcSettings);
  if(path.endsWith('/deposit-settings/scanners/eth')&&init?.method==='PUT'){const body=JSON.parse(String(init.body));Object.assign(settings.scanners[0],{enabled:body.enabled,confirmations:body.confirmations,revision:2});return new Response(null,{status:204});}
  if(path.endsWith('/deposit-receipts/1/review')){const body=JSON.parse(String(init?.body));receipt.status=body.action==='credit'?'credited':'ignored';receipt.review_note=body.reason;if(body.action==='credit'){order.status='credited';order.paid_amount=receipt.amount;}return new Response(null,{status:204});}
  if(path.endsWith('/deposit-settings/scanners/base/recovery')){

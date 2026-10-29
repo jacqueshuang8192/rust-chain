@@ -32,10 +32,11 @@ pub(super) async fn head(node: &Node, assets: &[ChainAsset]) -> AppResult<u64> {
 pub(super) async fn block(node: &Node, height: u64, context: &Context) -> AppResult<Block> {
     let native = context.assets.iter().find(|a| a.asset_kind == "native");
     let direct_native = node.network == "base" && native.is_some();
+    let full_transactions = direct_native && node.base_full_blocks;
     let mut data = node
         .rpc(
             "eth_getBlockByNumber",
-            json!([format!("0x{height:x}"), false]),
+            json!([format!("0x{height:x}"), full_transactions]),
         )
         .await?;
     if hex_integer(&data["number"])? != height {
@@ -106,20 +107,22 @@ pub(super) async fn block(node: &Node, height: u64, context: &Context) -> AppRes
         }
     }
     if let Some(asset) = native.filter(|_| direct_native) {
-        let hashes = array(&data["transactions"])?;
-        let params = hashes
-            .iter()
-            .map(|hash| text(hash).map(|hash| json!([hash])))
-            .collect::<AppResult<Vec<_>>>()?;
-        let transactions = node.rpc_batch("eth_getTransactionByHash", params).await?;
-        for (hash, transaction) in hashes.iter().zip(&transactions) {
-            if text(hash)? != text(&transaction["hash"])? {
-                return Err(failure(
-                    "EVM transaction hash does not match requested block",
-                ));
+        if !full_transactions {
+            let hashes = array(&data["transactions"])?;
+            let params = hashes
+                .iter()
+                .map(|hash| text(hash).map(|hash| json!([hash])))
+                .collect::<AppResult<Vec<_>>>()?;
+            let transactions = node.rpc_batch("eth_getTransactionByHash", params).await?;
+            for (hash, transaction) in hashes.iter().zip(&transactions) {
+                if text(hash)? != text(&transaction["hash"])? {
+                    return Err(failure(
+                        "EVM transaction hash does not match requested block",
+                    ));
+                }
             }
+            data["transactions"] = json!(transactions);
         }
-        data["transactions"] = json!(transactions);
         block
             .receipts
             .extend(direct_native_receipts(node, &data, &block, context, asset, time).await?);

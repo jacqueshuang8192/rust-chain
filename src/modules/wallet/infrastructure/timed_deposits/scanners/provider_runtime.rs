@@ -7,6 +7,7 @@ struct Candidate {
     provider_id: u64,
     key_id: u64,
     endpoint_encrypted: String,
+    preset_id: Option<String>,
     api_key_encrypted: Option<String>,
     provider_interval: u32,
     key_interval: u32,
@@ -45,7 +46,7 @@ pub(super) async fn scan_available(
     work: recovery::Work,
 ) -> Result<(Cursor, u64, bool), recovery::ScanFailure> {
     let encryption_key = key.ok_or_else(|| failure("credential encryption key is missing"))?;
-    let candidates=sqlx::query_as::<_,Candidate>("SELECT p.id AS provider_id,k.id AS key_id,p.endpoint_encrypted,k.api_key_encrypted,p.request_interval_ms AS provider_interval,k.request_interval_ms AS key_interval,k.rpc_batch_limit FROM wallet_deposit_scanner_providers p JOIN wallet_deposit_scanner_keys k ON k.provider_id=p.id WHERE p.network=? AND p.enabled=TRUE AND k.enabled=TRUE AND (p.cooldown_until IS NULL OR p.cooldown_until<=CURRENT_TIMESTAMP(6)) AND (k.cooldown_until IS NULL OR k.cooldown_until<=CURRENT_TIMESTAMP(6)) AND NOT EXISTS(SELECT 1 FROM wallet_deposit_scanner_stream_failures f WHERE f.provider_id=p.id AND f.stream=? AND f.cooldown_until>CURRENT_TIMESTAMP(6)) ORDER BY p.priority,p.id,k.priority,k.id")
+    let candidates=sqlx::query_as::<_,Candidate>("SELECT p.id AS provider_id,k.id AS key_id,p.endpoint_encrypted,p.preset_id,k.api_key_encrypted,p.request_interval_ms AS provider_interval,k.request_interval_ms AS key_interval,k.rpc_batch_limit FROM wallet_deposit_scanner_providers p JOIN wallet_deposit_scanner_keys k ON k.provider_id=p.id WHERE p.network=? AND p.enabled=TRUE AND k.enabled=TRUE AND (p.cooldown_until IS NULL OR p.cooldown_until<=CURRENT_TIMESTAMP(6)) AND (k.cooldown_until IS NULL OR k.cooldown_until<=CURRENT_TIMESTAMP(6)) AND NOT EXISTS(SELECT 1 FROM wallet_deposit_scanner_stream_failures f WHERE f.provider_id=p.id AND f.stream=? AND f.cooldown_until>CURRENT_TIMESTAMP(6)) ORDER BY p.priority,p.id,k.priority,k.id")
         .bind(&config.network).bind(&config.stream).fetch_all(pool).await.map_err(AppError::from)?;
     let mut last = failure("所有监听渠道暂不可用或正在冷却，请检查渠道状态后等待自动重试");
     let mut excluded = HashSet::new();
@@ -63,6 +64,20 @@ pub(super) async fn scan_available(
                 .ok_or_else(|| failure("provider endpoint is missing"))?;
         let mut api_key =
             decrypt_optional_secret(candidate.api_key_encrypted.as_deref(), encryption_key)?;
+        let preset = candidate
+            .preset_id
+            .as_deref()
+            .map(|id| {
+                crate::modules::wallet::domain::rpc_presets::find(&config.network, id)
+                    .ok_or_else(|| failure("unknown configured RPC preset"))
+            })
+            .transpose()?;
+        if preset.is_some_and(|preset| endpoint != preset.endpoint || api_key.is_some()) {
+            return Err(failure(
+                "public RPC preset endpoint or anonymous credential is inconsistent",
+            )
+            .into());
+        }
         if endpoint.contains("{API_KEY}") {
             let secret = api_key
                 .take()
@@ -72,6 +87,7 @@ pub(super) async fn scan_available(
         }
         let node = Node {
             network: config.network.clone(),
+            base_full_blocks: preset.is_some_and(|preset| preset.base_full_blocks),
             endpoint,
             api_key,
             client: reqwest::Client::builder()

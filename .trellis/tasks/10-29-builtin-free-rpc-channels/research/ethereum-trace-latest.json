@@ -1,0 +1,9 @@
+{
+  "endpoint": "https://ethereum-rpc.publicnode.com",
+  "method": "trace_block",
+  "params": [
+    "latest"
+  ],
+  "http": 403,
+  "error": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32602,\"message\":\"Archive requests require a personal token. Get one at: https://www.allnodes.com/publicnode\"},\"id\":1}\n"
+}

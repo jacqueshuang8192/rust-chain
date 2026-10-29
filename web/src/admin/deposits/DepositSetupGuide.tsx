@@ -14,7 +14,7 @@ export function DepositSetupGuide({ network, scanner, assets, addresses, catalog
   const activeAddresses = addresses.filter(row => row.enabled);
   const available = unavailable ? 0 : assets.filter(asset => methodBlockers(asset, scanner, addresses, catalog).length === 0).length;
   const steps = [
-    { title: '节点接入', summary: scanner?.endpoint_configured ? '节点已保存' : '选择服务商并填写节点凭据', done: scanner?.endpoint_configured, action: '配置节点', edit: editNode },
+    { title: '节点接入', summary: scanner?.endpoint_configured ? '节点已保存' : '选择免费默认渠道或配置自有节点', done: scanner?.endpoint_configured, action: '配置节点', edit: editNode },
     { title: '监听币种', summary: activeAssets.length ? `${activeAssets.length} 个币种已开启平台充值与监听` : '添加币种身份并开启平台充值', done: activeAssets.length > 0, action: '配置币种', edit: editAssets },
     { title: '收款地址', summary: activeAddresses.length ? `${activeAddresses.length} 个启用地址，共享给本网络币种` : '导入本网络的收款地址', done: activeAddresses.length > 0, action: '配置地址', edit: editAddresses },
     { title: '扫描与接单', summary: unavailable ? '状态待重新读取' : `${scan.label} · ${scanner?.enabled ? '接单开关已开启' : '接单开关未开启'}`, done: !unavailable && available > 0, action: '', edit: undefined }

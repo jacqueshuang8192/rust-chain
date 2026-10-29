@@ -96,7 +96,7 @@ pub(crate) async fn save_scanner(
     {
         return Err(AppError::Validation("invalid scanner API key".into()));
     }
-    validate_providers(&mut request)?;
+    validate_providers(&network, &mut request)?;
     storage::settings::save_scanner(pool, admin_id, &network, key, &request).await
 }
 
@@ -249,7 +249,7 @@ pub async fn cancel_order(pool: &Pool<MySql>, user_id: u64, id: u64) -> AppResul
     storage::orders::cancel(pool, user_id, id).await
 }
 
-fn validate_providers(request: &mut SaveScanner) -> AppResult<()> {
+fn validate_providers(network: &str, request: &mut SaveScanner) -> AppResult<()> {
     let Some(providers) = &mut request.providers else {
         return Ok(());
     };
@@ -274,6 +274,16 @@ fn validate_providers(request: &mut SaveScanner) -> AppResult<()> {
     let mut ids = std::collections::HashSet::new();
     for provider in providers {
         provider.name = provider.name.trim().to_owned();
+        if let Some(id) = &mut provider.preset_id {
+            *id = id.trim().to_owned();
+            if !id.is_empty()
+                && crate::modules::wallet::domain::rpc_presets::find(network, id).is_none()
+            {
+                return Err(AppError::Validation(
+                    "unknown RPC preset for this network".into(),
+                ));
+            }
+        }
         if provider.name.is_empty()
             || provider.name.chars().count() > 80
             || provider.name.chars().any(char::is_control)

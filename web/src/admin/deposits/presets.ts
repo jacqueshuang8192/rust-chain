@@ -26,6 +26,8 @@ export const assetPresets: readonly AssetPreset[] = [
   { id: 'eth-native', network: 'eth', symbol: 'ETH', kind: 'native', token: '', decimals: nativeAssets.eth.decimals, label: 'ETH · Ethereum 原生币', source: 'https://ethereum.org/en/developers/docs/intro-to-ether/' },
   { id: 'eth-usdt', network: 'eth', symbol: 'USDT', kind: 'token', token: '0xdac17f958d2ee523a2206206994597c13d831ec7', decimals: 6, label: 'USDT · Ethereum ERC20', source: tether },
   { id: 'eth-usdc', network: 'eth', symbol: 'USDC', kind: 'token', token: '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48', decimals: 6, label: 'USDC · Ethereum ERC20', source: circle },
+  { id: 'base-native', network: 'base', symbol: 'ETH', kind: 'native', token: '', decimals: nativeAssets.base.decimals, label: 'ETH · Base 原生币（直接转账）', source: 'https://docs.base.org/chain/network-information' },
+  { id: 'base-usdc', network: 'base', symbol: 'USDC', kind: 'token', token: '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913', decimals: 6, label: 'USDC · Base ERC20', source: circle },
   { id: 'tron-usdt', network: 'tron', symbol: 'USDT', kind: 'token', token: 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t', decimals: 6, label: 'USDT · Tron TRC20', source: tether },
   { id: 'solana-native', network: 'solana', symbol: 'SOL', kind: 'native', token: '', decimals: nativeAssets.solana.decimals, label: 'SOL · Solana 原生币', source: 'https://solana.com/docs/core/accounts' },
   { id: 'solana-usdt', network: 'solana', symbol: 'USDT', kind: 'token', token: 'Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB', decimals: 6, label: 'USDT · Solana SPL', source: tether },

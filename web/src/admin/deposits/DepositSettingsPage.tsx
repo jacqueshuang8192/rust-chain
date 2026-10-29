@@ -9,7 +9,7 @@ import { ConfirmAction } from '../../shared/ConfirmAction';
 import { AdminSelect } from '../../shared/SemiFormControls';
 import { AdminRequestActionBoundary, useCanAdminRequest } from '../access';
 import { AddressImportForm, AssetForm, DepositEditPanel, networkLabel, ScannerForm } from './DepositSettingsEditors';
-import { base, networkOptions, parseAddresses, parseSettings, type Asset, type Scanner, type ScannerStream, type Settings, type SharedAddress } from './contracts';
+import { base, networkOptions, parseAddresses, parseSettings, type Asset, type Scanner, type ScannerStream, type RpcPreset, type Settings, type SharedAddress } from './contracts';
 import { DepositSetupGuide } from './DepositSetupGuide';
 import { ScannerProgressStatus } from './ScannerProgressStatus';
 import { ScannerRecoveryForm } from './ScannerRecoveryForm';
@@ -17,11 +17,11 @@ import { ScannerProviderStatus } from './ScannerProviderStatus';
 import { methodBlockers } from './setupStatus';
 import './RechargeWorkspace.css';
 
-type Editing = { type: 'recovery'; scanner: Scanner; stream?: ScannerStream['stream'] } | { type: 'scanner'; scanner: Scanner } | { type: 'asset'; network: string; existing?: Asset; snapshot: Settings } | { type: 'addresses'; network: string };
+type Editing = { type: 'recovery'; scanner: Scanner; stream?: ScannerStream['stream'] } | { type: 'scanner'; scanner: Scanner; presets: RpcPreset[] } | { type: 'asset'; network: string; existing?: Asset; snapshot: Settings } | { type: 'addresses'; network: string };
 export function DepositSettingsPage() {
   const session = useSyncExternalStore(authStore.subscribe, () => authStore.getSession('admin'));
   const canConfigure = useCanAdminRequest(`${base}/deposit-settings`, 'GET');
-  const query = useQuery({ queryKey: ['timed-deposit-settings', session?.generation, canConfigure], queryFn: async (): Promise<Settings> => canConfigure ? parseSettings(await apiRequest<unknown>(`${base}/deposit-settings`)) : { scanners: [], assets: [], platform_assets: [], addresses: parseAddresses(await apiRequest<unknown>(`${base}/deposit-settings/addresses`)) }, enabled: Boolean(session), refetchOnWindowFocus: false });
+  const query = useQuery({ queryKey: ['timed-deposit-settings', session?.generation, canConfigure], queryFn: async (): Promise<Settings> => canConfigure ? parseSettings(await apiRequest<unknown>(`${base}/deposit-settings`)) : { rpc_presets: [], scanners: [], assets: [], platform_assets: [], addresses: parseAddresses(await apiRequest<unknown>(`${base}/deposit-settings/addresses`)) }, enabled: Boolean(session), refetchOnWindowFocus: false });
   return <main className="exchange-page admin-action-page"><PageHeader title="链上充值" description="按网络管理监听币种和收款地址。同一网络可同时接收多个币种，用户先输入币种数量，再获得 30 分钟有效的充值组合。" />
     {query.error ? <Banner type="danger" description={adminErrorMessage(query.error)} /> : null}
     {query.data ? <SettingsEditor key={`${session?.generation}:${canConfigure}`} data={query.data} canConfigure={canConfigure} unavailable={query.isFetching || query.isError} reload={async () => { await query.refetch(); }} /> : query.isPending ? <p>正在读取配置…</p> : <Button onClick={() => { void query.refetch(); }}>重新读取配置</Button>}
@@ -51,13 +51,13 @@ function SettingsEditor({ data, reload, canConfigure, unavailable }: { data: Set
       <Button disabled={addressBusy || addressDialog || Boolean(editing)} onClick={() => { void reload(); }}>刷新配置与监听状态</Button>
     </div>
     {canConfigure ? <DepositSetupGuide network={network} scanner={scanner} assets={assets} addresses={addresses} catalog={data.platform_assets} locked={locked || Boolean(editing)} unavailable={unavailable}
-      editNode={canEditScanner && scanner ? () => setEditing({ type: 'scanner', scanner: { ...scanner } }) : undefined}
+      editNode={canEditScanner && scanner ? () => setEditing({ type: 'scanner', scanner: { ...scanner }, presets: data.rpc_presets }) : undefined}
       editAssets={canEditAsset ? () => setEditing({ type: 'asset', network, snapshot: data }) : undefined}
       editAddresses={canImport ? () => setEditing({ type: 'addresses', network }) : undefined} /> : null}
-    {scanner ? <Card title={<Typography.Title heading={6}>{networkLabel(network)} · 网络与监听</Typography.Title>} headerExtraContent={canEditScanner ? <Button disabled={locked} onClick={() => setEditing({ type: 'scanner', scanner: { ...scanner } })}>编辑监听配置</Button> : <Tag>只读权限</Tag>}>
+    {scanner ? <Card title={<Typography.Title heading={6}>{networkLabel(network)} · 网络与监听</Typography.Title>} headerExtraContent={canEditScanner ? <Button disabled={locked} onClick={() => setEditing({ type: 'scanner', scanner: { ...scanner }, presets: data.rpc_presets })}>编辑监听配置</Button> : <Tag>只读权限</Tag>}>
       <div className="deposit-overview"><span>接单开关：{scanner.enabled ? '已开启' : '已暂停'}</span><span>节点：{scanner.endpoint_configured ? '已配置' : '待配置'}</span><span>确认深度：{scanner.confirmations}</span><span>启用币种：{assets.filter(row => row.enabled).length} 个</span><span>启用地址：{addresses.filter(row => row.enabled).length} 个</span></div>
       {(network === 'base' ? (scanner.streams ?? []).map(stream => ({ scanner: { ...scanner, ...stream, streams: [] }, stream: stream.stream })) : [{ scanner, stream: undefined }]).map(item => <ScannerProgressStatus key={item.stream ?? network} scanner={item.scanner} stream={item.stream} unavailable={unavailable} locked={locked || Boolean(editing)} recover={() => setEditing({ type: 'recovery', scanner: item.scanner, stream: item.stream })} />)}
-      <ScannerProviderStatus scanner={scanner} />
+      <ScannerProviderStatus scanner={scanner} presets={data.rpc_presets} />
     </Card> : canConfigure ? <Banner type="warning" description="当前网络缺少监听配置，请刷新确认服务端配置完整。" /> : <Banner type="info" description="当前账号可管理收款地址。查看和编辑网络、币种需要充值网络配置权限。" />}
     {canConfigure ? <Card title={<Typography.Title heading={6}>监听币种 · {assets.length} 个</Typography.Title>} headerExtraContent={canEditAsset ? <Button theme="solid" disabled={locked} onClick={() => setEditing({ type: 'asset', network, snapshot: data })}>新增监听币种</Button> : <Tag>只读权限</Tag>}>
       <p>每个币种单独配置链上身份，共用本网络的地址池。Ethereum 可添加 ETH、USDT、USDC 等；后续仍可继续添加。</p>
@@ -75,7 +75,7 @@ function SettingsEditor({ data, reload, canConfigure, unavailable }: { data: Set
       {!addresses.length ? <p className="muted">尚无收款地址，点击“添加收款地址”批量导入。</p> : <ul className="deposit-config-list">{addresses.map(row => <AddressRow key={row.pool_id} row={row} disabled={locked} setBusy={setAddressBusy} onOpenChange={setAddressDialog} reload={reload} />)}</ul>}
     </Card>
     {editing ? <DepositEditPanel className={editing.type === 'recovery' ? 'deposit-recovery-panel' : undefined} title={editing.type === 'recovery' ? `${networkLabel(editing.scanner.network)} · 恢复扫描进度` : editing.type === 'scanner' ? `${networkLabel(editing.scanner.network)} · 编辑监听配置` : editing.type === 'asset' ? `${networkLabel(editing.network)} · ${editing.existing ? '编辑监听币种' : '新增监听币种'}` : `${networkLabel(editing.network)} · 添加收款地址`} close={() => setEditing(null)}>
-      {controls => editing.type === 'recovery' ? <ScannerRecoveryForm scanner={editing.scanner} stream={editing.stream} {...controls} saved={saved} /> : editing.type === 'scanner' ? <ScannerForm scanner={editing.scanner} {...controls} saved={saved} /> : editing.type === 'asset' ? <AssetForm network={editing.network} existing={editing.existing} assets={editing.snapshot.assets.filter(row => row.network === editing.network)} catalog={editing.snapshot.platform_assets} {...controls} saved={saved} /> : <AddressImportForm network={editing.network} {...controls} saved={saved} />}
+      {controls => editing.type === 'recovery' ? <ScannerRecoveryForm scanner={editing.scanner} stream={editing.stream} {...controls} saved={saved} /> : editing.type === 'scanner' ? <ScannerForm scanner={editing.scanner} presets={editing.presets} {...controls} saved={saved} /> : editing.type === 'asset' ? <AssetForm network={editing.network} existing={editing.existing} assets={editing.snapshot.assets.filter(row => row.network === editing.network)} catalog={editing.snapshot.platform_assets} {...controls} saved={saved} /> : <AddressImportForm network={editing.network} {...controls} saved={saved} />}
     </DepositEditPanel> : null}
   </div>;
 }

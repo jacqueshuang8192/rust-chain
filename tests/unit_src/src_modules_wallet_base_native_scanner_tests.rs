@@ -454,3 +454,67 @@ async fn base_binds_hydrated_transactions_to_requested_hashes_and_accepts_empty_
     assert_eq!(server.received_requests().await.unwrap().len(), 1);
     server.verify().await;
 }
+
+async fn full_block(server: &MockServer, transactions: Value) -> Node {
+    Mock::given(matchers::body_partial_json(json!({"method":"eth_getBlockByNumber","params":["0xa",true]})))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({"jsonrpc":"2.0","id":1,"result":{
+            "number":"0xa","hash":"block10","parentHash":"block9","timestamp":"0x6553f100","transactions":transactions
+        }}))).expect(1).mount(server).await;
+    let mut node = node(server, "base");
+    node.base_full_blocks = true;
+    node
+}
+
+#[tokio::test]
+async fn base_public_full_block_uses_only_block_and_receipts_with_stable_evidence() {
+    let server = MockServer::start().await;
+    let direct = transaction("direct", 0, Some(RECEIVER), ONE_ETH);
+    let failed = transaction("failed", 1, Some(RECEIVER), ONE_ETH);
+    let other = transaction("other", 2, Some(OTHER), ONE_ETH);
+    let node = full_block(&server, json!([direct, failed, other])).await;
+    mock_receipt(&server, "direct", transaction_receipt(&direct, "0x1")).await;
+    mock_receipt(&server, "failed", transaction_receipt(&failed, "0x0")).await;
+    let block = evm::block(&node, 10, &context()).await.unwrap();
+    assert_eq!(block.receipts.len(), 1);
+    assert_eq!(block.receipts[0].tx_hash, "direct");
+    assert_eq!(block.receipts[0].amount, bigdecimal::BigDecimal::from(1));
+    assert_eq!(block.receipts[0].event_index, 0x8000_0000);
+    assert_eq!(block.receipts[0].confirmations, 13);
+    assert_eq!(server.received_requests().await.unwrap().len(), 3);
+    server.verify().await;
+}
+
+#[rstest::rstest]
+#[case("hash", Value::Null)]
+#[case("blockHash", json!("fork10"))]
+#[case("blockNumber", json!("0xb"))]
+#[case("transactionIndex", json!("0x1"))]
+#[case("to", json!("invalid"))]
+#[case("value", json!("no-amount"))]
+#[tokio::test]
+async fn base_public_full_block_rejects_incomplete_transaction_evidence(
+    #[case] field: &str,
+    #[case] value: Value,
+) {
+    let server = MockServer::start().await;
+    let mut tx = transaction("direct", 0, Some(RECEIVER), ONE_ETH);
+    tx[field] = value;
+    let node = full_block(&server, json!([tx])).await;
+    assert!(evm::block(&node, 10, &context()).await.is_err());
+    assert_eq!(server.received_requests().await.unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn base_public_full_block_rejects_hash_only_response_and_wrong_receipt() {
+    let server = MockServer::start().await;
+    let node = full_block(&server, json!(["tx-hash-only"])).await;
+    assert!(evm::block(&node, 10, &context()).await.is_err());
+    server.reset().await;
+    let tx = transaction("direct", 0, Some(RECEIVER), ONE_ETH);
+    let mut receipt = transaction_receipt(&tx, "0x1");
+    receipt["blockHash"] = json!("fork10");
+    let node = full_block(&server, json!([tx])).await;
+    mock_receipt(&server, "direct", receipt).await;
+    assert!(evm::block(&node, 10, &context()).await.is_err());
+    server.verify().await;
+}

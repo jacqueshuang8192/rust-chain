@@ -150,10 +150,39 @@ pub struct SharedAddressView {
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct DepositSettings {
+    pub rpc_presets: Vec<RpcPresetView>,
     pub scanners: Vec<ScannerView>,
     pub assets: Vec<ChainAssetView>,
     pub addresses: Vec<SharedAddressView>,
     pub platform_assets: Vec<DepositPlatformAsset>,
+}
+
+/// 内置目录仅回显公开 URL 和使用边界，不包含任何部署中的自定义地址或凭据。
+#[derive(Debug, Serialize, ToSchema)]
+pub struct RpcPresetView {
+    pub id: String,
+    pub network: String,
+    pub name: String,
+    pub endpoint: String,
+    pub source: String,
+    pub note: String,
+    pub recommended: bool,
+    pub request_interval_ms: u32,
+}
+
+impl From<&crate::modules::wallet::domain::rpc_presets::RpcPreset> for RpcPresetView {
+    fn from(preset: &crate::modules::wallet::domain::rpc_presets::RpcPreset) -> Self {
+        Self {
+            id: preset.id.into(),
+            network: preset.network.into(),
+            name: preset.name.into(),
+            endpoint: preset.endpoint.into(),
+            source: preset.source.into(),
+            note: preset.note.into(),
+            recommended: preset.recommended,
+            request_interval_ms: preset.request_interval_ms,
+        }
+    }
 }
 
 /// 充值配置专用币种目录，仅返回选择映射和判断平台充值开关所需的公开字段。
@@ -239,6 +268,7 @@ pub struct ReceiptView {
 /// 渠道与凭据仅公开配置标志和健康快照，禁止回显密文或含密钥 URL。
 #[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
 pub struct ScannerProviderView {
+    pub preset_id: Option<String>,
     pub id: u64,
     pub network: String,
     pub name: String,
@@ -275,6 +305,7 @@ pub struct ScannerKeyView {
 #[derive(Debug, Deserialize, ToSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SaveScannerProvider {
+    pub preset_id: Option<String>,
     pub id: Option<u64>,
     pub name: String,
     pub priority: u32,

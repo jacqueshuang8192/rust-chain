@@ -1,0 +1,140 @@
+[
+  {
+    "name": "eth-number",
+    "endpoint": "https://ethereum-rpc.publicnode.com",
+    "method": "debug_traceBlockByNumber",
+    "http": 200,
+    "bytes": 129,
+    "error": {
+      "code": -32601,
+      "message": "the method debug_traceBlockByNumber does not exist/is not available"
+    }
+  },
+  {
+    "name": "eth-flat",
+    "endpoint": "https://ethereum-rpc.publicnode.com",
+    "method": "trace_block",
+    "http": 403,
+    "error": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32602,\"message\":\"Archive requests require a personal token. Get one at: https://www.allnodes.com/publicnode\"},\"id\":1}\n"
+  },
+  {
+    "name": "solana-v1",
+    "endpoint": "https://solana-rpc.publicnode.com",
+    "method": "getBlock",
+    "http": 200,
+    "bytes": 2662958,
+    "shape": "dict",
+    "count": 6,
+    "versions": {
+      "0": 100,
+      "1": 94,
+      "legacy": 99
+    },
+    "transaction_count": 293,
+    "successful_metadata_complete": true,
+    "account_keys_parsed": true,
+    "v1_sample": {
+      "meta": {
+        "computeUnitsConsumed": 632,
+        "costUnits": 2139,
+        "err": null,
+        "fee": 26068,
+        "innerInstructions": [],
+        "logMessages": [
+          "Program hydHwdP54fiTbJ5QXuKDLZFLY5m8pqx15RSmWcL1yAJ invoke [1]",
+          "Program hydHwdP54fiTbJ5QXuKDLZFLY5m8pqx15RSmWcL1yAJ consumed 30 of 682 compute units",
+          "Program hydHwdP54fiTbJ5QXuKDLZFLY5m8pqx15RSmWcL1yAJ success",
+          "Program ojh19ojaKduoJZuaJADhcVGp4xt1TcdAvZmpVsCorch invoke [1]",
+          "Program ojh19ojaKduoJZuaJADhcVGp4xt1TcdAvZmpVsCorch consumed 602 of 652 compute units",
+          "Program ojh19ojaKduoJZuaJADhcVGp4xt1TcdAvZmpVsCorch success"
+        ],
+        "postBalances": [
+          8800743016,
+          21701760,
+          1169280,
+          1428440,
+          1844441
+        ],
+        "postTokenBalances": [],
+        "preBalances": [
+          8800769084,
+          21701760,
+          1169280,
+          1428440,
+          1844441
+        ],
+        "preTokenBalances": [],
+        "rewards": null,
+        "status": {
+          "Ok": null
+        }
+      },
+      "transaction": {
+        "message": {
+          "accountKeys": [
+            {
+              "pubkey": "83TSSS7qojPowqrrvH23mCrhEJjnJG2ygaf7FEq9ZgKC",
+              "signer": true,
+              "source": "transaction",
+              "writable": true
+            },
+            {
+              "pubkey": "HLixVmXdBqzP1sXT9au4BHcvUjDgx5ev16cEJdd9tUSM",
+              "signer": false,
+              "source": "transaction",
+              "writable": true
+            },
+            {
+              "pubkey": "SysvarC1ock11111111111111111111111111111111",
+              "signer": false,
+              "source": "transaction",
+              "writable": false
+            },
+            {
+              "pubkey": "hydHwdP54fiTbJ5QXuKDLZFLY5m8pqx15RSmWcL1yAJ",
+              "signer": false,
+              "source": "transaction",
+              "writable": false
+            },
+            {
+              "pubkey": "ojh19ojaKduoJZuaJADhcVGp4xt1TcdAvZmpVsCorch",
+              "signer": false,
+              "source": "transaction",
+              "writable": false
+            }
+          ],
+          "instructions": [
+            {
+              "accounts": [
+                "SysvarC1ock11111111111111111111111111111111"
+              ],
+              "data": "4EK6j28tQens",
+              "programId": "hydHwdP54fiTbJ5QXuKDLZFLY5m8pqx15RSmWcL1yAJ",
+              "stackHeight": 1
+            },
+            {
+              "accounts": [
+                "83TSSS7qojPowqrrvH23mCrhEJjnJG2ygaf7FEq9ZgKC",
+                "HLixVmXdBqzP1sXT9au4BHcvUjDgx5ev16cEJdd9tUSM"
+              ],
+              "data": "aAUGJ3TmZRNLPBBkj8yH2rZ2qpqzczrD6rmoj9QCSi7vSV5MmzVC2okrQX3e3aRu3dM4gACVpmpMN87US3jMHkaNQWZwV33o654CzVLEj7pQhGMHafo87ourVYEQRFXWaLp2ahprvYS2msipm7jU8hVxGsAuBAB3amikukVoLvUMqJHwFRpzwqc8EBbMMfb9y3nWprfdZ391vPGz21FwNQjYUt3hD6qp9auuBQR8aT72B2HLZHAS5ZhqU5HPF61ML5XeDGyoRmvFnJq7koBB6UdebkjK9MdYB6BWK9B48GDovuZ4hXd8W8q1B7VDgVzFjosbx41QTT1AdpYYtWfLt7GiiBqCBeVbrJFNaiqqJqYMar3MjvhTRPCfQ9B5jjSXL4mY9NXgCxAeqwKupUCg3xd11DKX8gKThc4jB69HSNGRnU2hinxpf7zGB9hUDVbHZgTDV3Rk111mAy6LzJ6G47HDWpVbC9GyFUvmp2sGzNaUmcRWKsGkfyvPN8KS1JTJptNXgetZBoba44YorW9",
+              "programId": "ojh19ojaKduoJZuaJADhcVGp4xt1TcdAvZmpVsCorch",
+              "stackHeight": 1
+            }
+          ],
+          "recentBlockhash": "43zBGbpA21mptrM51j8FGde9rycs86fUGMfEQwb63eAj",
+          "transactionConfig": {
+            "computeUnitLimit": 682,
+            "heapSize": 32768,
+            "loadedAccountsDataSizeLimit": 384248,
+            "priorityFee": 21068
+          }
+        },
+        "signatures": [
+          "57XyfotVuZrxrf1Fd8ATPvWGEe7kF6Gm1dtRexjHiNvLGKTZLviSCvYodzz5jHZPjD4S7Pyvw56yEHrxtQNzvaUE"
+        ]
+      },
+      "version": 1
+    }
+  }
+]

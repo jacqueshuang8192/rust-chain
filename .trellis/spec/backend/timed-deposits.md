@@ -130,7 +130,7 @@ Supported adapter boundaries:
 | Network | Assets | Node requirements |
 |---|---|---|
 | Ethereum | ETH, configured ERC20 | Mainnet chainId 1; blockHash logs; decimals; callTracer for native external/internal successful calls |
-| Base | Direct ETH transfers, configured ERC20 | Mainnet chainId 8453; blockHash logs; decimals; block transaction hashes, batched transaction lookups and individual receipts; no trace or fullTransactions=true requirement |
+| Base | Direct ETH transfers, configured ERC20 | Mainnet chainId 8453; blockHash logs; decimals; preset full transaction blocks or custom-channel hash lists/batched lookups, then individual receipts; no trace requirement |
 | Tron | Configured TRC20 | Mainnet FullNode, complete block transaction receipts and executed Transfer logs; native TRX rejected |
 | Bitcoin | BTC | Synchronized mainnet Bitcoin Core, getblock verbosity 2; each vout independent; exclude coinbase |
 | Solana | SOL, classic SPL | Mainnet-beta, finalized full jsonParsed blocks and inner instructions; verify mint program/decimals; Token2022 excluded |
@@ -143,7 +143,7 @@ are idempotent. Reorganization recovery requires reconciliation and a reviewed
 checkpoint repair. Ordinary restart/configuration saves never skip blocks; the
 explicit audited recovery action below is the only supported head-jump path.
 
-Base native scanning requests `eth_getBlockByNumber(height, false)`, then batches
+Custom-channel Base native scanning requests `eth_getBlockByNumber(height, false)`, then batches
 `eth_getTransactionByHash(hash)` in groups of at most 25 when a native asset is
 included (including mappings retained for historical orders). Each HTTP batch
 uses the existing durable gate; restore response order by numeric JSON-RPC IDs,
@@ -167,7 +167,7 @@ are outside direct-only support. Operator help must disclose this boundary.
 The RPC-path change has no HTTP DTO or schema change. Ordinary restarts never
 clear durable cooldowns or checkpoints. The one-time upgrade repair in 0166
 retires only the obsolete Base trace provider failure described below.
-Base rounds with native assets cap the existing adaptive batch at four blocks
+Custom-channel Base rounds with native assets cap the existing adaptive batch at four blocks
 because transaction lookup batches add requests. Provider per-method usage still
 applies to every subcall; batching is not a quota multiplier. HTTP 429 continues
 to cool the selected key, and sustained catch-up depends on actual plan capacity.
@@ -640,3 +640,107 @@ shapes, and equality with the retained Ethereum trace-root evidence. Keep the
 Ethereum internal-transfer regression; Base direct-only support must not narrow it.
 Batch fixtures must include shuffled replies, multiple 25-call chunks, empty
 requests, missing results, individual errors and invalid response IDs/versions.
+
+
+## Scenario: Built-in anonymous RPC presets (0168)
+
+### 1. Scope / Trigger
+
+Administrators should be able to configure all five mainnets without finding an
+endpoint or obtaining a key. The server catalog is a compatibility profile, not
+an uptime promise or an implicit fallback. Public provider probes are bounded
+read-only samples. Ethereum public trace availability is conditional; retain
+callTracer evidence and stop on permission failure rather than narrowing ETH
+support. No startup seed enables scanners or replaces existing custom endpoints.
+
+### 2. Signatures
+
+- `domain::rpc_presets::PRESETS` / `find(network, id)` own public identities.
+- `GET /admin/api/v1/wallet/deposit-settings` returns `rpc_presets: RpcPresetView[]`.
+- `RpcPresetView`: `id`, `network`, `name`, `endpoint`, `source`, `note`,
+  `recommended`, `request_interval_ms`. It exposes only fixed public URLs.
+- `SaveScannerProvider.preset_id: Option<String>` and
+  `ScannerProviderView.preset_id: Option<String>` preserve the selected profile.
+- Immutable migration `0168_deposit_rpc_presets.sql` adds nullable
+  `wallet_deposit_scanner_providers.preset_id VARCHAR(80)`. Old rows remain custom.
+- Audit `after_json.provider_presets` records effective persisted IDs and preset
+  identities, including omitted-field saves. Secrets and custom URLs remain absent.
+
+### 3. Contracts
+
+- Nonempty `preset_id` resolves only in its own network. Submit `endpoint:null`
+  with exactly one anonymous key slot. Any supplied nonblank URL or key is rejected.
+- Missing/null `preset_id` preserves existing identity on blank saves. A supplied
+  nonblank custom URL removes old identity. `preset_id:""` explicitly selects
+  custom while retaining a blank endpoint's prior encrypted URL.
+- Choosing a public preset clears prior API secrets and removes omitted extra
+  slots atomically. Never send a preserved custom secret to a public endpoint.
+- Retaining the same preset preserves ciphertext, key IDs, cooldowns and learned
+  batch caps. Replacing endpoints or secrets keeps the established reset rules.
+  Explicit legacy credential replacement clears preset metadata.
+- Runtime validates persisted public endpoint and anonymous credential against
+  the catalog. Changing a catalog endpoint requires a new ID or explicit migration;
+  do not silently retarget saved identities.
+- Base public presets request `eth_getBlockByNumber(height,true)` only when
+  scanning native assets. They use the same full transaction/receipt validators
+  and `0x80000000` root event index. Custom/Nodies channels keep hash-list batches.
+  Public full-block scans do not apply the custom-path four-block/learned-batch cap;
+  the normal interval-based limit, durable gate and complete-batch checks remain.
+- Solana requests `maxSupportedTransactionVersion:1`, accepts explicit `legacy`,
+  numeric 0/1 and existing responses with omitted version. Any other explicit
+  version fails the whole block. Parsed System/classic SPL rules stay unchanged.
+- Admin validates a present catalog strictly; absent legacy catalog becomes `[]`.
+  Empty provider lists prefill recommended rows in local drafts. Existing pools
+  append missing recommended IDs without replacement or duplicates. All saves
+  still require permission, pinned revision, reason and confirmation. Network
+  admission is not automatically enabled. Unknown selected IDs block saving.
+- Preset rows show source and limits, hide secret inputs, and retain one key ID.
+  Editing their request interval also updates the hidden anonymous slot interval.
+  State remains unverified until the server reports complete successful scans.
+- `CREDENTIAL_ENCRYPTION_KEY` remains required, even for anonymous endpoints.
+
+### 4. Validation & Error Matrix
+
+| Input / event | Required behavior |
+|---|---|
+| Unknown/cross-network preset, forged endpoint, nonempty key, multiple slots | Validation error and full rollback |
+| Same preset, blank custom URL/key | Keep ciphertext, key IDs and real cooldowns |
+| Custom-to-preset selection with blank old key field | Explicit conversion clears old key; no secret forwarding |
+| Explicit custom selection or legacy secret replacement | Clear preset profile, retain normal custom rules |
+| Stale revision / failed audit | Roll back provider, key, projection and revision together |
+| Public endpoint returns 429 or lacks trace | Preserve progress and normal cooldown/admission rules |
+| Partial Base block, mismatched receipt, unknown Solana version | Reject evidence; no successful checkpoint |
+| Malformed catalog / missing selected identity | Admin parser/editor fails closed |
+
+### 5. Good / Base / Bad Cases
+
+Good: Base first setup proposes PublicNode plus dRPC, saves both anonymously and
+uses one full-block read instead of fetching every transaction individually.
+Base: a custom Nodies channel keeps its own encrypted URL, keys and batch profile;
+adding a public backup does not modify it. Bad: infer a full-block profile from
+an arbitrary client URL or silently forward the old API key after switching hosts.
+
+### 6. Tests Required
+
+- Isolated MySQL `DEPOSIT_PRESET_TEST_DATABASE_URL` ending in
+  `timed_deposits_test_presets`: pre-0168 upgrade, repeated migrations, preserved
+  custom secrets/cooldowns/cursors, anonymous conversion, blank-save identity,
+  cross-network and forged requests, audit rollback, revision conflict, legacy
+  replacement, all-five-network saves and redacted response/audit snapshots.
+- Base full-block success, reverted payments, unchanged event identity, malformed
+  transactions and mismatched receipts; retain custom batches and Ethereum traces.
+- Solana legacy/V0/V1 with native and inner SPL events; reject future/string/null
+  versions and assert the outbound maximum version.
+- Real Semi forms: all-network defaults, append/dedup/custom preservation,
+  anonymous replacement, interval propagation, stale saves, read-only status.
+  Verify SideSheet plus confirmation/discard at desktop and 320px/390px.
+- OpenAPI includes the catalog and optional save identity without custom secrets.
+
+### 7. Wrong vs Correct
+
+Wrong: add a public URL only in the browser, retain the previous key, mark it
+healthy, and reset cooldowns whenever the same preset is saved.
+
+Correct: submit `preset_id:"base-publicnode", endpoint:null`, resolve its fixed
+URL on the server, atomically clear secrets, preserve unchanged runtime state,
+and display actual server scan status. Free public RPC remains best effort.

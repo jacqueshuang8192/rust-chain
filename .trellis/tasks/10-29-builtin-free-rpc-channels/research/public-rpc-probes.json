@@ -1,0 +1,327 @@
+{
+  "checked_at": "2026-10-29T08:02:49.011298+00:00",
+  "scope": "single low-volume compatibility sample; no throughput or availability guarantee",
+  "providers": [
+    {
+      "network": "base",
+      "endpoint": "https://base-rpc.publicnode.com",
+      "checks": [
+        {
+          "method": "eth_chainId",
+          "http": 200,
+          "bytes": 43,
+          "elapsed_ms": 757,
+          "shape": "str"
+        },
+        {
+          "method": "eth_getBlockByNumber",
+          "http": 200,
+          "bytes": 526336,
+          "elapsed_ms": 1634,
+          "shape": "object"
+        },
+        {
+          "method": "eth_call",
+          "http": 200,
+          "bytes": 103,
+          "elapsed_ms": 581,
+          "shape": "str"
+        },
+        {
+          "method": "eth_getLogs",
+          "http": 200,
+          "bytes": 103703,
+          "elapsed_ms": 754,
+          "shape": "array",
+          "count": 163
+        },
+        {
+          "method": "eth_getTransactionReceipt",
+          "http": 200,
+          "bytes": 1277,
+          "elapsed_ms": 496,
+          "shape": "object"
+        }
+      ],
+      "chain_id": "0x2105",
+      "block": {
+        "number": "0x32c5056",
+        "hash": "0x6bcfef03fba103e211140092f69ad2cf2378eda3f361fcc25a92dfd0976cec0e",
+        "timestamp": "0x6ae2fd8f"
+      },
+      "full_transactions": true,
+      "transaction_count": 334,
+      "usdc_decimals": 6,
+      "transfer_logs": 163,
+      "receipt_identity_matches": true,
+      "completed": true
+    },
+    {
+      "network": "base",
+      "endpoint": "https://mainnet.base.org",
+      "checks": [
+        {
+          "method": "eth_chainId",
+          "http": 200,
+          "bytes": 42,
+          "elapsed_ms": 725,
+          "shape": "str"
+        },
+        {
+          "method": "eth_getBlockByNumber",
+          "http": 200,
+          "bytes": 526335,
+          "elapsed_ms": 806,
+          "shape": "object"
+        },
+        {
+          "method": "eth_call",
+          "http": 200,
+          "bytes": 102,
+          "elapsed_ms": 464,
+          "shape": "str"
+        },
+        {
+          "method": "eth_getLogs",
+          "http": 429,
+          "error": "{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32011,\"message\":\"request limit reached\"}}"
+        }
+      ],
+      "chain_id": "0x2105",
+      "block": {
+        "number": "0x32c5056",
+        "hash": "0x6bcfef03fba103e211140092f69ad2cf2378eda3f361fcc25a92dfd0976cec0e",
+        "timestamp": "0x6ae2fd8f"
+      },
+      "full_transactions": true,
+      "transaction_count": 334,
+      "usdc_decimals": 6,
+      "completed": false
+    },
+    {
+      "network": "eth",
+      "endpoint": "https://ethereum-rpc.publicnode.com",
+      "checks": [
+        {
+          "method": "eth_chainId",
+          "http": 200,
+          "bytes": 40,
+          "elapsed_ms": 986,
+          "shape": "str"
+        },
+        {
+          "method": "eth_getBlockByNumber",
+          "http": 200,
+          "bytes": 622403,
+          "elapsed_ms": 2707,
+          "shape": "object"
+        },
+        {
+          "method": "eth_call",
+          "http": 200,
+          "bytes": 103,
+          "elapsed_ms": 453,
+          "shape": "str"
+        },
+        {
+          "method": "eth_getLogs",
+          "http": 200,
+          "bytes": 66764,
+          "elapsed_ms": 707,
+          "shape": "array",
+          "count": 105
+        },
+        {
+          "method": "eth_getTransactionReceipt",
+          "http": 200,
+          "bytes": 5892,
+          "elapsed_ms": 474,
+          "shape": "object"
+        },
+        {
+          "method": "debug_traceBlockByHash",
+          "http": 200,
+          "bytes": 127,
+          "elapsed_ms": 447,
+          "error": {
+            "code": -32601,
+            "message": "the method debug_traceBlockByHash does not exist/is not available"
+          }
+        }
+      ],
+      "chain_id": "0x1",
+      "block": {
+        "number": "0x19142ee",
+        "hash": "0x8b6fa1e9f1cd71734dc4e8e123e9fb65c375eea095e574c2d0ba3b90671c262c",
+        "timestamp": "0x6ae2fd83"
+      },
+      "full_transactions": true,
+      "transaction_count": 217,
+      "usdc_decimals": 6,
+      "transfer_logs": 105,
+      "receipt_identity_matches": true,
+      "completed": false
+    },
+    {
+      "network": "btc",
+      "endpoint": "https://bitcoin-rpc.publicnode.com",
+      "checks": [
+        {
+          "method": "getblockchaininfo",
+          "http": 200,
+          "bytes": 541,
+          "elapsed_ms": 704,
+          "shape": "object"
+        },
+        {
+          "method": "getblockhash",
+          "http": 200,
+          "bytes": 101,
+          "elapsed_ms": 878,
+          "shape": "str"
+        },
+        {
+          "method": "getblock",
+          "http": 200,
+          "bytes": 9996998,
+          "elapsed_ms": 6106,
+          "shape": "object"
+        }
+      ],
+      "chain": "main",
+      "initialblockdownload": false,
+      "block_height": 973656,
+      "transaction_count": 3025,
+      "decoded_outputs": true,
+      "completed": true
+    },
+    {
+      "network": "solana",
+      "endpoint": "https://solana-rpc.publicnode.com",
+      "checks": [
+        {
+          "method": "getGenesisHash",
+          "http": 200,
+          "bytes": 81,
+          "elapsed_ms": 718,
+          "shape": "str"
+        },
+        {
+          "method": "getSlot",
+          "http": 200,
+          "bytes": 44,
+          "elapsed_ms": 495,
+          "shape": "int"
+        },
+        {
+          "method": "getBlockTime",
+          "http": 200,
+          "bytes": 45,
+          "elapsed_ms": 456,
+          "shape": "int"
+        },
+        {
+          "method": "getBlock",
+          "http": 200,
+          "bytes": 239,
+          "elapsed_ms": 499,
+          "error": {
+            "code": -32015,
+            "message": "Transaction version (1) is not supported by the requesting client. Please try the request again with the following configuration parameter: \"maxSupportedTransactionVersion\": 1"
+          }
+        }
+      ],
+      "genesis": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+      "slot": 462806367,
+      "block_time": 1793260952,
+      "completed": false
+    },
+    {
+      "network": "solana",
+      "endpoint": "https://api.mainnet-beta.solana.com",
+      "checks": [
+        {
+          "method": "getGenesisHash",
+          "http": 200,
+          "bytes": 81,
+          "elapsed_ms": 703,
+          "shape": "str"
+        },
+        {
+          "method": "getSlot",
+          "http": 200,
+          "bytes": 44,
+          "elapsed_ms": 489,
+          "shape": "int"
+        },
+        {
+          "method": "getBlockTime",
+          "http": 200,
+          "bytes": 45,
+          "elapsed_ms": 925,
+          "shape": "int"
+        },
+        {
+          "method": "getBlock",
+          "http": 200,
+          "bytes": 239,
+          "elapsed_ms": 558,
+          "error": {
+            "code": -32015,
+            "message": "Transaction version (1) is not supported by the requesting client. Please try the request again with the following configuration parameter: \"maxSupportedTransactionVersion\": 1"
+          }
+        }
+      ],
+      "genesis": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+      "slot": 462806380,
+      "block_time": 1793260955,
+      "completed": false
+    },
+    {
+      "network": "tron",
+      "endpoint": "https://api.trongrid.io",
+      "checks": [
+        {
+          "method": "getblockbynum",
+          "http": 200,
+          "bytes": 2318,
+          "elapsed_ms": 909,
+          "shape": "object"
+        },
+        {
+          "method": "getnowblock",
+          "http": 200,
+          "bytes": 400283,
+          "elapsed_ms": 2407,
+          "shape": "object"
+        },
+        {
+          "method": "getblockbynum",
+          "http": 200,
+          "bytes": 440671,
+          "elapsed_ms": 1552,
+          "shape": "object"
+        },
+        {
+          "method": "gettransactioninfobyblocknum",
+          "http": 200,
+          "bytes": 152294,
+          "elapsed_ms": 1530,
+          "shape": "array",
+          "count": 417
+        },
+        {
+          "method": "triggerconstantcontract",
+          "http": 200,
+          "bytes": 970,
+          "elapsed_ms": 821,
+          "shape": "object"
+        }
+      ],
+      "genesis_suffix": "2b6653dc",
+      "receipt_ids_match": true,
+      "usdt_decimals": 6,
+      "completed": true
+    }
+  ]
+}

@@ -10566,3 +10566,24 @@
 - 修改文件：本任务归档、.trellis/workspace/rust-chain/index.md、journal-2.md、docs/superpowers/PROGRESS.md。
 - 验证结果：两个远程fetch后均可快进，普通push成功，git ls-remote均返回1c7a4cc549ffc2ea6ff24a1a9efdcc1f532e6732。沿用前条63项扫描器、最终实库综合回归、11项架构及Rust静态检查；归档和精确暂存diff检查通过，未访问生产或验收远程CI。
 - 后续事项：同步本条会话交付记录并复核最终SHA；部署须先停旧worker、执行0167及其余待应用迁移，再启动新版后端/worker。等待原429冷却到期，验证实际持续追块；未宣称生产已恢复。
+
+## 2026-10-29 11:26（Europe/Istanbul） - 五网络免费RPC渠道能力排查
+
+- 完成内容：用户确认覆盖Ethereum/Base/Tron/Bitcoin/Solana；按官方文档和低频只读探测选出候选默认渠道。Base PublicNode/dRPC支持完整交易块、USDC与回执，Bitcoin PublicNode完整输出及TronGrid完整回执通过；Solana发现并核实V1解析需求；Ethereum dRPC的trace实测通过但官方免费层不承诺权限，保留完整证据与失败关闭准入。
+- 修改文件：.trellis/tasks/10-29-builtin-free-rpc-channels/prd.md、info.md、research/*、上下文与task.json；docs/superpowers/PROGRESS.md。
+- 验证结果：公开免Key样本请求结果已脱敏保存，Base官方和Solana官方出现429、Ethereum PublicNode缺少trace、Llama/BlockPI失败均如实记录；空User-Agent的Base PublicNode调用也成功。未使用用户密钥、访问生产或执行付款，未验证长期吞吐。任务上下文校验通过。
+- 后续事项：实现服务端预设目录、首次配置默认草稿与已有渠道追加、0168预设身份迁移、Base整块读取及Solana V1兼容，并完成数据库/界面验证。
+
+## 2026-10-29 11:51（Europe/Istanbul） - 五网络免费RPC保存与扫描兼容
+
+- 完成内容：内置八个公开渠道预设并预填六个默认项，覆盖五网络；首次配置免密钥，已有渠道可追加，服务端校验预设身份并隔离旧密钥。新增0168仅增加预设字段；Base预设使用完整交易块，原自定义渠道保持自适应批次；Solana支持已验证V1并拒绝未知版本。后台接入预设选择、限制说明及Base ETH/USDC币种模板。
+- 修改文件：wallet domain/application/infrastructure/presentation相关文件、0168迁移、扫描器/预设数据库回归、web/src/admin/deposits及本地夹具、任务记录。
+- 验证结果：75项扫描器回归全部实际执行通过，包含隔离MySQL迁移/冷却/凭据隔离/审计回滚/版本冲突；初轮金额字符串断言改为精确BigDecimal比较后通过。Web定向首轮48/49，选择器标签修正后失败用例复验通过；类型和lint通过。Docker磁盘已满导致首次测试容器初始化失败，改用本任务临时内存盘后实库测试完成，未修改其他容器。
+- 后续事项：完成后台全量门禁、OpenAPI/架构和Rust静态检查、浏览器窄屏验证、规范及交付记录；尚未提交推送或部署。
+
+## 2026-10-29 12:15（Europe/Istanbul） - 五网络免费RPC配置最终验证
+
+- 完成内容：完成服务端免费目录、默认草稿与追加渠道、匿名凭据隔离、Base整块扫描及Solana V1兼容；修复320px保存/放弃弹窗裁切，同步规范、迁移和使用说明。仅交付本次RPC相关文件，已有代理管理草稿及旧进度保持本地。
+- 修改文件：10-29-builtin-free-rpc-channels/task.json.relatedFiles列出的30个业务/迁移/测试/规范文件，任务研究和交付记录，以及本次进度段。
+- 验证结果：扫描器75/75含全部所需实库回归；架构11/11、OpenAPI合同、生产Clippy、all-target check、fmt通过。Web全量首轮1225通过、1个USDC名单期望待更新，补充精确身份后最终充值定向64/64；类型/lint、policy15/15、coverage23/23、build通过。另导出HEAD加本次补丁验证，排除代理管理WIP，类型/lint、64项定向和build通过；发布版本JS为2786186/2600000，既有包体超限保留，未放宽门槛。Ego实组件与隔离API覆盖1728/1280/390/320、全部网络默认、保存、追加去重、自定义保留、409及取消；窄屏弹窗修复后288px完整可用，截图已查看。专用MySQL、Vite和浏览器任务已清理。
+- 后续事项：按已有授权精确提交、归档并推送双远程；发布须停旧worker并用同版迁移器执行0168及全部待应用迁移，同版更新API/worker/后台。未部署、未访问生产或做实链付款，公共RPC持续吞吐及Ethereum免费trace权限仍需上线观察。

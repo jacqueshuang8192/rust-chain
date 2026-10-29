@@ -5,6 +5,8 @@ import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ApiError, apiRequest } from '../../api/client';
 import { DepositSettingsPage } from './DepositSettingsPage';
+import { rpcPresetFixture } from '../../../tests/fixtures/rpcPresets';
+import { parseSettings } from './contracts';
 import { assetPresets, nodePresets } from './presets';
 
 vi.mock('../../api/client', async () => ({ ...await vi.importActual('../../api/client'), apiRequest: vi.fn() }));
@@ -165,7 +167,7 @@ it('shows immutable chain identity and only updates the selected asset state at 
   expect(screen.getByRole('textbox', { name: '操作原因' })).toHaveValue('暂停此币种');
 });
 
-const networkNames: Record<string, string> = { eth: 'Ethereum', tron: 'Tron（TRC20）', solana: 'Solana' };
+const networkNames: Record<string, string> = { base: 'Base', btc: 'Bitcoin', eth: 'Ethereum', tron: 'Tron（TRC20）', solana: 'Solana' };
 it.each(assetPresets)('applies $id only to a draft and sends the selected mainnet identity on confirmation', async (preset) => {
   const user = userEvent.setup(); show();
   await screen.findByRole('button', { name: '新增监听币种' });
@@ -441,4 +443,97 @@ it('shows isolated Base progress and recovers only the chosen token stream', asy
   await user.type(screen.getByRole('textbox', { name: '操作原因' }), '恢复代币分流');
   await user.click(screen.getByRole('button', { name: '确认' }));
   await waitFor(() => expect(mocked).toHaveBeenCalledWith('/admin/api/v1/wallet/deposit-settings/scanners/base/recovery', { method: 'POST', body: JSON.stringify({ stream: 'token', mode: 'backfill', expected_revision: 7, acknowledge_skip: false, reason: '恢复代币分流' }) }));
+});
+
+
+it.each(['eth', 'base', 'tron', 'btc', 'solana'])('prefills anonymous defaults for %s without enabling deposits', async network => {
+  const user = userEvent.setup();
+  mocked.mockResolvedValue({ ...settings, rpc_presets: rpcPresetFixture, scanners: [{ ...settings.scanners[0], network, streams: network === 'base' ? ['native', 'token'].map(stream => ({ ...settings.scanners[0], stream })) : [], enabled: false, endpoint_configured: false, api_key_configured: false }] });
+  show(); await screen.findByRole('combobox', { name: '配置网络' });
+  if (network !== 'eth') await choose(user, '配置网络', networkNames[network]);
+  await user.click(await screen.findByRole('button', { name: '编辑监听配置' }));
+  const defaults = rpcPresetFixture.filter(preset => preset.network === network && preset.recommended);
+  expect(screen.getByRole('switch', { name: '接受新充值订单' })).not.toBeChecked();
+  for (const [index, preset] of defaults.entries()) {
+    expect(screen.getByLabelText(`渠道 ${index + 1} 名称`)).toHaveValue(preset.name);
+    expect(screen.getByText(preset.endpoint)).toBeInTheDocument();
+    expect(screen.queryByLabelText(`渠道 ${index + 1} 凭据 1 API Key`)).not.toBeInTheDocument();
+  }
+  expect(screen.getByRole('button', { name: '补充免费默认渠道' })).toBeDisabled();
+  expect(mocked.mock.calls.every(([, init]) => !init?.method)).toBe(true);
+  await user.click(screen.getByRole('button', { name: '保存监听配置' }));
+  await user.type(screen.getByRole('textbox', { name: '操作原因' }), '启用默认渠道草稿');
+  await user.click(screen.getByRole('button', { name: '确认' }));
+  await waitFor(() => expect(mocked.mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(true));
+  const body = JSON.parse(String(mocked.mock.calls.find(([, init]) => init?.method === 'PUT')![1]?.body));
+  expect(body).toMatchObject({ enabled: false, expected_revision: 7, endpoint: null, api_key: null });
+  expect(body.providers.map((row: { preset_id: string }) => row.preset_id)).toEqual(defaults.map(preset => preset.id));
+  for (const row of body.providers) {
+    expect(row.endpoint).toBeNull(); expect(row.keys).toHaveLength(1);
+    expect(row.keys[0]).toMatchObject({ api_key: null, clear_api_key: false });
+  }
+});
+
+it('appends defaults once, retains custom keys, and preserves a conflicting free-channel draft', async () => {
+  const user = userEvent.setup(); mocked.mockResolvedValue({ ...withProviders(), rpc_presets: rpcPresetFixture }); show();
+  await user.click(await screen.findByRole('button', { name: '编辑监听配置' }));
+  await user.click(screen.getByRole('button', { name: '补充免费默认渠道' }));
+  expect(screen.getByRole('button', { name: '补充免费默认渠道' })).toBeDisabled();
+  expect(screen.getByLabelText('渠道 1 名称')).toHaveValue('Primary');
+  expect(screen.getByLabelText('渠道 1 凭据 1 API Key')).toHaveValue('');
+  expect(screen.getByLabelText('渠道 2 名称')).toHaveValue('dRPC · Ethereum');
+  await user.click(screen.getByRole('button', { name: '保存监听配置' }));
+  await user.type(screen.getByRole('textbox', { name: '操作原因' }), '补充免费备用');
+  mocked.mockRejectedValueOnce(new ApiError(409, 'CONFLICT', 'changed'));
+  await user.click(screen.getByRole('button', { name: '确认' }));
+  expect(await screen.findByText(/数据状态已变化/)).toBeInTheDocument();
+  const body = JSON.parse(String(mocked.mock.calls.find(([, init]) => init?.method === 'PUT')![1]?.body));
+  expect(body.providers).toHaveLength(2);
+  expect(body.providers[0]).toMatchObject({ id: 10, preset_id: '', endpoint: null, keys: [{ id: 20, api_key: null, clear_api_key: false }] });
+  expect(body.providers[1]).toMatchObject({ preset_id: 'eth-drpc', endpoint: null, priority: 1 });
+  expect(screen.getByRole('textbox', { name: '操作原因' })).toHaveValue('补充免费备用');
+  expect(screen.getByLabelText('渠道 2 名称')).toHaveValue('dRPC · Ethereum');
+});
+
+it('explicitly switches a custom provider to anonymous preset and back to custom', async () => {
+  const user = userEvent.setup(); mocked.mockResolvedValue({ ...withProviders(), rpc_presets: rpcPresetFixture }); show();
+  await user.click(await screen.findByRole('button', { name: '编辑监听配置' }));
+  await choose(user, '渠道 1 来源', 'dRPC · Ethereum（默认）');
+  expect(screen.getByText(/会清除本渠道原有密钥/)).toBeInTheDocument();
+  expect(screen.queryByLabelText('渠道 1 凭据 1 API Key')).not.toBeInTheDocument();
+  await choose(user, '渠道 1 来源', '自定义 RPC / 自有 API Key');
+  expect(screen.getByLabelText('渠道 1 节点地址')).toHaveValue('https://eth.drpc.org');
+  expect(screen.getByRole('switch', { name: '清除渠道 1 凭据 1 密钥' })).toBeChecked();
+  await choose(user, '渠道 1 来源', 'dRPC · Ethereum（默认）');
+  await user.click(screen.getByRole('button', { name: '保存监听配置' }));
+  await user.type(screen.getByRole('textbox', { name: '操作原因' }), '切换免费渠道');
+  await user.click(screen.getByRole('button', { name: '确认' }));
+  await waitFor(() => expect(mocked.mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(true));
+  const body = JSON.parse(String(mocked.mock.calls.find(([, init]) => init?.method === 'PUT')![1]?.body));
+  expect(body.providers[0]).toMatchObject({ id: 10, preset_id: 'eth-drpc', endpoint: null, keys: [{ id: 20, api_key: null, clear_api_key: true }] });
+});
+
+it.each([undefined, '800'])('keeps saved free-channel identities and synchronizes an edited interval %s', async interval => {
+  const data = withProviders(); const provider = data.scanners[0].providers[0];
+  mocked.mockResolvedValue({ ...data, rpc_presets: rpcPresetFixture, scanners: [{ ...data.scanners[0], providers: [{ ...provider, preset_id: 'eth-drpc', keys: [{ ...provider.keys[0], api_key_configured: false }] }] }] });
+  const user = userEvent.setup(); show();
+  expect(await screen.findByText(/内置免费渠道 · dRPC/)).toBeInTheDocument();
+  expect(screen.getByText('尚未验证')).toBeInTheDocument();
+  await user.click(await screen.findByRole('button', { name: '编辑监听配置' }));
+  expect(screen.getByRole('button', { name: '补充免费默认渠道' })).toBeDisabled();
+  if (interval) fireEvent.change(screen.getByLabelText('渠道 1 请求间隔'), { target: { value: interval } });
+  await user.click(screen.getByRole('button', { name: '保存监听配置' }));
+  await user.type(screen.getByRole('textbox', { name: '操作原因' }), '保存原有设置');
+  await user.click(screen.getByRole('button', { name: '确认' }));
+  await waitFor(() => expect(mocked.mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(true));
+  const body = JSON.parse(String(mocked.mock.calls.find(([, init]) => init?.method === 'PUT')![1]?.body));
+  expect(body.providers[0]).toMatchObject({ id: 10, preset_id: 'eth-drpc', endpoint: null, request_interval_ms: Number(interval ?? 250), keys: [{ id: 20, api_key: null, clear_api_key: false, request_interval_ms: Number(interval ?? 250) }] });
+});
+
+it('rejects malformed catalogs and accepts absent catalogs for older responses', () => {
+  expect(parseSettings(settings).rpc_presets).toEqual([]);
+  expect(parseSettings({ ...settings, rpc_presets: rpcPresetFixture }).rpc_presets).toHaveLength(8);
+  for (const rpc_presets of [null, {}, [{ ...rpcPresetFixture[0], source: 'javascript:alert(1)' }], [{ ...rpcPresetFixture[0], recommended: 'true' }], [rpcPresetFixture[0], rpcPresetFixture[0]]]) {
+    expect(() => parseSettings({ ...settings, rpc_presets })).toThrow();
+  }
 });

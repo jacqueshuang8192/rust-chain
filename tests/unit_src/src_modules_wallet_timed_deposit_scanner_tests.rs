@@ -4,6 +4,8 @@ use super::*;
 mod base_native_tests;
 #[path = "src_modules_wallet_base_stream_tests.rs"]
 mod base_stream_tests;
+#[path = "src_modules_wallet_rpc_preset_tests.rs"]
+mod preset_tests;
 #[path = "src_modules_wallet_deposit_provider_tests.rs"]
 mod provider_tests;
 #[path = "src_modules_wallet_scanner_recovery_tests.rs"]
@@ -33,6 +35,7 @@ fn transfer_topic_validates_padding_and_confirmation_bounds() {
 
 fn node(server: &wiremock::MockServer, network: &str) -> Node {
     Node {
+        base_full_blocks: false,
         gate: None,
         network: network.into(),
         endpoint: server.uri(),
@@ -157,8 +160,12 @@ async fn tron_reads_executed_transfer_logs_and_requires_complete_receipts() {
     );
 }
 
+#[rstest::rstest]
+#[case(json!("legacy"))]
+#[case(json!(0))]
+#[case(json!(1))]
 #[tokio::test]
-async fn solana_validates_program_and_keeps_inner_transfers_separate() {
+async fn solana_validates_program_and_keeps_inner_transfers_separate(#[case] version: Value) {
     let server = wiremock::MockServer::start().await;
     let address = "11111111111111111111111111111111";
     let mint = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
@@ -166,7 +173,7 @@ async fn solana_validates_program_and_keeps_inner_transfers_separate() {
     let native = json!({"programId":"11111111111111111111111111111111","parsed":{"type":"transfer","info":{"source":"sender","destination":address,"lamports":1000000000}}});
     let mut forged = transfer.clone();
     forged["programId"] = json!("not-the-token-program");
-    let good = json!({"transaction":{"signatures":["signature"],"message":{"accountKeys":[{"pubkey":"ata"}],"instructions":[native,forged]}},"meta":{"err":null,"preTokenBalances":[],"postTokenBalances":[{"accountIndex":0,"mint":mint,"owner":address,"uiTokenAmount":{"decimals":6}}],"innerInstructions":[{"index":0,"instructions":[transfer]}]}});
+    let good = json!({"version":version,"transaction":{"signatures":["signature"],"message":{"accountKeys":[{"pubkey":"ata"}],"instructions":[native,forged]}},"meta":{"err":null,"preTokenBalances":[],"postTokenBalances":[{"accountIndex":0,"mint":mint,"owner":address,"uiTokenAmount":{"decimals":6}}],"innerInstructions":[{"index":0,"instructions":[transfer]}]}});
     let mut failed = good.clone();
     failed["meta"]["err"] = json!({"InstructionError":[0,"failed"]});
     rpc(&server,"getBlock",json!({"blockhash":"block10","previousBlockhash":"block9","blockTime":1700000000,"transactions":[good,failed]})).await;
@@ -183,6 +190,20 @@ async fn solana_validates_program_and_keeps_inner_transfers_separate() {
     assert_eq!(block.receipts[0].amount, bigdecimal::BigDecimal::from(1));
     assert_eq!(block.receipts[1].amount, bigdecimal::BigDecimal::from(100));
     assert_ne!(block.receipts[0].event_index, block.receipts[1].event_index);
+    let request: Value =
+        serde_json::from_slice(&server.received_requests().await.unwrap()[0].body).unwrap();
+    assert_eq!(request["params"][1]["maxSupportedTransactionVersion"], 1);
+    for unsupported in [json!(2), json!("1"), Value::Null] {
+        server.reset().await;
+        let mut unknown = good.clone();
+        unknown["version"] = unsupported;
+        rpc(&server,"getBlock",json!({"blockhash":"block10","previousBlockhash":"block9","blockTime":1700000000,"transactions":[unknown]})).await;
+        assert!(
+            solana::block(&node(&server, "solana"), 10, &context)
+                .await
+                .is_err()
+        );
+    }
 }
 
 #[tokio::test]
