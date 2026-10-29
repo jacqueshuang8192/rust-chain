@@ -79,3 +79,9 @@ used for this validation. The pre-existing agent-management edits remain local.
 5. Knowledge: `.trellis/spec/backend/timed-deposits.md` and the operator guide
    record these invariants and deployment limits. There is no corresponding
    `src/templates/markdown/spec/` tree in this application repository.
+
+## Cleanup
+
+The task-only MySQL container `rust-chain-nodies-20261029` was stopped and
+automatically removed after final validation. Other containers and the existing
+agent-management worktree changes were preserved.

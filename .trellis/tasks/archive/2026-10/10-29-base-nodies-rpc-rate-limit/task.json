@@ -3,7 +3,7 @@
   "name": "base-nodies-rpc-rate-limit",
   "title": "Fix Base RPC burst pacing and persist adaptive transaction batches",
   "description": "",
-  "status": "in_progress",
+  "status": "completed",
   "dev_type": "backend",
   "scope": "wallet",
   "package": null,
@@ -11,11 +11,11 @@
   "creator": "rust-chain",
   "assignee": "rust-chain",
   "createdAt": "2026-10-29",
-  "completedAt": null,
-  "branch": null,
+  "completedAt": "2026-10-29",
+  "branch": "main",
   "base_branch": "main",
   "worktree_path": null,
-  "commit": null,
+  "commit": "5b58c75d278d8c8af0c7a18a52d7b1ecc1bcbf46",
   "pr_url": null,
   "subtasks": [],
   "children": [],
@@ -31,6 +31,6 @@
     "docs/superpowers/timed-chain-deposits.md",
     "docs/superpowers/PROGRESS.md"
   ],
-  "notes": "User confirmed Free Plan and sufficient monthly allowance; numeric RPS unavailable. Implemented and verified actual-send gate rechecks and durable adaptive Base batch caps, preserving shared cooldown and accounting safety. All 63 selected scanner cases passed across the expanded run and targeted fixture rerun; final gate regression, 11 architecture tests and Rust static checks passed. Live Nodies throughput remains unverified. Authorized dual-remote delivery pending.",
+  "notes": "User confirmed Free Plan and sufficient monthly allowance; numeric RPS unavailable. Implemented and verified actual-send gate rechecks and durable adaptive Base batch caps, preserving shared cooldown and accounting safety. All 63 selected scanner cases passed across the expanded run and targeted fixture rerun; final gate regression, 11 architecture tests and Rust static checks passed. Live Nodies throughput remains unverified. Deployment requires migration 0167 and new workers; existing real cooldowns remain in effect.",
   "meta": {}
 }
