@@ -10608,3 +10608,10 @@
 - 修改文件：10-29-ethereum-rpc-failover/task.json.relatedFiles所列12个业务/测试/规范/进度文件，以及任务研究与交付记录。
 - 验证结果：扫描器75/75含全部隔离MySQL回归、架构11/11、fmt/diff通过；Web全量1227通过、1个既有时区用例失败，UTC复验11/11通过，充值定向65/65、类型/lint/policy15/coverage23/build通过。导出HEAD加本次补丁排除代理WIP，类型/lint、65项充值及build通过；精确发布JS2789517/2600000仍超限，未改预算。Ego本地实组件与模拟API验证1728/1280/390/320、默认/追加/独立Key/409保留/取消；窄屏无页面横溢，截图已查看。专用MySQL、Vite和浏览器任务已清理。
 - 后续事项：按已有授权精确提交、归档并推送双远程；未部署或验证真实账号Key、历史trace及持续吞吐，不能据此宣称生产429已恢复。管理员更新后需申请并填写自有Key，等待完整扫描成功；仍落后前版的环境先执行0168等全部待应用迁移。
+
+## 2026-10-29 14:01（Europe/Istanbul） - Ethereum账号RPC渠道双远程交付
+
+- 完成内容：功能提交8dfec445、任务归档9efd4a58已推送origin与github8192的main并核实一致；记录本次Trellis会话。既有代理管理改动、四个旧任务目录及三段旧进度继续保留本地。
+- 修改文件：.trellis/tasks/archive/2026-10/10-29-ethereum-rpc-failover、.trellis/workspace/rust-chain/index.md与journal-2.md、docs/superpowers/PROGRESS.md（仅本次交付段）。
+- 验证结果：两远程fetch确认与起始HEAD一致，普通push均成功，git ls-remote均返回9efd4a58b2029bc4ecba23415ce28a79363c5949。归档校验与精确暂存diff通过；沿用前条75项扫描器、65项精确Web与浏览器结果。无关文件哈希保持一致，本轮测试容器、浏览器空间、Vite和临时发布导出已清理。
+- 后续事项：同步本条交付记录后复核最终远程SHA；未部署或验收远程CI。新增渠道须管理员申请并填写独立RPC API Key，等待完整扫描；真实账号权限、历史数据与持续吞吐尚未验证。既有Web时区用例与包体超限边界见任务delivery.md。

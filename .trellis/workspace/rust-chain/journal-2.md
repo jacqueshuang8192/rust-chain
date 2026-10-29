@@ -1366,3 +1366,38 @@ Implemented server-owned anonymous RPC presets, safe preset persistence via 0168
 ### Next Steps
 
 - None - task complete
+
+
+## Session 100: Ethereum free-account RPC template delivery
+
+**Date**: 2026-10-29
+**Task**: Ethereum free-account RPC template delivery
+**Branch**: `main`
+
+### Summary
+
+Added Chainnodes and SolidRPC account templates with isolated keys and retired the anonymous Ethereum default recommendation. Scanner 75, exact-release deposit Web 65, architecture 11 and responsive checks passed. Existing timezone-sensitive test and bundle-budget failure recorded. Real account trace compatibility and sustained capacity remain unverified. Task-scoped code and archive pushed to both remotes; unrelated WIP preserved.
+
+### Main Changes
+
+Added two owned-key Ethereum templates, retained stored dRPC identity/cooldowns and admission semantics, and prevented cross-provider credential reuse. See the archived task research/delivery.md for exact scope and evidence.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `8dfec445` | (see git log) |
+
+### Testing
+
+- Scanner 75/75 with isolated MySQL; architecture 11/11; exact-release deposit tests 65/65; typecheck/lint/build and responsive browser checks passed.
+- Existing timezone-dependent assertion passed in UTC; exact-release JS remains over budget at 2789517/2600000 bytes.
+- Both remote main branches verified at 9efd4a58 before this journal commit.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- No implementation work remains. Operators must obtain their own RPC keys and validate full scans after deployment; production was not accessed.

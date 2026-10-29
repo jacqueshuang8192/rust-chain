@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 99
+- **Total Sessions**: 100
 - **Last Active**: 2026-10-29
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~1368 | Active |
+| `journal-2.md` | ~1401 | Active |
 | `journal-1.md` | ~1985 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 100 | 2026-10-29 | Ethereum free-account RPC template delivery | `8dfec445` | `main` |
 | 99 | 2026-10-29 | Built-in free RPC channels across five deposit networks | `b00e22ad` | `main` |
 | 98 | 2026-10-29 | Base RPC pacing and adaptive batches | `5b58c75d` | `main` |
 | 97 | 2026-10-28 | Base upgrade cooldown and published agent grid fixes | `931ebe6`, `0ffbd2a4` | `main` |
