@@ -757,7 +757,7 @@ export default {
     register: '注册',
     loginSubtitle: '使用您的平台账户继续。',
     welcomeBack: '登录或注册',
-    pencilLoginDescription: '欢迎！请登录以开始使',
+    pencilLoginDescription: '欢迎！请登录以开始使用',
     pencilRegisterDescription: '注册完成后再按需提交身份认证和安全设置。',
     loginIdentityDescription: '选择登录方式并输入您的账户。',
     loginEmailDescription: '输入您的注册邮箱以继续。',

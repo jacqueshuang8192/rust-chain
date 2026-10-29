@@ -10622,3 +10622,10 @@
 - 修改文件：mobile/src/i18n/messages/zh-CN.ts、10-29-pwa-login-copy任务记录、docs/superpowers/PROGRESS.md。
 - 验证结果：npm --prefix mobile run release:gate通过，923/923测试、生产/测试类型检查、PWA/Tauri网页构建与产物、包体/源码预算和测试质量检查均通过。Ego本地登录页320/390下两行文案正确且无横向溢出，截图已查看；git diff --check通过。仅使用本地未连接后端的配置回退，未提交登录或访问生产。
 - 后续事项：保存本地提交及任务归档；未推送或部署。浏览器任务与Vite已清理。
+
+## 2026-10-29 14:34（Europe/Istanbul） - PWA/H5登录副标题补全文字
+
+- 完成内容：按用户更正，将副标题补全为“欢迎！请登录以开始使用”，标题仍为“登录或注册”。
+- 修改文件：mobile/src/i18n/messages/zh-CN.ts、10-29-pwa-login-subtitle-complete任务记录、docs/superpowers/PROGRESS.md。
+- 验证结果：直接导入生产语言资源核对两行精确值通过；npm --prefix mobile run release:gate通过（923/923测试、生产/测试类型、PWA/Tauri网页构建与产物、包体和治理检查）；diff和任务校验通过。此次仅增加一个字，未重复浏览器检查；上一轮320/390检查已通过。
+- 后续事项：无；保存本地提交，不推送或部署。
