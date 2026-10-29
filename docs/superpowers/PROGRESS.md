@@ -10587,3 +10587,10 @@
 - 修改文件：10-29-builtin-free-rpc-channels/task.json.relatedFiles列出的30个业务/迁移/测试/规范文件，任务研究和交付记录，以及本次进度段。
 - 验证结果：扫描器75/75含全部所需实库回归；架构11/11、OpenAPI合同、生产Clippy、all-target check、fmt通过。Web全量首轮1225通过、1个USDC名单期望待更新，补充精确身份后最终充值定向64/64；类型/lint、policy15/15、coverage23/23、build通过。另导出HEAD加本次补丁验证，排除代理管理WIP，类型/lint、64项定向和build通过；发布版本JS为2786186/2600000，既有包体超限保留，未放宽门槛。Ego实组件与隔离API覆盖1728/1280/390/320、全部网络默认、保存、追加去重、自定义保留、409及取消；窄屏弹窗修复后288px完整可用，截图已查看。专用MySQL、Vite和浏览器任务已清理。
 - 后续事项：按已有授权精确提交、归档并推送双远程；发布须停旧worker并用同版迁移器执行0168及全部待应用迁移，同版更新API/worker/后台。未部署、未访问生产或做实链付款，公共RPC持续吞吐及Ethereum免费trace权限仍需上线观察。
+
+## 2026-10-29 12:22（Europe/Istanbul） - 五网络免费RPC双远程交付
+
+- 完成内容：功能提交b00e22ad、任务归档42e91dbb已按既有授权推送origin与github8192的main，远端已核实一致；记录Trellis会话，旧代理管理代码、四个既有任务目录及三段旧进度继续保留本地。
+- 修改文件：本任务归档、.trellis/workspace/rust-chain/index.md、journal-2.md、docs/superpowers/PROGRESS.md（仅本次交付段）。
+- 验证结果：两远程fetch后与起始HEAD一致，普通push均成功，git ls-remote均返回42e91dbba5bf37ebf0bd40e32651c92fa56272e5。沿用前条扫描器75项、最终Web定向64项、Rust静态和浏览器验证；精确发布版本包体仍超限且未放宽阈值。专用MySQL、Vite、Ego任务和临时发布导出已清理。
+- 后续事项：同步本条交付记录后复核最终远程SHA；未执行生产部署或远程CI验收。发布须先停旧worker、执行0168及全部待应用迁移，再同版启动API/worker/后台；免费渠道需管理员确认保存，实际持续追块与Ethereum免费trace权限待部署观察。

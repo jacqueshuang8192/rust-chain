@@ -1333,3 +1333,36 @@ Admission rechecks current deadlines after every wait; Base batch HTTP 429 persi
 ### Next Steps
 
 - Apply migration 0167 before new workers, wait for genuine cooldowns and verify production progress. Live provider throughput and remote CI remain unverified.
+
+
+## Session 99: Built-in free RPC channels across five deposit networks
+
+**Date**: 2026-10-29
+**Task**: Built-in free RPC channels across five deposit networks
+**Branch**: `main`
+
+### Summary
+
+Implemented server-owned anonymous RPC presets, safe preset persistence via 0168, Base full-block reads and Solana V1 compatibility, Admin defaults/append/source notes and responsive dialogs. Verified 75 scanner tests with isolated MySQL, 64 Admin tests on the exact release export, Rust static/architecture/OpenAPI checks and Web gates. Existing JS budget overflow remains documented. Feature and archive pushed to both remotes; unrelated agent-management WIP preserved.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `b00e22ad` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
