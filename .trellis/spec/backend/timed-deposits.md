@@ -171,6 +171,8 @@ Base rounds with native assets cap the existing adaptive batch at four blocks
 because transaction lookup batches add requests. Provider per-method usage still
 applies to every subcall; batching is not a quota multiplier. HTTP 429 continues
 to cool the selected key, and sustained catch-up depends on actual plan capacity.
+Migration 0167 adds the learned per-key batch limit described below; reduced
+transaction batches also reduce each round's native block count.
 
 ### Retiring obsolete Base trace cooldowns
 
@@ -265,14 +267,94 @@ new credentials preserve cooldowns; explicit credential replacement resets the
 corresponding stored failure state.
 
 Before every HTTP request, the gate verifies network revision and live lease,
-locks provider then key, reserves the later of their persisted next-request times,
-and updates both deadlines. Sleep occurs outside the transaction; eligibility is
-checked again before sending. Response completion extends both persisted deadlines
-by the configured interval, preventing scheduling/DB latency from consuming the
-reserved gap before the request actually arrives. Different workers cannot reset request pacing or
+locks provider then key and checks the later persisted next-request time. If it
+is in the future, release the transaction and sleep without reserving another
+slot. Re-enter the entire lock/cooldown/lease/deadline check after every wait;
+only an eligible request whose deadline has arrived updates the next times.
+Response completion extends both deadlines by the configured interval. Waiting
+calls must observe that extension and scheduler delays must not release a queue
+of expired reservations together. Cancelled waiters do not consume future slots.
+Different workers cannot reset request pacing or
 cooldowns on restart. Failed rounds do not advance checkpoints; receipts already
 observed remain idempotent. All candidates cooling/unavailable closes admission;
 there is no unauthenticated fallback or automatic cursor skip.
+
+### Adaptive Base transaction batch size
+
+#### 1. Scope / Trigger
+
+Base `eth_getTransactionByHash` batches receive HTTP 429 even when monthly
+allowance remains. A provider's undisclosed RPS must not be guessed from monthly
+quota or from one successful batch.
+
+#### 2. Signatures
+
+`0167_deposit_rpc_batch_limit.sql` adds internal
+`wallet_deposit_scanner_keys.rpc_batch_limit INT UNSIGNED NOT NULL DEFAULT 25`.
+Runtime clamps loaded values to 1..25. No Admin request or response field changes.
+`Gate::throttled(message, minimum_seconds, batch_size: Option<usize>)` records
+quota feedback in the same transaction as the existing key cooldown.
+
+#### 3. Contracts
+
+- Only a Base transaction-lookup batch HTTP 429 supplies its actual rejected
+  subcall count. Set the key cap to `min(existing, max(1, floor(batch_size/2)))`.
+  Duplicate concurrent failures of size 25 therefore leave 12, not 6 or 3.
+- Preserve shared Retry-After/exponential cooldown, failure count and snapshot
+  diagnostics. Do not retry smaller batches inside the cooling attempt.
+  Scalar 429, other methods/networks and RPC application failures do not alter
+  the learned transaction cap.
+- Fresh candidates load the persisted cap; successful scans and restarts retain
+  it. Explicit credential replacement resets that key to 25; endpoint replacement
+  resets that provider's keys. Blank saves and unrelated settings preserve it.
+  Legacy single-provider writes follow the same rule.
+- Native rounds use at most `ceil(4 * cap / 25)` blocks, additionally bounded by
+  existing interval adaptation. Token rounds remain unchanged. Every transaction
+  in every selected block must still be validated before checkpoint success.
+- This controls envelope size and existing HTTP pacing; it is not a measured
+  account-wide RPS limiter. Very low sustained capacity can still lag or time out
+  on a dense block. Never skip history or fake readiness to conceal this limit.
+- Apply 0167 before starting the new backend/worker. It backfills existing keys
+  to 25 without clearing any genuine error, cooldown, progress or financial data.
+
+#### 4. Validation & Error Matrix
+
+| Input/state | Required outcome |
+|---|---|
+| Batch of 25 rejected with 429 | Key cap 12; Retry-After and checkpoint preserved |
+| Repeated rejection of the same 25-call batch | Cap remains 12 |
+| Batch sizes 12, 6, 3, 1 rejected | Caps 6, 3, 1, 1 |
+| Scalar/token HTTP 429 | Shared key cooldown; transaction cap unchanged |
+| Successful sibling while key cooling | Does not clear active cooldown or cap |
+| Blank configuration save / fresh Node | Cap preserved |
+| Replaced key / endpoint | Relevant cap reset only; existing credential-reset rules retained |
+| Waiter wakes after response extension or scheduler stall | Recheck deadlines before admission |
+| Lease/revision invalid or provider/key disabled | No admission |
+
+#### 5. Good / Base / Bad Cases
+
+Good: a rejected 25-call scan resumes with 12-call batches and validates all 98
+transactions in two blocks. Base: existing keys migrate to their previous cap 25.
+Bad: clear shared 429 for USDC, restore 25 after every success, or equate fewer
+HTTP envelopes with a guaranteed sustainable RPC budget.
+
+#### 6. Tests Required
+
+Real isolated MySQL and mock RPC: reproduce response-deadline extension and
+scheduler stalls, retain spacing across Base streams, cancellation without future
+reservations, cooldown/lease/config fencing, adaptive failure/retry with fresh
+candidate loading, complete transaction coverage, safe minimum and duplicate
+failure behavior, independent key caps, blank/replacement/legacy saves. Upgrade
+from 0166, preserve key/error/progress snapshots and run SQLx migrations twice.
+
+#### 7. Wrong vs Correct
+
+Wrong: reserve a future slot once and send after sleeping without checking a later
+completion deadline. Correct: wait outside locks, then atomically re-evaluate
+current eligibility and time; only due requests consume a slot.
+
+Wrong: retry the same 25-call shape after every cooldown. Correct: retain the
+observed smaller cap while honoring actual service cooldowns and full evidence.
 
 ### Explicit head recovery and dual progress
 

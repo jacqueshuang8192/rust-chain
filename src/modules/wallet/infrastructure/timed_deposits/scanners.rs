@@ -24,6 +24,7 @@ use sqlx::{MySql, Pool, types::Json};
 use std::{collections::HashSet, time::Duration};
 
 const TRANSFER_TOPIC: &str = "ddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+const MAX_RPC_BATCH_CALLS: usize = 25;
 
 #[derive(sqlx::FromRow)]
 struct ScannerConfig {
@@ -216,7 +217,7 @@ async fn scan(
     // Base 原生扫描需分片查询每笔交易，限制区块数为持久节流和整轮超时留出余量。
     let batch =
         if context.network == "base" && context.assets.iter().any(|a| a.asset_kind == "native") {
-            batch.min(4)
+            batch.min((node.rpc_batch_limit() * 4).div_ceil(MAX_RPC_BATCH_CALLS) as u64)
         } else {
             batch
         };
@@ -360,8 +361,17 @@ impl Node {
                 } else {
                     30
                 };
-                gate.failed(&error.to_string(), !matches!(status, 401 | 429), seconds)
-                    .await?;
+                if status == 429 {
+                    let batch_size = (self.network == "base"
+                        && operation == "eth_getTransactionByHash")
+                        .then(|| body.as_array().map(Vec::len))
+                        .flatten();
+                    gate.throttled(&error.to_string(), seconds, batch_size)
+                        .await?;
+                } else {
+                    gate.failed(&error.to_string(), status != 401, seconds)
+                        .await?;
+                }
             }
             return Err(error);
         }
@@ -451,11 +461,17 @@ impl Node {
         self.rpc_result(method, &response).await
     }
 
-    /// 批量请求按最多二十五个只读调用分片，每个 HTTP 请求仍经过持久节流；响应按 ID 重排，拒绝漏项和重号。
+    fn rpc_batch_limit(&self) -> usize {
+        self.gate
+            .as_ref()
+            .map_or(MAX_RPC_BATCH_CALLS, provider_runtime::Gate::batch_limit)
+    }
+
+    /// 批量请求按凭据已学习的上限分片（最多二十五笔），每包仍经过持久节流；按 ID 重排并拒绝漏项和重号。
     /// 任一子调用失败则不返回部分结果，保留渠道冷却与故障切换语义，诊断不包含参数或上游原文。
     async fn rpc_batch(&self, method: &'static str, params: Vec<Value>) -> AppResult<Vec<Value>> {
         let mut results = Vec::with_capacity(params.len());
-        for chunk in params.chunks(25) {
+        for chunk in params.chunks(self.rpc_batch_limit()) {
             let requests: Vec<_> = chunk.iter().enumerate().map(|(index, params)| {
                 json!({"jsonrpc":"2.0","id":index + 1,"method":method,"params":params})
             }).collect();

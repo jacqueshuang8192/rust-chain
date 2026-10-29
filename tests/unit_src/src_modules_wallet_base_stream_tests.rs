@@ -472,8 +472,9 @@ async fn base_trace_upgrade_retires_only_obsolete_cooldowns_and_resumes_both_str
         return;
     };
     let mut old = sqlx::migrate!("./migrations");
+    // 仅暂缓旧 trace 修复；当前 worker 所需的新表结构先就绪，避免缺列掩盖持久冷却复现。
     old.migrations =
-        std::borrow::Cow::Owned(old.iter().filter(|m| m.version < 166).cloned().collect());
+        std::borrow::Cow::Owned(old.iter().filter(|m| m.version != 166).cloned().collect());
     old.run(&pool).await.unwrap();
     let server = MockServer::start().await;
     let time = Utc::now().timestamp() - 1;

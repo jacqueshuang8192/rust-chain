@@ -10545,3 +10545,17 @@
 - 修改文件：docs/superpowers/PROGRESS.md；仅取消跟踪四个此前未提交的旧任务目录，不删除工作区文件。
 - 验证结果：两个远程fetch确认可快进；push成功，git ls-remote均返回84e0cbfe9d72f8973dde26f512ca0f4001a23b54。Rust实库3项、原生41项、架构11项、容器10项及静态检查通过；精确Web发布版本的验证与既有时区/包体限制见前条和任务delivery.md。浏览器/本地模拟会话/Vite/隔离MySQL及临时目录已清理。
 - 后续事项：同步本条交付及文档清理提交后复核最终SHA；未执行生产部署或远程CI验收。Base发布需停止旧worker、重新构建迁移器并执行0166后启动新版；代理页面需更新后台构建产物。
+
+## 2026-10-29 07:19（Europe/Istanbul） - Nodies Base交易查询429文档与代码排查
+
+- 完成内容：查阅Nodies官方计费、API Key、统计和最近请求文档；确认当前Base原生扫描逐笔查询全块交易，25笔批量按一个HTTP包节流，不能据单批成功推定持续容量。核对共享429与分流语义、失败重复读取及35秒尝试期限；记录Nodies的apikey/x-api-key鉴权与当前通用Bearer路径差异，当前实际配置待核实。
+- 修改文件：.trellis/tasks/10-29-base-nodies-rpc-rate-limit/prd.md、research/diagnosis.md、任务状态和上下文；docs/superpowers/PROGRESS.md。未修改业务代码。
+- 验证结果：cargo test --lib transaction_batches_are_bounded_and_restore_request_order -- --nocapture通过（1项实际执行，验证101个子调用分成5个HTTP包）；官方文档与既有2026-10-28脱敏能力探测交叉核对。未调用用户实时RPC、访问生产数据库或验证持续追块。
+- 后续事项：等待套餐、有效RPS、本月用量及共用账户情况，区分频率与总量限制；再确定按调用预算节流或使用已获权限的完整交易块方案。当前仅完成诊断，未宣称429已修复，未新增提交推送。
+
+## 2026-10-29 08:00（Europe/Istanbul） - Base RPC并发节流与429批次自适应修复
+
+- 完成内容：用户确认Free Plan、月额度充足且控制台无RPS；实库复现等待中的请求忽略响应延长时间，改为每次醒来重新校验节流、冷却、版本和租约，取消不预占槽位。新增0167按Key持久化Base交易批次上限，HTTP 429后按拒绝批次减半并保留共享冷却；成功/重启/留空保存保持，替换凭据或地址重置，每轮原生区块数同步缩小；保留完整证据与游标。
+- 修改文件：scanners.rs、scanners/provider_runtime.rs、providers.rs、migrations/0167_deposit_rpc_batch_limit.sql、src_modules_wallet_scanner_gate_tests.rs、src_modules_wallet_base_stream_tests.rs、.trellis/spec/backend/timed-deposits.md、docs/superpowers/timed-chain-deposits.md及本任务记录。
+- 验证结果：修复前500ms等待被提前到约204ms；修复后新增2项实库回归通过，实际模拟25笔429后以12笔批次完整检查两块98笔交易。扫描器63项逐项实际通过（首轮62项、旧升级夹具适配后1项），最终行类型调整后实库综合回归1/1；架构11/11、cargo clippy --lib --bins -- -D warnings、cargo check --all-targets、fmt、diff、任务上下文与范围内凭据检查通过。所有所需隔离数据库变量已设置，无跳过；未进行实链充值、生产访问或Nodies持续负载验证。
+- 后续事项：按已有授权精确提交、归档并推送两个远程；发布需停旧worker、执行0167及其他待应用迁移，再启动新版后端/worker。原429冷却保留，待到期后核实完整追块；批次自适应不保证Free Plan持续吞吐。
