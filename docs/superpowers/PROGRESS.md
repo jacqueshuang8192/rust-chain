@@ -10615,3 +10615,10 @@
 - 修改文件：.trellis/tasks/archive/2026-10/10-29-ethereum-rpc-failover、.trellis/workspace/rust-chain/index.md与journal-2.md、docs/superpowers/PROGRESS.md（仅本次交付段）。
 - 验证结果：两远程fetch确认与起始HEAD一致，普通push均成功，git ls-remote均返回9efd4a58b2029bc4ecba23415ce28a79363c5949。归档校验与精确暂存diff通过；沿用前条75项扫描器、65项精确Web与浏览器结果。无关文件哈希保持一致，本轮测试容器、浏览器空间、Vite和临时发布导出已清理。
 - 后续事项：同步本条交付记录后复核最终远程SHA；未部署或验收远程CI。新增渠道须管理员申请并填写独立RPC API Key，等待完整扫描；真实账号权限、历史数据与持续吞吐尚未验证。既有Web时区用例与包体超限边界见任务delivery.md。
+
+## 2026-10-29 14:19（Europe/Istanbul） - PWA/H5登录页中文文案调整
+
+- 完成内容：登录页标题改为“登录或注册”，副标题按用户原文改为“欢迎！请登录以开始使”；沿用现有i18n键与登录逻辑。
+- 修改文件：mobile/src/i18n/messages/zh-CN.ts、10-29-pwa-login-copy任务记录、docs/superpowers/PROGRESS.md。
+- 验证结果：npm --prefix mobile run release:gate通过，923/923测试、生产/测试类型检查、PWA/Tauri网页构建与产物、包体/源码预算和测试质量检查均通过。Ego本地登录页320/390下两行文案正确且无横向溢出，截图已查看；git diff --check通过。仅使用本地未连接后端的配置回退，未提交登录或访问生产。
+- 后续事项：保存本地提交及任务归档；未推送或部署。浏览器任务与Vite已清理。
