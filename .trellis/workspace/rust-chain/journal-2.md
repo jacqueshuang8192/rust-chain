@@ -1435,3 +1435,36 @@ Changed only auth.welcomeBack and auth.pencilLoginDescription in mobile/src/i18n
 ### Next Steps
 
 - No implementation work remains; changes are local and not pushed or deployed.
+
+
+## Session 102: Complete PWA login subtitle
+
+**Date**: 2026-10-29
+**Task**: Complete PWA login subtitle
+**Branch**: `main`
+
+### Summary
+
+Completed the Chinese login subtitle with the final character requested by the user. Exact production-locale assertions and the mobile release gate passed: 923 tests, type checks, PWA/Tauri web builds, artifacts and budgets. Local only; no push or deployment.
+
+### Main Changes
+
+Completed auth.pencilLoginDescription as 欢迎！请登录以开始使用; title remains 登录或注册.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `420c1364997c3a89fe31b71d4574d4df0f690142` | (see git log) |
+
+### Testing
+
+- Exact locale-value assertions and release:gate passed, including 923/923 tests and both web builds/budgets.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None. Local commits only; no push or deployment.
