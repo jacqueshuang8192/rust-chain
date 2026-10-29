@@ -10717,3 +10717,11 @@
 - 修改文件：本任务归档、.trellis/workspace/rust-chain/index.md与journal-2.md、docs/superpowers/PROGRESS.md（仅本段）。
 - 验证结果：沿用前条全量1264项、最终12项目录和构建复验、实库2项/Tron4项及浏览器结果；30个受保护文件核对未变，精确暂存与diff通过。Ego14已结束，Vite3052、专用MySQL和临时发布导出已清理。
 - 后续事项：无新增实施事项；尚未推送或部署。PublicNode免Key样本通过，免费账号仍需管理员填写凭据后验证持续扫描；既有Web包体预算超限保留。
+
+
+## 2026-10-29 20:10（Europe/Istanbul） - Tron免费渠道双远程交付
+
+- 完成内容：按用户授权，将919a5d1e、738101e6、62684a16推送至origin与github8192的main；五家免费服务商目录及PublicNode免Key备用已交付。
+- 修改文件：docs/superpowers/PROGRESS.md（仅本次交付段）。
+- 验证结果：两远程普通push成功，git ls-remote均返回62684a16d859f58f22421c7ac22cde6154012c45；沿用前述Web1264项、实库2项、Tron4项及最终构建和浏览器验证，本轮无业务代码变化，未重跑测试。既有包体预算超限保留。
+- 后续事项：同步本条交付记录；未部署。需同版更新API、worker和后台，由管理员补充免费默认渠道或填写免费账号凭据后保存；本轮无新增迁移。无关本地改动保留。
