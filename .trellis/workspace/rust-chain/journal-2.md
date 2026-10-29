@@ -1401,3 +1401,37 @@ Added two owned-key Ethereum templates, retained stored dRPC identity/cooldowns 
 ### Next Steps
 
 - No implementation work remains. Operators must obtain their own RPC keys and validate full scans after deployment; production was not accessed.
+
+
+## Session 101: PWA H5 login copy update
+
+**Date**: 2026-10-29
+**Task**: PWA H5 login copy update
+**Branch**: `main`
+
+### Summary
+
+Updated the two production Simplified Chinese login heading strings exactly as supplied. Mobile release gate passed with 923 tests, both web builds and budgets. Verified actual local login at 320px and 390px without overflow. Existing auth behavior, other locales and unrelated WIP preserved. Local commits only, no push or deployment.
+
+### Main Changes
+
+Changed only auth.welcomeBack and auth.pencilLoginDescription in mobile/src/i18n/messages/zh-CN.ts.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `1c39a40f` | (see git log) |
+
+### Testing
+
+- Mobile release:gate passed: 923 tests, type checks, PWA/Tauri web builds, artifact checks and budgets.
+- Local 320/390 login screenshots inspected; exact copy and no horizontal overflow.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- No implementation work remains; changes are local and not pushed or deployed.
