@@ -10559,3 +10559,10 @@
 - 修改文件：scanners.rs、scanners/provider_runtime.rs、providers.rs、migrations/0167_deposit_rpc_batch_limit.sql、src_modules_wallet_scanner_gate_tests.rs、src_modules_wallet_base_stream_tests.rs、.trellis/spec/backend/timed-deposits.md、docs/superpowers/timed-chain-deposits.md及本任务记录。
 - 验证结果：修复前500ms等待被提前到约204ms；修复后新增2项实库回归通过，实际模拟25笔429后以12笔批次完整检查两块98笔交易。扫描器63项逐项实际通过（首轮62项、旧升级夹具适配后1项），最终行类型调整后实库综合回归1/1；架构11/11、cargo clippy --lib --bins -- -D warnings、cargo check --all-targets、fmt、diff、任务上下文与范围内凭据检查通过。所有所需隔离数据库变量已设置，无跳过；未进行实链充值、生产访问或Nodies持续负载验证。
 - 后续事项：按已有授权精确提交、归档并推送两个远程；发布需停旧worker、执行0167及其他待应用迁移，再启动新版后端/worker。原429冷却保留，待到期后核实完整追块；批次自适应不保证Free Plan持续吞吐。
+
+## 2026-10-29 08:03（Europe/Istanbul） - Base RPC限流修复双远程交付
+
+- 完成内容：修复保存为5b58c75d，任务归档为1c7a4cc5；按用户既有授权推送origin与github8192的main并核实一致。归档上下文路径已修正且校验通过，专用MySQL测试容器已停止并自动删除；既有代理管理代码与三段进度保持本地。
+- 修改文件：本任务归档、.trellis/workspace/rust-chain/index.md、journal-2.md、docs/superpowers/PROGRESS.md。
+- 验证结果：两个远程fetch后均可快进，普通push成功，git ls-remote均返回1c7a4cc549ffc2ea6ff24a1a9efdcc1f532e6732。沿用前条63项扫描器、最终实库综合回归、11项架构及Rust静态检查；归档和精确暂存diff检查通过，未访问生产或验收远程CI。
+- 后续事项：同步本条会话交付记录并复核最终SHA；部署须先停旧worker、执行0167及其余待应用迁移，再启动新版后端/worker。等待原429冷却到期，验证实际持续追块；未宣称生产已恢复。

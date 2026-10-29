@@ -1300,3 +1300,36 @@ Retired only obsolete Base trace provider failures with migration 0166 and track
 ### Next Steps
 
 - None - task complete
+
+
+## Session 98: Base RPC pacing and adaptive batches
+
+**Date**: 2026-10-29
+**Task**: Base RPC pacing and adaptive batches
+**Branch**: `main`
+
+### Summary
+
+Fixed reproduced durable-gate deadline races and added migration 0167 for persistent per-key Base transaction batch caps after HTTP 429. All 63 selected scanner cases passed across the full run and a fixture rerun; final database regression, 11 architecture cases, Clippy, all-target compilation and formatting passed. Work and archive commits were pushed to both remotes and verified at 1c7a4cc5. Task-only MySQL was removed; unrelated agent-management edits remain local. Deploy migration 0167 before new workers; preserve cooldowns and verify real progress. Live Nodies throughput was not tested.
+
+### Main Changes
+
+Admission rechecks current deadlines after every wait; Base batch HTTP 429 persists a smaller per-key cap and reduces native round work, preserving full evidence and cooldowns.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5b58c75d` | fix(wallet): adapt Base RPC batches and recheck request pacing |
+
+### Testing
+
+- [OK] 63 scanner cases across expanded/targeted runs; final isolated gate regression 1/1; architecture 11/11; Clippy, all-target check, formatting and scoped diff checks.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- Apply migration 0167 before new workers, wait for genuine cooldowns and verify production progress. Live provider throughput and remote CI remain unverified.
