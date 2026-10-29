@@ -1476,7 +1476,7 @@ Pause during editors, address confirmation dialogs, reads and writes.
 `ConfirmAction.onOpenChange?: (open: boolean) => void` notifies open/cancel/success;
 failed confirmation retains the dialog and paused refresh. Its optional nature
 preserves other call sites. Tests cover pause/resume and failed confirmation.
-Keep the guide at four/two/one columns for desktop/tablet/narrow layouts. Scope
+Keep the compact guide at four/two/one columns for desktop/tablet/narrow layouts. Scope
 summary flex rules to its text block; Semi Tag is also a `div` and must not stretch.
 
 Search actual `order_no`; display internal IDs only as labelled action references.
@@ -1557,7 +1557,7 @@ bounds at 320px; document-level overflow alone misses clipped overlay controls.
 
 ### Deposit RPC configuration overview and disclosures
 
-Place the selected network's RPC channel card before scan progress and setup guidance.
+The selected network workbench defaults to receiving configuration; RPC channel details and scan/recovery each own a separate tab.
 Show configured channels, snapshot-eligible channels and credential slots separately;
 these counts never imply deposit admission or successful chain synchronization.
 Priority/ID order labels the configured preferred/backup channels, not the currently
@@ -1596,3 +1596,13 @@ SideSheet title/close bounds, form overflow and confirmation-dialog bounds.
 5. **Cases:** good: append public defaults with fresh anonymous slots while preserving an existing private key; base: no saved changes until confirmation; bad: count multiple keys as independent free providers or equate free with unlimited throughput.
 6. **Tests:** assert five/legacy-four free choices, paid exclusion, source links, unchanged credential DTO, append-once and conflict retention. Check desktop and 320/390px disclosure/save flows.
 7. **Wrong/correct:** wrong: silently upgrade a custom row to an anonymous URL; correct: explicit catalog selection/save and authoritative runtime health.
+
+
+### Network receiving workbench
+
+- `NetworkNavigation` shares `networkOptions` with its desktop buttons and narrow select. Selected network survives tab changes and saves. Each button exposes `aria-pressed`; only the selected Semi TabPane is mounted with `keepDOM=false`.
+- Overview readiness uses `methodBlockers` and `scanStatus` against server snapshots; never infer health from enabled channel counts. Pending/failed reads show unknown readiness, no green completion indicators. Address-only users request only addresses and never see scanner/asset tabs or stats.
+- Keep pinned editors outside the tabs. Network and section switches are disabled during editors, address confirmations and writes, preventing cross-network context changes or loss of a pending dialog. Idle visible polling remains paused through these operations.
+- Distinguish `refreshing` (request in flight) from `unavailable` (pending or failed snapshot). The former disables refresh; the latter disables writes and readiness claims. A failed read must leave a working retry action.
+- Deposit confirmation callers pass `modalWidth="min(448px, calc(100vw - 32px))"` and `modalClassName="deposit-confirmation"`. The optional shared class prop leaves unrelated confirmations unchanged; scoped body/title wrapping keeps complete long addresses visible. All deposit editor titles shrink/wrap while their close buttons retain width.
+- Verify desktop 1728/1280 and narrow 390/320 with the real AdminLayout: no document overflow, one active panel per tablist, visible confirmation/close controls, complete address preview, successful save, 409 draft/reason retention, discard, read-only and address-only behavior. Desktop regressions select network buttons, not the intentionally hidden narrow combobox.

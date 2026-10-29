@@ -13,12 +13,14 @@ describe('ConfirmAction', () => {
     const modal = dialog.closest('.semi-modal') as HTMLElement;
     const defaultWidth = modal.style.width;
     expect(defaultWidth).not.toContain('100vw');
-    view.rerender(<ConfirmAction {...props} modalWidth="75%" />);
+    view.rerender(<ConfirmAction {...props} modalWidth="75%" modalClassName="deposit-confirmation" />);
     expect(modal.style.width).toBe('75%');
+    expect(modal.closest('.deposit-confirmation')).not.toBeNull();
     view.rerender(<ConfirmAction {...props} modalWidth={420} />);
     expect(modal.style.width).toBe('420px');
     view.rerender(<ConfirmAction {...props} />);
     expect(modal.style.width).toBe(defaultWidth);
+    expect(modal.closest('.deposit-confirmation')).toBeNull();
   });
 
   it('submits a trimmed reason with primary semantics and clears cancelled drafts', async () => {

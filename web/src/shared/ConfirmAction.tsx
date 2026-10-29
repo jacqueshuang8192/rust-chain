@@ -12,6 +12,7 @@ type ConfirmActionProps = {
   disabled?: boolean;
   description?: string;
   modalWidth?: number | string;
+  modalClassName?: string;
   onConfirm: (reason: string) => Promise<void> | void;
   /** 通知父页面暂停会改变待确认目标的后台刷新。 */
   onOpenChange?: (open: boolean) => void;
@@ -20,7 +21,7 @@ type ConfirmActionProps = {
   title: string;
 };
 
-export function ConfirmAction({ actionAriaLabel, actionText = '执行', confirmText = '确认', dangerous, description, disabled, modalWidth, onConfirm, onOpenChange, reasonOptional = false, title }: ConfirmActionProps) {
+export function ConfirmAction({ actionAriaLabel, actionText = '执行', confirmText = '确认', dangerous, description, disabled, modalWidth, modalClassName, onConfirm, onOpenChange, reasonOptional = false, title }: ConfirmActionProps) {
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const [visible, setVisible] = useState(false);
@@ -64,6 +65,7 @@ export function ConfirmAction({ actionAriaLabel, actionText = '执行', confirmT
         {actionText}
       </Button>
       <Modal
+        className={modalClassName}
         cancelButtonProps={{ 'aria-label': '取消', disabled: submitting }}
         closeOnEsc={!submitting}
         confirmLoading={submitting}

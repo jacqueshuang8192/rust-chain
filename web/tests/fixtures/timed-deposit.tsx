@@ -7,6 +7,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { AdminAccessProvider } from '../../src/admin/access';
 import { authStore } from '../../src/auth/authStore';
+import { AdminLayout } from '../../src/layouts/AdminLayout';
+import { RechargeWorkspace } from '../../src/admin/deposits/RechargeWorkspace';
 import { DepositSettingsPage } from '../../src/admin/deposits/DepositSettingsPage';
 import { DepositReviewPage } from '../../src/admin/deposits/DepositReviewPage';
 import { networkOptions, parseSettings } from '../../src/admin/deposits/contracts';
@@ -46,6 +48,15 @@ const order={id:1,order_no:'CD-local-payment-review',user_id:5,asset_symbol:'ETH
 const receipt={id:1,network:'eth',tx_hash:'0xlocal-payment-evidence',event_index:2147483648,asset_kind:'native',token_address:'',address,amount:'100',block_height:200,block_hash:'0xlocal-block',block_time:now-10000,confirmations:12,status:'review',review_reason:'expired_unpaid_combination_reused',order_id:1,review_note:null as string|null};
 window.fetch=async(input,init)=>{
  const path=new URL(String(input),location.origin).pathname;
+ if(params.has('error') && path.endsWith('/deposit-settings')) return Response.json({message:'本地模拟配置读取失败'}, {status:503});
+ if(path.endsWith('/deposit-settings/addresses') && !init?.method) return Response.json((rpcMode?rpcSettings:settings).addresses);
+ if(path.endsWith('/deposit-settings/addresses') && init?.method==='POST') {
+  const body=JSON.parse(String(init.body));
+  const target=(rpcMode?rpcSettings:settings).addresses;
+  body.addresses.forEach((value:string,index:number)=>target.push({pool_id:target.length+index+100,network:body.network,address:value,enabled:true}));
+  document.documentElement.dataset.savedAddresses=String(body.addresses.length);
+  return new Response(null,{status:204});
+ }
  if(rpcMode && path.includes('/deposit-settings/scanners/') && init?.method === 'PUT') {
   const body = JSON.parse(String(init.body));
   const target = rpcSettings.scanners.find(row => path.endsWith('/'+row.network));
@@ -76,5 +87,6 @@ window.fetch=async(input,init)=>{
 };
 authStore.setSession({accessToken:'local-only',refreshToken:'local-refresh',scope:'admin',subject:'admin:1'});
 const client=new QueryClient({defaultOptions:{queries:{retry:false}}});
-const router=createMemoryRouter([{path:'/',element:<DepositSettingsPage/>},{path:'/admin/wallet/deposit-settings',element:<DepositSettingsPage/>},{path:'/admin/wallet/deposit-receipts',element:<DepositReviewPage/>}]);
-createRoot(document.getElementById('root')!).render(<AdminAccessProvider access={{admin_id:1,username:'local-reviewer',role_id:1,role_name:'Local',is_super_admin:!params.has('readonly'),permissions:params.has('readonly')?['wallet.networks.read']:['*']}}><QueryClientProvider client={client}><div style={{padding:24,maxWidth:1200,margin:'auto'}}><RouterProvider router={router}/></div></QueryClientProvider></AdminAccessProvider>);
+const routes = [{path:'/',element:<DepositSettingsPage/>},{path:'/admin/wallet/deposit-settings',element:<DepositSettingsPage/>},{path:'/admin/wallet/deposit-receipts',element:<DepositReviewPage/>}];
+const router=createMemoryRouter(params.has('shell') ? [{path:'/admin',element:<AdminLayout/>,children:[{path:params.has('addressonly')?'wallet/chain-recharge/addresses':'wallet/chain-recharge',element:<RechargeWorkspace kind="chain"><DepositSettingsPage/></RechargeWorkspace>}]}] : routes, {initialEntries:[params.has('shell')?params.has('addressonly')?'/admin/wallet/chain-recharge/addresses':'/admin/wallet/chain-recharge':'/']});
+createRoot(document.getElementById('root')!).render(<AdminAccessProvider access={{admin_id:1,username:'本地验收',role_id:1,role_name:'管理员',is_super_admin:!params.has('readonly')&&!params.has('addressonly'),permissions:params.has('addressonly')?['wallet.address_pool.read','wallet.address_pool.write']:params.has('readonly')?['wallet.networks.read']:['*']}}><QueryClientProvider client={client}>{params.has('shell')?<RouterProvider router={router}/>:<div style={{padding:24,maxWidth:1200,margin:'auto'}}><RouterProvider router={router}/></div>}</QueryClientProvider></AdminAccessProvider>);

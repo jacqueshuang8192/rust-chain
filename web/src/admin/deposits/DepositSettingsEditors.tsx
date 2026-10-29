@@ -22,7 +22,7 @@ export function DepositEditPanel({ title, close, children, className }: { classN
   const modalProps = createModalProps('medium');
   return <>
     <UnsavedChangesGuard enabled={dirty || busy} />
-    <SideSheet {...modalProps} className={[modalProps.className, className].filter(Boolean).join(' ')} title={title} visible motion={false} onCancel={cancel} closable={!busy} closeOnEsc={!busy}
+    <SideSheet {...modalProps} className={[modalProps.className, 'deposit-edit-panel', className].filter(Boolean).join(' ')} title={title} visible motion={false} onCancel={cancel} closable={!busy} closeOnEsc={!busy}
       footer={<Button disabled={busy} onClick={cancel}>取消编辑</Button>}>
       {children({ dirty: () => setDirty(true), busy, setBusy })}
     </SideSheet>
@@ -72,7 +72,7 @@ function InitialScannerForm({ scanner, dirty, busy, setBusy, saved }: CommonProp
     </fieldset>
     <p>停止接单后仍监听已有订单。Ethereum 原生 ETH 需要节点支持 callTracer；Base 原生 ETH 通过区块与回执识别直接转账，不支持合约内部转账；Bitcoin 使用 Core RPC；Tron 监听 TRC20；Solana 监听 finalized 区块与经典 SPL Token。</p>
     {error ? <Banner type="warning" description={error} /> : null}
-    <ConfirmAction actionText="保存监听配置" title={`更新 ${networkLabel(scanner.network)} 监听配置`} disabled={busy || Boolean(error)}
+    <ConfirmAction modalClassName="deposit-confirmation" modalWidth="min(448px, calc(100vw - 32px))" actionText="保存监听配置" title={`更新 ${networkLabel(scanner.network)} 监听配置`} disabled={busy || Boolean(error)}
       description="保存后等待监听重新追上区块，再恢复接单。原监听进度保留。" onConfirm={async reason => {
         if (error || count === null) throw new Error(error || '确认数无效');
         setBusy(true);
@@ -136,7 +136,7 @@ export function AssetForm({ network, assets, catalog, existing, dirty, busy, set
     {platform && (platform.status !== 'active' || !platform.deposit_enabled) ? <Banner type="warning" description="平台资产尚未启用或未开启充值。可以保存映射，但用户入口需等待平台资产和网络均准备完成。" /> : null}
     <p>该网络的所有启用地址共享这些币种。代币精度由节点再次核对；钱包精度为 {platform?.precision_scale ?? '—'}，用户可输入精度取钱包与链上精度中较小者。</p>
     {error ? <Banner type="warning" description={error} /> : null}
-    <ConfirmAction actionText={existing ? '保存币种状态' : '添加监听币种'} title={`${existing ? '更新' : '添加'} ${symbol || '币种'} · ${networkLabel(network)}`} disabled={busy || Boolean(error)}
+    <ConfirmAction modalClassName="deposit-confirmation" modalWidth="min(448px, calc(100vw - 32px))" actionText={existing ? '保存币种状态' : '添加监听币种'} title={`${existing ? '更新' : '添加'} ${symbol || '币种'} · ${networkLabel(network)}`} disabled={busy || Boolean(error)}
       description={`类型：${kind === 'native' ? '原生币' : '代币'}；合约：${token || '无'}；精度：${decimals || '未填写'}。请核对真实主网身份；保存后等待监听追上区块。`} onConfirm={async reason => {
         if (error || scale === null) throw new Error(error || '链上精度无效');
         setBusy(true);
@@ -157,7 +157,7 @@ export function AddressImportForm({ network, dirty, busy, setBusy, saved }: Comm
     <fieldset disabled={busy}><label>收款地址（每行一个）<AdminTextArea ariaLabel="收款地址批量输入" value={text} onChange={value => { dirty(); setText(value); }} placeholder="粘贴当前网络的收款地址" /></label></fieldset>
     <p>已输入 {addresses.length} 个。重复地址自动跳过，已停用地址不会重新启用。任一地址无效则整批不保存。</p>
     {error ? <Banner type="warning" description={error} /> : null}
-    <Space><ConfirmAction actionText="确认添加地址" title={`向 ${networkLabel(network)} 添加收款地址`} disabled={busy || Boolean(error)} description={`确认地址：${addresses.join('；')}`} onConfirm={async reason => {
+    <Space><ConfirmAction modalClassName="deposit-confirmation" modalWidth="min(448px, calc(100vw - 32px))" actionText="确认添加地址" title={`向 ${networkLabel(network)} 添加收款地址`} disabled={busy || Boolean(error)} description={`确认地址：${addresses.join('；')}`} onConfirm={async reason => {
       if (error) throw new Error(error);
       setBusy(true);
       try { await apiRequest(`${base}/deposit-settings/addresses`, { method: 'POST', body: JSON.stringify({ network, addresses, reason }) }); await saved(); }

@@ -21,7 +21,7 @@ export function ScannerRecoveryForm({ scanner, stream, dirty, busy, setBusy, sav
       <label className="deposit-switch-row">我已了解跳过历史可能遗漏到账<Switch aria-label="确认跳过历史风险" checked={acknowledged} disabled={busy} onChange={value => { dirty(); setAcknowledged(value); }} /></label>
     </> : <Banner type="info" description={`保留从进度 ${history} 开始的历史区间。最新区块优先监听，历史区块按限速继续补扫；重复恢复会扩展已有补扫范围，重复发现的交易不会重复入账。`} />}
     <p>提交后先等待节点校验。节点不可用、链身份不符或区块锚点异常时保留原进度。恢复完成且最新扫描成功后，符合其他收款条件的网络即可继续接单。</p>
-    <ConfirmAction modalWidth="min(448px, calc(100vw - 32px))" key={mode} actionText="提交恢复请求" title={skipping ? '跳到最新并跳过历史' : '跳到最新并保留历史补扫'} dangerous={skipping} disabled={busy || (skipping && !acknowledged)} description={skipping ? '此操作会停止该历史区间（含已有补扫）的自动到账识别。请填写核对依据和操作原因。' : '先恢复最新扫描，同时保留历史补扫；操作与实际应用的进度均记录审计。'} onConfirm={async reason => {
+    <ConfirmAction modalClassName="deposit-confirmation" modalWidth="min(448px, calc(100vw - 32px))" key={mode} actionText="提交恢复请求" title={skipping ? '跳到最新并跳过历史' : '跳到最新并保留历史补扫'} dangerous={skipping} disabled={busy || (skipping && !acknowledged)} description={skipping ? '此操作会停止该历史区间（含已有补扫）的自动到账识别。请填写核对依据和操作原因。' : '先恢复最新扫描，同时保留历史补扫；操作与实际应用的进度均记录审计。'} onConfirm={async reason => {
       setBusy(true);
       try {
         await apiRequest(`${base}/deposit-settings/scanners/${scanner.network}/recovery`, { method: 'POST', body: JSON.stringify({ ...(stream ? { stream } : {}), mode, expected_revision: scanner.revision, acknowledge_skip: skipping && acknowledged, reason }) });

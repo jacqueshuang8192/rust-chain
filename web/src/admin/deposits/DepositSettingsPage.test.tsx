@@ -84,12 +84,13 @@ it('explains read-only access and exposes no write controls for network readers'
   for (const name of ['编辑监听配置', '新增监听币种', '添加收款地址', '停用地址']) {
     expect(screen.queryByRole('button', { name })).not.toBeInTheDocument();
   }
-  expect(screen.getByRole('combobox', { name: '配置网络' })).toBeEnabled();
+  expect(screen.getByRole('button', { name: '切换至 Base' })).toBeEnabled();
   expect(screen.getByRole('button', { name: '刷新配置与监听状态' })).toBeEnabled();
   expect(mocked.mock.calls.every(([, init]) => !init?.method)).toBe(true);
 });
 
 async function choose(user: ReturnType<typeof userEvent.setup>, label: string, option: string) {
+  if (label === '配置网络') { await user.click(screen.getByRole('button', { name: `切换至 ${option}` })); return; }
   await user.click(screen.getByRole('combobox', { name: label }));
   const target = await screen.findByText(option, { selector: '.semi-select-option-text' });
   fireEvent.mouseDown(target); fireEvent.mouseUp(target); fireEvent.click(target);
@@ -191,7 +192,7 @@ it.each(nodePresets.filter(preset => (!preset.account || preset.legacy)))('fills
   const user = userEvent.setup();
   mocked.mockResolvedValue({ ...settings, scanners: [{ ...settings.scanners[0], network: preset.network, streams: preset.network === 'base' ? ['native', 'token'].map(stream => ({ ...settings.scanners[0], stream })) : [], enabled: false, endpoint_configured: false }] });
   show();
-  await screen.findByRole('combobox', { name: '配置网络' });
+  await screen.findByRole('navigation', { name: '收款网络' });
   if (preset.network !== 'eth') await choose(user, '配置网络', networkNames[preset.network]);
   await user.click(await screen.findByRole('button', { name: '编辑监听配置' }));
   await choose(user, '主网节点预设', preset.label);
@@ -243,7 +244,7 @@ it('preserves the selected network after a successful save and validates native 
   await user.type(screen.getByRole('textbox', { name: '操作原因' }), '配置 Base ETH');
   await user.click(screen.getByRole('button', { name: '确认' }));
   await waitFor(() => expect(screen.queryByRole('textbox', { name: '操作原因' })).not.toBeInTheDocument());
-  expect(screen.getByRole('combobox', { name: '配置网络' })).toHaveTextContent('Base');
+  expect(screen.getByRole('button', { name: '切换至 Base' })).toHaveAttribute('aria-pressed', 'true');
   await choose(user, '配置网络', 'Tron（TRC20）');
   await user.click(screen.getByRole('button', { name: '新增监听币种' }));
   expect(screen.getByRole('combobox', { name: '链上资产类型' })).toHaveTextContent('TRC20 代币');
@@ -256,7 +257,7 @@ it('offers permission-aware setup shortcuts and explains unavailable payment met
   mocked.mockResolvedValue({ ...settings, assets: [asset] }); show();
   expect(await screen.findByText('收款配置指引')).toBeInTheDocument();
   expect(screen.getByText('可收款支付方式 0 / 1')).toBeInTheDocument();
-  expect(screen.getByText('待处理：缺少启用的收款地址；等待扫描确认')).toBeInTheDocument();
+  expect(screen.getAllByText('待处理：缺少启用的收款地址；等待扫描确认').length).toBeGreaterThan(0);
   await user.click(screen.getByRole('button', { name: '配置节点' }));
   expect(screen.getByLabelText('监听节点地址')).toHaveValue('');
   expect(screen.getByRole('button', { name: '刷新配置与监听状态' })).toBeDisabled();
@@ -279,7 +280,7 @@ it('builds a credential URL from the dedicated provider key without putting it i
 it('clears provider key when switching presets and cancels without any save', async () => {
   const user = userEvent.setup();
   mocked.mockResolvedValue({ ...settings, scanners: [{ ...settings.scanners[0], network: 'solana' }] }); show();
-  await screen.findByRole('combobox', { name: '配置网络' });
+  await screen.findByRole('navigation', { name: '收款网络' });
   await choose(user, '配置网络', 'Solana');
   await user.click(screen.getByRole('button', { name: '配置节点' }));
   await choose(user, '主网节点预设', 'Solana · Helius（免费账号）');
@@ -370,6 +371,7 @@ it('shows persisted channel and key cooldown states for read-only users', async 
   const data = withProviders();
   mocked.mockResolvedValue({ ...data, scanners: [{ ...data.scanners[0], providers: [{ ...data.scanners[0].providers[0], cooldown_until: settings.scanners[0].checked_at + 60000, last_error: 'HTTP 503 upstream unavailable', keys: [{ ...data.scanners[0].providers[0].keys[0], cooldown_until: settings.scanners[0].checked_at + 120000, last_error: 'HTTP 429 limited' }] }] }] });
   show();
+  await userEvent.setup().click(await screen.findByRole('tab', { name: 'RPC 渠道' }));
   expect(await screen.findByText('渠道冷却')).toBeInTheDocument();
   expect(screen.getByText(/HTTP 429 limited/)).toBeInTheDocument();
   expect(screen.getByText(/HTTP 503 upstream unavailable/)).toBeInTheDocument();
@@ -380,7 +382,8 @@ it('submits dual progress with the pinned revision and shows the queued state', 
   const user = userEvent.setup();
   const scanner = { ...settings.scanners[0], cursor_height: 80 };
   mocked.mockResolvedValue({ ...settings, scanners: [scanner] }); show();
-  await user.click(await screen.findByRole('button', { name: '恢复到最新区块' }));
+  await user.click(await screen.findByRole('tab', { name: '扫描与恢复' }));
+  await user.click(screen.getByRole('button', { name: '恢复到最新区块' }));
   expect(screen.getByRole('combobox', { name: '历史区块处理方式' })).toHaveTextContent('双进度');
   await user.click(screen.getByRole('button', { name: '提交恢复请求' }));
   await user.type(screen.getByRole('textbox', { name: '操作原因' }), '恢复最新监听并补扫');
@@ -393,7 +396,8 @@ it('submits dual progress with the pinned revision and shows the queued state', 
 it('requires skip acknowledgement and retains failed recovery mode, reason and revision', async () => {
   const user = userEvent.setup();
   mocked.mockResolvedValue({ ...settings, scanners: [{ ...settings.scanners[0], cursor_height: 100, backfill_cursor_height: 50, backfill_target_height: 100 }] }); show();
-  await user.click(await screen.findByRole('button', { name: '恢复到最新区块' }));
+  await user.click(await screen.findByRole('tab', { name: '扫描与恢复' }));
+  await user.click(screen.getByRole('button', { name: '恢复到最新区块' }));
   await choose(user, '历史区块处理方式', '手动跳过：不再扫描历史区间');
   expect(screen.getByText(/将放弃从进度 50/)).toBeInTheDocument();
   expect(screen.getByRole('button', { name: '提交恢复请求' })).toBeDisabled();
@@ -413,6 +417,7 @@ it('requires skip acknowledgement and retains failed recovery mode, reason and r
 it('shows separate historical errors to readers without recovery write access', async () => {
   permissions.readOnly = true;
   mocked.mockResolvedValue({ ...settings, scanners: [{ ...settings.scanners[0], cursor_height: 110, backfill_cursor_height: 80, backfill_target_height: 100, backfill_last_error: 'anchor mismatch', backfill_blocked: true }] }); show();
+  await userEvent.setup().click(await screen.findByRole('tab', { name: '扫描与恢复' }));
   expect(await screen.findByText('历史补扫 · 异常待核对')).toBeInTheDocument();
   expect(screen.getByText(/已扫描区块高度：80 \/ 100/)).toBeInTheDocument();
   expect(screen.getByText(/已阻止新订单准入/)).toBeInTheDocument();
@@ -420,6 +425,7 @@ it('shows separate historical errors to readers without recovery write access', 
 });
 it('does not allow recovery before the scanner has a checkpoint', async () => {
   show();
+  await userEvent.setup().click(await screen.findByRole('tab', { name: '扫描与恢复' }));
   expect(await screen.findByRole('button', { name: '恢复到最新区块' })).toBeDisabled();
 });
 
@@ -430,8 +436,9 @@ it('shows isolated Base progress and recovers only the chosen token stream', asy
   const native = { ...common, stream: 'native', last_error: 'RPC native method unavailable', scan_fresh: false };
   mocked.mockResolvedValue({ ...settings, scanners: [{ ...common, streams: [native, token], last_error: native.last_error }] });
   show();
-  await screen.findByRole('combobox', { name: '配置网络' });
+  await screen.findByRole('navigation', { name: '收款网络' });
   await choose(user, '配置网络', 'Base');
+  await user.click(screen.getByRole('tab', { name: '扫描与恢复' }));
   const nativeRegion = await screen.findByRole('region', { name: 'ETH 原生币监听状态' });
   const tokenRegion = screen.getByRole('region', { name: 'ERC20 代币（包括 USDC）监听状态' });
   expect(within(nativeRegion).getByText('扫描异常')).toBeInTheDocument();
@@ -449,7 +456,7 @@ it('shows isolated Base progress and recovers only the chosen token stream', asy
 it.each(['base', 'tron', 'btc', 'solana'])('prefills anonymous defaults for %s without enabling deposits', async network => {
   const user = userEvent.setup();
   mocked.mockResolvedValue({ ...settings, rpc_presets: rpcPresetFixture, scanners: [{ ...settings.scanners[0], network, streams: network === 'base' ? ['native', 'token'].map(stream => ({ ...settings.scanners[0], stream })) : [], enabled: false, endpoint_configured: false, api_key_configured: false }] });
-  show(); await screen.findByRole('combobox', { name: '配置网络' });
+  show(); await screen.findByRole('navigation', { name: '收款网络' });
   if (network !== 'eth') await choose(user, '配置网络', networkNames[network]);
   await user.click(await screen.findByRole('button', { name: '编辑监听配置' }));
   const defaults = rpcPresetFixture.filter(preset => preset.network === network && preset.recommended);
@@ -523,6 +530,7 @@ it.each([undefined, '800'])('keeps saved free-channel identities and synchronize
   const data = withProviders(); const provider = data.scanners[0].providers[0];
   mocked.mockResolvedValue({ ...data, rpc_presets: rpcPresetFixture, scanners: [{ ...data.scanners[0], providers: [{ ...provider, preset_id: 'eth-drpc', keys: [{ ...provider.keys[0], api_key_configured: false }] }] }] });
   const user = userEvent.setup(); show();
+  await user.click(await screen.findByRole('tab', { name: 'RPC 渠道' }));
   expect(await screen.findByText(/内置免费渠道 · dRPC/)).toBeInTheDocument();
   expect(screen.getByText('尚未验证')).toBeInTheDocument();
   await user.click(await screen.findByRole('button', { name: '编辑监听配置' }));
@@ -636,7 +644,7 @@ it.each(nodePresets.filter(preset => preset.account))('configures $id with fresh
   data.scanners[0].providers[0].network = preset.network;
   mocked.mockResolvedValue({ ...data, rpc_presets: rpcPresetFixture, scanners: data.scanners.map(scanner => ({ ...scanner, streams: preset.network === 'base' ? ['native', 'token'].map(stream => ({ ...scanner, stream })) : [] })) });
   const user = userEvent.setup(); show();
-  await screen.findByRole('combobox', { name: '配置网络' });
+  await screen.findByRole('navigation', { name: '收款网络' });
   await choose(user, '配置网络', networkOptions.find(row => row.value === preset.network)!.label);
   await user.click(await screen.findByRole('button', { name: '编辑监听配置' }));
   await choose(user, '渠道 1 服务商模板', preset.label);
@@ -666,7 +674,7 @@ it('adds both free Tron defaults once, preserves a private channel and shows acc
   data.scanners[0].network = 'tron'; data.scanners[0].providers[0].network = 'tron';
   mocked.mockResolvedValue({ ...data, rpc_presets: rpcPresetFixture });
   const user = userEvent.setup(); show();
-  await screen.findByRole('combobox', { name: '配置网络' });
+  await screen.findByRole('navigation', { name: '收款网络' });
   await choose(user, '配置网络', networkNames.tron);
   await user.click(await screen.findByRole('button', { name: '编辑监听配置' }));
   const catalog = screen.getByRole('region', { name: '服务商渠道目录' });
@@ -710,4 +718,57 @@ it('requires a replacement URL after selecting a dashboard template even when it
   await choose(user, '渠道 1 服务商模板', '选择模板填入地址');
   expect(screen.getByRole('button', { name: '保存监听配置' })).toBeDisabled();
   expect(mocked.mock.calls.every(([, init]) => !init?.method)).toBe(true);
+});
+
+it('uses a single active workbench panel and keeps network selection across sections', async () => {
+  const user = userEvent.setup(); mocked.mockResolvedValue({ ...settings, scanners: ['eth', 'tron'].map(network => ({ ...settings.scanners[0], network })) }); show();
+  expect(await screen.findByRole('tabpanel', { name: '收款配置' })).toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: 'RPC 渠道状态' })).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: '切换至 Tron（TRC20）' }));
+  expect(screen.getByRole('button', { name: '切换至 Tron（TRC20）' })).toHaveAttribute('aria-pressed', 'true');
+  await user.click(screen.getByRole('tab', { name: 'RPC 渠道' }));
+  expect(screen.getAllByRole('tabpanel')).toHaveLength(1);
+  const panel = screen.getByRole('tabpanel', { name: 'RPC 渠道' });
+  expect(panel).toHaveAttribute('aria-labelledby', screen.getByRole('tab', { name: 'RPC 渠道' }).id);
+  expect(within(panel).getByRole('region', { name: 'RPC 渠道状态' })).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: '添加收款地址' })).not.toBeInTheDocument();
+  await user.click(screen.getByRole('tab', { name: '扫描与恢复' }));
+  expect(screen.getAllByRole('tabpanel')).toHaveLength(1);
+  expect(screen.getByRole('heading', { name: 'Tron（TRC20） · 扫描进度' })).toBeInTheDocument();
+  expect(mocked.mock.calls.every(([, init]) => !init?.method)).toBe(true);
+});
+
+it('locks network and section navigation during a draft and address confirmation, then releases it', async () => {
+  const user = userEvent.setup();
+  mocked.mockResolvedValue({ ...settings, addresses: [{ pool_id: 3, network: 'eth', address: '0x1111111111111111111111111111111111111111', enabled: true }] }); show();
+  await user.click(await screen.findByRole('button', { name: '新增监听币种' }));
+  expect(screen.getByRole('button', { name: '切换至 Base' })).toBeDisabled();
+  expect(screen.getByRole('tab', { name: 'RPC 渠道' })).toHaveAttribute('aria-disabled', 'true');
+  await user.click(screen.getByRole('button', { name: '取消编辑' }));
+  await user.click(screen.getByRole('button', { name: '停用地址' }));
+  expect(screen.getByRole('button', { name: '切换至 Base' })).toBeDisabled();
+  expect(screen.getByRole('tab', { name: '扫描与恢复' })).toHaveAttribute('aria-disabled', 'true');
+  await user.click(screen.getByRole('button', { name: '取消' }));
+  expect(screen.getByRole('button', { name: '切换至 Base' })).toBeEnabled();
+  await user.click(screen.getByRole('button', { name: '切换至 Base' }));
+  expect(screen.getByRole('region', { name: 'Base 收款概况' })).toBeInTheDocument();
+  expect(mocked.mock.calls.every(([, init]) => !init?.method)).toBe(true);
+});
+
+it('shows unknown readiness after a failed refresh and allows retry without enabling stale writes', async () => {
+  const user = userEvent.setup();
+  const ready = { ...settings, scanners: [{ ...settings.scanners[0], scan_fresh: true, last_scan_at: settings.scanners[0].checked_at }], assets: [{ id: 1, network: 'eth', asset_symbol: 'ETH', asset_kind: 'native', token_address: '', decimals: 18, enabled: true, revision: 1 }], addresses: [{ pool_id: 1, network: 'eth', address: '0x1111111111111111111111111111111111111111', enabled: true }] };
+  mocked.mockResolvedValue(ready); show();
+  const overview = await screen.findByRole('region', { name: 'Ethereum 收款概况' });
+  expect(within(overview).getByText('可收款')).toBeInTheDocument();
+  mocked.mockRejectedValueOnce(new ApiError(503, 'UNAVAILABLE', 'refresh failed'));
+  await user.click(screen.getByRole('button', { name: '刷新配置与监听状态' }));
+  await screen.findByRole('alert');
+  expect(within(overview).queryByText('可收款')).not.toBeInTheDocument();
+  expect(within(overview).getByText('状态待刷新')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '新增监听币种' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: '刷新配置与监听状态' })).toBeEnabled();
+  await user.click(screen.getByRole('button', { name: '刷新配置与监听状态' }));
+  await waitFor(() => expect(within(overview).getByText('可收款')).toBeInTheDocument());
+  expect(screen.getByRole('button', { name: '新增监听币种' })).toBeEnabled();
 });

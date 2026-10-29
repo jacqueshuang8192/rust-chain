@@ -134,7 +134,7 @@ export function MultiScannerForm({ scanner, presets: catalog = [], dirty, busy, 
     <Button disabled={busy || rows.length >= 10} onClick={() => append([newProvider(nextPriority)])}>添加备用渠道</Button>
     <p>免密钥公共渠道无需 Key；账号渠道按模板填写自有 Key 或完整节点地址；试用和付费渠道不会自动开通。原有渠道输入框留空保留已有密钥，切换服务商模板需重新填写。移除和启停在确认保存后生效。原扫描进度不变，所有渠道不可用时停止新订单准入，恢复后继续补扫。</p>
     {error ? <Banner type="warning" description={error} /> : null}
-    <ConfirmAction modalWidth="min(448px, calc(100vw - 32px))" actionText="保存监听配置" title="保存主备渠道与凭据" description={`将保存 ${rows.length} 个渠道、${rows.reduce((sum, row) => sum + row.keys.length, 0)} 个凭据槽及网络接单设置。被移除的配置不再参与监听，原扫描进度保留。`} disabled={busy || Boolean(error)} onConfirm={async reason => {
+    <ConfirmAction modalClassName="deposit-confirmation" modalWidth="min(448px, calc(100vw - 32px))" actionText="保存监听配置" title="保存主备渠道与凭据" description={`将保存 ${rows.length} 个渠道、${rows.reduce((sum, row) => sum + row.keys.length, 0)} 个凭据槽及网络接单设置。被移除的配置不再参与监听，原扫描进度保留。`} disabled={busy || Boolean(error)} onConfirm={async reason => {
       if (error || count === null) throw new Error(error || '确认数无效');
       const providers = payload(rows, presets);
       setBusy(true);
