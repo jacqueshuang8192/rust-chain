@@ -255,9 +255,11 @@ asset decimals and the persisted block hash. Only transport/provider protocol
 failures permit automatic retry: chain-identity, continuity and financial errors
 remain network-level stops rather than being hidden by a different source.
 
-Primary/backup order is provider priority/ID then key priority/ID. A round makes
-at most four attempts within its existing 45-second deadline (35 seconds per
-attempt). 401/429 cool down the selected key; connection, 403, server, malformed
+Primary/backup order first takes one eligible key per provider (provider priority/ID),
+then repeats for each subsequent key rank (key priority/ID within its provider).
+A round makes at most ten attempts within its existing 45-second deadline
+(35 seconds per attempt); slow providers can exhaust that deadline before all
+candidates run. 401/429 cool down the selected key; connection, 403, server, malformed
 JSON and application/RPC failures cool down the provider. 429 accepts numeric or
 HTTP-date Retry-After, with 60 seconds minimum and seven days maximum; other
 minimums are 300 seconds for access rejection and 30 seconds for connection/server
@@ -774,3 +776,67 @@ healthy, and reset cooldowns whenever the same preset is saved.
 Correct: submit `preset_id:"base-publicnode", endpoint:null`, resolve its fixed
 URL on the server, atomically clear secrets, preserve unchanged runtime state,
 and display actual server scan status. Free public RPC remains best effort.
+
+
+### Multi-channel fairness and channel-state presentation
+
+#### 1. Scope / Trigger
+All five networks use the same sequential candidate traversal. The former four
+attempts in provider-major order let one provider's failing keys starve independent
+backups. Anchor-only reads also fetched unnecessary Bitcoin/Solana transactions.
+
+#### 2. Signatures
+- `provider_runtime::scan_available(...)`: order eligible rows by
+  `ROW_NUMBER() OVER (PARTITION BY p.id ORDER BY k.priority,k.id),p.priority,p.id`.
+- `GET /admin/api/v1/wallet/deposit-settings`: each `ScannerProviderView` includes
+  `stream_failures: ScannerProviderStreamFailure[]`.
+- Failure fields: `stream: native|token`, `cooldown_until: UnixMillis|null`,
+  `last_error: string|null`. Read from existing `wallet_deposit_scanner_stream_failures`.
+  No migration, endpoint or secret response field is added.
+
+#### 3. Contracts
+Select only enabled, noncooling providers/keys for the current stream. Try at most
+10 candidates without extending the 45-second round / 35-second attempt deadlines.
+A provider cooldown discovered during admission marks `channel_failed`, excluding
+its remaining keys; a key cooldown alone must not. Every attempt independently
+validates network, assets and anchors. No response cache or concurrent race combines
+sources. Bitcoin empty-asset anchors request `getblock(hash,1)`; normal reads use 2.
+Solana empty-asset anchors request `transactionDetails:none`; normal reads stay full.
+
+Load provider failures in one extra batch query, limited to Base. Other networks
+return an empty array. Only success of that same stream clears its failure. The
+frontend accepts an absent field from an older backend as unknown Base state, not
+an empty healthy snapshot. Present fields are strictly checked for array shape,
+known/unique streams, Base network, timestamps and nullable error strings.
+
+#### 4. Validation & Error Matrix
+| Condition | Behavior |
+| --- | --- |
+| Many 401 keys in first provider | Visit other providers before sibling keys |
+| Fifth/sixth fast-failing provider | Later candidate still eligible within deadline |
+| Provider enters cooldown while waiting | No request; exclude its sibling keys |
+| Key enters cooldown while waiting | No request; sibling keys remain candidates |
+| Chain/continuity/accounting failure | Stop; never hide with another provider |
+| Base native method cooldown | Show native error; token can remain eligible |
+| Missing Base failure snapshot / refresh failure | Unknown, never healthy |
+| Expired failure | Eligible for retry; retain historical error until success |
+| Anchor-only payload used for actual payment scan | Reject missing transaction evidence |
+
+#### 5. Good / Base / Bad Cases
+Good: six providers with four keys each reach provider six after five quick 401s.
+Base: one provider still tries its remaining eligible keys under the same cap.
+Bad: increase concurrency or erase 429 cooldowns to simulate extra quota.
+
+#### 6. Required Tests
+`src_modules_wallet_multichannel_tests.rs` uses isolated
+`DEPOSIT_MULTICHANNEL_TEST_DATABASE_URL` ending in `timed_deposits_test_multichannel`:
+prove all five networks reach the sixth provider, only one key per failed provider
+is touched, and remaining keys retain their state. Mock anchor calls assert light
+parameters and reject missing full payment evidence. Gate, Base stream, OpenAPI,
+parser/status and editor collapse/conflict tests protect the other boundaries.
+
+#### 7. Wrong vs Correct
+Wrong: mark a Base provider healthy after ERC20 succeeds despite a live native cooldown.
+Correct: show eligibility per stream and retain the independent network admission status.
+Wrong: count multiple keys as independent provider capacity.
+Correct: preserve provider/key pacing and bounded, sequential failover.

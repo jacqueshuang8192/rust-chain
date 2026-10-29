@@ -221,6 +221,15 @@ async fn base_streams_isolate_rpc_admission_credit_recovery_and_quota() {
         state.providers[0].cooldown_until.is_none(),
         "native method failure must not globally cool RPC"
     );
+    let failures = &state.providers[0].stream_failures;
+    assert_eq!(failures.len(), 1);
+    assert_eq!(failures[0].stream, "native");
+    assert!(
+        failures[0]
+            .cooldown_until
+            .is_some_and(|until| until > Utc::now())
+    );
+    assert!(failures[0].last_error.is_some());
 
     // Reverse the failure: native now completes, while token remains at its old checkpoint.
     native_error.store(false, Ordering::SeqCst);

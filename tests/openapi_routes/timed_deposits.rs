@@ -86,7 +86,19 @@ async fn timed_deposit_openapi_preserves_decimal_text_and_protected_routes() {
             .get("providers")
             .is_some()
     );
-    for name in ["ScannerProviderView", "ScannerKeyView"] {
+    assert_eq!(
+        schemas["ScannerProviderView"]["properties"]["stream_failures"]["type"],
+        "array"
+    );
+    assert_eq!(
+        schemas["ScannerProviderStreamFailure"]["properties"]["stream"]["type"],
+        "string"
+    );
+    for name in [
+        "ScannerProviderView",
+        "ScannerKeyView",
+        "ScannerProviderStreamFailure",
+    ] {
         assert!(schemas[name]["properties"].get("cooldown_until").is_some());
         for secret in [
             "endpoint",

@@ -10629,3 +10629,19 @@
 - 修改文件：mobile/src/i18n/messages/zh-CN.ts、10-29-pwa-login-subtitle-complete任务记录、docs/superpowers/PROGRESS.md。
 - 验证结果：直接导入生产语言资源核对两行精确值通过；npm --prefix mobile run release:gate通过（923/923测试、生产/测试类型、PWA/Tauri网页构建与产物、包体和治理检查）；diff和任务校验通过。此次仅增加一个字，未重复浏览器检查；上一轮320/390检查已通过。
 - 后续事项：无；保存本地提交，不推送或部署。
+
+
+## 2026-10-29 15:05（Europe/Istanbul） - 五网络主备公平切换与后台渠道状态
+
+- 完成内容：五网络共用按Key轮次的跨渠道主备切换，最多10次且保留原时限、节流和真实冷却；等待时遇渠道冷却会排除同渠道后续Key。Bitcoin/Solana锚点读取改为精简响应；后台新增Base分流错误快照、渠道概览、顺序预览与折叠编辑，折叠隐藏输入但保留草稿。
+- 修改文件：wallet scanners/provider_runtime.rs、bitcoin.rs、solana.rs、providers.rs、presentation/timed_deposits.rs；相应Rust回归与OpenAPI测试；web/src/admin/deposits及本地夹具；后端/后台规范和操作说明。
+- 验证结果：Rust扫描器77/77含全部隔离MySQL用例通过；增强等待冷却回归最终1/1，架构11/11、OpenAPI1/1、Clippy/all-target check通过。Web全量1233通过、1项新增折叠可见性回归失败，补隐藏处理后单项复验和最终充值71/71通过；类型/lint/policy15/coverage23/build通过。既有包体超限仍为2800763/2600000，未放宽预算。浏览器桌面渠道和编辑实组件已核对，窄屏及最终精确版本验证继续进行。
+- 后续事项：完成320/390/1280浏览器与保存/取消/冲突检查、排除代理管理WIP的精确交付验证及任务归档；未推送或部署。
+
+
+## 2026-10-29 15:16（Europe/Istanbul） - 五网络多渠道查询与后台配置最终验收
+
+- 完成内容：完成主备公平轮转、渠道共享冷却排除、轻量锚点和Base分流状态；RPC概览前置、主备顺序预览及折叠草稿已交付。保持已有代理管理WIP及旧进度，不新增迁移或第三方渠道。
+- 修改文件：10-29-deposit-multichannel-optimization/task.json.relatedFiles所列22个源码/测试/规范/进度文件及本任务研究记录。
+- 验证结果：后端77项扫描回归含全部隔离数据库通过，最后新增等待冷却断言1/1通过；OpenAPI1/1、架构11/11、Clippy/all-target/fmt通过。Web全量1233通过及1项新增折叠失败，修正后定向71/71、类型/lint/policy15/coverage23/build通过；排除代理WIP的精确版本类型/lint/71项及build通过，JS2795023/2600000仍超既有预算。Ego1728/1280/390/320实组件完成主备排序、默认网络、折叠独立Key、320保存、390冲突保留及放弃草稿、只读权限；确认弹窗分别288/358px，无页面横溢，截图已查看。
+- 后续事项：保存本地提交和归档，不推送、不部署。API/worker/后台需同版更新；真实服务商权限、持续吞吐与实链到账尚未验收。专用浏览器、Vite、MySQL及临时发布导出已清理。

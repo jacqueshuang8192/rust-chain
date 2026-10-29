@@ -126,6 +126,10 @@ async fn scanner_gate_rechecks_delayed_admission_and_cooling_before_send() {
     token.failed("fixture HTTP 429", false, 120).await.unwrap();
     assert!(pending.await.is_err());
     assert!(native.retryable.load(Ordering::Relaxed));
+    assert!(
+        !native.channel_failed.load(Ordering::Relaxed),
+        "a key cooldown must not exclude sibling credentials"
+    );
     assert!(token.acquire().await.is_err());
     adaptive_base_scans_and_configuration(&pool, provider, key).await;
     fence_waiting_requests(&pool, provider, key).await;
@@ -410,6 +414,23 @@ async fn fence_waiting_requests(pool: &Pool<MySql>, provider: u64, key: u64) {
         before, after,
         "a cancelled waiter must not reserve future request slots"
     );
+    let waiting = gate(pool, provider, key, "native", 100);
+    let mut pending = Box::pin(waiting.acquire());
+    tokio::select! {
+        result=&mut pending=>panic!("request should wait: {result:?}"),
+        _=tokio::time::sleep(Duration::from_millis(25))=>{},
+    }
+    sqlx::query("UPDATE wallet_deposit_scanner_providers SET cooldown_until=DATE_ADD(CURRENT_TIMESTAMP(6),INTERVAL 1 MINUTE) WHERE id=?").bind(provider).execute(pool).await.unwrap();
+    assert!(pending.await.is_err());
+    assert!(
+        waiting.channel_failed.load(Ordering::Relaxed),
+        "provider cooldown must exclude all sibling credentials from this round"
+    );
+    sqlx::query("UPDATE wallet_deposit_scanner_providers SET cooldown_until=NULL WHERE id=?")
+        .bind(provider)
+        .execute(pool)
+        .await
+        .unwrap();
     for (table, id) in [
         ("wallet_deposit_scanner_providers", provider),
         ("wallet_deposit_scanner_keys", key),

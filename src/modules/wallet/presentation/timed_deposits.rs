@@ -284,6 +284,17 @@ pub struct ScannerProviderView {
     pub last_success_at: Option<DateTime<Utc>>,
     #[sqlx(skip)]
     pub keys: Vec<ScannerKeyView>,
+    #[sqlx(skip)]
+    pub stream_failures: Vec<ScannerProviderStreamFailure>,
+}
+/// Base 分流失败只公开作用范围、截止时间和脱敏错误，不将另一分流的成功误报为恢复。
+#[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
+pub struct ScannerProviderStreamFailure {
+    pub stream: String,
+    #[serde(with = "option_unix_millis")]
+    #[schema(value_type = Option<i64>)]
+    pub cooldown_until: Option<DateTime<Utc>>,
+    pub last_error: Option<String>,
 }
 #[derive(Debug, Serialize, sqlx::FromRow, ToSchema)]
 pub struct ScannerKeyView {

@@ -1553,3 +1553,24 @@ bounds at 320px; document-level overflow alone misses clipped overlay controls.
 - Browser regression: populated and empty list, list/create switching and inner
   scroll at 2942/1920/1728/1280/390/320; wait for responsive sidebar state before
   measuring. Stage only the page scope class and scoped CSS for this repair.
+
+
+### Deposit RPC configuration overview and disclosures
+
+Place the selected network's RPC channel card before scan progress and setup guidance.
+Show configured channels, snapshot-eligible channels and credential slots separately;
+these counts never imply deposit admission or successful chain synchronization.
+Priority/ID order labels the configured preferred/backup channels, not the currently
+active source. Base native/token availability must respect provider, key and stream
+cooldowns using `checked_at`, with unknown state for older responses missing
+`stream_failures`. Expired errors remain labelled historical; refresh failures use
+unknown status. Read-only and address-only permissions retain their existing scope.
+
+The pinned scanner editor previews enabled provider order and uses Semi Collapse
+with drafts held in React state. Start with the first channel open; appended rows
+open automatically. Expand/collapse actions must preserve URL/key replacements,
+existing blank-secret preservation, priorities and revision-conflict drafts.
+Semi Collapse `keepDOM` can leave zero-height inputs keyboard-focusable; explicitly
+hide collapsed fieldsets with `display:none` while retaining their state. The
+expand-all action provides a keyboard-accessible path to every channel. Check 320px
+SideSheet title/close bounds, form overflow and confirmation-dialog bounds.

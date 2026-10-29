@@ -10,6 +10,16 @@ use sqlx::{MySql, Pool, Transaction};
 pub(super) async fn load(pool: &Pool<MySql>, scanners: &mut [ScannerView]) -> AppResult<()> {
     let mut providers = sqlx::query_as::<_, ScannerProviderView>("SELECT id,network,preset_id,name,priority,enabled,request_interval_ms,cooldown_until,last_error,last_success_at FROM wallet_deposit_scanner_providers ORDER BY priority,id").fetch_all(pool).await?;
     let keys = sqlx::query_as::<_, ScannerKeyView>("SELECT id,provider_id,name,priority,enabled,api_key_encrypted IS NOT NULL AS api_key_configured,request_interval_ms,cooldown_until,last_error,last_success_at FROM wallet_deposit_scanner_keys ORDER BY priority,id").fetch_all(pool).await?;
+    let failures = sqlx::query_as::<_, (u64, String, Option<chrono::DateTime<chrono::Utc>>, Option<String>)>("SELECT f.provider_id,f.stream,f.cooldown_until,f.last_error FROM wallet_deposit_scanner_stream_failures f JOIN wallet_deposit_scanner_providers p ON p.id=f.provider_id WHERE p.network='base' ORDER BY f.provider_id,f.stream").fetch_all(pool).await?;
+    for (provider_id, stream, cooldown_until, last_error) in failures {
+        if let Some(provider) = providers.iter_mut().find(|p| p.id == provider_id) {
+            provider.stream_failures.push(ScannerProviderStreamFailure {
+                stream,
+                cooldown_until,
+                last_error,
+            });
+        }
+    }
     for key in keys {
         if let Some(provider) = providers.iter_mut().find(|p| p.id == key.provider_id) {
             provider.keys.push(key);

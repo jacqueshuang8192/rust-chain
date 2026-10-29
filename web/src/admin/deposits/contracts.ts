@@ -45,13 +45,26 @@ export function parseAddresses(value: unknown): SharedAddress[] {
 }
 
 export interface ScannerKey { id: number; provider_id: number; name: string; priority: number; enabled: boolean; api_key_configured: boolean; request_interval_ms: number; cooldown_until: number | null; last_error: string | null; last_success_at: number | null }
-export interface ScannerProvider { preset_id?: string | null; id: number; network: string; name: string; priority: number; enabled: boolean; request_interval_ms: number; cooldown_until: number | null; last_error: string | null; last_success_at: number | null; keys: ScannerKey[] }
+export interface ScannerProviderStreamFailure { stream: 'native' | 'token'; cooldown_until: number | null; last_error: string | null }
+export interface ScannerProvider { stream_failures?: ScannerProviderStreamFailure[]; preset_id?: string | null; id: number; network: string; name: string; priority: number; enabled: boolean; request_interval_ms: number; cooldown_until: number | null; last_error: string | null; last_success_at: number | null; keys: ScannerKey[] }
 function parseProvider(value: unknown): ScannerProvider {
   const r = row(value);
   if (!Array.isArray(r.keys)) throw new Error('渠道凭据响应不完整');
-  return { preset_id: r.preset_id === undefined ? null : nullableText(r.preset_id), id: integer(r.id), network: string(r.network), name: string(r.name), priority: integer(r.priority), enabled: bool(r.enabled), request_interval_ms: integer(r.request_interval_ms), cooldown_until: r.cooldown_until === null ? null : integer(r.cooldown_until), last_error: nullableText(r.last_error), last_success_at: r.last_success_at === null ? null : integer(r.last_success_at), keys: r.keys.map(value => {
+  return { stream_failures: parseProviderFailures(r), preset_id: r.preset_id === undefined ? null : nullableText(r.preset_id), id: integer(r.id), network: string(r.network), name: string(r.name), priority: integer(r.priority), enabled: bool(r.enabled), request_interval_ms: integer(r.request_interval_ms), cooldown_until: r.cooldown_until === null ? null : integer(r.cooldown_until), last_error: nullableText(r.last_error), last_success_at: r.last_success_at === null ? null : integer(r.last_success_at), keys: r.keys.map(value => {
     const k = row(value); return { id: integer(k.id), provider_id: integer(k.provider_id), name: string(k.name), priority: integer(k.priority), enabled: bool(k.enabled), api_key_configured: bool(k.api_key_configured), request_interval_ms: integer(k.request_interval_ms), cooldown_until: k.cooldown_until === null ? null : integer(k.cooldown_until), last_error: nullableText(k.last_error), last_success_at: k.last_success_at === null ? null : integer(k.last_success_at) };
   }) };
+}
+
+function parseProviderFailures(provider: Record<string, unknown>): ScannerProviderStreamFailure[] | undefined {
+  if (provider.stream_failures === undefined) return undefined;
+  if (!Array.isArray(provider.stream_failures)) throw new Error('渠道分流状态不完整');
+  const seen = new Set<string>();
+  return provider.stream_failures.map(value => {
+    const r = row(value);
+    if (provider.network !== 'base' || (r.stream !== 'native' && r.stream !== 'token') || seen.has(r.stream)) throw new Error('渠道分流身份无效');
+    seen.add(r.stream);
+    return { stream: r.stream, cooldown_until: r.cooldown_until === null ? null : integer(r.cooldown_until), last_error: nullableText(r.last_error) };
+  });
 }
 
 function parseStreams(scanner: Record<string, unknown>): ScannerStream[] {

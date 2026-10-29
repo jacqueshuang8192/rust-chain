@@ -37,7 +37,7 @@ pub(super) struct Gate {
     pub(super) credential_configured: bool,
 }
 
-/// 主备按渠道和 Key 优先级挑选；每次尝试重新做链身份与游标校验，不混用节点区块。
+/// 每轮先按渠道优先级各取一个可用 Key，再轮转次级 Key；每次独立校验链和游标，不混用节点证据。
 pub(super) async fn scan_available(
     pool: &Pool<MySql>,
     key: Option<&str>,
@@ -46,7 +46,7 @@ pub(super) async fn scan_available(
     work: recovery::Work,
 ) -> Result<(Cursor, u64, bool), recovery::ScanFailure> {
     let encryption_key = key.ok_or_else(|| failure("credential encryption key is missing"))?;
-    let candidates=sqlx::query_as::<_,Candidate>("SELECT p.id AS provider_id,k.id AS key_id,p.endpoint_encrypted,p.preset_id,k.api_key_encrypted,p.request_interval_ms AS provider_interval,k.request_interval_ms AS key_interval,k.rpc_batch_limit FROM wallet_deposit_scanner_providers p JOIN wallet_deposit_scanner_keys k ON k.provider_id=p.id WHERE p.network=? AND p.enabled=TRUE AND k.enabled=TRUE AND (p.cooldown_until IS NULL OR p.cooldown_until<=CURRENT_TIMESTAMP(6)) AND (k.cooldown_until IS NULL OR k.cooldown_until<=CURRENT_TIMESTAMP(6)) AND NOT EXISTS(SELECT 1 FROM wallet_deposit_scanner_stream_failures f WHERE f.provider_id=p.id AND f.stream=? AND f.cooldown_until>CURRENT_TIMESTAMP(6)) ORDER BY p.priority,p.id,k.priority,k.id")
+    let candidates=sqlx::query_as::<_,Candidate>("SELECT p.id AS provider_id,k.id AS key_id,p.endpoint_encrypted,p.preset_id,k.api_key_encrypted,p.request_interval_ms AS provider_interval,k.request_interval_ms AS key_interval,k.rpc_batch_limit FROM wallet_deposit_scanner_providers p JOIN wallet_deposit_scanner_keys k ON k.provider_id=p.id WHERE p.network=? AND p.enabled=TRUE AND k.enabled=TRUE AND (p.cooldown_until IS NULL OR p.cooldown_until<=CURRENT_TIMESTAMP(6)) AND (k.cooldown_until IS NULL OR k.cooldown_until<=CURRENT_TIMESTAMP(6)) AND NOT EXISTS(SELECT 1 FROM wallet_deposit_scanner_stream_failures f WHERE f.provider_id=p.id AND f.stream=? AND f.cooldown_until>CURRENT_TIMESTAMP(6)) ORDER BY ROW_NUMBER() OVER (PARTITION BY p.id ORDER BY k.priority,k.id),p.priority,p.id")
         .bind(&config.network).bind(&config.stream).fetch_all(pool).await.map_err(AppError::from)?;
     let mut last = failure("所有监听渠道暂不可用或正在冷却，请检查渠道状态后等待自动重试");
     let mut excluded = HashSet::new();
@@ -55,7 +55,8 @@ pub(super) async fn scan_available(
         if excluded.contains(&candidate.provider_id) {
             continue;
         }
-        if attempts >= 4 {
+        // 最多支持十个渠道；快速失败时每个渠道均有机会，仍受外层 45 秒总时限约束。
+        if attempts >= 10 {
             break;
         }
         attempts += 1;
@@ -213,6 +214,9 @@ impl Gate {
                 || key.cooldown_until.is_some_and(|t| t > now)
             {
                 self.retryable.store(true, Ordering::Relaxed);
+                if provider.cooldown_until.is_some_and(|t| t > now) {
+                    self.channel_failed.store(true, Ordering::Relaxed);
+                }
                 return Err(failure("监听渠道或 API Key 正在冷却"));
             }
             let scoped_cool: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM wallet_deposit_scanner_stream_failures WHERE provider_id=? AND stream=? AND cooldown_until>?)")

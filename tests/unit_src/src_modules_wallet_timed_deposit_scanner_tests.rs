@@ -4,6 +4,8 @@ use super::*;
 mod base_native_tests;
 #[path = "src_modules_wallet_base_stream_tests.rs"]
 mod base_stream_tests;
+#[path = "src_modules_wallet_multichannel_tests.rs"]
+mod multichannel_tests;
 #[path = "src_modules_wallet_rpc_preset_tests.rs"]
 mod preset_tests;
 #[path = "src_modules_wallet_deposit_provider_tests.rs"]

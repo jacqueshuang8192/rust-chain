@@ -61,6 +61,35 @@
 .deposit-provider-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .deposit-provider-status { list-style: none; padding: 0; display: grid; gap: 12px; }
 .deposit-provider-status > li { border-top: 1px solid var(--semi-color-border); padding-top: 12px; overflow-wrap: anywhere; }
+.deposit-channels-card .deposit-provider-status { gap: 16px; margin-bottom: 0; }
+.deposit-channels-card .deposit-provider-status > li { border: 1px solid var(--semi-color-border); border-radius: 8px; padding: 16px; min-width: 0; }
+.deposit-channel-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.deposit-channel-summary > div { display: flex; flex-direction: column; gap: 6px; padding: 16px; background: var(--semi-color-fill-0); border-radius: 8px; }
+.deposit-channel-summary strong { font-size: 24px; font-variant-numeric: tabular-nums; }
+.deposit-channel-summary span { color: var(--semi-color-text-2); }
+.deposit-channel-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; min-width: 0; width: 100%; }
+.deposit-channel-heading > div { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+.deposit-channel-heading strong { overflow-wrap: anywhere; }
+.deposit-channel-rank { color: var(--semi-color-text-2); font-size: 12px; }
+.deposit-channel-error { color: var(--semi-color-warning); overflow-wrap: anywhere; }
+.deposit-stream-availability { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-block: 12px; }
+.deposit-stream-availability > div { padding: 12px; background: var(--semi-color-fill-0); border-radius: 6px; min-width: 0; }
+.deposit-stream-availability span { display: block; margin-top: 6px; }
+.deposit-priority-preview { padding: 16px; border: 1px solid var(--semi-color-border); border-radius: 8px; }
+.deposit-priority-preview ol { display: grid; gap: 8px; padding-left: 20px; }
+.deposit-priority-preview li > * { margin-right: 8px; }
+.deposit-priority-preview li > span { color: var(--semi-color-text-2); font-size: 12px; }
+.deposit-provider-editor .semi-collapse-header { gap: 8px; padding-inline: 12px; }
+.deposit-provider-editor .semi-collapse-content { padding-inline: 0; }
+.deposit-provider-editor .semi-collapse-content > .semi-collapse-content { padding: 0; }
+.deposit-scanner-panel .semi-sidesheet-title { flex: 1 1 0; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+.deposit-scanner-panel .semi-sidesheet-close { flex-shrink: 0; }
+@media (max-width: 600px) { .deposit-stream-availability { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 400px) {
+  .deposit-channel-summary { gap: 6px; }
+  .deposit-channel-summary > div { padding: 10px 8px; }
+  .deposit-channels-card .deposit-provider-status > li { padding: 12px; }
+}
 .deposit-key-status { margin: 8px 0; padding-left: 12px; border-left: 2px solid var(--semi-color-border); }
 @media (max-width: 600px) { .deposit-provider-fields { grid-template-columns: 1fr; } .deposit-provider-draft { padding: 10px; } }
 

@@ -40,7 +40,13 @@ pub(super) async fn head(node: &Node, assets: &[ChainAsset]) -> AppResult<u64> {
 
 /// 区块包含完整交易及内部指令；缺少成功交易的执行元数据时停止该块，不把扫描时间当成链时间。
 pub(super) async fn block(node: &Node, height: u64, context: &Context) -> AppResult<Block> {
-    let data=node.rpc("getBlock",json!([height,{"commitment":"finalized","encoding":"jsonParsed","transactionDetails":"full","rewards":false,"maxSupportedTransactionVersion":1}])).await?;
+    // 锚点校验不下载交易；实际扫描仍要求完整交易与执行元数据。
+    let details = if context.assets.is_empty() {
+        "none"
+    } else {
+        "full"
+    };
+    let data=node.rpc("getBlock",json!([height,{"commitment":"finalized","encoding":"jsonParsed","transactionDetails":details,"rewards":false,"maxSupportedTransactionVersion":1}])).await?;
     let mut block = Block {
         height,
         hash: text(&data["blockhash"])?.into(),

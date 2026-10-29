@@ -599,3 +599,32 @@ it('replaces template credentials without reusing a saved key and cancels withou
   await user.click(screen.getByRole('button', { name: '放弃草稿' }));
   expect(mocked.mock.calls.filter(([, init]) => init?.method === 'PUT')).toHaveLength(1);
 });
+
+it('previews priority changes and preserves credentials when channel forms are collapsed', async () => {
+  const user = userEvent.setup();
+  const data = withProviders(); const first = data.scanners[0].providers[0];
+  mocked.mockResolvedValue({ ...data, scanners: [{ ...data.scanners[0], providers: [first, { ...first, id: 11, name: 'Standby', priority: 1, keys: [{ ...first.keys[0], id: 21, provider_id: 11 }] }] }] });
+  show(); await user.click(await screen.findByRole('button', { name: '编辑监听配置' }));
+  expect(screen.getByLabelText('渠道 1 名称')).toBeVisible();
+  expect(screen.getByLabelText('渠道 2 名称')).not.toBeVisible();
+  await user.click(screen.getByRole('button', { name: '展开全部渠道' }));
+  fireEvent.change(screen.getByLabelText('渠道 1 优先级'), { target: { value: '5' } });
+  await user.type(screen.getByLabelText('渠道 2 凭据 1 API Key'), 'independent-fixture');
+  const preview = screen.getByRole('region', { name: '主备尝试顺序' });
+  expect(within(preview).getAllByRole('listitem')[0]).toHaveTextContent('首选Standby');
+  await user.click(screen.getByRole('button', { name: '收起全部渠道' }));
+  expect(screen.getByLabelText('渠道 2 凭据 1 API Key')).not.toBeVisible();
+  await user.click(screen.getByRole('button', { name: '展开全部渠道' }));
+  expect(screen.getByLabelText('渠道 2 凭据 1 API Key')).toHaveValue('independent-fixture');
+  expect(screen.getByLabelText('渠道 1 凭据 1 API Key')).toHaveValue('');
+  await user.click(screen.getByRole('button', { name: '保存监听配置' }));
+  await user.type(screen.getByRole('textbox', { name: '操作原因' }), '调整主备顺序');
+  mocked.mockRejectedValueOnce(new ApiError(409, 'CONFLICT', 'changed'));
+  await user.click(screen.getByRole('button', { name: '确认' }));
+  expect(await screen.findByText(/数据状态已变化/)).toBeInTheDocument();
+  const body = JSON.parse(String(mocked.mock.calls.find(([, init]) => init?.method === 'PUT')![1]?.body));
+  expect(body.expected_revision).toBe(7);
+  expect(body.providers[0]).toMatchObject({ id: 10, priority: 5, endpoint: null, keys: [{ id: 20, api_key: null }] });
+  expect(body.providers[1]).toMatchObject({ id: 11, priority: 1, endpoint: null, keys: [{ id: 21, api_key: 'independent-fixture' }] });
+  expect(screen.getByLabelText('渠道 2 凭据 1 API Key')).toHaveValue('independent-fixture');
+});

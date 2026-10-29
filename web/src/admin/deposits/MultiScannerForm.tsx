@@ -1,4 +1,4 @@
-import { Banner, Button, Switch } from '@douyinfe/semi-ui';
+import { Banner, Button, Collapse, Switch, Tag } from '@douyinfe/semi-ui';
 import { useState } from 'react';
 import { apiRequest } from '../../api/client';
 import { ConfirmAction } from '../../shared/ConfirmAction';
@@ -49,6 +49,9 @@ export function MultiScannerForm({ scanner, presets: catalog = [], dirty, busy, 
   const [enabled, setEnabled] = useState(scanner.enabled);
   const [confirmations, setConfirmations] = useState(String(scanner.confirmations));
   const [rows, setRows] = useState<ProviderDraft[]>(() => scanner.providers.length ? scanner.providers.map(row => ({ preset_id: row.preset_id ?? '', uid: `provider-${row.id}`, id: row.id, name: row.name, enabled: row.enabled, priority: String(row.priority), endpoint: '', interval: String(row.request_interval_ms), keys: row.keys.map(key => ({ uid: `key-${key.id}`, id: key.id, name: key.name, enabled: key.enabled, priority: String(key.priority), api_key: '', configured: key.api_key_configured, clear_api_key: false, interval: String(key.request_interval_ms) })) })) : presets.some(preset => preset.recommended) ? presets.filter(preset => preset.recommended).map(fromPreset) : accountTemplates[0] ? [fromTemplate(accountTemplates[0], 0)] : [newProvider(0)]);
+  const [expanded, setExpanded] = useState<string[]>(() => rows.slice(0, 1).map(row => row.uid));
+  const append = (additions: ProviderDraft[]) => { dirty(); setRows(current => [...current, ...additions]); setExpanded(current => [...current, ...additions.map(row => row.uid)]); };
+  const ordered = rows.filter(row => row.enabled && row.keys.some(key => key.enabled)).map((row, index) => ({ row, index })).sort((a, b) => (parseSafeInteger(a.row.priority, 0, 1000) ?? 0) - (parseSafeInteger(b.row.priority, 0, 1000) ?? 0) || (a.row.id ?? Number.MAX_SAFE_INTEGER) - (b.row.id ?? Number.MAX_SAFE_INTEGER) || a.index - b.index);
   const count = parseSafeInteger(confirmations, 1, 10000);
   let error = count === null ? '确认数必须为 1 至 10000 的整数' : enabled && !rows.some(row => row.enabled && row.keys.some(key => key.enabled)) ? '接单前至少启用一个渠道和凭据槽' : '';
   try { payload(rows, presets); } catch (cause) { error = cause instanceof Error ? cause.message : '渠道配置无效'; }
@@ -67,23 +70,32 @@ export function MultiScannerForm({ scanner, presets: catalog = [], dirty, busy, 
     }
   };
   return <div className="deposit-edit-form">
-    <Banner type="info" description="按优先级自动切换主备，限流后冷却重试。同账户多个 Key 共用额度。" />
+    <label className="deposit-switch-row">接受新充值订单<Switch aria-label="接受新充值订单" disabled={busy} checked={enabled} onChange={value => { dirty(); setEnabled(value); }} /></label>
+    <label>确认数 / finalized slot 深度<AdminTextInput ariaLabel="充值确认数" disabled={busy} value={confirmations} onChange={value => { dirty(); setConfirmations(value); }} /></label>
+    <Banner type="info" description="按优先级切换独立渠道，再轮转同渠道的其他 Key。限流后保留冷却；同账户多个 Key 共用额度。" />
     {accountTemplate ? <section className="deposit-preset" aria-label="免费账号渠道">
       <strong>免费账号渠道 · 需申请 API Key</strong>
       <p>Ethereum 内部转账监听需要区块 trace 权限。选择下面的账号模板后填写自己的 Key，已有渠道继续保留。免费额度不代表无限使用，需等完整扫描成功。</p>
       <label id="account-rpc-template">账号渠道模板</label><AdminSelect motion={false} ariaLabel="账号渠道模板" ariaLabelledBy="account-rpc-template" disabled={busy} value={accountTemplateId} optionList={accountTemplates.map(template => ({ value: template.id, label: template.label }))} onChange={setAccountTemplateId} />
       <p>{accountTemplate.note}</p>
       <p><a href={accountTemplate.freeAccount?.signup} target="_blank" rel="noopener noreferrer">申请免费账号 / 获取 Key</a> · <a href={accountTemplate.source} target="_blank" rel="noopener noreferrer">查看账号渠道说明</a></p>
-      <Button disabled={busy || rows.length >= 10 || rows.some(row => row.template_id === accountTemplate.id)} onClick={() => { dirty(); setRows(current => [...current, fromTemplate(accountTemplate, nextPriority)]); }}>添加所选账号渠道</Button>
+      <Button disabled={busy || rows.length >= 10 || rows.some(row => row.template_id === accountTemplate.id)} onClick={() => append([fromTemplate(accountTemplate, nextPriority)])}>添加所选账号渠道</Button>
     </section> : null}
     {presets.length ? <div className="deposit-preset">
       <strong>免密钥公共渠道</strong>
       <p>{presets.some(preset => preset.recommended) ? scanner.providers.length ? '补充默认渠道会追加到现有列表，已配置的渠道继续保留。' : '已填入本网络的默认渠道，核对后确认保存即可使用。' : '本网络暂不推荐免密钥默认渠道；现有配置继续保留，可在渠道来源中手动选择。'} 公共服务可能限流，请以完整扫描成功和接单状态为准。</p>
-      <Button disabled={busy || !missing.length || rows.length >= 10} onClick={() => { dirty(); setRows(current => [...current, ...missing.slice(0, 10 - current.length).map((preset, index) => fromPreset(preset, Math.min(1000, nextPriority + index)))]); }}>补充免费默认渠道</Button>
+      <Button disabled={busy || !missing.length || rows.length >= 10} onClick={() => append(missing.slice(0, 10 - rows.length).map((preset, index) => fromPreset(preset, Math.min(1000, nextPriority + index))))}>补充免费默认渠道</Button>
     </div> : null}
-    <label className="deposit-switch-row">接受新充值订单<Switch aria-label="接受新充值订单" disabled={busy} checked={enabled} onChange={value => { dirty(); setEnabled(value); }} /></label>
-    <label>确认数 / finalized slot 深度<AdminTextInput ariaLabel="充值确认数" disabled={busy} value={confirmations} onChange={value => { dirty(); setConfirmations(value); }} /></label>
-    {rows.map((row, index) => <fieldset disabled={busy} className="deposit-provider-draft" key={row.uid}>
+    <section className="deposit-priority-preview" aria-label="主备尝试顺序">
+      <strong>主备尝试顺序 · 保存后生效</strong>
+      <ol>{ordered.map(({ row }, index) => <li key={row.uid}><span>{index === 0 ? '首选' : `备用 ${index}`}</span><strong>{row.name || '未命名渠道'}</strong><span>优先级 {row.priority}</span></li>)}</ol>
+      {!ordered.length ? <p>尚无启用的渠道与凭据。</p> : null}
+      <p className="muted">小数值优先，同优先级按保存顺序；冷却中的候选运行时会跳过。此处展示配置顺序，实际状态见渠道列表。</p>
+    </section>
+    <div className="deposit-provider-actions"><Button disabled={busy} onClick={() => setExpanded(rows.map(row => row.uid))}>展开全部渠道</Button><Button disabled={busy} onClick={() => setExpanded([])}>收起全部渠道</Button></div>
+    <Collapse className="deposit-provider-editor" keepDOM motion={false} activeKey={expanded} onChange={value => setExpanded(Array.isArray(value) ? value : value ? [value] : [])}>
+    {rows.map((row, index) => <Collapse.Panel key={row.uid} itemKey={row.uid} disabled={busy} header={<div className="deposit-channel-heading"><div><span className="deposit-channel-rank">渠道 {index + 1}</span><strong>{row.name || '未命名渠道'}</strong></div><Tag>{row.enabled ? `${row.keys.length} 个凭据 · 优先级 ${row.priority}` : '已停用'}</Tag></div>}>
+      <fieldset disabled={busy} className="deposit-provider-draft" style={expanded.includes(row.uid) ? undefined : { display: 'none' }}>
       <legend>渠道 {index + 1}</legend>
       <label>渠道名称<AdminTextInput ariaLabel={`渠道 ${index + 1} 名称`} value={row.name} onChange={name => update(row.uid, { name })} /></label>
       <label className="deposit-switch-row">启用渠道<Switch aria-label={`启用渠道 ${index + 1}`} disabled={busy} checked={row.enabled} onChange={value => update(row.uid, { enabled: value, ...(row.preset_id && value ? { keys: row.keys.map(key => ({ ...key, enabled: true })) } : {}) })} /></label>
@@ -114,8 +126,9 @@ export function MultiScannerForm({ scanner, presets: catalog = [], dirty, busy, 
         <Button disabled={busy || row.keys.length === 1} onClick={() => update(row.uid, { keys: row.keys.filter(item => item.uid !== key.uid) })}>移除凭据 {k + 1}</Button>
       </div>) : null}
       <div className="deposit-provider-actions">{!row.preset_id ? <Button disabled={busy || row.keys.length >= 10} onClick={() => update(row.uid, { keys: [...row.keys, newKey(row.keys.length)] })}>添加 API Key · 渠道 {index + 1}</Button> : null}<Button type="danger" disabled={busy || rows.length === 1} onClick={() => { dirty(); setRows(current => current.filter(item => item.uid !== row.uid)); }}>移除渠道 {index + 1}</Button></div>
-    </fieldset>)}
-    <Button disabled={busy || rows.length >= 10} onClick={() => { dirty(); setRows(current => [...current, newProvider(nextPriority)]); }}>添加备用渠道</Button>
+    </fieldset></Collapse.Panel>)}
+    </Collapse>
+    <Button disabled={busy || rows.length >= 10} onClick={() => append([newProvider(nextPriority)])}>添加备用渠道</Button>
     <p>免密钥公共渠道无需 Key；免费账号模板需自有 Key。原有渠道输入框留空保留已有密钥，切换服务商模板需重新填写。移除和启停在确认保存后生效。原扫描进度不变，所有渠道不可用时停止新订单准入，恢复后继续补扫。</p>
     {error ? <Banner type="warning" description={error} /> : null}
     <ConfirmAction modalWidth="min(448px, calc(100vw - 32px))" actionText="保存监听配置" title="保存主备渠道与凭据" description={`将保存 ${rows.length} 个渠道、${rows.reduce((sum, row) => sum + row.keys.length, 0)} 个凭据槽及网络接单设置。被移除的配置不再参与监听，原扫描进度保留。`} disabled={busy || Boolean(error)} onConfirm={async reason => {

@@ -17,7 +17,9 @@ pub(super) async fn head(node: &Node) -> AppResult<u64> {
 /// 逐 vout 匹配，不聚合不同输出或分笔款项；同一交易向多个地址付款仍分别保留可去重证据。
 pub(super) async fn block(node: &Node, height: u64, context: &Context) -> AppResult<Block> {
     let hash = node.rpc("getblockhash", json!([height])).await?;
-    let data = node.rpc("getblock", json!([hash, 2])).await?;
+    // 游标锚点只需区块身份；实际到账扫描仍读取完整 vout，不以精简响应替代付款证据。
+    let verbosity = if context.assets.is_empty() { 1 } else { 2 };
+    let data = node.rpc("getblock", json!([hash, verbosity])).await?;
     if data["hash"] != hash
         || integer(&data["height"])? != height
         || data["confirmations"].as_i64().is_none_or(|c| c < 1)
