@@ -1501,3 +1501,36 @@ Fair sequential provider rotation, light Bitcoin/Solana anchors, Base scoped fai
 ### Next Steps
 
 - None - task complete
+
+
+## Session 104: Five deposit providers per supported network
+
+**Date**: 2026-10-29
+**Task**: Five deposit providers per supported network
+**Branch**: `main`
+
+### Summary
+
+Added 21 account setup templates and five distinct provider choices per network with explicit plan/setup labels, fresh credentials, required replacement endpoints and placeholder validation. Web 1262 full tests and final deposit 99 passed; lint/typecheck/build, policy15 and coverage23 passed; Ego desktop/320/390 checks passed. Existing exact JS budget remains over limit at 2804007/2600000. Preserved unrelated agent WIP; no real keys, purchases, production, deployment or push.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `be852649` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

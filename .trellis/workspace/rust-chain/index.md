@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-2.md`
-- **Total Sessions**: 103
+- **Total Sessions**: 104
 - **Last Active**: 2026-10-29
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-2.md` | ~1503 | Active |
+| `journal-2.md` | ~1536 | Active |
 | `journal-1.md` | ~1985 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 104 | 2026-10-29 | Five deposit providers per supported network | `be852649` | `main` |
 | 103 | 2026-10-29 | Five-network RPC failover and admin configuration | `831f9c1a` | `main` |
 | 102 | 2026-10-29 | Complete PWA login subtitle | `420c1364997c3a89fe31b71d4574d4df0f690142` | `main` |
 | 101 | 2026-10-29 | PWA H5 login copy update | `1c39a40f` | `main` |
