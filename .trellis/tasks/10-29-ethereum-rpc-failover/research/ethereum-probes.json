@@ -1,0 +1,222 @@
+{
+  "checked_at": "2026-10-29T10:26:48.784118+00:00",
+  "scope": "single low-frequency compatibility sample per endpoint; no throughput/SLA claim",
+  "providers": [
+    {
+      "name": "tenderly",
+      "endpoint": "https://mainnet.gateway.tenderly.co",
+      "checks": [
+        {
+          "method": "eth_chainId",
+          "http": 200,
+          "elapsed_ms": 703,
+          "bytes": 39,
+          "limits": {
+            "x-tdly-egress-limit": "1000000000",
+            "x-tdly-egress-remaining": "699610009",
+            "x-tdly-egress-reset-timestamp": "1793281412356"
+          }
+        },
+        {
+          "method": "eth_getBlockByNumber",
+          "http": 200,
+          "elapsed_ms": 594,
+          "bytes": 10103,
+          "limits": {
+            "x-tdly-egress-limit": "1000000000",
+            "x-tdly-egress-remaining": "699609970",
+            "x-tdly-egress-reset-timestamp": "1793281412356"
+          }
+        },
+        {
+          "method": "eth_getBlockByNumber",
+          "http": 200,
+          "elapsed_ms": 592,
+          "bytes": 21655,
+          "limits": {
+            "x-tdly-egress-limit": "1000000000",
+            "x-tdly-egress-remaining": "699609970",
+            "x-tdly-egress-reset-timestamp": "1793281412356"
+          }
+        },
+        {
+          "method": "debug_traceBlockByHash",
+          "http": 429,
+          "error": "{\"id\":1,\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32005,\"message\":\"rate limit exceeded\"}}"
+        }
+      ],
+      "complete": false,
+      "chain_id": "0x1",
+      "block": {
+        "number": "0x19145b1",
+        "hash": "0x2843b8cd0636a9c1b296ec2acbd1f3a58fb5a2080b60c8663ec9a23aa90ea0ca",
+        "timestamp": "0x6ae31ebf"
+      },
+      "head_age_seconds": 5.75680685043335,
+      "failure": "HTTPError"
+    },
+    {
+      "name": "0xrpc",
+      "endpoint": "https://0xrpc.io/eth",
+      "checks": [
+        {
+          "method": "eth_chainId",
+          "http": 404,
+          "error": "<html>\r\n<head><title>404 Not Found</title></head>\r\n<body>\r\n<center><h1>404 Not Found</h1></center>\r\n<hr><center>nginx</center>\r\n</body>\r\n</html>\r\n"
+        }
+      ],
+      "complete": false,
+      "failure": "HTTPError"
+    },
+    {
+      "name": "onfinality",
+      "endpoint": "https://eth.api.onfinality.io/public",
+      "checks": [
+        {
+          "method": "eth_chainId",
+          "http": 200,
+          "elapsed_ms": 1468,
+          "bytes": 39,
+          "limits": {}
+        },
+        {
+          "method": "eth_getBlockByNumber",
+          "http": 429,
+          "error": "{\"jsonrpc\":\"2.0\",\"error\":{\"code\":-32029,\"message\":\"Too Many Requests, Please apply an OnFinality API key or contact us to receive a higher rate limit\"},\"id\":1}"
+        }
+      ],
+      "complete": false,
+      "chain_id": "0x1",
+      "failure": "HTTPError"
+    },
+    {
+      "name": "alchemy-public",
+      "endpoint": "https://eth-mainnet.g.alchemy.com/public",
+      "checks": [
+        {
+          "method": "eth_chainId",
+          "http": 200,
+          "elapsed_ms": 699,
+          "bytes": 39,
+          "limits": {}
+        },
+        {
+          "method": "eth_getBlockByNumber",
+          "http": 200,
+          "elapsed_ms": 593,
+          "bytes": 10103,
+          "limits": {}
+        },
+        {
+          "method": "eth_getBlockByNumber",
+          "http": 200,
+          "elapsed_ms": 666,
+          "bytes": 21655,
+          "limits": {}
+        },
+        {
+          "method": "debug_traceBlockByHash",
+          "http": 401,
+          "error": "{\"jsonrpc\":\"2.0\",\"id\":1,\"error\":{\"code\":-32600,\"message\":\"Only core evm requests are allowed.\"}}"
+        }
+      ],
+      "complete": false,
+      "chain_id": "0x1",
+      "block": {
+        "number": "0x19145b1",
+        "hash": "0x2843b8cd0636a9c1b296ec2acbd1f3a58fb5a2080b60c8663ec9a23aa90ea0ca",
+        "timestamp": "0x6ae31ebf"
+      },
+      "head_age_seconds": 13.695188045501709,
+      "failure": "HTTPError"
+    },
+    {
+      "name": "blast",
+      "endpoint": "https://eth-mainnet.public.blastapi.io",
+      "checks": [
+        {
+          "method": "eth_chainId",
+          "http": 200,
+          "elapsed_ms": 769,
+          "bytes": 39,
+          "limits": {}
+        },
+        {
+          "method": "eth_getBlockByNumber",
+          "http": 200,
+          "elapsed_ms": 593,
+          "bytes": 10103,
+          "limits": {}
+        },
+        {
+          "method": "eth_getBlockByNumber",
+          "http": 200,
+          "elapsed_ms": 961,
+          "bytes": 21655,
+          "limits": {}
+        },
+        {
+          "method": "debug_traceBlockByHash",
+          "http": 401,
+          "error": "Only core evm requests are allowed."
+        }
+      ],
+      "complete": false,
+      "chain_id": "0x1",
+      "block": {
+        "number": "0x19145b1",
+        "hash": "0x2843b8cd0636a9c1b296ec2acbd1f3a58fb5a2080b60c8663ec9a23aa90ea0ca",
+        "timestamp": "0x6ae31ebf"
+      },
+      "head_age_seconds": 15.03707504272461,
+      "failure": "HTTPError"
+    },
+    {
+      "name": "meowrpc",
+      "endpoint": "https://eth.meowrpc.com",
+      "checks": [
+        {
+          "method": "eth_chainId",
+          "http": 200,
+          "elapsed_ms": 1162,
+          "bytes": 39,
+          "limits": {}
+        },
+        {
+          "method": "eth_getBlockByNumber",
+          "http": 200,
+          "elapsed_ms": 1142,
+          "bytes": 23173,
+          "limits": {}
+        },
+        {
+          "method": "eth_getBlockByNumber",
+          "http": 200,
+          "elapsed_ms": 834,
+          "bytes": 17932,
+          "limits": {}
+        },
+        {
+          "method": "debug_traceBlockByHash",
+          "http": 200,
+          "elapsed_ms": 913,
+          "bytes": 126,
+          "limits": {},
+          "error": {
+            "code": -32601,
+            "message": "The method debug_traceBlockByHash does not exist/is not available"
+          }
+        }
+      ],
+      "complete": false,
+      "chain_id": "0x1",
+      "block": {
+        "number": "0x19145b2",
+        "hash": "0x5b12320959d4b513e670fdddb8e85a646f48d91b1d427a5133a59bdce262145c",
+        "timestamp": "0x6ae31ecb"
+      },
+      "head_age_seconds": 11.366223096847534,
+      "failure": "ValueError"
+    }
+  ]
+}

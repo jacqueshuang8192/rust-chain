@@ -69,12 +69,12 @@ Base 分为 **ETH 原生币** 和 **ERC20 代币（包括 USDC）** 两路，各
 | 网络 | 默认免费渠道 | 监听范围与限制 |
 |---|---|---|
 | Base | PublicNode 主用、dRPC 备用 | ETH 直接转账、USDC 等已配置 ERC20；整块读取减少逐笔交易请求 |
-| Ethereum | dRPC | ERC20；ETH 内部转账需要 callTracer，2026-10-29 实测通过，但服务商不保证免费 trace 权限 |
+| Ethereum | 免费账号模板：Chainnodes；SolidRPC 可选备用 | 需自行申请 API Key；官方文档提供区块 callTracer，尚未用实际账号验证。dRPC 匿名渠道不再默认推荐 |
 | Bitcoin | PublicNode | BTC，读取主网完整交易输出 |
 | Tron | TronGrid 匿名访问 | TRC20；匿名限流较严格，原生 TRX 不支持 |
 | Solana | PublicNode | SOL、经典 SPL Token，兼容 legacy/V0/V1，Token2022 不支持 |
 
-这些默认项免注册、免 API Key。首次打开监听配置会生成草稿；已有配置点击“补充免费默认渠道”追加未存在的默认项，不覆盖自有节点。填写操作原因并确认保存后生效，不自动打开接单。仍需配置监听币种、真实收款地址与平台充值开关，再等完整扫描成功。未配置的网络不会仅因目录存在就自动请求节点。
+Base、Bitcoin、Tron、Solana 的默认项免注册、免 API Key。首次打开监听配置会生成草稿；已有配置点击“补充免费默认渠道”追加未存在的默认项，不覆盖自有节点。Ethereum 新配置改为账号模板草稿，流程见下节。填写操作原因并确认保存后生效，不自动打开接单。仍需配置监听币种、真实收款地址与平台充值开关，再等完整扫描成功。未配置的网络不会仅因目录存在就自动请求节点。
 
 Base 官方及 Solana 官方公共节点仍可选择，但本次探测完整扫描所需请求遇到429，只列为低频测试选项，不预填为默认。每个渠道在界面展示公开地址、官方说明链接及适用限制。样本测试不代表长期吞吐、历史可用范围或 SLA；Ethereum 免费 trace 被拒绝时会停止该轮扫描，不能悄悄改成仅识别直接转账。
 
@@ -85,6 +85,25 @@ Base 默认预设读取 `eth_getBlockByNumber(height,true)`，再仅核对实际
 Base 币种模板补充 ETH 和原生 USDC（`0x833589fcd6edb6e08f4c7c32d4f71b54bda02913`，6 位精度），均只填草稿。USDC 合约以 Circle 官方地址表为依据，不能换成桥接币或其他网络合约。Solana 请求允许 V1，未知显式交易版本仍停止扫描，不能用忽略交易来维持“健康”状态。
 
 官方来源与低频探测结果保存于本任务 research/providers.md；公共地址来自 PublicNode、dRPC、TronGrid 及链官方文档。持续追块和实链到账需部署后逐网观察，本轮没有生产数据库修改或真实付款。
+
+## Ethereum 免费账号主备渠道（2026-10-29）
+
+dRPC 匿名节点曾在单次探测中返回完整 trace，但实际监听出现 429；这不能作为免费权限或持续吞吐保证。保留其已有预设身份及配置，取消新配置默认推荐，不清除旧错误、冷却或进度。没有新增迁移，仍需同版更新后端目录与后台；此前未应用的迁移照常执行。
+
+| 账号模板 | 官方免费层说明 | 用法 |
+|---|---|---|
+| Chainnodes | Core 每月 1250 万请求、25 RPS，包含 debug/trace | 首次 Ethereum 配置的草稿；申请自己的 Key 后保存 |
+| SolidRPC | 每日 1 万次响应，debug/trace 按单次计数 | 可选短时备用，额度不足以单独保证持续全链扫描 |
+
+后台「充值配置 → Ethereum → 编辑监听配置」新增「免费账号渠道」：从官方申请入口获取 Key，选择模板后点「添加所选账号渠道」。节点地址和间隔自动填入，Key 填在该渠道的独立 API Key 框，不要替换 URL 中的 `{API_KEY}`。服务端会编码后填入 URL，并使用既有加密存储、主备切换和持久冷却；不是请求头 Bearer 鉴权。
+
+Chainnodes 模板为 `https://mainnet.chainnodes.org/{API_KEY}`；SolidRPC 为 `https://rpc.solidrpc.io/{API_KEY}/evm/1`，须使用 RPC API Key，不能填其管理用 Personal Access Token。官方资料分别为 [Chainnodes 价格与免费层](https://www.chainnodes.org/pricing)、[区块 trace](https://www.chainnodes.org/docs/ethereum/debug_traceBlockByHash)、[SolidRPC 接入](https://solidrpc.io/docs)、[trace](https://solidrpc.io/docs/tracing)。按当前控制台确认额度；多个同账户 Key 不会增加账户总额度。
+
+追加账号模板不会改动已有渠道、密钥或接单开关。同一草稿内已添加的模板不能重复追加；保存后它属于普通自定义渠道，系统不会根据隐藏地址猜测其服务商。切换某条渠道的服务商模板会新建空白凭据，确认保存时替换原凭据，不把旧 Key 转发到新服务商；未切换的渠道留空仍保留原值。409 保留草稿与原因，取消不写入。
+
+这两个模板已核对官方文档，**尚未使用实际账号 Key 验证完整响应、历史权限或持续追块**。保存后只有完整扫描成功才恢复健康状态。Ethereum 继续严格核对交易哈希、完整调用树和区块连续性；不支持的返回格式停止该轮，不降低为只识别直接转账。新增渠道也不会自动跳过积压历史。
+
+本轮匿名候选 Tenderly、OnFinality、Alchemy、Blast、MeowRPC、LlamaRPC、Merkle、0xRPC 均未通过完整能力探测，未作为可用默认项加入。Tenderly 当前 Node RPC 文档说明无免费层；Alchemy Debug API 要求付费计划，因此未列入新免费账号推荐。完整官方来源和脱敏样本见 `10-29-ethereum-rpc-failover/research/providers.md`。
 
 ## 主网节点与币种预设（2026-10-24）
 

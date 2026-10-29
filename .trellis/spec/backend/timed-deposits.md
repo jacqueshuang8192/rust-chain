@@ -646,8 +646,10 @@ requests, missing results, individual errors and invalid response IDs/versions.
 
 ### 1. Scope / Trigger
 
-Administrators should be able to configure all five mainnets without finding an
-endpoint or obtaining a key. The server catalog is a compatibility profile, not
+Administrators should be able to configure the supported mainnets without finding an
+endpoint. Base/Tron/Bitcoin/Solana have recommended anonymous presets; Ethereum
+full native scanning now uses documentation-qualified free-account templates.
+The server catalog is a compatibility profile, not
 an uptime promise or an implicit fallback. Public provider probes are bounded
 read-only samples. Ethereum public trace availability is conditional; retain
 callTracer evidence and stop on permission failure rather than narrowing ETH
@@ -698,6 +700,23 @@ support. No startup seed enables scanners or replaces existing custom endpoints.
   Editing their request interval also updates the hidden anonymous slot interval.
   State remains unverified until the server reports complete successful scans.
 - `CREDENTIAL_ENCRYPTION_KEY` remains required, even for anonymous endpoints.
+- Keep `eth-drpc` resolvable for stored records but `recommended=false`: public
+  trace failures must not be hidden by recommending it again on fresh setup.
+  Its status and editor explain the limitation. Removing recommendation does
+  not mutate encrypted URLs, cooldowns, keys, cursors or network admission.
+- Free-account Chainnodes/SolidRPC entries in Admin `nodePresets` populate the
+  existing custom-provider URL template and separate API-key slot. They are
+  documentation-qualified, not verified live keys or anonymous preset identities.
+  Do not send their local-only `template_id` or claim they are healthy.
+- Fresh Ethereum multi-provider setup proposes an unsaved Chainnodes draft and
+  blocks saving until an enabled URL-key slot has a key. Existing configurations
+  receive no implicit changes; account-template addition appends at the next
+  priority. Template replacement allocates fresh blank key drafts (no stored
+  key IDs), so another provider never inherits an old credential. Blank saves
+  of unchanged persisted channels retain their original IDs and cooldowns.
+- SolidRPC free daily quota is only an optional short-term backup. Do not rotate
+  keys to bypass provider/account limits. Preserve full Ethereum txHash/count/
+  call-tree validation; unsupported response shapes fail closed.
 
 ### 4. Validation & Error Matrix
 
@@ -711,6 +730,9 @@ support. No startup seed enables scanners or replaces existing custom endpoints.
 | Public endpoint returns 429 or lacks trace | Preserve progress and normal cooldown/admission rules |
 | Partial Base block, mismatched receipt, unknown Solana version | Reject evidence; no successful checkpoint |
 | Malformed catalog / missing selected identity | Admin parser/editor fails closed |
+| Free-account URL template without an enabled slot's API key | Block save; no automatic admission or request |
+| Replace a custom provider using a service template | Fresh blank key slots; require the new provider's key; save atomically |
+| Append account template / cancel / HTTP 409 | Preserve other providers; cancel writes nothing; conflict retains draft and reason |
 
 ### 5. Good / Base / Bad Cases
 
@@ -720,6 +742,11 @@ Base: a custom Nodies channel keeps its own encrypted URL, keys and batch profil
 adding a public backup does not modify it. Bad: infer a full-block profile from
 an arbitrary client URL or silently forward the old API key after switching hosts.
 
+For free-account setup, good means Chainnodes and SolidRPC have distinct owned
+keys and explicit priorities. Base behavior preserves the old dRPC ID and its
+cooldown while an account channel is appended. Bad means claiming a template is
+healthy from documentation alone or treating multiple keys as extra quota.
+
 ### 6. Tests Required
 
 - Isolated MySQL `DEPOSIT_PRESET_TEST_DATABASE_URL` ending in
@@ -727,11 +754,14 @@ an arbitrary client URL or silently forward the old API key after switching host
   custom secrets/cooldowns/cursors, anonymous conversion, blank-save identity,
   cross-network and forged requests, audit rollback, revision conflict, legacy
   replacement, all-five-network saves and redacted response/audit snapshots.
+  Account-template append also verifies missing-key rollback, retained encrypted
+  values/cooldowns, new key IDs on replacement, and secret-free response/audit.
 - Base full-block success, reverted payments, unchanged event identity, malformed
   transactions and mismatched receipts; retain custom batches and Ethereum traces.
 - Solana legacy/V0/V1 with native and inner SPL events; reject future/string/null
   versions and assert the outbound maximum version.
-- Real Semi forms: all-network defaults, append/dedup/custom preservation,
+- Real Semi forms: four-network anonymous defaults, Ethereum account templates,
+  required keys, template replacement isolation, append/dedup/custom preservation,
   anonymous replacement, interval propagation, stale saves, read-only status.
   Verify SideSheet plus confirmation/discard at desktop and 320px/390px.
 - OpenAPI includes the catalog and optional save identity without custom secrets.

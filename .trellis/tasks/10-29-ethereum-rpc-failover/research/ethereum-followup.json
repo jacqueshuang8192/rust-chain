@@ -1,0 +1,31 @@
+{
+  "checked_at": "2026-10-29T10:28:06.138689+00:00",
+  "providers": [
+    {
+      "name": "merkle",
+      "endpoint": "https://eth.merkle.io",
+      "checks": [
+        {
+          "method": "eth_chainId",
+          "http": 403,
+          "error": "<!DOCTYPE html>\n<!--[if lt IE 7]> <html class=\"no-js ie6 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if IE 7]>    <html class=\"no-js ie7 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if IE 8]>    <html class=\"no-js ie8 oldie\" lang=\"en-US\"> <![endif]-->\n<!--[if gt IE 8]><!--> <html class=\"no-js\" lang=\"en-US\"> <!--<![endif]-->\n<head>\n<title>Attention Required! | Cloudflare</title>\n<meta charset=\"UTF-8\" />\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\" />\n<meta http-equiv=\"X-UA-Compatible\" "
+        }
+      ],
+      "complete": false,
+      "failure": "HTTPError"
+    },
+    {
+      "name": "llama",
+      "endpoint": "https://eth.llamarpc.com",
+      "checks": [
+        {
+          "method": "eth_chainId",
+          "http": 525,
+          "error": "error code: 525\n"
+        }
+      ],
+      "complete": false,
+      "failure": "HTTPError"
+    }
+  ]
+}

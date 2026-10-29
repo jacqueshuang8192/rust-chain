@@ -7,10 +7,16 @@ export const nativeAssets: Record<string, { symbol: string; decimals: number }> 
   btc: { symbol: 'BTC', decimals: 8 }, solana: { symbol: 'SOL', decimals: 9 }
 };
 
-type NodePreset = { id: string; network: string; label: string; endpoint: string; confirmations: number; note: string; source: string };
+export type NodePreset = { id: string; network: string; label: string; endpoint: string; confirmations: number; note: string; source: string; freeAccount?: { name: string; signup: string; interval: number } };
 export const nodePresets: readonly NodePreset[] = [
+  { id: 'eth-chainnodes', network: 'eth', label: 'Ethereum · Chainnodes（免费账号）', endpoint: 'https://mainnet.chainnodes.org/{API_KEY}', confirmations: 12,
+    freeAccount: { name: 'Chainnodes · Ethereum', signup: 'https://app.chainnodes.org/', interval: 500 },
+    note: '需注册并申请自己的 API Key。官方 Core 免费计划提供每月 1250 万次请求、25 RPS，并提供区块 callTracer；额度以账号控制台为准。模板尚未使用你的 Key 验证，须等待完整扫描成功。', source: 'https://www.chainnodes.org/docs/ethereum/debug_traceBlockByHash' },
+  { id: 'eth-solidrpc', network: 'eth', label: 'Ethereum · SolidRPC（免费备用）', endpoint: 'https://rpc.solidrpc.io/{API_KEY}/evm/1', confirmations: 12,
+    freeAccount: { name: 'SolidRPC · Ethereum', signup: 'https://solidrpc.io/register', interval: 1000 },
+    note: '需免费账号的 RPC API Key（不是管理凭据）。官方免费层开放 debug/trace，每日 1 万次响应，适合作短时备用，不能保证单独持续追块。权限、配额和返回证据以完整扫描结果为准。', source: 'https://solidrpc.io/docs/tracing' },
   { id: 'eth-alchemy', network: 'eth', label: 'Ethereum · Alchemy（需密钥）', endpoint: 'https://eth-mainnet.g.alchemy.com/v2/{API_KEY}', confirmations: 12,
-    note: '将节点地址中的 {API_KEY} 替换为自己的 Alchemy 密钥。监听 ETH 需要账号支持 debug_traceBlockByHash / callTracer；保存前确认方法权限和调用额度。此密钥放在 URL 中，不填入下方 Bearer 密钥框。', source: 'https://www.alchemy.com/docs/reference/debug-traceblockbyhash' },
+    note: '监听 ETH 所需的 Debug API 要求 Pay As You Go 或 Enterprise，不能将免费 Key 当作完整 ETH 监听渠道。模板中的 {API_KEY} 由下方凭据填入；旧版单节点编辑器会生成加密地址。', source: 'https://www.alchemy.com/docs/reference/debug-api-quickstart' },
   { id: 'tron-trongrid', network: 'tron', label: 'Tron · TronGrid 主网', endpoint: 'https://api.trongrid.io', confirmations: 20,
     note: '在下方节点 API 密钥框填写自己的 TronGrid API Key，服务端使用 TRON-PRO-API-KEY 请求头。未配置密钥可能被限流；这里只监听 TRC20。', source: 'https://developers.tron.network/reference/select-network' },
   { id: 'solana-public', network: 'solana', label: 'Solana · 公共主网（测试用）', endpoint: 'https://api.mainnet-beta.solana.com', confirmations: 32,

@@ -10594,3 +10594,17 @@
 - 修改文件：本任务归档、.trellis/workspace/rust-chain/index.md、journal-2.md、docs/superpowers/PROGRESS.md（仅本次交付段）。
 - 验证结果：两远程fetch后与起始HEAD一致，普通push均成功，git ls-remote均返回42e91dbba5bf37ebf0bd40e32651c92fa56272e5。沿用前条扫描器75项、最终Web定向64项、Rust静态和浏览器验证；精确发布版本包体仍超限且未放宽阈值。专用MySQL、Vite、Ego任务和临时发布导出已清理。
 - 后续事项：同步本条交付记录后复核最终远程SHA；未执行生产部署或远程CI验收。发布须先停旧worker、执行0168及全部待应用迁移，再同版启动API/worker/后台；免费渠道需管理员确认保存，实际持续追块与Ethereum免费trace权限待部署观察。
+
+## 2026-10-29 13:34 - Ethereum备用RPC能力与免费套餐核查
+
+- 完成内容：用户接受免费账号及API Key；排除无法完成trace的匿名候选，确认Chainnodes与SolidRPC官方免费方法说明，Tenderly当前Node RPC无免费层。确定沿用现有自定义渠道模板，取消dRPC新配置默认推荐并保留已存身份和冷却。
+- 修改文件：.trellis/tasks/10-29-ethereum-rpc-failover/prd.md、research/providers.md、探测脚本及脱敏JSON；docs/superpowers/PROGRESS.md。
+- 验证结果：8个候选仅做免密钥低频只读探测，无完整成功项；429/401/403/404/525及方法未开放均记录。未使用用户Key、生产配置或真实付款；新账号模板仅确认官方文档，未实测账号持续扫描。
+- 后续事项：接入两个账号模板及凭据隔离交互，完成现有保存/备用切换回归和后台验证。
+
+## 2026-10-29 13:58（Europe/Istanbul） - Ethereum免费账号主备渠道实现与验收
+
+- 完成内容：新增Chainnodes/SolidRPC账号模板、官方申请入口和独立Key；首次Ethereum配置预填未保存的Chainnodes，缺Key禁止保存，追加保留原渠道，切模板清空凭据。取消dRPC默认推荐但保留已存身份、冷却与进度；无新增迁移或扫描/到账语义变化。
+- 修改文件：10-29-ethereum-rpc-failover/task.json.relatedFiles所列12个业务/测试/规范/进度文件，以及任务研究与交付记录。
+- 验证结果：扫描器75/75含全部隔离MySQL回归、架构11/11、fmt/diff通过；Web全量1227通过、1个既有时区用例失败，UTC复验11/11通过，充值定向65/65、类型/lint/policy15/coverage23/build通过。导出HEAD加本次补丁排除代理WIP，类型/lint、65项充值及build通过；精确发布JS2789517/2600000仍超限，未改预算。Ego本地实组件与模拟API验证1728/1280/390/320、默认/追加/独立Key/409保留/取消；窄屏无页面横溢，截图已查看。专用MySQL、Vite和浏览器任务已清理。
+- 后续事项：按已有授权精确提交、归档并推送双远程；未部署或验证真实账号Key、历史trace及持续吞吐，不能据此宣称生产429已恢复。管理员更新后需申请并填写自有Key，等待完整扫描成功；仍落后前版的环境先执行0168等全部待应用迁移。

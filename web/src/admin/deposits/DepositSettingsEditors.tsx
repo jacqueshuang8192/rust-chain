@@ -44,7 +44,7 @@ function InitialScannerForm({ scanner, dirty, busy, setBusy, saved }: CommonProp
   const [confirmations, setConfirmations] = useState(String(scanner.confirmations));
   const [presetId, setPresetId] = useState('');
   const [providerKey, setProviderKey] = useState('');
-  const presets = nodePresets.filter(row => row.network === scanner.network);
+  const presets = nodePresets.filter(row => row.network === scanner.network && !row.freeAccount);
   const preset = presets.find(row => row.id === presetId);
   const count = parseSafeInteger(confirmations, 1, 10000);
   const error = hasCredentialPlaceholder(endpoint) ? '请将节点地址中的 API_KEY 占位符替换为自己的真实密钥' : count === null ? '确认数必须为 1 至 10000 的整数' : enabled && !scanner.endpoint_configured && !endpoint.trim() ? '开启新订单前，请填写监听节点地址' : '';

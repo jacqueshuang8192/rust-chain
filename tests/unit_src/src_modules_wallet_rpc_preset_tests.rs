@@ -46,13 +46,20 @@ fn public_catalog_covers_every_network_without_keys_and_keeps_optional_nodes_dis
         assert!(rpc_presets::find(preset.network, preset.id).is_some());
         assert!(rpc_presets::find("unsupported", preset.id).is_none());
     }
-    for network in ["eth", "base", "tron", "btc", "solana"] {
+    for network in ["base", "tron", "btc", "solana"] {
         assert!(
             rpc_presets::PRESETS
                 .iter()
                 .any(|p| p.network == network && p.recommended)
         );
     }
+    // 已保存身份必须继续识别；不再给新 Ethereum 原生配置推荐无权限保证的匿名节点。
+    assert!(!rpc_presets::find("eth", "eth-drpc").unwrap().recommended);
+    assert!(
+        !rpc_presets::PRESETS
+            .iter()
+            .any(|p| p.network == "eth" && p.recommended)
+    );
     assert!(
         !rpc_presets::find("base", "base-official")
             .unwrap()
@@ -240,7 +247,7 @@ async fn public_presets_migrate_preserve_cooldowns_isolate_credentials_and_fence
     for network in ["eth", "base", "tron", "btc", "solana"] {
         let rows: Vec<_> = rpc_presets::PRESETS
             .iter()
-            .filter(|p| p.network == network && p.recommended)
+            .filter(|p| p.network == network && (p.recommended || p.id == "eth-drpc"))
             .map(|p| draft(None, Some(p.id), None, None, None))
             .collect();
         save(&pool, admin, network, json!(rows)).await.unwrap();
@@ -295,5 +302,104 @@ async fn public_presets_migrate_preserve_cooldowns_isolate_credentials_and_fence
         ] {
             assert!(!serialized.contains(private));
         }
+    }
+
+    // 免费账号模板走自定义渠道合同：新 Key 必填，追加备用不能改动旧密文、冷却或进度。
+    let chainnodes = "https://mainnet.chainnodes.org/{API_KEY}";
+    let solid = "https://rpc.solidrpc.io/{API_KEY}/evm/1";
+    assert!(
+        save(
+            &pool,
+            admin,
+            "eth",
+            json!([draft(None, None, Some(chainnodes), None, None)])
+        )
+        .await
+        .is_err()
+    );
+    save(
+        &pool,
+        admin,
+        "eth",
+        json!([draft(
+            None,
+            None,
+            Some(chainnodes),
+            None,
+            Some("chainnodes-fixture/a?b")
+        )]),
+    )
+    .await
+    .unwrap();
+    let (eth_id, eth_key): (u64, u64) = sqlx::query_as("SELECT p.id,k.id FROM wallet_deposit_scanner_providers p JOIN wallet_deposit_scanner_keys k ON k.provider_id=p.id WHERE p.network='eth'").fetch_one(&pool).await.unwrap();
+    sqlx::query("UPDATE wallet_deposit_scanner_keys SET cooldown_until=DATE_ADD(NOW(6),INTERVAL 5 MINUTE),last_error='HTTP 429' WHERE id=?").bind(eth_key).execute(&pool).await.unwrap();
+    let original = snapshot(&pool, eth_id).await;
+    let retained = draft(Some(eth_id), None, None, Some(eth_key), None);
+    assert!(
+        save(
+            &pool,
+            admin,
+            "eth",
+            json!([retained.clone(), draft(None, None, Some(solid), None, None)])
+        )
+        .await
+        .is_err()
+    );
+    assert_eq!(snapshot(&pool, eth_id).await, original);
+    save(
+        &pool,
+        admin,
+        "eth",
+        json!([
+            retained,
+            draft(None, None, Some(solid), None, Some("solid-fixture-key"))
+        ]),
+    )
+    .await
+    .unwrap();
+    assert_eq!(snapshot(&pool, eth_id).await, original);
+    let mut replacement = draft(
+        Some(eth_id),
+        Some(""),
+        Some(solid),
+        None,
+        Some("replacement-fixture-key"),
+    );
+    replacement["keys"][0]["name"] = json!("New provider credential");
+    save(&pool, admin, "eth", json!([replacement]))
+        .await
+        .unwrap();
+    let updated = snapshot(&pool, eth_id).await;
+    assert_ne!(updated["key_id"], eth_key);
+    assert_eq!(
+        crate::infra::secrets::decrypt_optional_secret(updated["secret"].as_str(), KEY)
+            .unwrap()
+            .as_deref(),
+        Some("replacement-fixture-key")
+    );
+    assert_eq!(
+        crate::infra::secrets::decrypt_optional_secret(updated["endpoint"].as_str(), KEY)
+            .unwrap()
+            .as_deref(),
+        Some(solid)
+    );
+    assert!(updated["preset"].is_null());
+    let settings = serde_json::to_string(&app::settings(&pool).await.unwrap()).unwrap();
+    let audit: Vec<Json<Value>> = sqlx::query_scalar(
+        "SELECT after_json FROM admin_audit_logs WHERE action='deposit_scanner.update'",
+    )
+    .fetch_all(&pool)
+    .await
+    .unwrap();
+    let audit = serde_json::to_string(&audit).unwrap();
+    for value in [
+        "chainnodes-fixture/a?b",
+        "solid-fixture-key",
+        "replacement-fixture-key",
+        chainnodes,
+        solid,
+    ] {
+        assert!(!settings.contains(value));
+        assert!(!audit.contains(value));
     }
 }

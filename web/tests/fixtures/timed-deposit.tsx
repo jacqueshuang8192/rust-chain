@@ -25,11 +25,12 @@ const settings={
 // Opt-in RPC fixture keeps the existing review/recovery scenarios intact.
 const params = new URLSearchParams(location.search);
 const rpcMode = params.has('rpc');
+const customNetwork = params.get('custom-network') ?? 'base';
 const rpcSettings = parseSettings({ ...settings, rpc_presets: rpcPresetFixture, scanners: networkOptions.map(({ value }) => ({
-  ...scanner, network: value, enabled: false, endpoint_configured: params.has('custom') && value === 'base', api_key_configured: params.has('custom') && value === 'base',
+  ...scanner, network: value, enabled: false, endpoint_configured: params.has('custom') && value === customNetwork, api_key_configured: params.has('custom') && value === customNetwork,
   scan_fresh: false, last_scan_at: null, cursor_height: null,
   streams: value === 'base' ? ['native', 'token'].map(stream => ({ ...progress, stream, scan_fresh: false, last_scan_at: null, cursor_height: null })) : [],
-  providers: params.has('custom') && value === 'base' ? [{ id: 10, network: value, preset_id: null, name: '已有自定义渠道', priority: 0, enabled: true, request_interval_ms: 500, cooldown_until: null, last_error: 'HTTP 429 请求限流', last_success_at: null,
+  providers: params.has('custom') && value === customNetwork ? [{ id: 10, network: value, preset_id: null, name: '已有自定义渠道', priority: 0, enabled: true, request_interval_ms: 500, cooldown_until: null, last_error: 'HTTP 429 请求限流', last_success_at: null,
     keys: [{ id: 20, provider_id: 10, name: '已有凭据', priority: 0, enabled: true, api_key_configured: true, request_interval_ms: 500, cooldown_until: null, last_error: null, last_success_at: null }] }] : []
 })) });
 const order={id:1,order_no:'CD-local-payment-review',user_id:5,asset_symbol:'ETH',network:'eth',asset_kind:'native',token_address:'',address,amount:'100',fee_amount:'0.01',paid_amount:null as string|null,status:'review',created_at:now-20000,expires_at:now+1780000,required_confirmations:12,tx_hash:null};
@@ -40,10 +41,10 @@ window.fetch=async(input,init)=>{
   const body = JSON.parse(String(init.body));
   const target = rpcSettings.scanners.find(row => path.endsWith('/'+row.network));
   if(!target || params.has('conflict') || body.expected_revision !== target.revision) return Response.json({code:'CONFLICT',message:'configuration conflict'},{status:409});
-  Object.assign(target, {enabled:body.enabled, confirmations:body.confirmations, revision:target.revision+1, endpoint_configured:true, api_key_configured:false,
-    providers:body.providers.map((provider: Record<string, unknown>, index: number) => ({...provider,id:provider.id??index+100,network:target.network,cooldown_until:null,last_error:null,last_success_at:null,
-      keys:(provider.keys as Array<Record<string, unknown>>).map((key,k) => ({...key,id:key.id??index*10+k+100,provider_id:provider.id??index+100,api_key_configured:provider.preset_id?false:key.id===20,cooldown_until:null,last_error:null,last_success_at:null}))}))});
-  document.documentElement.dataset.savedPresetIds = target.providers.map(provider=>provider.preset_id??'custom').join(',');
+  Object.assign(target, {enabled:body.enabled, confirmations:body.confirmations, revision:target.revision+1, endpoint_configured:true, api_key_configured:body.providers.some((provider: {keys: Array<{api_key: string|null}>}) => provider.keys.some(key => Boolean(key.api_key))),
+    providers:body.providers.map((provider: Record<string, unknown>, index: number) => ({...provider,endpoint:undefined,id:provider.id??index+100,network:target.network,cooldown_until:null,last_error:null,last_success_at:null,
+      keys:(provider.keys as Array<Record<string, unknown>>).map((key,k) => ({...key,id:key.id??index*10+k+100,provider_id:provider.id??index+100,api_key_configured:provider.preset_id||key.clear_api_key?false:Boolean(key.api_key)||key.id===20,api_key:undefined,cooldown_until:null,last_error:null,last_success_at:null}))}))});
+  document.documentElement.dataset.savedPresetIds = target.providers.map(provider=>provider.preset_id||'custom').join(',');
   return new Response(null,{status:204});
  }
  if(rpcMode && path.endsWith('/deposit-settings')) return Response.json(rpcSettings);

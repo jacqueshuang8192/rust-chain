@@ -187,7 +187,7 @@ it.each(assetPresets)('applies $id only to a draft and sends the selected mainne
   await waitFor(() => expect(mocked).toHaveBeenCalledWith('/admin/api/v1/wallet/deposit-settings/assets', { method: 'PUT', body: JSON.stringify({ network: preset.network, asset_symbol: preset.symbol, asset_kind: preset.kind, token_address: preset.token, decimals: preset.decimals, enabled: true, expected_revision: 0, reason: '使用已核对主网预设' }) }));
 });
 
-it.each(nodePresets)('fills $id without enabling admission or sending unresolved credentials', async (preset) => {
+it.each(nodePresets.filter(preset => !preset.freeAccount))('fills $id without enabling admission or sending unresolved credentials', async (preset) => {
   const user = userEvent.setup();
   mocked.mockResolvedValue({ ...settings, scanners: [{ ...settings.scanners[0], network: preset.network, streams: preset.network === 'base' ? ['native', 'token'].map(stream => ({ ...settings.scanners[0], stream })) : [], enabled: false, endpoint_configured: false }] });
   show();
@@ -446,7 +446,7 @@ it('shows isolated Base progress and recovers only the chosen token stream', asy
 });
 
 
-it.each(['eth', 'base', 'tron', 'btc', 'solana'])('prefills anonymous defaults for %s without enabling deposits', async network => {
+it.each(['base', 'tron', 'btc', 'solana'])('prefills anonymous defaults for %s without enabling deposits', async network => {
   const user = userEvent.setup();
   mocked.mockResolvedValue({ ...settings, rpc_presets: rpcPresetFixture, scanners: [{ ...settings.scanners[0], network, streams: network === 'base' ? ['native', 'token'].map(stream => ({ ...settings.scanners[0], stream })) : [], enabled: false, endpoint_configured: false, api_key_configured: false }] });
   show(); await screen.findByRole('combobox', { name: '配置网络' });
@@ -474,14 +474,19 @@ it.each(['eth', 'base', 'tron', 'btc', 'solana'])('prefills anonymous defaults f
   }
 });
 
-it('appends defaults once, retains custom keys, and preserves a conflicting free-channel draft', async () => {
+it('appends an account template once, retains custom keys, and preserves a conflicting draft', async () => {
   const user = userEvent.setup(); mocked.mockResolvedValue({ ...withProviders(), rpc_presets: rpcPresetFixture }); show();
   await user.click(await screen.findByRole('button', { name: '编辑监听配置' }));
-  await user.click(screen.getByRole('button', { name: '补充免费默认渠道' }));
+  expect(screen.getByRole('button', { name: '补充免费默认渠道' })).toBeDisabled();
+  await user.click(screen.getByRole('button', { name: '添加所选账号渠道' }));
+  expect(screen.getByRole('button', { name: '添加所选账号渠道' })).toBeDisabled();
   expect(screen.getByRole('button', { name: '补充免费默认渠道' })).toBeDisabled();
   expect(screen.getByLabelText('渠道 1 名称')).toHaveValue('Primary');
   expect(screen.getByLabelText('渠道 1 凭据 1 API Key')).toHaveValue('');
-  expect(screen.getByLabelText('渠道 2 名称')).toHaveValue('dRPC · Ethereum');
+  expect(screen.getByLabelText('渠道 2 名称')).toHaveValue('Chainnodes · Ethereum');
+  expect(screen.getByLabelText('渠道 2 节点地址')).toHaveValue('https://mainnet.chainnodes.org/{API_KEY}');
+  expect(screen.getByRole('button', { name: '保存监听配置' })).toBeDisabled();
+  await user.type(screen.getByLabelText('渠道 2 凭据 1 API Key'), 'fixture/a?b');
   await user.click(screen.getByRole('button', { name: '保存监听配置' }));
   await user.type(screen.getByRole('textbox', { name: '操作原因' }), '补充免费备用');
   mocked.mockRejectedValueOnce(new ApiError(409, 'CONFLICT', 'changed'));
@@ -490,21 +495,22 @@ it('appends defaults once, retains custom keys, and preserves a conflicting free
   const body = JSON.parse(String(mocked.mock.calls.find(([, init]) => init?.method === 'PUT')![1]?.body));
   expect(body.providers).toHaveLength(2);
   expect(body.providers[0]).toMatchObject({ id: 10, preset_id: '', endpoint: null, keys: [{ id: 20, api_key: null, clear_api_key: false }] });
-  expect(body.providers[1]).toMatchObject({ preset_id: 'eth-drpc', endpoint: null, priority: 1 });
+  expect(body.providers[1]).toMatchObject({ preset_id: '', endpoint: 'https://mainnet.chainnodes.org/{API_KEY}', priority: 1, keys: [{ id: null, api_key: 'fixture/a?b', clear_api_key: false }] });
   expect(screen.getByRole('textbox', { name: '操作原因' })).toHaveValue('补充免费备用');
-  expect(screen.getByLabelText('渠道 2 名称')).toHaveValue('dRPC · Ethereum');
+  expect(screen.getByLabelText('渠道 2 名称')).toHaveValue('Chainnodes · Ethereum');
+  expect(screen.getByLabelText('渠道 2 凭据 1 API Key')).toHaveValue('fixture/a?b');
 });
 
 it('explicitly switches a custom provider to anonymous preset and back to custom', async () => {
   const user = userEvent.setup(); mocked.mockResolvedValue({ ...withProviders(), rpc_presets: rpcPresetFixture }); show();
   await user.click(await screen.findByRole('button', { name: '编辑监听配置' }));
-  await choose(user, '渠道 1 来源', 'dRPC · Ethereum（默认）');
+  await choose(user, '渠道 1 来源', 'dRPC · Ethereum');
   expect(screen.getByText(/会清除本渠道原有密钥/)).toBeInTheDocument();
   expect(screen.queryByLabelText('渠道 1 凭据 1 API Key')).not.toBeInTheDocument();
   await choose(user, '渠道 1 来源', '自定义 RPC / 自有 API Key');
   expect(screen.getByLabelText('渠道 1 节点地址')).toHaveValue('https://eth.drpc.org');
   expect(screen.getByRole('switch', { name: '清除渠道 1 凭据 1 密钥' })).toBeChecked();
-  await choose(user, '渠道 1 来源', 'dRPC · Ethereum（默认）');
+  await choose(user, '渠道 1 来源', 'dRPC · Ethereum');
   await user.click(screen.getByRole('button', { name: '保存监听配置' }));
   await user.type(screen.getByRole('textbox', { name: '操作原因' }), '切换免费渠道');
   await user.click(screen.getByRole('button', { name: '确认' }));
@@ -536,4 +542,60 @@ it('rejects malformed catalogs and accepts absent catalogs for older responses',
   for (const rpc_presets of [null, {}, [{ ...rpcPresetFixture[0], source: 'javascript:alert(1)' }], [{ ...rpcPresetFixture[0], recommended: 'true' }], [rpcPresetFixture[0], rpcPresetFixture[0]]]) {
     expect(() => parseSettings({ ...settings, rpc_presets })).toThrow();
   }
+});
+
+it('starts Ethereum with an unsaved account template and requires its own key', async () => {
+  const user = userEvent.setup();
+  mocked.mockResolvedValue({ ...settings, rpc_presets: rpcPresetFixture, scanners: [{ ...settings.scanners[0], enabled: false, endpoint_configured: false, api_key_configured: false }] });
+  show(); await user.click(await screen.findByRole('button', { name: '编辑监听配置' }));
+  expect(screen.getByRole('switch', { name: '接受新充值订单' })).not.toBeChecked();
+  expect(screen.getByLabelText('渠道 1 名称')).toHaveValue('Chainnodes · Ethereum');
+  expect(screen.getByLabelText('渠道 1 节点地址')).toHaveValue('https://mainnet.chainnodes.org/{API_KEY}');
+  expect(screen.getByRole('button', { name: '保存监听配置' })).toBeDisabled();
+  expect(screen.getByRole('button', { name: '添加所选账号渠道' })).toBeDisabled();
+  expect(screen.getByRole('link', { name: '申请免费账号 / 获取 Key' })).toHaveAttribute('href', 'https://app.chainnodes.org/');
+  await choose(user, '账号渠道模板', 'Ethereum · SolidRPC（免费备用）');
+  expect(screen.getByRole('link', { name: '申请免费账号 / 获取 Key' })).toHaveAttribute('href', 'https://solidrpc.io/register');
+  await user.click(screen.getByRole('button', { name: '添加所选账号渠道' }));
+  expect(screen.getByLabelText('渠道 2 节点地址')).toHaveValue('https://rpc.solidrpc.io/{API_KEY}/evm/1');
+  await user.type(screen.getByLabelText('渠道 1 凭据 1 API Key'), 'chainnodes-fixture');
+  expect(screen.getByRole('button', { name: '保存监听配置' })).toBeDisabled();
+  await user.type(screen.getByLabelText('渠道 2 凭据 1 API Key'), 'solid-fixture');
+  expect(mocked.mock.calls.every(([, init]) => !init?.method)).toBe(true);
+  await user.click(screen.getByRole('button', { name: '保存监听配置' }));
+  await user.type(screen.getByRole('textbox', { name: '操作原因' }), '配置免费账号主备');
+  await user.click(screen.getByRole('button', { name: '确认' }));
+  await waitFor(() => expect(mocked.mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(true));
+  const body = JSON.parse(String(mocked.mock.calls.find(([, init]) => init?.method === 'PUT')![1]?.body));
+  expect(body).toMatchObject({ enabled: false, expected_revision: 7, endpoint: null, api_key: null });
+  expect(body.providers).toHaveLength(2);
+  expect(body.providers[0]).toMatchObject({ preset_id: '', priority: 0, endpoint: 'https://mainnet.chainnodes.org/{API_KEY}', keys: [{ api_key: 'chainnodes-fixture' }] });
+  expect(body.providers[1]).toMatchObject({ preset_id: '', priority: 1, endpoint: 'https://rpc.solidrpc.io/{API_KEY}/evm/1', request_interval_ms: 1000, keys: [{ api_key: 'solid-fixture', request_interval_ms: 1000 }] });
+  expect(body.providers.every((provider: Record<string, unknown>) => !('template_id' in provider))).toBe(true);
+});
+
+it('replaces template credentials without reusing a saved key and cancels without writing', async () => {
+  const user = userEvent.setup(); mocked.mockResolvedValue({ ...withProviders(), rpc_presets: rpcPresetFixture }); show();
+  await user.click(await screen.findByRole('button', { name: '编辑监听配置' }));
+  await choose(user, '渠道 1 服务商模板', 'Ethereum · Chainnodes（免费账号）');
+  expect(screen.getByLabelText('渠道 1 凭据 1 API Key')).toHaveValue('');
+  expect(screen.getByRole('button', { name: '保存监听配置' })).toBeDisabled();
+  expect(screen.queryByRole('switch', { name: '清除渠道 1 凭据 1 密钥' })).not.toBeInTheDocument();
+  await user.type(screen.getByLabelText('渠道 1 凭据 1 API Key'), 'first-provider-fixture');
+  await choose(user, '渠道 1 服务商模板', 'Ethereum · SolidRPC（免费备用）');
+  expect(screen.getByLabelText('渠道 1 凭据 1 API Key')).toHaveValue('');
+  expect(screen.getByRole('button', { name: '保存监听配置' })).toBeDisabled();
+  await user.type(screen.getByLabelText('渠道 1 凭据 1 API Key'), 'replacement-fixture');
+  await user.click(screen.getByRole('button', { name: '保存监听配置' }));
+  await user.type(screen.getByRole('textbox', { name: '操作原因' }), '更换账号渠道');
+  mocked.mockRejectedValueOnce(new ApiError(409, 'CONFLICT', 'changed'));
+  await user.click(screen.getByRole('button', { name: '确认' }));
+  expect(await screen.findByText(/数据状态已变化/)).toBeInTheDocument();
+  const body = JSON.parse(String(mocked.mock.calls.find(([, init]) => init?.method === 'PUT')![1]?.body));
+  expect(body.providers).toHaveLength(1);
+  expect(body.providers[0]).toMatchObject({ id: 10, endpoint: 'https://rpc.solidrpc.io/{API_KEY}/evm/1', keys: [{ id: null, api_key: 'replacement-fixture', clear_api_key: false }] });
+  await user.click(screen.getByRole('button', { name: '取消' }));
+  await user.click(screen.getByRole('button', { name: '取消编辑' }));
+  await user.click(screen.getByRole('button', { name: '放弃草稿' }));
+  expect(mocked.mock.calls.filter(([, init]) => init?.method === 'PUT')).toHaveLength(1);
 });
