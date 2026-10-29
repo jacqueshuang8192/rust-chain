@@ -1,4 +1,4 @@
 {"file": ".trellis/spec/backend/timed-deposits.md", "reason": "Deposit evidence, cursor, cooldown and lease contracts."}
 {"file": ".trellis/spec/backend/database-guidelines.md", "reason": "Immutable migrations and preservation."}
 {"file": ".trellis/spec/admin/ui-system.md", "reason": "Admin drafts, permission and responsive contracts."}
-{"file": ".trellis/tasks/10-29-builtin-free-rpc-channels/research/providers.md", "reason": "Official provider sources and actual capability findings."}
+{"file": ".trellis/tasks/archive/2026-10/10-29-builtin-free-rpc-channels/research/providers.md", "reason": "Official provider sources and actual capability findings."}
