@@ -51,6 +51,16 @@ export const rpcPresetFixture = [
     "request_interval_ms": 500
   },
   {
+    "id": "tron-publicnode",
+    "network": "tron",
+    "name": "PublicNode · Tron",
+    "endpoint": "https://tron-rpc.publicnode.com",
+    "source": "https://tron.publicnode.com/",
+    "note": "免注册、免密钥；TRC20 主网区块、合约精度和整块回执样本验证通过。公共服务有频率及容量限制，不保证持续吞吐；默认低频作为备用，实际到账以完整扫描状态为准，暂不支持原生 TRX。",
+    "recommended": true,
+    "request_interval_ms": 1000
+  },
+  {
     "id": "solana-publicnode",
     "network": "solana",
     "name": "PublicNode · Solana",

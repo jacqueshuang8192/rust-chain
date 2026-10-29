@@ -15,6 +15,7 @@ export type NodePreset = {
     plan: '免费账号' | '免费备用' | '需付费权限' | '试用 / 付费' | '按账号套餐';
     credential: 'url-key' | 'tron-header' | 'endpoint';
     setup: string;
+    freeTier?: { quota: string; source: string; checkedOn: string };
     publicPresetIds?: readonly string[];
   };
 };
@@ -29,18 +30,21 @@ const scanRequirements: Record<string, string> = {
 };
 function chainstack(network: string): NodePreset {
   const name = networkNames[network];
-  const plan = network === 'eth' ? '需付费权限' : '按账号套餐';
+  const plan = network === 'eth' ? '需付费权限' : network === 'tron' ? '免费账号' : '按账号套餐';
   return { id: `${network}-chainstack`, network, label: `${name} · Chainstack（${plan}）`, endpoint: '', confirmations: depth[network],
     account: { provider: 'chainstack', name: `Chainstack · ${name}`, signup: 'https://console.chainstack.com/', interval: 500, plan, credential: 'endpoint',
-      setup: '从 Chainstack 控制台复制该主网的完整 HTTPS 节点地址（含节点访问令牌），填入节点基础地址；不要填平台管理 API Key。Tron 地址不要重复包含 /wallet 方法路径。' },
+      setup: '从 Chainstack 控制台复制该主网的完整 HTTPS 节点地址（含节点访问令牌），填入节点基础地址；不要填平台管理 API Key。Tron 地址不要重复包含 /wallet 方法路径。',
+      ...(network === 'tron' ? { freeTier: { quota: 'Developer 免费计划：每月 300 万 RU、25 次/秒、1 个节点，无需信用卡。Tron 请求按 RU 计费；不要开通付费超额用量。', source: 'https://chainstack.com/build-better-with-tron/', checkedOn: '2026-10-29' } } : {}) },
     note: `${scanRequirements[network]} ${network === 'eth' ? '官方要求付费计划的 Global Node 才能使用 debug/trace。' : '节点和方法的免费额度、历史范围及套餐权限需在控制台核对。'} 模板只核对文档，须等待完整扫描成功。`,
     source: network === 'eth' ? 'https://docs.chainstack.com/docs/debug-and-trace-apis' : `https://docs.chainstack.com/docs/${network === 'btc' ? 'bitcoin' : network}-tooling` };
 }
 function ankr(network: 'tron' | 'btc' | 'solana'): NodePreset {
   const name = networkNames[network];
-  return { id: `${network}-ankr`, network, label: `${name} · Ankr（按账号套餐）`, endpoint: `https://rpc.ankr.com/${network === 'tron' ? 'premium-http/tron' : network}/{API_KEY}`, confirmations: depth[network],
-    account: { provider: 'ankr', name: `Ankr · ${name}`, signup: 'https://www.ankr.com/rpc/', interval: 1000, plan: '按账号套餐', credential: 'url-key',
-      setup: '创建该主网的 RPC API Key，填入下方独立凭据。确认账户开放所需方法和历史数据；同一账号的多个 Key 可能共享额度。' },
+  const plan = network === 'tron' ? '免费账号' : '按账号套餐';
+  return { id: `${network}-ankr`, network, label: `${name} · Ankr（${plan}）`, endpoint: `https://rpc.ankr.com/${network === 'tron' ? 'premium-http/tron' : network}/{API_KEY}`, confirmations: depth[network],
+    account: { provider: 'ankr', name: `Ankr · ${name}`, signup: 'https://www.ankr.com/rpc/', interval: 1000, plan, credential: 'url-key',
+      setup: '创建该主网的 RPC API Key，填入下方独立凭据。确认账户开放所需方法和历史数据；同一账号的多个 Key 可能共享额度。',
+      ...(network === 'tron' ? { freeTier: { quota: 'Freemium 免费计划：每月 2 亿 API credits，Tron 页面标示 30 次/秒。credits 不等于请求次数；选择原生 HTTP 地址，账号 Key 不需要充值。', source: 'https://www.ankr.com/docs/rpc-service/service-plans/', checkedOn: '2026-10-29' } } : {}) },
     note: `${scanRequirements[network]} 公开地址、普通 RPC 与原生 HTTP 的权限可能不同，以账号套餐和完整扫描为准。`,
     source: `https://www.ankr.com/docs/rpc-service/chains/chains-api/${network}/` };
 }
@@ -76,12 +80,14 @@ export const nodePresets: readonly NodePreset[] = [
     note: `${scanRequirements.base} 免费计划仍有 CU、批量请求及频率限制；以完整扫描状态为准。`, source: 'https://www.alchemy.com/docs/chains/base/base-api-quickstart' },
   chainstack('base'),
   { id: 'tron-trongrid', network: 'tron', label: 'Tron · TronGrid 主网', endpoint: 'https://api.trongrid.io', confirmations: 20, legacy: true,
-    account: { provider: 'trongrid', name: 'TronGrid · Tron', signup: 'https://www.trongrid.io/', interval: 500, plan: '免费账号', credential: 'tron-header', publicPresetIds: ['tron-trongrid-public'], setup: '填入自己的 TronGrid API Key，系统通过 TRON-PRO-API-KEY 请求头发送。与免密钥 TronGrid 属于同一服务商，不重复计数。' },
+    account: { provider: 'trongrid', name: 'TronGrid · Tron', signup: 'https://www.trongrid.io/', interval: 500, plan: '免费账号', credential: 'tron-header', publicPresetIds: ['tron-trongrid-public'], setup: '填入自己的 TronGrid API Key，系统通过 TRON-PRO-API-KEY 请求头发送。与免密钥 TronGrid 属于同一服务商，不重复计数。',
+      freeTier: { quota: 'Basic 免费计划：每天 10 万次请求、最多 3 个 API Key。Key 不会增加账户总额度；频率限制以控制台与接口响应为准。', source: 'https://www.trongrid.io/price', checkedOn: '2026-10-29' } },
     note: 'TronGrid 免费账号仍有每日和频率限制；这里监听 TRC20，必须读取完整交易回执，不能仅凭转账调用参数入账。', source: 'https://developers.tron.network/reference/rate-limits' },
   ankr('tron'),
-  { id: 'tron-alchemy', network: 'tron', label: 'Tron · Alchemy（按账号套餐）', endpoint: 'https://tron-mainnet.g.alchemy.com/v2/{API_KEY}', confirmations: 20,
-    account: { provider: 'alchemy', name: 'Alchemy · Tron', signup: 'https://dashboard.alchemy.com/', interval: 1000, plan: '按账号套餐', credential: 'url-key', setup: '创建 Tron Mainnet 应用，填入应用 API Key。必须开放原生 HTTP / Wallet API，不是只支持 EVM 兼容 JSON-RPC 的地址。' },
-    note: `${scanRequirements.tron} 先核对 Tron 套餐与全部所需方法权限；模板不代表已验证到账或持续吞吐。`, source: 'https://www.alchemy.com/docs/chains/tron/tron-api-quickstart' },
+  { id: 'tron-alchemy', network: 'tron', label: 'Tron · Alchemy（免费账号）', endpoint: 'https://tron-mainnet.g.alchemy.com/v2/{API_KEY}', confirmations: 20,
+    account: { provider: 'alchemy', name: 'Alchemy · Tron', signup: 'https://dashboard.alchemy.com/', interval: 1000, plan: '免费账号', credential: 'url-key', setup: '创建 Tron Mainnet 应用，填入应用 API Key。必须开放原生 HTTP / Wallet API，不是只支持 EVM 兼容 JSON-RPC 的地址。',
+      freeTier: { quota: 'Free 免费计划：每月 3000 万 CU、15 次/秒。不同方法消耗不同 CU，不能按请求次数估算额度；不要切换付费套餐。', source: 'https://www.alchemy.com/pricing', checkedOn: '2026-10-29' } },
+    note: `${scanRequirements.tron} 官方免费计划提供主网访问；须核对账号方法权限，模板不代表已验证到账或持续吞吐。`, source: 'https://www.alchemy.com/docs/reference/tron-api-quickstart' },
   chainstack('tron'), quicknode('tron'),
   { id: 'btc-getblock', network: 'btc', label: 'Bitcoin · GetBlock（按账号套餐）', endpoint: '', confirmations: 6,
     account: { provider: 'getblock', name: 'GetBlock · Bitcoin', signup: 'https://account.getblock.io/', interval: 1000, plan: '按账号套餐', credential: 'endpoint', setup: '在控制台为 Bitcoin Mainnet 创建 JSON-RPC 节点，复制含 Access Token 的完整区域节点地址；不要选择 Blockbook / REST，也不要填账户管理 API Key。下方 API Key 留空。' },
@@ -99,8 +105,8 @@ export const nodePresets: readonly NodePreset[] = [
 ];
 
 /** Count distinct documented account providers plus recommended public profiles; credentials are not channels. */
-export function providerChoiceCount(network: string, publicPresets: readonly { id: string; network: string; recommended: boolean }[]) {
-  const accounts = nodePresets.filter(row => row.network === network && row.account);
+export function providerChoiceCount(network: string, publicPresets: readonly { id: string; network: string; recommended: boolean }[], freeOnly = false) {
+  const accounts = nodePresets.filter(row => row.network === network && row.account && (!freeOnly || row.account.freeTier));
   const publicAliases = new Set(accounts.flatMap(row => row.account?.publicPresetIds ?? []));
   return new Set(accounts.map(row => row.account!.provider)).size
     + publicPresets.filter(row => row.network === network && row.recommended && !publicAliases.has(row.id)).length;

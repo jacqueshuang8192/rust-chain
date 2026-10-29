@@ -70,6 +70,11 @@ fn public_catalog_covers_every_network_without_keys_and_keeps_optional_nodes_dis
             .unwrap()
             .recommended
     );
+    let tron = rpc_presets::find("tron", "tron-publicnode").unwrap();
+    assert!(tron.recommended);
+    assert_eq!(tron.endpoint, "https://tron-rpc.publicnode.com");
+    assert_eq!(tron.request_interval_ms, 1000);
+    assert!(rpc_presets::find("base", "tron-publicnode").is_none());
 }
 
 #[tokio::test]
@@ -254,6 +259,17 @@ async fn public_presets_migrate_preserve_cooldowns_isolate_credentials_and_fence
     }
     let settings = app::settings(&pool).await.unwrap();
     assert_eq!(settings.rpc_presets.len(), rpc_presets::PRESETS.len());
+    let tron = settings
+        .scanners
+        .iter()
+        .find(|s| s.network == "tron")
+        .unwrap();
+    assert_eq!(tron.providers.len(), 2);
+    assert!(
+        tron.providers
+            .iter()
+            .any(|p| p.preset_id.as_deref() == Some("tron-publicnode"))
+    );
     for scanner in &settings.scanners {
         assert!(!scanner.enabled);
         assert!(!scanner.scan_fresh);

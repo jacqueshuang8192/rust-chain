@@ -840,3 +840,11 @@ Wrong: mark a Base provider healthy after ERC20 succeeds despite a live native c
 Correct: show eligibility per stream and retain the independent network admission status.
 Wrong: count multiple keys as independent provider capacity.
 Correct: preserve provider/key pacing and bounded, sequential failover.
+
+
+### Tron PublicNode catalog extension (2026-10-29)
+
+- Add `tron-publicnode` at `https://tron-rpc.publicnode.com`, recommended with 1000ms spacing; preserve existing preset identities and pool order. Uses the unchanged native HTTP/TRC20 complete-receipt adapter, never the JSON-RPC-only endpoint.
+- Qualification requires bounded read-only genesis, decimals, recent head, complete block/receipt IDs and matching height/time samples; the result is a setup recommendation, not sustained-capacity evidence. Account templates qualify free tiers from official method/pricing documentation separately.
+- No new migration, startup seed, automatic pool modification or new DTO is needed. Operators update API/worker/admin together and explicitly append/save. Existing 0168 identity, anonymous-key clearing, revision and cooldown rules apply.
+- Tests must exercise catalog lookup in the right network, saved two-provider Tron anonymous pool, old private-key preservation, new anonymous slot interval and public/account alias counting.

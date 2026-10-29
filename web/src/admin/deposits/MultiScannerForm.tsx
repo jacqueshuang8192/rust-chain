@@ -77,8 +77,10 @@ export function MultiScannerForm({ scanner, presets: catalog = [], dirty, busy, 
     {accountTemplate ? <section className="deposit-preset" aria-label="服务商渠道目录">
       <strong>服务商渠道 · {providerChoiceCount(scanner.network, presets)} 家可选</strong>
       <p>每个网络提供至少 5 家服务商选择。选择模板、填写该服务商的凭据并保存后，才会加入主备监听；模板数量不代表已配置或当前可用数量。各服务商独立配置，多个 Key 不重复计数。</p>
+      {scanner.network === 'tron' ? <p><strong>其中 {providerChoiceCount(scanner.network, presets, true)} 家提供免费访问。</strong> 公共渠道免 Key；免费账号渠道需自行注册并填写凭据，试用和付费渠道不计入免费数量。免费额度有上限，同一家公共与账号入口只计一次。</p> : null}
       <label id="account-rpc-template">账号渠道模板</label><AdminSelect motion={false} ariaLabel="账号渠道模板" ariaLabelledBy="account-rpc-template" disabled={busy} value={accountTemplateId} optionList={accountTemplates.map(template => ({ value: template.id, label: template.label }))} onChange={setAccountTemplateId} />
       <p><Tag>{accountTemplate.account?.plan}</Tag> {accountTemplate.note}</p><p>{accountTemplate.account?.setup}</p>
+      {accountTemplate.account?.freeTier ? <p>{accountTemplate.account.freeTier.quota} <a href={accountTemplate.account.freeTier.source} target="_blank" rel="noopener noreferrer">查看免费额度说明</a>（核查于 {accountTemplate.account.freeTier.checkedOn}，以官方及账号当前限制为准）</p> : null}
       <p><a href={accountTemplate.account?.signup} target="_blank" rel="noopener noreferrer">开通渠道 / 获取凭据</a> · <a href={accountTemplate.source} target="_blank" rel="noopener noreferrer">查看账号渠道说明</a></p>
       <Button disabled={busy || rows.length >= 10 || rows.some(row => row.template_id === accountTemplate.id)} onClick={() => append([fromTemplate(accountTemplate, nextPriority)])}>添加所选账号渠道</Button>
     </section> : null}

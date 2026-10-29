@@ -71,7 +71,7 @@ Base 分为 **ETH 原生币** 和 **ERC20 代币（包括 USDC）** 两路，各
 | Base | PublicNode 主用、dRPC 备用 | ETH 直接转账、USDC 等已配置 ERC20；整块读取减少逐笔交易请求 |
 | Ethereum | 免费账号模板：Chainnodes；SolidRPC 可选备用 | 需自行申请 API Key；官方文档提供区块 callTracer，尚未用实际账号验证。dRPC 匿名渠道不再默认推荐 |
 | Bitcoin | PublicNode | BTC，读取主网完整交易输出 |
-| Tron | TronGrid 匿名访问 | TRC20；匿名限流较严格，原生 TRX 不支持 |
+| Tron | TronGrid 匿名访问、PublicNode | TRC20；PublicNode 默认 1000ms 间隔作为备用，公共服务有限流，原生 TRX 不支持 |
 | Solana | PublicNode | SOL、经典 SPL Token，兼容 legacy/V0/V1，Token2022 不支持 |
 
 Base、Bitcoin、Tron、Solana 的默认项免注册、免 API Key。首次打开监听配置会生成草稿；已有配置点击“补充免费默认渠道”追加未存在的默认项，不覆盖自有节点。Ethereum 新配置改为账号模板草稿，流程见下节。填写操作原因并确认保存后生效，不自动打开接单。仍需配置监听币种、真实收款地址与平台充值开关，再等完整扫描成功。未配置的网络不会仅因目录存在就自动请求节点。
@@ -258,7 +258,7 @@ ETH 和 SOL 为原生币，无合约或 mint。收款地址仍需自行添加，
 | --- | --- |
 | Ethereum | Chainnodes、SolidRPC、Google Cloud、Alchemy、Chainstack |
 | Base | PublicNode、dRPC、Chainnodes、Alchemy、Chainstack |
-| Tron | TronGrid、Ankr、Alchemy、Chainstack、QuickNode |
+| Tron | TronGrid、PublicNode、Ankr、Alchemy、Chainstack，另有试用 / 付费 QuickNode |
 | Bitcoin | PublicNode、GetBlock、Ankr、Chainstack、dRPC |
 | Solana | PublicNode、Helius、Ankr、Chainstack、QuickNode |
 
@@ -271,4 +271,22 @@ Ethereum 的 Alchemy、Chainstack 需要付费 trace 权限，QuickNode 标记�
 
 更换已有渠道的模板后会重建空白凭据，且必须填写新节点地址；不会因为留空而把原服务商地址错误保留下来。未更换模板的原配置仍支持留空保留，已有冷却、游标和账务规则不变。本次仅更新后台模板与校验，没有迁移和扫描器改动。
 
-新增账号条目按官方方法文档核对，没有使用管理员真实 Key 实测或执行实链付款。公开 dRPC Bitcoin/Tron 探测返回 403，因此没有增加新的免密钥默认项；账号访问权限与持续吞吐仍须保存后观察完整扫描状态。
+新增账号条目按官方方法文档核对，没有使用管理员真实 Key 实测或执行实链付款。前次公开 dRPC Bitcoin/Tron 探测返回 403，未纳入默认项；本次新增 PublicNode Tron，验证范围见下节。账号访问权限与持续吞吐仍须保存后观察完整扫描状态。
+
+## Tron 至少五家免费渠道（2026-10-29 核查）
+
+后台 Tron 目录区分「全部服务商」与「提供免费访问的服务商」，当前为 6 家可选、其中 5 家免费。下列免费计划可持续申请使用，不把限时试用算作免费；额度或接口权限可能调整，请以官方及账户当前限制为准。
+
+| 免费服务商 | 使用方式 | 免费限制与官方依据 |
+| --- | --- | --- |
+| PublicNode | 免注册、免 Key；点击「补充免费默认渠道」加入备用 | [官方公开主网](https://tron.publicnode.com/)，公共容量与限流无独立账号配额保证，默认请求间隔 1000ms |
+| TronGrid | 免 Key 公共入口或免费账号的 `TRON-PRO-API-KEY` 请求头 | [Basic](https://www.trongrid.io/price)：每天 10 万次请求、3 个 Key；多个 Key 共用额度，频率限制以官方与接口响应为准 |
+| Ankr | 注册 Freemium，申请 Tron 主网 Key；使用原生 HTTP 模板 | [Freemium](https://www.ankr.com/docs/rpc-service/service-plans/)：每月 2 亿 API credits，[Tron 页面](https://www.ankr.com/web3-api/chains-list/tron/)标示 30 次/秒；credits 不等于请求次数 |
+| Alchemy | 免费应用开启 Tron Mainnet，填独立 Key | [Free](https://www.alchemy.com/pricing)：每月 3000 万 CU、15 次/秒；不同方法消耗不同 CU |
+| Chainstack | 免费 Developer 创建 Tron 主网节点，复制含令牌的完整 HTTPS 地址 | [Tron 免费计划](https://chainstack.com/build-better-with-tron/)：每月 300 万 RU、25 次/秒、1 个节点，无需信用卡；不要开通付费超额用量 |
+
+TronGrid 的公共/账号入口只算一家。QuickNode 仍是明确标注的试用 / 付费选项，不计入这 5 家免费渠道。GetBlock 的免费产品入口已查到，但本次没有确认当前文档中的整块交易回执方法，未用它凑数。
+
+PublicNode 的固定身份为 `tron-publicnode`，原生 HTTP 基础地址为 `https://tron-rpc.publicnode.com`。本次只读样本核对了主网创世块、USDT 精度 6、实时区块与确认区块，496 笔交易的回执全部匹配且区块高度/时间一致。仅说明该样本满足当前 TRC20 扫描校验，不保证历史全范围、长期速率或实链到账。其他免费账号未使用真实 Key 验证。
+
+已有渠道不会自动增加或改变：更新同版 API、worker 与后台后，进入 Tron 的「编辑监听配置」，点击「补充免费默认渠道」，或选择免费账号模板填写凭据，输入原因确认保存。新增 PublicNode 保留原主备顺序，免费额度说明只在后台展示，不进入保存 DTO；主备冷却、完整回执校验和扫描游标规则保持不变。本次没有新增迁移。

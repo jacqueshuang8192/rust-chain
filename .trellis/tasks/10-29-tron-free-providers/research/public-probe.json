@@ -1,0 +1,36 @@
+{
+  "checked_at": "2026-10-29T15:39:10.344047+00:00",
+  "endpoint": "https://tron-rpc.publicnode.com",
+  "requests": [
+    {
+      "method": "getblockbynum",
+      "status": 200
+    },
+    {
+      "method": "triggerconstantcontract",
+      "status": 200
+    },
+    {
+      "method": "getnowblock",
+      "status": 200
+    },
+    {
+      "method": "getblockbynum",
+      "status": 200
+    },
+    {
+      "method": "gettransactioninfobyblocknum",
+      "status": 200
+    }
+  ],
+  "genesis_mainnet": true,
+  "usdt_decimals_six": true,
+  "head_height": 87538345,
+  "head_age_seconds": 6,
+  "sample_height": 87538325,
+  "transactions": 496,
+  "receipts": 496,
+  "complete_receipts": true,
+  "matching_block_identity": true,
+  "passed": true
+}

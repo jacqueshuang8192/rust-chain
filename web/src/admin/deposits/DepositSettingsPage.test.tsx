@@ -538,7 +538,7 @@ it.each([undefined, '800'])('keeps saved free-channel identities and synchronize
 
 it('rejects malformed catalogs and accepts absent catalogs for older responses', () => {
   expect(parseSettings(settings).rpc_presets).toEqual([]);
-  expect(parseSettings({ ...settings, rpc_presets: rpcPresetFixture }).rpc_presets).toHaveLength(8);
+  expect(parseSettings({ ...settings, rpc_presets: rpcPresetFixture }).rpc_presets).toHaveLength(9);
   for (const rpc_presets of [null, {}, [{ ...rpcPresetFixture[0], source: 'javascript:alert(1)' }], [{ ...rpcPresetFixture[0], recommended: 'true' }], [rpcPresetFixture[0], rpcPresetFixture[0]]]) {
     expect(() => parseSettings({ ...settings, rpc_presets })).toThrow();
   }
@@ -658,6 +658,41 @@ it.each(nodePresets.filter(preset => preset.account))('configures $id with fresh
   expect(body.providers[0]).toMatchObject({ id: 10, preset_id: '', endpoint, keys: [{ id: null, api_key: preset.account!.credential === 'endpoint' ? null : 'new-provider-fixture', clear_api_key: false }] });
   expect(body.providers[0]).not.toHaveProperty('template_id');
   expect(body.providers[0]).not.toHaveProperty('replacementEndpoint');
+  expect(body.providers[0]).not.toHaveProperty('freeTier');
+});
+
+it('adds both free Tron defaults once, preserves a private channel and shows account quotas separately from trials', async () => {
+  const data = withProviders();
+  data.scanners[0].network = 'tron'; data.scanners[0].providers[0].network = 'tron';
+  mocked.mockResolvedValue({ ...data, rpc_presets: rpcPresetFixture });
+  const user = userEvent.setup(); show();
+  await screen.findByRole('combobox', { name: '配置网络' });
+  await choose(user, '配置网络', networkNames.tron);
+  await user.click(await screen.findByRole('button', { name: '编辑监听配置' }));
+  const catalog = screen.getByRole('region', { name: '服务商渠道目录' });
+  expect(within(catalog).getByText('其中 5 家提供免费访问。')).toBeInTheDocument();
+  for (const preset of nodePresets.filter(row => row.network === 'tron' && row.account?.freeTier)) {
+    await choose(user, '账号渠道模板', preset.label);
+    expect(within(catalog).getByRole('link', { name: '查看免费额度说明' })).toHaveAttribute('href', preset.account!.freeTier!.source);
+  }
+  await choose(user, '账号渠道模板', 'Tron · QuickNode（试用 / 付费）');
+  expect(within(catalog).queryByRole('link', { name: '查看免费额度说明' })).not.toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: '补充免费默认渠道' }));
+  expect(screen.getByRole('button', { name: '补充免费默认渠道' })).toBeDisabled();
+  expect(screen.getByLabelText('渠道 1 凭据 1 API Key')).toHaveValue('');
+  expect(screen.queryByLabelText('渠道 3 凭据 1 API Key')).not.toBeInTheDocument();
+  expect(screen.getByLabelText('渠道 3 请求间隔')).toHaveValue('1000');
+  await user.click(screen.getByRole('button', { name: '保存监听配置' }));
+  fireEvent.change(screen.getByRole('textbox', { name: '操作原因' }), { target: { value: '添加免费 Tron 备用' } });
+  mocked.mockRejectedValueOnce(new ApiError(409, 'CONFLICT', 'configuration conflict'));
+  await user.click(screen.getByRole('button', { name: '确认' }));
+  expect(await screen.findByText(/数据状态已变化/)).toBeInTheDocument();
+  const body = JSON.parse(String(mocked.mock.calls.find(([, init]) => init?.method === 'PUT')![1]?.body));
+  expect(body.providers).toHaveLength(3);
+  expect(body.providers[0]).toMatchObject({ id: 10, endpoint: null, keys: [{ id: 20, api_key: null, clear_api_key: false }] });
+  expect(body.providers[2]).toMatchObject({ id: null, preset_id: 'tron-publicnode', endpoint: null, priority: 2, request_interval_ms: 1000, keys: [{ id: null, api_key: null, request_interval_ms: 1000 }] });
+  expect(screen.getByLabelText('渠道 3 名称')).toHaveValue('PublicNode · Tron');
+  expect(screen.getByRole('textbox', { name: '操作原因' })).toHaveValue('添加免费 Tron 备用');
 });
 
 it('requires a replacement URL after selecting a dashboard template even when its selection is cleared', async () => {

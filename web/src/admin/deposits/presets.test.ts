@@ -33,9 +33,24 @@ it.each(['eth', 'base', 'tron', 'btc', 'solana'])('offers at least five distinct
 });
 
 it('counts TronGrid public and account access once and discloses Ethereum paid trace requirements', () => {
-  expect(providerChoiceCount('tron', rpcPresetFixture)).toBe(5);
+  expect(providerChoiceCount('tron', rpcPresetFixture)).toBe(6);
   expect(providerChoiceCount('tron', [])).toBe(5);
   for (const id of ['eth-chainstack', 'eth-alchemy']) expect(nodePresets.find(row => row.id === id)?.account?.plan).toBe('需付费权限');
   expect(nodePresets.find(row => row.id === 'tron-ankr')?.endpoint).toBe('https://rpc.ankr.com/premium-http/tron/{API_KEY}');
   expect(nodePresets.find(row => row.id === 'btc-ankr')?.endpoint).toBe('https://rpc.ankr.com/btc/{API_KEY}');
+});
+
+it('counts five documented free Tron providers without counting trials or duplicate public/account access', () => {
+  const freeAccounts = nodePresets.filter(row => row.network === 'tron' && row.account?.freeTier);
+  expect(freeAccounts.map(row => row.account!.provider).sort()).toEqual(['alchemy', 'ankr', 'chainstack', 'trongrid']);
+  expect(providerChoiceCount('tron', rpcPresetFixture, true)).toBe(5);
+  expect(providerChoiceCount('tron', [], true)).toBe(4);
+  expect(providerChoiceCount('tron', rpcPresetFixture.filter(row => row.id !== 'tron-trongrid-public'), true)).toBe(5);
+  expect(providerChoiceCount('tron', rpcPresetFixture.map(row => ({ ...row, recommended: row.id === 'tron-publicnode' ? false : row.recommended })), true)).toBe(4);
+  for (const preset of freeAccounts) {
+    expect(preset.account!.plan).toBe('免费账号');
+    expect(preset.account!.freeTier!.quota).not.toBe('');
+    expect(preset.account!.freeTier!.source).toMatch(/^https:\/\//);
+  }
+  expect(nodePresets.find(row => row.id === 'tron-quicknode')?.account?.freeTier).toBeUndefined();
 });
