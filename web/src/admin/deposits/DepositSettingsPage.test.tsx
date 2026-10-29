@@ -6,7 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ApiError, apiRequest } from '../../api/client';
 import { DepositSettingsPage } from './DepositSettingsPage';
 import { rpcPresetFixture } from '../../../tests/fixtures/rpcPresets';
-import { parseSettings } from './contracts';
+import { parseSettings, networkOptions } from './contracts';
 import { assetPresets, nodePresets } from './presets';
 
 vi.mock('../../api/client', async () => ({ ...await vi.importActual('../../api/client'), apiRequest: vi.fn() }));
@@ -187,7 +187,7 @@ it.each(assetPresets)('applies $id only to a draft and sends the selected mainne
   await waitFor(() => expect(mocked).toHaveBeenCalledWith('/admin/api/v1/wallet/deposit-settings/assets', { method: 'PUT', body: JSON.stringify({ network: preset.network, asset_symbol: preset.symbol, asset_kind: preset.kind, token_address: preset.token, decimals: preset.decimals, enabled: true, expected_revision: 0, reason: '使用已核对主网预设' }) }));
 });
 
-it.each(nodePresets.filter(preset => !preset.freeAccount))('fills $id without enabling admission or sending unresolved credentials', async (preset) => {
+it.each(nodePresets.filter(preset => (!preset.account || preset.legacy)))('fills $id without enabling admission or sending unresolved credentials', async (preset) => {
   const user = userEvent.setup();
   mocked.mockResolvedValue({ ...settings, scanners: [{ ...settings.scanners[0], network: preset.network, streams: preset.network === 'base' ? ['native', 'token'].map(stream => ({ ...settings.scanners[0], stream })) : [], enabled: false, endpoint_configured: false }] });
   show();
@@ -265,7 +265,7 @@ it('offers permission-aware setup shortcuts and explains unavailable payment met
 it('builds a credential URL from the dedicated provider key without putting it in the Bearer field', async () => {
   const user = userEvent.setup(); show();
   await user.click(await screen.findByRole('button', { name: '配置节点' }));
-  await choose(user, '主网节点预设', 'Ethereum · Alchemy（需密钥）');
+  await choose(user, '主网节点预设', 'Ethereum · Alchemy（需付费权限）');
   await user.type(screen.getByLabelText('服务商 API Key'), 'fixture/a?b');
   expect(screen.getByLabelText('监听节点地址')).toHaveValue('https://eth-mainnet.g.alchemy.com/v2/fixture%2Fa%3Fb');
   expect(screen.getByLabelText('节点 API 密钥')).toHaveValue('');
@@ -282,11 +282,11 @@ it('clears provider key when switching presets and cancels without any save', as
   await screen.findByRole('combobox', { name: '配置网络' });
   await choose(user, '配置网络', 'Solana');
   await user.click(screen.getByRole('button', { name: '配置节点' }));
-  await choose(user, '主网节点预设', 'Solana · Helius（需密钥）');
+  await choose(user, '主网节点预设', 'Solana · Helius（免费账号）');
   await user.type(screen.getByLabelText('服务商 API Key'), 'first-key');
   await choose(user, '主网节点预设', 'Solana · 公共主网（测试用）');
   expect(screen.queryByLabelText('服务商 API Key')).not.toBeInTheDocument();
-  await choose(user, '主网节点预设', 'Solana · Helius（需密钥）');
+  await choose(user, '主网节点预设', 'Solana · Helius（免费账号）');
   expect(screen.getByLabelText('服务商 API Key')).toHaveValue('');
   expect(screen.getByRole('button', { name: '保存监听配置' })).toBeDisabled();
   await user.click(screen.getByRole('button', { name: '取消编辑' }));
@@ -553,9 +553,9 @@ it('starts Ethereum with an unsaved account template and requires its own key', 
   expect(screen.getByLabelText('渠道 1 节点地址')).toHaveValue('https://mainnet.chainnodes.org/{API_KEY}');
   expect(screen.getByRole('button', { name: '保存监听配置' })).toBeDisabled();
   expect(screen.getByRole('button', { name: '添加所选账号渠道' })).toBeDisabled();
-  expect(screen.getByRole('link', { name: '申请免费账号 / 获取 Key' })).toHaveAttribute('href', 'https://app.chainnodes.org/');
+  expect(screen.getByRole('link', { name: '开通渠道 / 获取凭据' })).toHaveAttribute('href', 'https://app.chainnodes.org/');
   await choose(user, '账号渠道模板', 'Ethereum · SolidRPC（免费备用）');
-  expect(screen.getByRole('link', { name: '申请免费账号 / 获取 Key' })).toHaveAttribute('href', 'https://solidrpc.io/register');
+  expect(screen.getByRole('link', { name: '开通渠道 / 获取凭据' })).toHaveAttribute('href', 'https://solidrpc.io/register');
   await user.click(screen.getByRole('button', { name: '添加所选账号渠道' }));
   expect(screen.getByLabelText('渠道 2 节点地址')).toHaveValue('https://rpc.solidrpc.io/{API_KEY}/evm/1');
   await user.type(screen.getByLabelText('渠道 1 凭据 1 API Key'), 'chainnodes-fixture');
@@ -627,4 +627,52 @@ it('previews priority changes and preserves credentials when channel forms are c
   expect(body.providers[0]).toMatchObject({ id: 10, priority: 5, endpoint: null, keys: [{ id: 20, api_key: null }] });
   expect(body.providers[1]).toMatchObject({ id: 11, priority: 1, endpoint: null, keys: [{ id: 21, api_key: 'independent-fixture' }] });
   expect(screen.getByLabelText('渠道 2 凭据 1 API Key')).toHaveValue('independent-fixture');
+});
+
+
+it.each(nodePresets.filter(preset => preset.account))('configures $id with fresh credentials and the correct mainnet endpoint', async preset => {
+  const data = withProviders();
+  data.scanners[0].network = preset.network;
+  data.scanners[0].providers[0].network = preset.network;
+  mocked.mockResolvedValue({ ...data, rpc_presets: rpcPresetFixture, scanners: data.scanners.map(scanner => ({ ...scanner, streams: preset.network === 'base' ? ['native', 'token'].map(stream => ({ ...scanner, stream })) : [] })) });
+  const user = userEvent.setup(); show();
+  await screen.findByRole('combobox', { name: '配置网络' });
+  await choose(user, '配置网络', networkOptions.find(row => row.value === preset.network)!.label);
+  await user.click(await screen.findByRole('button', { name: '编辑监听配置' }));
+  await choose(user, '渠道 1 服务商模板', preset.label);
+  expect(screen.getByRole('button', { name: '保存监听配置' })).toBeDisabled();
+  expect(screen.getByLabelText('渠道 1 凭据 1 API Key')).toHaveValue('');
+  expect(screen.queryByRole('switch', { name: '清除渠道 1 凭据 1 密钥' })).not.toBeInTheDocument();
+  const endpoint = preset.account!.credential === 'endpoint' ? 'https://node.fixture.example/project-token' : preset.endpoint;
+  if (preset.account!.credential === 'endpoint') fireEvent.change(screen.getByLabelText('渠道 1 节点地址'), { target: { value: endpoint } });
+  else fireEvent.change(screen.getByLabelText('渠道 1 凭据 1 API Key'), { target: { value: 'new-provider-fixture' } });
+  expect(screen.getByRole('button', { name: '保存监听配置' })).toBeEnabled();
+  await user.click(screen.getByRole('button', { name: '保存监听配置' }));
+  fireEvent.change(screen.getByRole('textbox', { name: '操作原因' }), { target: { value: '配置独立备用服务商' } });
+  await user.click(screen.getByRole('button', { name: '确认' }));
+  await waitFor(() => expect(mocked.mock.calls.some(([, init]) => init?.method === 'PUT')).toBe(true));
+  const call = mocked.mock.calls.find(([, init]) => init?.method === 'PUT')!;
+  expect(call[0]).toBe(`/admin/api/v1/wallet/deposit-settings/scanners/${preset.network}`);
+  const body = JSON.parse(String(call[1]?.body));
+  expect(body).toMatchObject({ expected_revision: 7, endpoint: null, api_key: null });
+  expect(body.providers[0]).toMatchObject({ id: 10, preset_id: '', endpoint, keys: [{ id: null, api_key: preset.account!.credential === 'endpoint' ? null : 'new-provider-fixture', clear_api_key: false }] });
+  expect(body.providers[0]).not.toHaveProperty('template_id');
+  expect(body.providers[0]).not.toHaveProperty('replacementEndpoint');
+});
+
+it('requires a replacement URL after selecting a dashboard template even when its selection is cleared', async () => {
+  const user = userEvent.setup(); mocked.mockResolvedValue({ ...withProviders(), rpc_presets: rpcPresetFixture }); show();
+  await user.click(await screen.findByRole('button', { name: '编辑监听配置' }));
+  await choose(user, '渠道 1 服务商模板', 'Ethereum · Google Cloud（免费账号）');
+  expect(screen.getByRole('button', { name: '保存监听配置' })).toBeDisabled();
+  for (const marker of ['YOUR_API_KEY', '<API_KEY>', '%7BAPI_KEY%7D', '{api_key}']) {
+    fireEvent.change(screen.getByLabelText('渠道 1 节点地址'), { target: { value: `https://node.fixture.example/rpc?key=${marker}` } });
+    expect(screen.getByRole('button', { name: '保存监听配置' })).toBeDisabled();
+  }
+  fireEvent.change(screen.getByLabelText('渠道 1 节点地址'), { target: { value: 'https://node.fixture.example/project-key' } });
+  expect(screen.getByRole('button', { name: '保存监听配置' })).toBeEnabled();
+  fireEvent.change(screen.getByLabelText('渠道 1 节点地址'), { target: { value: '' } });
+  await choose(user, '渠道 1 服务商模板', '选择模板填入地址');
+  expect(screen.getByRole('button', { name: '保存监听配置' })).toBeDisabled();
+  expect(mocked.mock.calls.every(([, init]) => !init?.method)).toBe(true);
 });

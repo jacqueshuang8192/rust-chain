@@ -5,18 +5,18 @@ import { ConfirmAction } from '../../shared/ConfirmAction';
 import { AdminPasswordInput, AdminSelect, AdminTextInput } from '../../shared/SemiFormControls';
 import { parseSafeInteger } from '../../shared/integer';
 import { base, type RpcPreset, type Scanner } from './contracts';
-import { nodePresets, type NodePreset } from './presets';
+import { hasCredentialPlaceholder, nodePresets, providerChoiceCount, type NodePreset } from './presets';
 
 type KeyDraft = { uid: string; id: number | null; name: string; enabled: boolean; priority: string; api_key: string; configured: boolean; clear_api_key: boolean; interval: string };
-type ProviderDraft = { preset_id: string; template_id?: string; uid: string; id: number | null; name: string; enabled: boolean; priority: string; endpoint: string; interval: string; keys: KeyDraft[] };
+type ProviderDraft = { preset_id: string; template_id?: string; replacementEndpoint?: boolean; requiredCredential?: boolean; uid: string; id: number | null; name: string; enabled: boolean; priority: string; endpoint: string; interval: string; keys: KeyDraft[] };
 const newKey = (priority = 0): KeyDraft => ({ uid: crypto.randomUUID(), id: null, name: `凭据 ${priority + 1}`, enabled: true, priority: String(priority), api_key: '', configured: false, clear_api_key: false, interval: '250' });
 const newProvider = (priority: number): ProviderDraft => ({ preset_id: '', uid: crypto.randomUUID(), id: null, name: `渠道 ${priority + 1}`, enabled: true, priority: String(priority), endpoint: '', interval: '250', keys: [newKey()] });
 function fromPreset(preset: RpcPreset, priority: number): ProviderDraft {
   return { ...newProvider(priority), preset_id: preset.id, name: preset.name, interval: String(preset.request_interval_ms), keys: [{ ...newKey(), name: '免密钥访问', interval: String(preset.request_interval_ms) }] };
 }
 function fromTemplate(template: NodePreset, priority: number): ProviderDraft {
-  const interval = String(template.freeAccount?.interval ?? 500);
-  return { ...newProvider(priority), template_id: template.id, name: template.freeAccount?.name ?? template.label, endpoint: template.endpoint, interval, keys: [{ ...newKey(), interval }] };
+  const interval = String(template.account?.interval ?? 500);
+  return { ...newProvider(priority), template_id: template.id, replacementEndpoint: true, requiredCredential: template.account?.credential === 'tron-header', name: template.account?.name ?? template.label, endpoint: template.endpoint, interval, keys: [{ ...newKey(), interval }] };
 }
 function payload(rows: ProviderDraft[], presets: RpcPreset[]) {
   if (!rows.length || rows.length > 10) throw new Error('请配置 1 至 10 个渠道');
@@ -24,8 +24,9 @@ function payload(rows: ProviderDraft[], presets: RpcPreset[]) {
     const priority = parseSafeInteger(row.priority, 0, 1000); const interval = parseSafeInteger(row.interval, 100, 2000);
     if (!row.name.trim() || row.name.trim().length > 80 || priority === null || interval === null) throw new Error('请填写渠道名称、0 至 1000 的优先级及 100 至 2000 毫秒请求间隔');
     if (row.preset_id && !presets.some(preset => preset.id === row.preset_id)) throw new Error('所选免费渠道已不在目录中，请重新选择');
-    if (!row.preset_id && !row.id && !row.endpoint.trim()) throw new Error(`${row.name} 需要节点地址`);
+    if (!row.preset_id && (!row.id || row.replacementEndpoint) && !row.endpoint.trim()) throw new Error(`${row.name} 需要节点地址`);
     if (row.endpoint.trim()) {
+      if (hasCredentialPlaceholder(row.endpoint.replaceAll('{API_KEY}', 'credential'))) throw new Error(`${row.name} 含未填写的密钥占位符，请填写真实节点地址或使用 {API_KEY} 与独立凭据`);
       let url: URL;
       try { url = new URL(row.endpoint.trim().replace('{API_KEY}', 'credential')); } catch { throw new Error(`${row.name} 的节点地址无效`); }
       if (!['http:', 'https:'].includes(url.protocol) || url.hash || row.endpoint.length > 2000) throw new Error(`${row.name} 需要有效 HTTP 或 HTTPS 地址`);
@@ -34,7 +35,7 @@ function payload(rows: ProviderDraft[], presets: RpcPreset[]) {
     return { id: row.id, preset_id: row.preset_id, name: row.name.trim(), enabled: row.enabled, priority, endpoint: row.preset_id ? null : row.endpoint.trim() || null, request_interval_ms: interval, keys: row.keys.map(key => {
       const priority = parseSafeInteger(key.priority, 0, 1000); const interval = parseSafeInteger(key.interval, 100, 2000);
       if (!key.name.trim() || key.name.trim().length > 80 || priority === null || interval === null || key.api_key.length > 1024 || /[\r\n]/.test(key.api_key)) throw new Error(`${row.name} 的凭据名称、优先级、间隔或密钥格式无效`);
-      if (key.enabled && row.endpoint.includes('{API_KEY}') && (!key.api_key.trim() && (!key.configured || key.clear_api_key))) throw new Error(`${row.name} 的 URL 模板需要 API Key`);
+      if (key.enabled && (row.requiredCredential || row.endpoint.includes('{API_KEY}')) && (!key.api_key.trim() && (!key.configured || key.clear_api_key))) throw new Error(`${row.name}${row.requiredCredential ? ' 需要 API Key' : ' 的 URL 模板需要 API Key'}`);
       return { id: key.id, name: key.name.trim(), enabled: key.enabled, priority, api_key: key.api_key.trim() || null, clear_api_key: key.clear_api_key, request_interval_ms: interval };
     }) };
   });
@@ -43,7 +44,7 @@ function payload(rows: ProviderDraft[], presets: RpcPreset[]) {
 type Props = { scanner: Scanner; presets?: RpcPreset[]; dirty: () => void; busy: boolean; setBusy: (busy: boolean) => void; saved: () => Promise<void> };
 export function MultiScannerForm({ scanner, presets: catalog = [], dirty, busy, setBusy, saved }: Props) {
   const presets = catalog.filter(preset => preset.network === scanner.network);
-  const accountTemplates = nodePresets.filter(preset => preset.network === scanner.network && preset.freeAccount);
+  const accountTemplates = nodePresets.filter(preset => preset.network === scanner.network && preset.account);
   const [accountTemplateId, setAccountTemplateId] = useState(accountTemplates[0]?.id ?? '');
   const accountTemplate = accountTemplates.find(preset => preset.id === accountTemplateId);
   const [enabled, setEnabled] = useState(scanner.enabled);
@@ -64,7 +65,7 @@ export function MultiScannerForm({ scanner, presets: catalog = [], dirty, busy, 
     const preset = presets.find(preset => preset.id === id);
     if (preset) {
       const key = row.keys[0] ?? newKey();
-      update(row.uid, { preset_id: id, template_id: '', name: preset.name, endpoint: '', interval: String(preset.request_interval_ms), keys: [{ ...key, name: '免密钥访问', enabled: true, priority: '0', api_key: '', clear_api_key: key.configured, interval: String(preset.request_interval_ms) }] });
+      update(row.uid, { preset_id: id, template_id: '', replacementEndpoint: false, requiredCredential: false, name: preset.name, endpoint: '', interval: String(preset.request_interval_ms), keys: [{ ...key, name: '免密钥访问', enabled: true, priority: '0', api_key: '', clear_api_key: key.configured, interval: String(preset.request_interval_ms) }] });
     } else {
       update(row.uid, { preset_id: '', endpoint: presets.find(preset => preset.id === row.preset_id)?.endpoint ?? row.endpoint });
     }
@@ -73,12 +74,12 @@ export function MultiScannerForm({ scanner, presets: catalog = [], dirty, busy, 
     <label className="deposit-switch-row">接受新充值订单<Switch aria-label="接受新充值订单" disabled={busy} checked={enabled} onChange={value => { dirty(); setEnabled(value); }} /></label>
     <label>确认数 / finalized slot 深度<AdminTextInput ariaLabel="充值确认数" disabled={busy} value={confirmations} onChange={value => { dirty(); setConfirmations(value); }} /></label>
     <Banner type="info" description="按优先级切换独立渠道，再轮转同渠道的其他 Key。限流后保留冷却；同账户多个 Key 共用额度。" />
-    {accountTemplate ? <section className="deposit-preset" aria-label="免费账号渠道">
-      <strong>免费账号渠道 · 需申请 API Key</strong>
-      <p>Ethereum 内部转账监听需要区块 trace 权限。选择下面的账号模板后填写自己的 Key，已有渠道继续保留。免费额度不代表无限使用，需等完整扫描成功。</p>
+    {accountTemplate ? <section className="deposit-preset" aria-label="服务商渠道目录">
+      <strong>服务商渠道 · {providerChoiceCount(scanner.network, presets)} 家可选</strong>
+      <p>每个网络提供至少 5 家服务商选择。选择模板、填写该服务商的凭据并保存后，才会加入主备监听；模板数量不代表已配置或当前可用数量。各服务商独立配置，多个 Key 不重复计数。</p>
       <label id="account-rpc-template">账号渠道模板</label><AdminSelect motion={false} ariaLabel="账号渠道模板" ariaLabelledBy="account-rpc-template" disabled={busy} value={accountTemplateId} optionList={accountTemplates.map(template => ({ value: template.id, label: template.label }))} onChange={setAccountTemplateId} />
-      <p>{accountTemplate.note}</p>
-      <p><a href={accountTemplate.freeAccount?.signup} target="_blank" rel="noopener noreferrer">申请免费账号 / 获取 Key</a> · <a href={accountTemplate.source} target="_blank" rel="noopener noreferrer">查看账号渠道说明</a></p>
+      <p><Tag>{accountTemplate.account?.plan}</Tag> {accountTemplate.note}</p><p>{accountTemplate.account?.setup}</p>
+      <p><a href={accountTemplate.account?.signup} target="_blank" rel="noopener noreferrer">开通渠道 / 获取凭据</a> · <a href={accountTemplate.source} target="_blank" rel="noopener noreferrer">查看账号渠道说明</a></p>
       <Button disabled={busy || rows.length >= 10 || rows.some(row => row.template_id === accountTemplate.id)} onClick={() => append([fromTemplate(accountTemplate, nextPriority)])}>添加所选账号渠道</Button>
     </section> : null}
     {presets.length ? <div className="deposit-preset">
@@ -109,11 +110,11 @@ export function MultiScannerForm({ scanner, presets: catalog = [], dirty, busy, 
       </div> : <>
         <label id={`preset-${row.uid}-custom`}>渠道 {index + 1} 服务商模板</label><AdminSelect motion={false} ariaLabel={`渠道 ${index + 1} 服务商模板`} ariaLabelledBy={`preset-${row.uid}-custom`} disabled={busy} value={row.template_id ?? ''} optionList={[{ value: '', label: '选择模板填入地址' }, ...nodePresets.filter(preset => preset.network === scanner.network).map(preset => ({ value: preset.id, label: preset.label }))]} onChange={value => {
           const template = nodePresets.find(preset => preset.id === value && preset.network === scanner.network);
-          if (template && value !== row.template_id) { const next = fromTemplate(template, parseSafeInteger(row.priority, 0, 1000) ?? 0); update(row.uid, { template_id: next.template_id, endpoint: next.endpoint, name: next.name, interval: next.interval, keys: next.keys }); }
+          if (template && value !== row.template_id) { const next = fromTemplate(template, parseSafeInteger(row.priority, 0, 1000) ?? 0); update(row.uid, { template_id: next.template_id, replacementEndpoint: true, requiredCredential: next.requiredCredential, endpoint: next.endpoint, name: next.name, interval: next.interval, keys: next.keys }); }
           else if (!value) update(row.uid, { template_id: '' });
         }} />
-        {row.template_id ? <><p>{nodePresets.find(preset => preset.id === row.template_id)?.note}</p><p>已为所选模板创建空白凭据。请填写该服务商的 Key；确认保存后替换本渠道原有凭据。</p></> : null}
-        <label>节点基础地址<AdminPasswordInput ariaLabel={`渠道 ${index + 1} 节点地址`} value={row.endpoint} placeholder={row.id ? '已配置；留空保留原值' : 'https://'} onChange={endpoint => update(row.uid, { endpoint, template_id: '' })} /></label>
+        {row.template_id ? <><p>{nodePresets.find(preset => preset.id === row.template_id)?.note}</p><p>{nodePresets.find(preset => preset.id === row.template_id)?.account?.setup}</p><p>更换模板后须填写该服务商的地址或凭据，确认保存后替换本渠道原有配置。</p></> : null}
+        <label>节点基础地址<AdminPasswordInput ariaLabel={`渠道 ${index + 1} 节点地址`} value={row.endpoint} placeholder={row.id && !row.replacementEndpoint ? '已配置；留空保留原值' : '填写完整 HTTPS 节点地址'} onChange={endpoint => update(row.uid, { endpoint })} /></label>
         <p className="muted">URL 鉴权可在路径或查询中使用 {'{API_KEY}'}，系统将填入当前凭据并编码。TronGrid 使用基础地址和下方 Key 请求头，无需占位符。</p>
       </>}
       <div className="deposit-provider-fields"><label>优先级（小数值优先）<AdminTextInput ariaLabel={`渠道 ${index + 1} 优先级`} value={row.priority} onChange={priority => update(row.uid, { priority })} /></label><label>渠道请求间隔（毫秒）<AdminTextInput ariaLabel={`渠道 ${index + 1} 请求间隔`} value={row.interval} onChange={interval => update(row.uid, { interval, ...(row.preset_id ? { keys: row.keys.map(key => ({ ...key, interval })) } : {}) })} /></label></div>
@@ -129,7 +130,7 @@ export function MultiScannerForm({ scanner, presets: catalog = [], dirty, busy, 
     </fieldset></Collapse.Panel>)}
     </Collapse>
     <Button disabled={busy || rows.length >= 10} onClick={() => append([newProvider(nextPriority)])}>添加备用渠道</Button>
-    <p>免密钥公共渠道无需 Key；免费账号模板需自有 Key。原有渠道输入框留空保留已有密钥，切换服务商模板需重新填写。移除和启停在确认保存后生效。原扫描进度不变，所有渠道不可用时停止新订单准入，恢复后继续补扫。</p>
+    <p>免密钥公共渠道无需 Key；账号渠道按模板填写自有 Key 或完整节点地址；试用和付费渠道不会自动开通。原有渠道输入框留空保留已有密钥，切换服务商模板需重新填写。移除和启停在确认保存后生效。原扫描进度不变，所有渠道不可用时停止新订单准入，恢复后继续补扫。</p>
     {error ? <Banner type="warning" description={error} /> : null}
     <ConfirmAction modalWidth="min(448px, calc(100vw - 32px))" actionText="保存监听配置" title="保存主备渠道与凭据" description={`将保存 ${rows.length} 个渠道、${rows.reduce((sum, row) => sum + row.keys.length, 0)} 个凭据槽及网络接单设置。被移除的配置不再参与监听，原扫描进度保留。`} disabled={busy || Boolean(error)} onConfirm={async reason => {
       if (error || count === null) throw new Error(error || '确认数无效');

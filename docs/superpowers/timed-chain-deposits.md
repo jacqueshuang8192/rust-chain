@@ -248,3 +248,27 @@ ETH 和 SOL 为原生币，无合约或 mint。收款地址仍需自行添加，
 编辑时可预览主备顺序、展开/收起单个或全部渠道；新增渠道会自动展开，折叠不丢失已填 Key。保存仍需原因，冲突保留草稿。新版 API 增加分流状态字段，旧版 API 缺少该字段时显示“分流状态待更新”，请同版更新 API、worker 和后台。本次优化没有新增迁移。Bitcoin、Solana 的游标校验使用精简区块响应，真实充值扫描仍要求完整交易证据。
 
 建议根据实际账户额度设置间隔并配置独立备用服务商；本功能不创建或购买第三方账号。节点真实权限、额度、持续补扫和实链到账仍需环境验收。
+
+
+## 每个网络至少五家服务商的接入入口（2026-10-29）
+
+新版「编辑监听配置 → 服务商渠道」提供下列主网选择，继续按既有主备规则轮转。**五家可选服务商不等于已经配置五个可用渠道**：免密钥项可用原默认入口追加；账号项须点击官方控制台链接、申请对应权限，再填自己的 Key 或完整节点地址。试用、付费和账号套餐限制逐项标注，不会自动开通、购买、保存或开启接单。
+
+| 网络 | 五家服务商 |
+| --- | --- |
+| Ethereum | Chainnodes、SolidRPC、Google Cloud、Alchemy、Chainstack |
+| Base | PublicNode、dRPC、Chainnodes、Alchemy、Chainstack |
+| Tron | TronGrid、Ankr、Alchemy、Chainstack、QuickNode |
+| Bitcoin | PublicNode、GetBlock、Ankr、Chainstack、dRPC |
+| Solana | PublicNode、Helius、Ankr、Chainstack、QuickNode |
+
+Ethereum 的 Alchemy、Chainstack 需要付费 trace 权限，QuickNode 标记为试用 / 付费；其他条目的额度和方法权限以所选账号套餐为准。免费账号不保证持续追块。TronGrid 的免密钥和账号版本只算一家服务商，同账号多个 Key 也不会增加服务商数量或账号总额度。Base 官方、Solana 官方测试节点以及旧 Ethereum 匿名 dRPC 继续保留，但不计入上述五家推荐配置选择。
+
+- URL 模板型：在独立 Key 框填服务商 RPC Key，保留地址中的 `{API_KEY}`，由服务端编码代入。
+- TronGrid：基础地址使用 `https://api.trongrid.io`，Key 通过既有 `TRON-PRO-API-KEY` 请求头发送。账号模板空 Key 禁止保存。
+- 完整地址型：Google Cloud、Chainstack、QuickNode、GetBlock 和 Bitcoin dRPC 从控制台复制该主网含访问令牌的 HTTPS 地址到掩码输入框，额外 API Key 留空；不要使用平台管理凭据。
+- Tron 必须使用原生 HTTP / Wallet API 基础地址，系统追加 `/wallet/...`，不能填 JSON-RPC-only 或已经带具体方法的 URL。Bitcoin 必须使用 Core JSON-RPC，不能填 Blockbook / 浏览器 REST。
+
+更换已有渠道的模板后会重建空白凭据，且必须填写新节点地址；不会因为留空而把原服务商地址错误保留下来。未更换模板的原配置仍支持留空保留，已有冷却、游标和账务规则不变。本次仅更新后台模板与校验，没有迁移和扫描器改动。
+
+新增账号条目按官方方法文档核对，没有使用管理员真实 Key 实测或执行实链付款。公开 dRPC Bitcoin/Tron 探测返回 403，因此没有增加新的免密钥默认项；账号访问权限与持续吞吐仍须保存后观察完整扫描状态。

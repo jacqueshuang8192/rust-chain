@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
-import { assetPresets, hasCredentialPlaceholder } from './presets';
+import { assetPresets, hasCredentialPlaceholder, nodePresets, providerChoiceCount } from './presets';
+import { rpcPresetFixture } from '../../../tests/fixtures/rpcPresets';
 
 it('pins issuer mainnet stablecoin identities instead of bridged or testnet variants', () => {
   expect(assetPresets.filter(row => row.kind === 'token').map(row => [row.network, row.symbol, row.token, row.decimals])).toEqual([
@@ -15,4 +16,26 @@ it('pins issuer mainnet stablecoin identities instead of bridged or testnet vari
 it.each(['{API_KEY}', 'YOUR_API_KEY', '<API_KEY>', '%7BAPI_KEY%7D'])('blocks unresolved credential marker %s', (marker) => {
   expect(hasCredentialPlaceholder(`https://node.invalid/?key=${marker}`)).toBe(true);
   expect(hasCredentialPlaceholder('https://node.invalid/?key=local-fixture')).toBe(false);
+});
+
+
+it.each(['eth', 'base', 'tron', 'btc', 'solana'])('offers at least five distinct provider choices for %s without counting testing-only public nodes', network => {
+  expect(providerChoiceCount(network, rpcPresetFixture)).toBeGreaterThanOrEqual(5);
+  const accounts = nodePresets.filter(row => row.network === network && row.account);
+  expect(new Set(accounts.map(row => row.account!.provider)).size).toBe(accounts.length);
+  for (const row of accounts) {
+    expect(row.account!.signup).toMatch(/^https:\/\//);
+    expect(row.source).toMatch(/^https:\/\//);
+    expect(row.account!.setup).not.toBe('');
+    if (row.account!.credential === 'endpoint') expect(row.endpoint).toBe('');
+    if (row.account!.credential === 'url-key') expect(row.endpoint).toContain('{API_KEY}');
+  }
+});
+
+it('counts TronGrid public and account access once and discloses Ethereum paid trace requirements', () => {
+  expect(providerChoiceCount('tron', rpcPresetFixture)).toBe(5);
+  expect(providerChoiceCount('tron', [])).toBe(5);
+  for (const id of ['eth-chainstack', 'eth-alchemy']) expect(nodePresets.find(row => row.id === id)?.account?.plan).toBe('需付费权限');
+  expect(nodePresets.find(row => row.id === 'tron-ankr')?.endpoint).toBe('https://rpc.ankr.com/premium-http/tron/{API_KEY}');
+  expect(nodePresets.find(row => row.id === 'btc-ankr')?.endpoint).toBe('https://rpc.ankr.com/btc/{API_KEY}');
 });

@@ -1,0 +1,14 @@
+[
+  {
+    "network": "btc",
+    "endpoint": "https://bitcoin.drpc.org",
+    "method": "getblockchaininfo",
+    "error": "HTTPError: HTTP Error 403: Forbidden"
+  },
+  {
+    "network": "tron",
+    "endpoint": "https://tron.drpc.org/wallet/getblockbynum",
+    "method": "/wallet/getblockbynum",
+    "error": "HTTPError: HTTP Error 403: Forbidden"
+  }
+]
